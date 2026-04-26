@@ -4,13 +4,24 @@ function getNodeEnv() {
 
 function getJwtSecret() {
   const ***REMOVED*** = String(process.env.JWT_SECRET || '').trim();
-  const isProduction = getNodeEnv() === 'production';
 
-  if (!***REMOVED*** && isProduction) {
-    throw new Error('JWT_SECRET must be configured in production.');
+  if (!***REMOVED***) {
+    if (getNodeEnv() === 'production') {
+      throw new Error('JWT_SECRET must be configured in production.');
+    }
+    // Warn loudly in non-production so developers notice
+    console.warn(
+      '[auth] WARNING: JWT_SECRET is not set. Using an insecure fallback. ' +
+      'Set JWT_SECRET before deploying to production.'
+    );
+    return '***REMOVED***';
   }
 
-  return ***REMOVED*** || '***REMOVED***';
+  if (***REMOVED***.length < 32) {
+    console.warn('[auth] WARNING: JWT_SECRET is shorter than 32 characters. Use a longer ***REMOVED***.');
+  }
+
+  return ***REMOVED***;
 }
 
 module.exports = {
