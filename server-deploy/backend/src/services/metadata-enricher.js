@@ -4,6 +4,13 @@ const NOISE_PATTERNS = [
   /\b(480p|720p|1080p|2160p|4k)\b/gi,
   /\b(web[- ]?dl|webrip|bluray|brrip|hdrip|dvdrip|x264|x265|h\.?264|h\.?265|hevc)\b/gi,
   /\b(dual audio|multi audio|english|hindi|bangla|bengali|japanese|korean|french|spanish|dubbed|subbed)\b/gi,
+  /\b(complete|full)\s+(series|season)\b/gi,
+  /\bseason\s*\d{1,2}\b/gi,
+  /\bs\d{1,2}\s*[-_. ]*e\d{1,3}\b/gi,
+  /\bs\d{1,2}\b/gi,
+  /\be\d{1,3}\b/gi,
+  /\b\d{1,2}x\d{1,3}\b/gi,
+  /\bepisode\s*\d{1,3}\b/gi,
   /\b(normalizing|pre-normalize)\b/gi,
   /\[[^\]]+\]/g,
   /\{[^}]+\}/g,
@@ -11,6 +18,10 @@ const NOISE_PATTERNS = [
 
 function hasTmdbKey() {
   return Boolean(process.env.TMDB_API_KEY);
+}
+
+function hasOmdbKey() {
+  return Boolean(process.env.OMDB_API_KEY);
 }
 
 function cleanSearchTitle(value) {
@@ -27,6 +38,8 @@ function cleanSearchTitle(value) {
 
   return normalized
     .replace(/\((19|20)\d{2}\)/g, ' ')
+    .replace(/\b(19|20)\d{2}\b/g, ' ')
+    .replace(/\s*[-:]+\s*/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -154,6 +167,47 @@ async function fetchTvSeasons(tmdbId, seasonCount) {
   return seasons;
 }
 
+async function fetchMetadataFromOmdb(imdbId) {
+  const url = new URL('http://www.omdbapi.com/');
+  url.searchParams.set('i', imdbId);
+  url.searchParams.set('apikey', process.env.OMDB_API_KEY);
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`OMDB request failed with status ${response.status}`);
+  }
+
+  const data = await response.json();
+  if (data.Response === 'False') {
+    throw new Error(`OMDB error: ${data.Error}`);
+  }
+
+  const isSeries = data.Type === 'series';
+  return {
+    type: isSeries ? 'series' : 'movie',
+    title: data.Title || '',
+    description: data.Plot !== 'N/A' ? data.Plot : '',
+    year: parseInt(data.Year, 10) || null,
+    genre: data.Genre !== 'N/A' ? data.Genre : '',
+    genres: data.Genre !== 'N/A' ? data.Genre.split(',').map((g) => g.trim()) : [],
+    poster: data.Poster !== 'N/A' ? data.Poster : '',
+    backdrop: data.Poster !== 'N/A' ? data.Poster : '',
+    tmdbId: null,
+    imdbId: data.imdbID || imdbId,
+    originalTitle: data.Title || '',
+    originalLanguage: data.Language && data.Language !== 'N/A' ? data.Language.split(',')[0].trim() : 'en',
+    rating: data.imdbRating !== 'N/A' ? parseFloat(data.imdbRating) : null,
+    runtime: data.Runtime && data.Runtime !== 'N/A' ? parseInt(data.Runtime, 10) : null,
+    seasons: [], // OMDB doesn't provide rich episode lists in the base call
+    metadataStatus: 'matched',
+    metadataProvider: 'omdb',
+    metadataConfidence: 100,
+    metadataUpdatedAt: new Date().toISOString(),
+    metadataError: '',
+    parsedTitle: cleanSearchTitle(data.Title),
+  };
+}
+
 async function fetchMetadataByTmdbId(tmdbId, mediaType = 'movie') {
   if (!hasTmdbKey()) {
     throw new Error('TMDB_API_KEY is not configured.');
@@ -192,6 +246,44 @@ async function fetchMetadataByTmdbId(tmdbId, mediaType = 'movie') {
 
 async function enrichItemWithMetadata(item) {
   const parsedTitle = cleanSearchTitle(item.title);
+
+  // If OMDB key is available and IMDb ID is provided, try OMDB first for items not found on TMDb
+  if (item.imdbId && hasOmdbKey()) {
+    try {
+      const omdbData = await fetchMetadataFromOmdb(item.imdbId);
+      return {
+        ...item,
+        description: item.description || omdbData.description,
+        poster: item.poster || omdbData.poster,
+        backdrop: item.backdrop || omdbData.backdrop,
+        genre: item.genre || omdbData.genre,
+        genres: Array.isArray(item.genres) && item.genres.length ? item.genres : omdbData.genres,
+        rating: item.rating || omdbData.rating,
+        runtime: item.runtime || omdbData.runtime,
+        imdbId: omdbData.imdbId,
+        originalTitle: omdbData.originalTitle,
+        originalLanguage: omdbData.originalLanguage,
+        metadataStatus: 'matched',
+        metadataProvider: 'omdb',
+        metadataConfidence: 100,
+        metadataUpdatedAt: new Date().toISOString(),
+        metadataError: '',
+        parsedTitle,
+      };
+    } catch (omdbError) {
+      if (!hasTmdbKey()) {
+        return {
+          ...item,
+          metadataStatus: 'failed',
+          metadataProvider: 'omdb',
+          metadataConfidence: 0,
+          metadataUpdatedAt: new Date().toISOString(),
+          metadataError: omdbError.message || 'OMDB enrichment failed.',
+          parsedTitle,
+        };
+      }
+    }
+  }
 
   if (!hasTmdbKey()) {
     return {
@@ -320,5 +412,7 @@ module.exports = {
   cleanSearchTitle,
   enrichItemWithMetadata,
   fetchMetadataByTmdbId,
+  fetchMetadataFromOmdb,
   hasTmdbKey,
+  hasOmdbKey,
 };

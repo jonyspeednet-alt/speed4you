@@ -8,6 +8,7 @@ const {
   removeWatchlistEntry,
 } = require('../data/store');
 const { resolveUserId, requireStateUser } = require('../middleware/resolve-user-id');
+const { AppError } = require('../utils/error');
 
 function getUserId(req) {
   return req.stateUserId || resolveUserId(req);
@@ -43,7 +44,7 @@ router.get('/check', requireStateUser, async (req, res, next) => {
     const contentId = Number(req.query.contentId);
 
     if (!contentType || !Number.isFinite(contentId) || contentId <= 0) {
-      return res.status(400).json({ error: 'Valid contentType and contentId required' });
+      throw new AppError('Valid contentType and contentId required', 400, 'BAD_REQUEST');
     }
 
     const entries = await getWatchlistEntries(userId);
@@ -67,17 +68,17 @@ router.post('/', requireStateUser, async (req, res, next) => {
     const { contentType, contentId } = req.body;
 
     if (!contentType || !contentId) {
-      return res.status(400).json({ error: 'contentType and contentId required' });
+      throw new AppError('contentType and contentId required', 400, 'BAD_REQUEST');
     }
 
     const item = await getItemById(contentId);
     if (!item) {
-      return res.status(404).json({ error: 'Content not found' });
+      throw new AppError('Content not found', 404, 'NOT_FOUND');
     }
 
     const created = await addWatchlistEntry(userId, contentType, contentId);
     if (!created) {
-      return res.status(409).json({ error: 'Already in watchlist' });
+      throw new AppError('Already in watchlist', 409, 'CONFLICT');
     }
 
     res.status(201).json({ success: true });
@@ -91,7 +92,7 @@ router.delete('/:id', requireStateUser, async (req, res, next) => {
     const userId = getUserId(req);
     const removed = await removeWatchlistEntry(userId, req.params.id);
     if (!removed) {
-      return res.status(404).json({ error: 'Item not found' });
+      throw new AppError('Item not found', 404, 'NOT_FOUND');
     }
     res.json({ success: true });
   } catch (error) {

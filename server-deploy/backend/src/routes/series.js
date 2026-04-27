@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getItemById, listItems } = require('../data/store');
 const { Joi, validateQuery } = require('../middleware/validate');
+const { AppError } = require('../utils/error');
 
 const seriesQuerySchema = Joi.object({
   genre: Joi.string().trim().min(1).max(80),
@@ -41,7 +42,7 @@ router.get('/:id', async (req, res, next) => {
   try {
     const show = await getItemById(req.params.id);
     if (!show || show.type !== 'series') {
-      return res.status(404).json({ error: 'Series not found' });
+      throw new AppError('Series not found', 404, 'NOT_FOUND');
     }
     res.json(show);
   } catch (error) {
@@ -53,7 +54,7 @@ router.get('/:id/seasons', async (req, res, next) => {
   try {
     const show = await getItemById(req.params.id);
     if (!show || show.type !== 'series') {
-      return res.status(404).json({ error: 'Series not found' });
+      throw new AppError('Series not found', 404, 'NOT_FOUND');
     }
     res.json({
       seasons: (show.seasons || []).map((season) => ({
@@ -72,11 +73,11 @@ router.get('/:id/seasons/:seasonId/episodes', async (req, res, next) => {
   try {
     const show = await getItemById(req.params.id);
     if (!show || show.type !== 'series') {
-      return res.status(404).json({ error: 'Series not found' });
+      throw new AppError('Series not found', 404, 'NOT_FOUND');
     }
     const season = (show.seasons || []).find((item) => String(item.id) === req.params.seasonId || String(item.number) === req.params.seasonId);
     if (!season) {
-      return res.status(404).json({ error: 'Season not found' });
+      throw new AppError('Season not found', 404, 'NOT_FOUND');
     }
     res.json({ episodes: season.episodes || [] });
   } catch (error) {

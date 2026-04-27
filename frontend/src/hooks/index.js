@@ -31,17 +31,13 @@ export function useBreakpoint() {
   const rafRef = useRef(null);
 
   useEffect(() => {
-    // Use ResizeObserver on the document element for better accuracy
-    // Fall back to window resize event
     const handleResize = () => {
-      // Debounce via requestAnimationFrame to avoid excessive re-renders
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(() => {
         setWidth(window.innerWidth);
       });
     };
 
-    // ResizeObserver is more accurate than window resize for viewport changes
     let observer;
     if (typeof ResizeObserver !== 'undefined') {
       observer = new ResizeObserver(handleResize);
@@ -50,7 +46,6 @@ export function useBreakpoint() {
       window.addEventListener('resize', handleResize, { passive: true });
     }
 
-    // Also listen for orientation change (important on mobile)
     window.addEventListener('orientationchange', handleResize, { passive: true });
 
     return () => {
@@ -74,7 +69,6 @@ export function useBreakpoint() {
     isDesktop: breakpoint === 'desktop',
     isSmallMobile: width < BREAKPOINTS.SMALL_MOBILE,
     isLargeDesktop: width >= BREAKPOINTS.LARGE_DESKTOP,
-    // Convenience: touch-first devices
     isTouchDevice: breakpoint === 'mobile' || breakpoint === 'tablet',
   };
 }
@@ -201,7 +195,6 @@ export function useContentFilters() {
   return { filters, updateFilter, resetFilters };
 }
 
-// Track recently viewed content (last 12 items, no duplicates)
 export function useRecentlyViewed() {
   const [items, setItems] = useLocalStorage('isp-recently-viewed', []);
 
@@ -217,3 +210,5 @@ export function useRecentlyViewed() {
 
   return { items: items || [], addItem, clearAll };
 }
+
+export { useTVMode } from './useTVMode';

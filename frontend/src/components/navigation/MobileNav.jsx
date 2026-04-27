@@ -73,7 +73,6 @@ const navItems = [
 
 function MobileNav() {
   const [isOpen, setIsOpen] = useState(false);
-  const [searchText, setSearchText] = useState('');
   const [dragStartY, setDragStartY] = useState(null);
   const [dragDelta, setDragDelta] = useState(0);
   const location = useLocation();
@@ -81,7 +80,6 @@ function MobileNav() {
   const { isSmallMobile } = useBreakpoint();
   const menuRef = useRef(null);
   const firstFocusableRef = useRef(null);
-  const searchInputRef = useRef(null);
   const primaryItems = navItems.slice(0, 4);
   const secondaryItems = navItems.slice(4);
 
@@ -93,9 +91,6 @@ function MobileNav() {
 
     const menu = menuRef.current;
     if (!menu) return;
-
-    // Focus search input when drawer opens
-    setTimeout(() => searchInputRef.current?.focus(), 80);
 
     function handleKeyDown(e) {
       if (e.key === 'Escape') {
@@ -153,12 +148,11 @@ function MobileNav() {
     setDragDelta(0);
   }
 
-  function handleSearch(e) {
-    e.preventDefault();
-    if (!searchText.trim()) return;
-    navigate(`/browse?q=${encodeURIComponent(searchText.trim())}`);
+  function handleOpenSearch() {
     setIsOpen(false);
-    setSearchText('');
+    setTimeout(() => {
+      window.dispatchEvent(new Event('open-global-search'));
+    }, 150);
   }
 
   const menuTransform = dragDelta > 0 ? `translateY(${dragDelta}px)` : undefined;
@@ -230,26 +224,22 @@ function MobileNav() {
         </div>
 
         {/* Inline search */}
-        <form onSubmit={handleSearch} style={styles.searchForm} role="search" aria-label="Search catalog">
+        <div
+          onClick={handleOpenSearch}
+          style={{ ...styles.searchForm, cursor: 'pointer' }}
+          role="button"
+          tabIndex={0}
+          aria-label="Search catalog"
+          onKeyDown={(e) => e.key === 'Enter' && handleOpenSearch()}
+        >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={styles.searchIcon} aria-hidden="true">
             <circle cx="11" cy="11" r="8" />
             <path d="M21 21l-4.35-4.35" />
           </svg>
-          <input
-            ref={searchInputRef}
-            type="search"
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            placeholder="Search movies, series, year…"
-            style={styles.searchInput}
-            autoComplete="off"
-          />
-          {searchText && (
-            <button type="submit" style={styles.searchSubmit} aria-label="Search">
-              Go
-            </button>
-          )}
-        </form>
+          <div style={{ ...styles.searchInput, display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}>
+            Search movies, series...
+          </div>
+        </div>
 
         {/* Primary nav grid */}
         <div style={styles.sectionLabel} aria-hidden="true">Browse</div>
@@ -351,9 +341,11 @@ const styles = {
     overflowY: 'auto',
     padding: '16px 16px 24px',
     borderRadius: '30px',
-    background: 'linear-gradient(180deg, rgba(13,26,43,0.98), rgba(7,17,31,0.98))',
+    background: 'linear-gradient(180deg, rgba(13,26,43,0.85), rgba(5,12,22,0.95))',
     border: '1px solid rgba(255,255,255,0.08)',
-    boxShadow: '0 -8px 40px rgba(0,0,0,0.4)',
+    backdropFilter: 'blur(32px)',
+    WebkitBackdropFilter: 'blur(32px)',
+    boxShadow: '0 -8px 40px rgba(0,0,0,0.5)',
     zIndex: 2001,
     transition: 'transform 320ms cubic-bezier(0.32, 0.72, 0, 1), opacity 280ms ease',
     willChange: 'transform',
@@ -398,12 +390,14 @@ const styles = {
     gap: '12px',
   },
   logoBadge: {
-    color: '#fff',
+    color: '#050c16',
     fontSize: '0.72rem',
-    letterSpacing: '0.16em',
+    letterSpacing: '0.12em',
+    fontWeight: '900',
     borderRadius: '14px',
     padding: '0.52rem 0.7rem',
-    background: 'linear-gradient(135deg, var(--accent-red), #ff9151)',
+    background: 'linear-gradient(135deg, var(--accent-cyan), var(--accent-violet))',
+    boxShadow: '0 0 15px rgba(0, 255, 255, 0.3)',
     flexShrink: 0,
   },
   logoText: {
@@ -451,7 +445,7 @@ const styles = {
   searchSubmit: {
     padding: '8px 14px',
     borderRadius: '12px',
-    background: 'var(--accent-cyan)',
+    background: 'var(--accent-secondary)',
     color: '#07111f',
     fontWeight: '800',
     fontSize: '0.78rem',
@@ -518,8 +512,8 @@ const styles = {
     transition: 'background 150ms ease, color 150ms ease',
   },
   navLinkIconActive: {
-    background: 'rgba(125,249,255,0.16)',
-    color: 'var(--accent-cyan)',
+    background: 'rgba(121, 228, 255, 0.16)',
+    color: 'var(--accent-secondary)',
   },
   navArrow: {
     color: 'var(--text-muted)',
@@ -533,20 +527,30 @@ const styles = {
   quickActions: {
     display: 'flex',
     gap: '8px',
-    flexWrap: 'wrap',
+    overflowX: 'auto',
+    WebkitOverflowScrolling: 'touch',
+    flexWrap: 'nowrap',
+    paddingBottom: '8px',
     paddingTop: '4px',
+    scrollbarWidth: 'none',
+    WebkitOverflowScrolling: 'touch',
   },
   quickChip: {
     padding: '10px 14px',
     borderRadius: '999px',
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    color: 'var(--text-secondary)',
+    background: 'rgba(255,255,255,0.06)',
+    border: '1px solid rgba(255,255,255,0.12)',
+    color: 'var(--text-primary)',
     fontSize: '0.82rem',
     fontWeight: '700',
     minHeight: '44px',
     display: 'flex',
     alignItems: 'center',
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
+    transition: 'background 150ms ease, transform 150ms ease',
+    cursor: 'pointer',
+    WebkitTapHighlightColor: 'transparent',
   },
 };
 

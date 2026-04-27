@@ -159,7 +159,7 @@ export const playerService = {
 };
 
 export const progressService = {
-  get: () => apiClient('/progress', { headers: getAuthHeader() }),
+  get: () => apiClient('/progress', { headers: getAuthHeader(), bustCache: true }),
   update: (contentType, contentId, position, duration) => apiClient('/progress', {
     method: 'POST',
     body: JSON.stringify({ contentType, contentId, position, duration }),
@@ -167,6 +167,7 @@ export const progressService = {
   }),
   getFor: (contentType, contentId) => apiClient(`/progress/${contentType}/${contentId}`, {
     headers: getAuthHeader(),
+    bustCache: true,
   }),
   markComplete: (contentType, contentId) => apiClient('/progress/complete', {
     method: 'POST',
@@ -175,5 +176,6 @@ export const progressService = {
   }),
   getContinueWatching: () => apiClient('/progress/continue-watching', {
     headers: getAuthHeader(),
+    bustCache: true,
   }),
 };

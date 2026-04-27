@@ -378,7 +378,7 @@ run_sudo() {
 }
 
 resolve_service_name() {
-  for candidate in "$SERVICE_NAME" 'isp-portal-backend.service' 'isp-portal-backend' 'isp-portal.service' 'isp-portal'; do
+  for candidate in "$SERVICE_NAME" 'isp-portal-backend.service' 'isp-portal-backend' 'isp-portal.service' 'isp-portal' 'portal-backend' 'portal-app'; do
     if [ -n "$candidate" ] && systemctl list-unit-files --type=service --all 2>/dev/null | grep -Fq "$candidate"; then
       printf '%s\n' "$candidate"
       return 0
@@ -421,6 +421,8 @@ stop_backend_processes() {
 
   if command -v fuser >/dev/null 2>&1; then
     run_sudo fuser -k __REMOTE_PORT__/tcp || true
+    run_sudo pkill -9 node || true
+
   elif command -v lsof >/dev/null 2>&1; then
     PORT_PIDS=$(run_sudo lsof -t -iTCP:__REMOTE_PORT__ -sTCP:LISTEN 2>/dev/null || true)
     if [ -n "$PORT_PIDS" ]; then

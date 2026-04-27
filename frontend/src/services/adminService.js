@@ -1,27 +1,11 @@
 import apiClient from './apiClient';
 
-const ADMIN_CACHE_TTL_MS = 12000;
-const adminCache = new Map();
-
-function buildCacheKey(path, params = {}) {
-  return `${path}?${new URLSearchParams(params)}`;
-}
-
-async function cachedGet(path, params = {}, ttl = ADMIN_CACHE_TTL_MS) {
-  const key = buildCacheKey(path, params);
-  const now = Date.now();
-  const cached = adminCache.get(key);
-  if (cached && now - cached.at < ttl) {
-    return cached.data;
-  }
-
-  const data = await apiClient(`${path}?${new URLSearchParams(params)}`);
-  adminCache.set(key, { at: now, data });
-  return data;
+function cachedGet(path, params = {}) {
+  return apiClient(`${path}?${new URLSearchParams(params)}`);
 }
 
 function clearAdminCache() {
-  adminCache.clear();
+  // Now handled globally by React Query (queryClient.invalidateQueries)
 }
 
 export const adminService = {
@@ -42,6 +26,7 @@ export const adminService = {
   getDuplicateReview: () => cachedGet('/admin/duplicates/review'),
   runDuplicateCleanup: () => apiClient('/admin/duplicates/cleanup', { method: 'POST' }).finally(clearAdminCache),
   pruneCatalog: () => apiClient('/admin/maintenance/prune', { method: 'POST' }).finally(clearAdminCache),
+  runVacuum: () => apiClient('/admin/maintenance/vacuum', { method: 'POST' }).finally(clearAdminCache),
   getScannerDrafts: (status = 'draft') => cachedGet('/admin/scanner/drafts', { status }),
 
   // Content management
