@@ -8,7 +8,12 @@ const path = require('path');
 const fs = require('fs');
 const { getScannerHealth } = require('./services/scanner');
 const { compressionMiddleware, setStaticCacheHeaders } = require('./middleware/response-optimizer');
-const { ensureContentStore } = require('./data/store');
+const { ensureContentStore, closePool } = require('./data/store');
+const logger = require('./utils/logger');
+const checkEnv = require('./config/env-check');
+
+// Validate environment before doing anything else
+checkEnv();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -20,9 +25,9 @@ const corsOrigins = String(process.env.CORS_ALLOWED_ORIGINS || '')
   .map((value) => value.trim())
   .filter(Boolean);
 
-// The production deployment sits behind nginx, so Express must trust the
-// first proxy hop for client IP and rate limiting to work correctly.
-app.set('trust proxy', true);
+// The production deployment sits behind a single nginx hop. Limiting trust
+// to one proxy avoids express-rate-limit permissive proxy warnings.
+app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS || 1));
 
 if ((isProduction || process.env.REQUIRE_CORS_ALLOWLIST === '1') && !corsOrigins.length) {
   throw new Error('CORS_ALLOWED_ORIGINS must be configured in production.');
@@ -37,7 +42,9 @@ function createCorsError() {
 function buildCorsOriginChecker() {
   if (!corsOrigins.length) {
     return (origin, callback) => {
-      callback(null, !origin);
+      // In development, if no origins are specified, allow all.
+      // In production, we'll have already thrown an error if REQUIRE_CORS_ALLOWLIST is 1.
+      callback(null, true);
     };
   }
 
@@ -138,39 +145,43 @@ app.get('/health/scanner', (req, res) => {
   res.json(getScannerHealth());
 });
 
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/content', publicContentLimiter, require('./routes/content'));
-app.use('/api/movies', publicContentLimiter, require('./routes/movies'));
-app.use('/api/series', publicContentLimiter, require('./routes/series'));
-app.use('/api/search', publicContentLimiter, require('./routes/search'));
-app.use('/api/watchlist', require('./routes/watchlist'));
-app.use('/api/progress', require('./routes/progress'));
-app.use('/api/player', require('./routes/player'));
-app.use('/api/tv', publicContentLimiter, require('./routes/tv'));
-app.use('/api/admin', require('./routes/admin'));
+  // Group API routes to allow mounting at multiple points
+  const apiRouter = express.Router();
+  apiRouter.use('/auth', require('./routes/auth'));
+  apiRouter.use('/content', publicContentLimiter, require('./routes/content'));
+  apiRouter.use('/movies', publicContentLimiter, require('./routes/movies'));
+  apiRouter.use('/series', publicContentLimiter, require('./routes/series'));
+  apiRouter.use('/search', publicContentLimiter, require('./routes/search'));
+  apiRouter.use('/watchlist', require('./routes/watchlist'));
+  apiRouter.use('/progress', require('./routes/progress'));
+  apiRouter.use('/player', require('./routes/player'));
+  apiRouter.use('/tv', publicContentLimiter, require('./routes/tv'));
+  apiRouter.use('/admin', require('./routes/admin'));
+
+  // Mount at both /api (legacy/dev) and / (proxied production)
+  app.use('/api', apiRouter);
+  app.use('/', apiRouter);
 
 if (fs.existsSync(frontendDistPath)) {
-  app.use('/portal', express.static(frontendDistPath, {
+  // Serve static assets from the frontend build
+  app.use(express.static(frontendDistPath, {
     index: false,
     setHeaders: setStaticCacheHeaders,
   }));
 
-  app.get('/portal', (req, res) => {
-    res.setHeader('Cache-Control', 'no-cache');
-    res.sendFile(path.join(frontendDistPath, 'index.html'));
-  });
-
-  app.get('/portal/*', (req, res) => {
-    res.setHeader('Cache-Control', 'no-cache');
-    res.sendFile(path.join(frontendDistPath, 'index.html'));
-  });
-
+  // Handle SPA routing: serve index.html for all non-API routes
   app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api')) {
+    if (req.path.startsWith('/api/')) {
+      return next();
+    }
+    
+    // Explicitly handle /health to avoid sending index.html
+    if (req.path === '/health' || req.path === '/health/scanner') {
       return next();
     }
 
-    return res.redirect('/portal');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.sendFile(path.join(frontendDistPath, 'index.html'));
   });
 }
 
@@ -196,7 +207,7 @@ app.use((err, req, res, next) => {
 
   // Always log the full error server-side
   if (statusCode >= 500) {
-    console.error(`[${req.requestId}] Unhandled error:`, err);
+    logger.error(`Unhandled error: ${err.message}`, { requestId: req.requestId, stack: err.stack });
   }
 
   const code = isPayloadTooLarge
@@ -222,13 +233,47 @@ app.use((err, req, res, next) => {
 async function startServer() {
   await ensureContentStore();
 
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT} [${nodeEnv}]`);
+  const server = app.listen(PORT, () => {
+    logger.info(`Server running on port ${PORT} [${nodeEnv}] (PID: ${process.pid})`);
   });
+
+  server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      logger.error(`Port ${PORT} is already in use. Failed to start server.`);
+    } else {
+      logger.error('Server error:', { error: error.message });
+    }
+    process.exit(1);
+  });
+
+  const shutdown = async (signal) => {
+    logger.info(`Received ${signal}. Starting graceful shutdown...`);
+    
+    server.close(async () => {
+      logger.info('HTTP server closed.');
+      try {
+        await closePool();
+        logger.info('Graceful shutdown completed.');
+        process.exit(0);
+      } catch (err) {
+        logger.error('Error during shutdown:', { error: err.message });
+        process.exit(1);
+      }
+    });
+
+    // If server doesn't close in 10s, force exit
+    setTimeout(() => {
+      logger.error('Could not close connections in time, forcefully shutting down');
+      process.exit(1);
+    }, 10000);
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 startServer().catch((error) => {
-  console.error('Failed to initialize content store', error);
+  logger.error('Failed to initialize content store', { error: error.message, stack: error.stack });
   process.exit(1);
 });
 

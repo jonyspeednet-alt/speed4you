@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-function ProfileMenu({ user }) {
+function ProfileMenu({ user, compact = false }) {
   const [isOpen, setIsOpen] = useState(false);
   const [hoveredItem, setHoveredItem] = useState(null);
   const containerRef = useRef(null);
@@ -14,7 +14,11 @@ function ProfileMenu({ user }) {
       }
     };
     document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    document.addEventListener('touchstart', handleClick);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('touchstart', handleClick);
+    };
   }, [isOpen]);
 
   useEffect(() => {
@@ -26,7 +30,7 @@ function ProfileMenu({ user }) {
 
   if (!user) {
     return (
-      <Link to="/login" style={styles.loginLink}>
+      <Link to="/login" style={{ ...styles.loginLink, ...(compact ? styles.loginLinkCompact : {}) }}>
         Sign In
       </Link>
     );
@@ -116,7 +120,7 @@ function ProfileMenu({ user }) {
             onClick={() => {
               localStorage.removeItem('token');
               localStorage.removeItem('user');
-              window.location.href = '/';
+              window.location.href = '/login';
             }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -247,6 +251,10 @@ const styles = {
     fontWeight: '700',
     fontSize: '0.88rem',
     transition: 'background 150ms ease',
+  },
+  loginLinkCompact: {
+    padding: '10px 14px',
+    fontSize: '0.82rem',
   },
 };
 

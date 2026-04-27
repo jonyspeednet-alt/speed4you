@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const { findAdminByUsername, touchAdminLogin } = require('../data/store');
 const { getJwtSecret } = require('../config/auth');
 const { Joi, validateBody } = require('../middleware/validate');
+const { AppError } = require('../utils/error');
 
 const SECRET = getJwtSecret();
 const loginLimiter = rateLimit({
@@ -21,18 +22,18 @@ const loginSchema = Joi.object({
   password: Joi.string().min(1).max(256).required(),
 });
 
-router.post('/login', loginLimiter, validateBody(loginSchema), async (req, res) => {
+router.post('/login', loginLimiter, validateBody(loginSchema), async (req, res, next) => {
   try {
     const { username, password } = req.validatedBody;
 
     const admin = await findAdminByUsername(username);
     if (!admin) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      throw new AppError('Invalid credentials', 401, 'UNAUTHORIZED');
     }
 
     const valid = await bcrypt.compare(password, admin.password_hash);
     if (!valid) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      throw new AppError('Invalid credentials', 401, 'UNAUTHORIZED');
     }
 
     await touchAdminLogin(admin.id);
@@ -45,22 +46,22 @@ router.post('/login', loginLimiter, validateBody(loginSchema), async (req, res) 
 
     res.json({ token, user: { id: admin.id, username: admin.username, role: admin.role } });
   } catch (error) {
-    res.status(500).json({ error: 'Login failed. Please try again.' });
+    next(error);
   }
 });
 
-function verifyToken(req, res) {
+function verifyToken(req, res, next) {
   const token = req.headers.authorization?.replace('Bearer ', '');
 
   if (!token) {
-    return res.status(401).json({ error: 'No token provided' });
+    return next(new AppError('No token provided', 401, 'UNAUTHORIZED'));
   }
 
   try {
     const decoded = jwt.verify(token, SECRET);
     return res.json({ valid: true, user: decoded });
   } catch (err) {
-    return res.status(401).json({ valid: false, error: 'Invalid token' });
+    return next(new AppError('Invalid token', 401, 'UNAUTHORIZED'));
   }
 }
 
@@ -71,11 +72,11 @@ router.post('/logout', (req, res) => {
   res.json({ ok: true });
 });
 
-router.post('/refresh', (req, res) => {
+router.post('/refresh', (req, res, next) => {
   const token = req.headers.authorization?.replace('Bearer ', '');
 
   if (!token) {
-    return res.status(401).json({ error: 'No token provided' });
+    return next(new AppError('No token provided', 401, 'UNAUTHORIZED'));
   }
 
   try {
@@ -91,7 +92,7 @@ router.post('/refresh', (req, res) => {
       user: { id: decoded.id, username: decoded.username, role: decoded.role },
     });
   } catch {
-    return res.status(401).json({ error: 'Invalid token' });
+    return next(new AppError('Invalid token', 401, 'UNAUTHORIZED'));
   }
 });
 

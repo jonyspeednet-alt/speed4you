@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getItemById, listItems } = require('../data/store');
 const { Joi, validateQuery } = require('../middleware/validate');
+const { AppError } = require('../utils/error');
 
 const moviesQuerySchema = Joi.object({
   genre: Joi.string().trim().min(1).max(80),
@@ -41,7 +42,7 @@ router.get('/:id', async (req, res, next) => {
   try {
     const movie = await getItemById(req.params.id);
     if (!movie || movie.type !== 'movie') {
-      return res.status(404).json({ error: 'Movie not found' });
+      throw new AppError('Movie not found', 404, 'NOT_FOUND');
     }
     res.json(movie);
   } catch (error) {

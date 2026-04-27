@@ -240,7 +240,7 @@ function AddContentPage() {
       setTmdbPreview(response.metadata || null);
     } catch (tmdbError) {
       setTmdbPreview(null);
-      setError(tmdbError.message || 'TMDb import failed.');
+      setError(tmdbError.message || 'Metadata import failed.');
     } finally {
       setLoadingTmdb(false);
     }
@@ -417,18 +417,18 @@ function AddContentPage() {
                   <span style={styles.sectionEyebrow}>Metadata Assist</span>
                   <div style={{ ...styles.tmdbRow, ...(isMobile ? styles.tmdbRowMobile : {}) }}>
                     <div style={styles.field}>
-                      <label style={styles.label}>TMDb ID</label>
+                      <label style={styles.label}>TMDb / IMDb ID</label>
                       <input
-                        type="number"
+                        type="text"
                         value={tmdbIdInput}
                         onChange={(event) => setTmdbIdInput(event.target.value)}
                         style={styles.input}
-                        placeholder="Example: 728754"
+                        placeholder="Example: 728754 or tt7651504"
                       />
                     </div>
                     <div style={styles.tmdbActions}>
                       <button type="button" onClick={handleTmdbImport} disabled={loadingTmdb || !tmdbIdInput} style={styles.secondaryBtn}>
-                        {loadingTmdb ? 'Fetching...' : 'Preview from TMDb'}
+                        {loadingTmdb ? 'Fetching...' : 'Import Metadata'}
                       </button>
                       <button type="button" onClick={() => applyTmdbMetadata(tmdbPreview)} disabled={!tmdbPreview} style={styles.submitBtn}>
                         Apply to Form
@@ -438,7 +438,7 @@ function AddContentPage() {
 
                   {tmdbPreview && (
                     <div style={styles.tmdbPreviewCard}>
-                      <strong>{tmdbPreview.title || 'TMDb Result'}</strong>
+                      <strong>{tmdbPreview.title || 'Imported Result'}</strong>
                       <span>{tmdbPreview.type} | {tmdbPreview.year || 'N/A'} | {tmdbPreview.genre || 'No genre'}</span>
                       <small>
                         TMDb #{tmdbPreview.tmdbId} | IMDb {tmdbPreview.imdbId || '-'}
