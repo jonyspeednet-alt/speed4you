@@ -49,6 +49,7 @@ const styles = {
     gap: 'var(--spacing-md)',
     padding: '0 var(--spacing-lg)',
     overflowX: 'auto',
+    WebkitOverflowScrolling: 'touch',
     scrollSnapType: 'x mandatory',
   },
   card: {

@@ -95,13 +95,18 @@ export function RouteErrorBoundary() {
   const error = useRouteError();
 
   const message = isRouteErrorResponse(error)
-    ? error.statusText || error.message || 'Route error'
+    ? `${error.status} ${error.statusText || ''} - ${error.data || error.message || 'Route error'}`
     : error?.message || 'Unexpected route error';
+
+  const description = isRouteErrorResponse(error) && error.status === 404
+    ? "The page you're looking for doesn't exist. Please check the URL or your basename configuration."
+    : "An internal application error occurred while navigating.";
 
   return (
     <ErrorState
       title="Navigation Error"
       message={message}
+      description={description}
       onRetry={() => window.history.back()}
     />
   );
