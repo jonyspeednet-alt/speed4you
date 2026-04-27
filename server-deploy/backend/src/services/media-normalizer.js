@@ -24,7 +24,18 @@ function isProcessAlive(pid) {
 async function getStatus() {
   const state = await getMediaNormalizerState();
   const lock = state?.lock || null;
-  const running = Boolean(lock?.pid && isProcessAlive(Number(lock.pid)));
+  const lastUpdatedMs = new Date(state?.updatedAt || 0).getTime();
+  // Assume process is dead if no heartbeat in 10 minutes, even if PID exists
+  const isStale = (Date.now() - lastUpdatedMs) > 10 * 60 * 1000; 
+  
+  let running = false;
+  if (lock?.pid) {
+    if (isStale) {
+      running = false;
+    } else {
+      running = isProcessAlive(Number(lock.pid));
+    }
+  }
 
   return {
     running,

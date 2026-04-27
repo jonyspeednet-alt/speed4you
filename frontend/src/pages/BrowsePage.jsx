@@ -1,10 +1,11 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { contentService, searchService } from '../services';
 import { useBreakpoint } from '../hooks';
 import { CardSkeleton } from '../components/feedback/Skeleton';
 import WatchlistButton from '../components/ui/WatchlistButton';
+import QuickViewModal from '../components/ui/QuickViewModal';
 
 const QUICK_GENRES = ['All', 'Action', 'Drama', 'Comedy', 'Horror', 'Romance', 'Thriller', 'Crime'];
 const QUICK_LANGUAGES = ['All', 'English', 'Bengali', 'Hindi', 'Korean', 'Japanese'];
@@ -27,69 +28,75 @@ function normalizeItem(item) {
 }
 
 function normalizeQuery(value, fallback = 'All') {
-  if (!value || value === 'undefined' || value === 'null') {
-    return fallback;
-  }
-
+  if (!value || value === 'undefined' || value === 'null') return fallback;
   return value;
 }
 
-function BrowseCard({ item, index, isMobile }) {
+function BrowseCard({ item, index, isMobile, onQuickView }) {
   const [hovered, setHovered] = useState(false);
+  const genre = String(item.genre || 'Featured').split(',')[0].trim();
+  const isSeries = item.type === 'series';
+
   return (
-    <div
-      style={styles.cardWrap}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <Link
-        to={item.type === 'series' ? `/series/${item.id}` : `/movies/${item.id}`}
-        style={styles.card}
-      >
+    <article style={styles.cardShell} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+      <button type="button" className="browse-card" style={styles.cardButton} onClick={() => onQuickView(item)}>
         <div style={{
-          ...styles.posterWrapper,
-          transform: hovered && !isMobile ? 'scale(1.02)' : 'scale(1)',
+          ...styles.posterWrap,
+          transform: hovered && !isMobile ? 'translateY(-5px) scale(1.02)' : 'translateY(0) scale(1)',
           boxShadow: hovered && !isMobile
-            ? '0 24px 48px rgba(0,0,0,0.5), 0 0 28px rgba(255,90,95,0.18)'
-            : 'var(--shadow-card)',
-          transition: 'transform 280ms ease, box-shadow 280ms ease',
+            ? '0 24px 56px rgba(0,0,0,0.5), 0 0 0 1px rgba(121,228,255,0.16), 0 0 40px rgba(255,143,83,0.08)'
+            : '0 8px 28px rgba(0,0,0,0.3)',
+          borderColor: hovered && !isMobile ? 'rgba(121,228,255,0.14)' : 'rgba(255,255,255,0.07)',
         }}>
-          <img src={item.poster} alt={item.title} style={styles.poster} loading="lazy" />
-          <div style={styles.overlay} />
-          <div style={styles.rankBadge}>{String(index + 1).padStart(2, '0')}</div>
-          <div style={styles.meta}>
-            <span style={styles.rating}>★ {item.rating}</span>
-            <span style={styles.badge}>{item.type === 'series' ? 'Series' : 'Movie'}</span>
-          </div>
-          {hovered && !isMobile && (
-            <div style={styles.hoverPlay}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            </div>
-          )}
-          <div style={styles.cardWatchlistBtn}>
-            <WatchlistButton
-              contentType={item.type === 'series' ? 'series' : 'movie'}
-              contentId={item.id}
-              title={item.title}
-              compact
-            />
-          </div>
-        </div>
-        <div style={styles.info}>
-          <div style={styles.infoTop}>
-            <h3 style={styles.cardTitle}>{item.title}</h3>
-            {item.metadataStatus === 'needs_review' ? (
-              <span style={styles.reviewBadge}>Review</span>
+          <img src={item.poster} alt={item.title} style={{
+            ...styles.poster,
+            transform: hovered && !isMobile ? 'scale(1.06)' : 'scale(1)',
+          }} loading="lazy" />
+          <div style={styles.posterOverlay} />
+
+          <div style={styles.posterTop}>
+            <span style={styles.typeBadge}>{isSeries ? 'Series' : 'Movie'}</span>
+            {item.rating ? (
+              <span style={styles.ratingBadge}>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="var(--accent-tertiary)" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                {item.rating}
+              </span>
             ) : null}
           </div>
-          <span style={styles.cardMeta}>{`${item.genre} | ${item.year}`}</span>
-          <span style={styles.languageMeta}>{`${item.language}${item.runtime ? ` | ${item.runtime} min` : ''}`}</span>
-          {item.collection ? <span style={styles.collectionMeta}>{item.collection}</span> : null}
+
+          <div style={styles.posterBottom}>
+            <h3 style={styles.posterTitle}>{item.title}</h3>
+            <div style={styles.posterMeta}>
+              <span style={styles.genrePill}>{genre}</span>
+              {item.year ? <span style={styles.yearText}>{item.year}</span> : null}
+            </div>
+          </div>
+
+          {!isMobile && hovered ? (
+            <div style={styles.hoverOverlay}>
+              <div style={styles.playCircle}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="#08111d" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+              </div>
+              <span style={styles.hoverLabel}>Quick View</span>
+            </div>
+          ) : null}
         </div>
-      </Link>
-    </div>
+
+        <div style={styles.cardInfo}>
+          <div style={styles.cardMeta}>
+            <span>{item.language}</span>
+            <span style={styles.metaDot}>·</span>
+            <span>{item.year}</span>
+            {item.runtime ? <><span style={styles.metaDot}>·</span><span>{item.runtime}m</span></> : null}
+            {item.metadataStatus === 'needs_review' ? <span style={styles.reviewBadge}>Review</span> : null}
+          </div>
+        </div>
+      </button>
+
+      <div style={styles.watchlistSlot}>
+        <WatchlistButton contentType={isSeries ? 'series' : 'movie'} contentId={item.id} title={item.title} compact />
+      </div>
+    </article>
   );
 }
 
@@ -101,40 +108,32 @@ function BrowsePage({ type }) {
   const [sortBy, setSortBy] = useState(() => normalizeQuery(searchParams.get('sort'), 'latest'));
   const [selectedCollection, setSelectedCollection] = useState(() => normalizeQuery(searchParams.get('collection')));
   const [searchText, setSearchText] = useState(() => searchParams.get('q') || '');
-  const [page, setPage] = useState(() => Number(searchParams.get('page') || 1));
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [quickViewItem, setQuickViewItem] = useState(null);
   const loadMoreRef = useRef(null);
   const [suggestions, setSuggestions] = useState([]);
   const deferredSearchText = useDeferredValue(searchText);
 
-  // Reset filters when type prop changes (e.g. /movies → /series)
   const prevTypeRef = useRef(type);
   useEffect(() => {
     if (prevTypeRef.current === type) return;
     prevTypeRef.current = type;
-    // Batch all resets — intentional setState calls in response to prop change
-    /* eslint-disable react-hooks/set-state-in-effect */
     setSelectedGenre('All');
     setSelectedLanguage('All');
     setSortBy('latest');
     setSelectedCollection('All');
     setSearchText('');
-    setPage(1);
-    /* eslint-enable react-hooks/set-state-in-effect */
   }, [type]);
 
   useEffect(() => {
     const nextParams = {};
-
     if (selectedGenre !== 'All') nextParams.genre = selectedGenre;
     if (selectedLanguage !== 'All') nextParams.language = selectedLanguage;
     if (sortBy !== 'latest') nextParams.sort = sortBy;
     if (selectedCollection !== 'All') nextParams.collection = selectedCollection;
     if (deferredSearchText.trim()) nextParams.q = deferredSearchText.trim();
-    if (page > 1) nextParams.page = String(page);
-
     setSearchParams(nextParams, { replace: true });
-  }, [deferredSearchText, page, selectedCollection, selectedGenre, selectedLanguage, setSearchParams, sortBy]);
+  }, [deferredSearchText, selectedCollection, selectedGenre, selectedLanguage, setSearchParams, sortBy]);
 
   const params = useMemo(() => ({
     type,
@@ -146,16 +145,7 @@ function BrowsePage({ type }) {
     limit: PAGE_SIZE,
   }), [type, selectedGenre, selectedLanguage, selectedCollection, deferredSearchText, sortBy]);
 
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetching,
-    isFetchingNextPage,
-    isLoading,
-    error,
-    refetch,
-  } = useInfiniteQuery({
+  const { data, fetchNextPage, hasNextPage, isFetching, isFetchingNextPage, isLoading, error, refetch } = useInfiniteQuery({
     queryKey: ['browse', params],
     queryFn: ({ pageParam = 1 }) => contentService.fetchBrowsePage({ pageParam, ...params }),
     initialPageParam: 1,
@@ -164,17 +154,14 @@ function BrowsePage({ type }) {
     gcTime: 10 * 60 * 1000,
   });
 
-  const content = useMemo(() => {
-    return data?.pages.flatMap(page => page.items || [])?.map(normalizeItem) || [];
-  }, [data]);
-
+  const content = useMemo(() => data?.pages.flatMap((page) => page.items || [])?.map(normalizeItem) || [], [data]);
   const total = data?.pages[0]?.total || 0;
 
   useEffect(() => {
     let cancelled = false;
-    const query = deferredSearchText.trim();
 
     async function fetchSuggestions() {
+      const query = deferredSearchText.trim();
       if (query.length < 2) {
         setSuggestions([]);
         return;
@@ -182,70 +169,43 @@ function BrowsePage({ type }) {
 
       try {
         const result = await searchService.getSuggestions(query);
-        if (!cancelled) {
-          setSuggestions(Array.isArray(result.items) ? result.items.slice(0, 6) : []);
-        }
+        if (!cancelled) setSuggestions(Array.isArray(result.items) ? result.items.slice(0, 6) : []);
       } catch {
-        if (!cancelled) {
-          setSuggestions([]);
-        }
+        if (!cancelled) setSuggestions([]);
       }
     }
 
     fetchSuggestions();
-
     return () => {
       cancelled = true;
     };
   }, [deferredSearchText]);
 
-  const filteredContent = useMemo(() => content, [content]);
-
-  const collectionOptions = useMemo(() => {
-    const dynamicCollections = Array.from(new Set(content.map((item) => item.collection).filter(Boolean)));
-    return ['All', ...dynamicCollections];
-  }, [content]);
-
-  const languageOptions = useMemo(() => {
-    const dynamicLanguages = Array.from(new Set(content.map((item) => item.language).filter(Boolean)));
-    return ['All', ...Array.from(new Set([...QUICK_LANGUAGES.slice(1), ...dynamicLanguages]))];
-  }, [content]);
-
+  const collectionOptions = useMemo(() => ['All', ...Array.from(new Set(content.map((item) => item.collection).filter(Boolean)))], [content]);
+  const languageOptions = useMemo(() => ['All', ...Array.from(new Set([...QUICK_LANGUAGES.slice(1), ...content.map((item) => item.language).filter(Boolean)]))], [content]);
   const genreOptions = useMemo(() => {
-    const dynamicGenres = Array.from(new Set(
-      content
-        .flatMap((item) => String(item.genre || '').split(','))
-        .map((entry) => entry.trim())
-        .filter(Boolean),
-    ));
-
+    const dynamicGenres = Array.from(new Set(content.flatMap((item) => String(item.genre || '').split(',')).map((entry) => entry.trim()).filter(Boolean)));
     return ['All', ...Array.from(new Set([...QUICK_GENRES.slice(1), ...dynamicGenres]))];
   }, [content]);
 
-  const pageTitle = type === 'movie' ? 'Movies' : type === 'series' ? 'Series' : 'Browse';
-  const pageDescription = type === 'movie'
-    ? 'Lean into a smarter movie shelf with stronger filters, faster scanning, and cleaner poster-first decisions.'
-    : type === 'series'
-      ? 'Track binge-worthy stories with clearer seasons, tighter search, and faster discovery.'
-      : 'Explore the full premium catalog with sharper search, faster filters, and richer result intelligence.';
-  const activeFilterCount = [selectedGenre !== 'All', selectedLanguage !== 'All', selectedCollection !== 'All', deferredSearchText.trim().length > 0, sortBy !== 'latest'].filter(Boolean).length;
-  const hasMore = hasNextPage;
-  const highRatedCount = filteredContent.filter((item) => Number(item.rating) >= 8).length;
-  const reviewNeededCount = filteredContent.filter((item) => item.metadataStatus === 'needs_review').length;
-
-  // Infinite scroll via IntersectionObserver
   useEffect(() => {
     const el = loadMoreRef.current;
-    if (!el || !hasNextPage || isFetchingNextPage) return;
-    const observer = new IntersectionObserver(
-      (entries) => { if (entries[0].isIntersecting) fetchNextPage(); },
-      { rootMargin: '200px' }
-    );
+    if (!el || !hasNextPage || isFetchingNextPage) return undefined;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) fetchNextPage();
+    }, { rootMargin: '200px' });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
-  const newestYear = filteredContent.reduce((maxYear, item) => Math.max(maxYear, Number(item.year) || 0), 0);
-  const hasActiveQuery = deferredSearchText.trim().length > 0;
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+  const pageTitle = type === 'movie' ? 'Movies' : type === 'series' ? 'Series' : 'Browse';
+  const pageDescription = type === 'movie'
+    ? 'A sharper movie shelf with stronger filtering, calmer spacing, and better scan rhythm.'
+    : type === 'series'
+      ? 'Track longer stories with tighter discovery, clearer metadata, and cleaner results.'
+      : 'Explore the full catalog with a redesigned discovery workspace built for speed.';
+
+  const activeFilterCount = [selectedGenre !== 'All', selectedLanguage !== 'All', selectedCollection !== 'All', deferredSearchText.trim().length > 0, sortBy !== 'latest'].filter(Boolean).length;
 
   function resetFilters() {
     setSelectedGenre('All');
@@ -253,365 +213,246 @@ function BrowsePage({ type }) {
     setSelectedCollection('All');
     setSortBy('latest');
     setSearchText('');
-    setPage(1);
   }
 
   return (
     <div style={{ ...styles.page, ...(isMobile ? styles.pageMobile : {}) }}>
       <section style={{ ...styles.hero, ...(isMobile ? styles.heroMobile : isTablet ? styles.heroTablet : {}) }}>
         <div style={styles.heroCopy}>
-          <span style={styles.kicker}>Discovery Mode</span>
-          <h1 style={styles.title}>{pageTitle}</h1>
-          <p style={styles.description}>{pageDescription}</p>
+          <span style={styles.heroEyebrow}>Discovery workspace</span>
+          <h1 style={styles.heroTitle}>{pageTitle}</h1>
+          <p style={styles.heroDescription}>{pageDescription}</p>
 
-          <div style={styles.heroSearchBar}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={styles.heroSearchIcon}>
+          <div style={styles.searchBar}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={styles.searchIcon} aria-hidden="true">
               <circle cx="11" cy="11" r="8" />
               <path d="M21 21l-4.35-4.35" />
             </svg>
             <input
               type="text"
-              name="browse_search"
-              autoComplete="off"
               value={searchText}
-              onChange={(event) => {
-                setSearchText(event.target.value);
-                setPage(1);
-              }}
-              placeholder="Search title, genre, year, language..."
-              style={styles.heroSearchInput}
+              onChange={(event) => setSearchText(event.target.value)}
+              placeholder="Search title, year, language, genre..."
+              style={styles.searchInput}
             />
           </div>
 
-          <div style={{ ...styles.trendingSearchRow, ...(isMobile ? styles.trendingSearchRowMobile : {}) }}>
+          <div style={{ ...styles.chipRow, ...(isMobile ? styles.chipRowMobile : {}) }}>
             {TRENDING_SEARCHES.map((term) => (
-              <button
-                key={term}
-                type="button"
-                onClick={() => {
-                  setSearchText(term);
-                  setPage(1);
-                }}
-                style={styles.trendingSearchChip}
-              >
+              <button key={term} type="button" onClick={() => setSearchText(term)} style={styles.trendingChip}>
                 {term}
               </button>
             ))}
           </div>
 
-          {suggestions.length > 0 && (
-            <div style={{ ...styles.suggestionRow, ...(isMobile ? styles.quickChipsMobile : {}) }}>
+          {suggestions.length > 0 ? (
+            <div style={{ ...styles.suggestions, ...(isMobile ? styles.chipRowMobile : {}) }}>
               {suggestions.map((item) => (
-                <button
-                  key={`${item.type}-${item.id}`}
-                  type="button"
-                  onClick={() => {
-                    setSearchText(item.title);
-                    setPage(1);
-                  }}
-                  style={styles.suggestionChip}
-                >
+                <button key={`${item.type}-${item.id}`} type="button" onClick={() => setSearchText(item.title)} style={styles.suggestionChip}>
                   {item.title}
                 </button>
               ))}
             </div>
-          )}
+          ) : null}
+        </div>
 
-          <div style={{ ...styles.insightRow, ...(isMobile ? styles.insightRowMobile : isTablet ? styles.insightRowTablet : {}) }}>
-            <div style={styles.insightCard}>
-              <span style={styles.insightLabel}>Visible Now</span>
-              <strong style={styles.insightValue}>{isLoading ? '...' : filteredContent.length}</strong>
-            </div>
-            <div style={styles.insightCard}>
-              <span style={styles.insightLabel}>Top Rated</span>
-              <strong style={styles.insightValue}>{isLoading ? '...' : highRatedCount}</strong>
-            </div>
-            <div style={styles.insightCard}>
-              <span style={styles.insightLabel}>Latest Year</span>
-              <strong style={styles.insightValue}>{isLoading ? '...' : newestYear || 'N/A'}</strong>
-            </div>
-            <div style={styles.insightCard}>
-              <span style={styles.insightLabel}>Needs Review</span>
-              <strong style={styles.insightValue}>{isLoading ? '...' : reviewNeededCount}</strong>
+        <aside style={styles.filterPanel}>
+          {isMobile ? (
+            <button type="button" onClick={() => setFiltersOpen((value) => !value)} style={styles.mobileFilterToggle}>
+              <span>{activeFilterCount ? `Filters (${activeFilterCount})` : 'Filters'}</span>
+              <span>{filtersOpen ? 'Hide' : 'Show'}</span>
+            </button>
+          ) : null}
+
+          <div style={{ ...styles.filterInner, ...(isMobile && !filtersOpen ? styles.filterInnerHidden : {}) }}>
+            <FilterField label="Genre" value={selectedGenre} onChange={setSelectedGenre} options={genreOptions} />
+            <FilterField label="Language" value={selectedLanguage} onChange={setSelectedLanguage} options={languageOptions} />
+            <FilterField label="Sort" value={sortBy} onChange={setSortBy} options={['latest', 'popular', 'trending', 'rating', 'featured']} />
+            <FilterField label="Collection" value={selectedCollection} onChange={setSelectedCollection} options={collectionOptions} />
+
+            <div style={styles.filterFooter}>
+              <button type="button" onClick={resetFilters} style={styles.resetButton}>Reset</button>
+              <span style={styles.filterStatus}>{activeFilterCount ? `${activeFilterCount} active filters` : 'All titles visible'}</span>
             </div>
           </div>
-        </div>
-
-        <div style={{ ...styles.commandPanel, ...(isMobile ? styles.commandPanelMobile : {}) }}>
-          {/* Mobile: collapsible toggle */}
-          {isMobile && (
-            <button
-              style={styles.filterToggleBtn}
-              onClick={() => setFiltersOpen((o) => !o)}
-              aria-expanded={filtersOpen}
-              aria-controls="filter-panel"
-            >
-              <span>
-                {activeFilterCount > 0 ? `Filters (${activeFilterCount} active)` : 'Filters'}
-              </span>
-              <svg
-                viewBox="0 0 24 24" width="18" height="18" fill="currentColor"
-                style={{ transform: filtersOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 200ms ease' }}
-                aria-hidden="true"
-              >
-                <path d="M7 10l5 5 5-5z" />
-              </svg>
-            </button>
-          )}
-
-          <div
-            id="filter-panel"
-            style={{
-              ...styles.filterPanelInner,
-              ...(isMobile && !filtersOpen ? styles.filterPanelHidden : {}),
-            }}
-          >
-            <div style={styles.filterGrid}>
-              <label style={styles.filterField}>
-                <span style={styles.filterLabel}>Genre</span>
-                <select
-                  value={selectedGenre}
-                  onChange={(event) => {
-                    setSelectedGenre(event.target.value);
-                    setPage(1);
-                  }}
-                  style={styles.select}
-                >
-                  {genreOptions.map((genre) => <option key={genre} value={genre}>{genre}</option>)}
-                </select>
-              </label>
-
-              <label style={styles.filterField}>
-                <span style={styles.filterLabel}>Language</span>
-                <select
-                  value={selectedLanguage}
-                  onChange={(event) => {
-                    setSelectedLanguage(event.target.value);
-                    setPage(1);
-                  }}
-                  style={styles.select}
-                >
-                  {languageOptions.map((language) => <option key={language} value={language}>{language}</option>)}
-                </select>
-              </label>
-
-              <label style={styles.filterField}>
-                <span style={styles.filterLabel}>Sort</span>
-                <select
-                  value={sortBy}
-                  onChange={(event) => {
-                    setSortBy(event.target.value);
-                    setPage(1);
-                  }}
-                  style={styles.select}
-                >
-                  <option value="latest">Latest</option>
-                  <option value="popular">Popular</option>
-                  <option value="trending">Trending</option>
-                  <option value="rating">Top Rated</option>
-                  <option value="featured">Featured Order</option>
-                </select>
-              </label>
-
-              <label style={styles.filterField}>
-                <span style={styles.filterLabel}>Collection</span>
-                <select
-                  value={selectedCollection}
-                  onChange={(event) => {
-                    setSelectedCollection(event.target.value);
-                    setPage(1);
-                  }}
-                  style={styles.select}
-                >
-                  {collectionOptions.map((collection) => <option key={collection} value={collection}>{collection}</option>)}
-                </select>
-              </label>
-            </div>
-
-            <div style={styles.actionRow}>
-              <button type="button" onClick={resetFilters} style={styles.resetButton}>
-                Reset Filters
-              </button>
-              <span style={styles.filterStatus}>
-                {activeFilterCount ? `${activeFilterCount} filters active` : 'Browsing all available titles'}
-              </span>
-            </div>
-          </div>{/* end filterPanelInner */}
-        </div>
+        </aside>
       </section>
 
-      <div style={{ ...styles.quickChips, ...(isMobile ? styles.quickChipsMobile : {}) }}>
+      <div style={{ ...styles.genreStrip, ...(isMobile ? styles.genreStripMobile : {}) }}>
         {genreOptions.slice(0, 8).map((genre) => (
           <button
             key={genre}
             type="button"
-            onClick={() => {
-              setSelectedGenre(genre);
-              setPage(1);
-            }}
-            style={{
-              ...styles.chip,
-              ...(selectedGenre === genre ? styles.chipActive : {}),
-            }}
+            onClick={() => setSelectedGenre(genre)}
+            style={{ ...styles.genreChip, ...(selectedGenre === genre ? styles.genreChipActive : {}) }}
           >
             {genre}
           </button>
         ))}
       </div>
 
-      <div style={styles.summaryBar}>
-        <span style={styles.summaryLabel}>Browse Results</span>
-        <strong style={styles.summaryValue}>
-          {isFetching && !isFetchingNextPage ? 'Refreshing...' : hasActiveQuery ? `${total} ranked matches for "${deferredSearchText.trim()}"` : `${filteredContent.length} of ${total} titles visible`}
-        </strong>
-      </div>
+      <section style={styles.summaryPanel}>
+        <div style={styles.summaryText}>
+          <span style={styles.summaryLabel}>Results</span>
+          <strong style={styles.summaryValue}>
+            {isFetching && !isFetchingNextPage ? 'Refreshing results...' : deferredSearchText.trim() ? `${total} matches for "${deferredSearchText.trim()}"` : `${content.length} visible from ${total} titles`}
+          </strong>
+        </div>
+        <div style={styles.summaryStats}>
+          <span style={styles.statPill}>{selectedLanguage === 'All' ? 'All languages' : selectedLanguage}</span>
+          <span style={styles.statPill}>{sortBy}</span>
+        </div>
+      </section>
 
       {isLoading ? (
         <div style={{ ...styles.grid, ...(isMobile ? styles.gridMobile : isTablet ? styles.gridTablet : {}) }}>
-          {Array.from({ length: 12 }).map((_, i) => (
-            <CardSkeleton key={i} />
-          ))}
+          {Array.from({ length: 12 }).map((_, index) => <CardSkeleton key={index} />)}
         </div>
       ) : error ? (
         <div style={styles.emptyState}>
           <h2 style={styles.emptyTitle}>Error loading content</h2>
           <p style={styles.emptyText}>{error.message || 'An unexpected error occurred.'}</p>
-          <button
-            type="button"
-            onClick={() => refetch({ cancelRefetch: false })}
-            style={styles.resetButton}
-          >
-            Retry
-          </button>
+          <button type="button" onClick={() => refetch({ cancelRefetch: false })} style={styles.resetButton}>Retry</button>
         </div>
       ) : (
         <>
-          <div style={{ ...styles.grid, ...(isMobile ? styles.gridMobile : isTablet ? styles.gridTablet : {}) }}>
-            {filteredContent.map((item, index) => (
-              <BrowseCard key={item.id} item={item} index={index} isMobile={isMobile} />
+          <div className="browse-grid" style={{ ...styles.grid, ...(isMobile ? styles.gridMobile : isTablet ? styles.gridTablet : {}) }}>
+            {content.map((item, index) => (
+              <BrowseCard key={item.id} item={item} index={index} isMobile={isMobile} onQuickView={setQuickViewItem} />
             ))}
           </div>
 
-          {hasMore && (
+          {hasNextPage ? (
             <div ref={loadMoreRef} style={styles.loadMoreWrap}>
-              {isFetchingNextPage && (
-                <div style={styles.loadingSpinner} aria-label="Loading more titles">
-                  <div style={styles.spinnerDot} />
-                  <div style={{ ...styles.spinnerDot, animationDelay: '0.15s' }} />
-                  <div style={{ ...styles.spinnerDot, animationDelay: '0.3s' }} />
-                </div>
-              )}
+              {isFetchingNextPage ? <div style={styles.loader}>Loading more...</div> : null}
             </div>
-          )}
+          ) : null}
         </>
       )}
 
-      {!isLoading && !error && filteredContent.length === 0 && (
+      {!isLoading && !error && content.length === 0 ? (
         <div style={styles.emptyState}>
           <h2 style={styles.emptyTitle}>No content matched this selection.</h2>
-          <p style={styles.emptyText}>Try clearing the filters or searching with a broader title, language, or genre.</p>
-          <button type="button" onClick={resetFilters} style={styles.resetButton}>
-            Clear Filters
-          </button>
+          <p style={styles.emptyText}>Try broader filters, another language, or a simpler search term.</p>
+          <button type="button" onClick={resetFilters} style={styles.resetButton}>Clear filters</button>
         </div>
-      )}
+      ) : null}
+
+      <QuickViewModal isOpen={!!quickViewItem} item={quickViewItem} onClose={() => setQuickViewItem(null)} />
     </div>
+  );
+}
+
+function FilterField({ label, value, onChange, options }) {
+  return (
+    <label style={styles.filterField}>
+      <span style={styles.filterLabel}>{label}</span>
+      <select value={value} onChange={(event) => onChange(event.target.value)} className="browse-filter-button" style={styles.select}>
+        {options.map((option) => <option key={option} value={option}>{option}</option>)}
+      </select>
+    </label>
   );
 }
 
 const styles = {
   page: {
     minHeight: '100vh',
-    padding: '112px var(--spacing-lg) var(--spacing-3xl)',
+    padding: 'calc(var(--nav-occupied-desktop) + 8px) 24px var(--spacing-3xl)',
   },
   pageMobile: {
-    padding: '96px var(--spacing-md) var(--spacing-2xl)',
+    padding: 'calc(var(--nav-occupied-mobile) + 8px) 12px var(--spacing-2xl)',
   },
   hero: {
-    maxWidth: '1400px',
-    margin: '0 auto 18px auto',
-    padding: '24px',
-    borderRadius: '28px',
-    background: 'linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03))',
-    border: '1px solid rgba(255,255,255,0.08)',
+    width: 'min(1440px, calc(100vw - 48px))',
+    margin: '0 auto 16px',
     display: 'grid',
-    gridTemplateColumns: 'minmax(0, 1.12fr) minmax(300px, 400px)',
+    gridTemplateColumns: 'minmax(0, 1fr) 360px',
     gap: '18px',
-    alignItems: 'stretch',
-    boxShadow: 'var(--shadow-soft)',
+    padding: '24px',
+    borderRadius: '34px',
+    background: 'rgba(13, 26, 45, 0.45)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    backdropFilter: 'blur(32px)',
+    WebkitBackdropFilter: 'blur(32px)',
+    boxShadow: '0 32px 64px rgba(0,0,0,0.5)',
   },
   heroTablet: {
+    width: 'min(1440px, calc(100vw - 28px))',
     gridTemplateColumns: '1fr',
   },
   heroMobile: {
-    padding: '16px',
+    width: '100%',
     gridTemplateColumns: '1fr',
+    padding: '16px',
+    borderRadius: '26px',
   },
   heroCopy: {
     display: 'grid',
-    gap: '12px',
+    gap: '14px',
   },
-  kicker: {
-    color: 'var(--accent-cyan)',
+  heroEyebrow: {
+    color: 'var(--accent-pink)',
+    fontSize: '0.72rem',
+    fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: '0.16em',
-    fontSize: '0.72rem',
-    fontWeight: '700',
   },
-  title: {
-    fontSize: 'clamp(2rem, 5vw, 4.4rem)',
-    color: 'var(--text-primary)',
+  heroTitle: {
+    color: '#ffffff',
+    fontSize: 'clamp(2.4rem, 5vw, 4rem)',
+    fontWeight: '900',
+    letterSpacing: '-0.02em',
   },
-  description: {
-    maxWidth: '52ch',
-    lineHeight: '1.65',
+  heroDescription: {
+    maxWidth: '58ch',
+    fontSize: '1rem',
+    lineHeight: '1.7',
+    color: 'rgba(255, 255, 255, 0.7)',
   },
-  heroSearchBar: {
+  searchBar: {
     position: 'relative',
+    minHeight: '62px',
     display: 'flex',
     alignItems: 'center',
-    maxWidth: '640px',
-    minHeight: '54px',
-    padding: '0 16px 0 44px',
-    borderRadius: '999px',
-    background: 'rgba(7,17,31,0.62)',
-    border: '1px solid rgba(255,255,255,0.09)',
-    boxShadow: 'var(--shadow-soft)',
+    padding: '0 18px 0 48px',
+    borderRadius: '16px',
+    background: 'rgba(255, 255, 255, 0.05)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
   },
-  heroSearchIcon: {
+  searchIcon: {
     position: 'absolute',
-    left: '16px',
-    color: 'var(--text-muted)',
+    left: '18px',
+    color: 'var(--accent-cyan)',
   },
-  heroSearchInput: {
+  searchInput: {
     width: '100%',
+    background: 'transparent',
     border: 'none',
     outline: 'none',
-    background: 'transparent',
-    color: 'var(--text-primary)',
+    color: '#ffffff',
     fontSize: '1rem',
   },
-  trendingSearchRow: {
+  chipRow: {
     display: 'flex',
     flexWrap: 'wrap',
     gap: '10px',
   },
-  trendingSearchRowMobile: {
+  chipRowMobile: {
     flexWrap: 'nowrap',
     overflowX: 'auto',
     paddingBottom: '4px',
     scrollbarWidth: 'none',
   },
-  trendingSearchChip: {
-    padding: '9px 14px',
+  trendingChip: {
+    padding: '10px 14px',
     borderRadius: '999px',
-    background: 'rgba(12, 191, 214, 0.12)',
-    border: '1px solid rgba(12, 191, 214, 0.24)',
-    color: 'var(--accent-cyan)',
-    fontSize: '0.78rem',
-    fontWeight: '700',
+    background: 'rgba(121, 228, 255, 0.1)',
+    border: '1px solid rgba(121, 228, 255, 0.18)',
+    color: 'var(--accent-secondary)',
+    fontSize: '0.8rem',
+    fontWeight: '800',
   },
-  suggestionRow: {
+  suggestions: {
     display: 'flex',
     flexWrap: 'wrap',
     gap: '10px',
@@ -619,366 +460,364 @@ const styles = {
   suggestionChip: {
     padding: '10px 14px',
     borderRadius: '999px',
-    background: 'rgba(255,255,255,0.06)',
-    border: '1px solid rgba(255,255,255,0.1)',
+    background: 'rgba(255, 255, 255, 0.06)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
     color: 'var(--text-primary)',
     fontSize: '0.8rem',
     fontWeight: '700',
   },
-  insightRow: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-    gap: '10px',
-    marginTop: '2px',
+  filterPanel: {
+    padding: '18px',
+    borderRadius: '28px',
+    background: 'rgba(255, 255, 255, 0.04)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
   },
-  insightRowTablet: {
-    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  },
-  insightRowMobile: {
-    gridTemplateColumns: '1fr 1fr',
-  },
-  insightCard: {
-    padding: '14px 16px',
-    borderRadius: '18px',
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.08)',
-  },
-  insightLabel: {
-    display: 'block',
-    marginBottom: '8px',
-    fontSize: '0.72rem',
-    textTransform: 'uppercase',
-    letterSpacing: '0.14em',
-    color: 'var(--text-muted)',
-    fontWeight: '700',
-  },
-  insightValue: {
+  mobileFilterToggle: {
+    width: '100%',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '12px 14px',
+    borderRadius: '16px',
+    background: 'rgba(255, 255, 255, 0.06)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
     color: 'var(--text-primary)',
-    fontSize: '0.98rem',
     fontWeight: '800',
   },
-  commandPanel: {
+  filterInner: {
     display: 'grid',
     gap: '12px',
-    padding: '18px',
-    borderRadius: '24px',
-    background: 'rgba(7,17,31,0.48)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    alignContent: 'start',
   },
-  commandPanelMobile: {
-    padding: '14px',
-    borderRadius: '20px',
-  },
-  filterToggleBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    padding: '12px 14px',
-    borderRadius: '14px',
-    background: 'rgba(255,255,255,0.06)',
-    border: '1px solid rgba(255,255,255,0.1)',
-    color: 'var(--text-primary)',
-    fontWeight: '700',
-    fontSize: '0.9rem',
-    minHeight: '48px',
-  },
-  filterPanelInner: {
-    display: 'grid',
-    gap: '12px',
-    overflow: 'hidden',
-    transition: 'max-height 280ms ease, opacity 200ms ease',
-    maxHeight: '1000px',
-    opacity: 1,
-    marginTop: '10px',
-  },
-  filterPanelHidden: {
-    maxHeight: '0',
-    opacity: 0,
-    marginTop: '0',
-    pointerEvents: 'none',
-  },
-  filterGrid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr',
-    gap: '10px',
+  filterInnerHidden: {
+    display: 'none',
   },
   filterField: {
     display: 'grid',
     gap: '8px',
   },
   filterLabel: {
-    fontSize: '0.72rem',
-    textTransform: 'uppercase',
-    letterSpacing: '0.14em',
     color: 'var(--text-muted)',
-    fontWeight: '700',
+    fontSize: '0.72rem',
+    fontWeight: '800',
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase',
   },
   select: {
-    padding: '13px 14px',
-    background: 'rgba(255,255,255,0.06)',
+    minHeight: '48px',
+    padding: '0 14px',
+    borderRadius: '16px',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    background: 'rgba(255, 255, 255, 0.06)',
     color: 'var(--text-primary)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: '18px',
-    cursor: 'pointer',
-    fontSize: '0.92rem',
-    backdropFilter: 'blur(10px)',
   },
-  actionRow: {
+  filterFooter: {
     display: 'flex',
     flexWrap: 'wrap',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    gap: '12px',
+    gap: '10px',
+    alignItems: 'center',
   },
   filterStatus: {
     color: 'var(--text-muted)',
-    fontSize: '0.84rem',
+    fontSize: '0.82rem',
   },
   resetButton: {
-    padding: '12px 16px',
-    borderRadius: '999px',
-    background: 'rgba(255,255,255,0.08)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    color: 'var(--text-primary)',
-    fontWeight: '700',
+    minHeight: '44px',
+    padding: '0 20px',
+    borderRadius: '12px',
+    background: 'linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-secondary) 100%)',
+    color: '#050c16',
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    fontSize: '0.76rem',
+    boxShadow: '0 0 15px rgba(0, 255, 255, 0.2)',
   },
-  quickChips: {
-    maxWidth: '1400px',
-    margin: '0 auto 12px auto',
+  genreStrip: {
+    width: 'min(1440px, calc(100vw - 48px))',
+    margin: '0 auto 14px',
     display: 'flex',
     gap: '10px',
     flexWrap: 'wrap',
   },
-  quickChipsMobile: {
+  genreStripMobile: {
+    width: '100%',
     flexWrap: 'nowrap',
     overflowX: 'auto',
-    paddingBottom: '6px',
+    paddingBottom: '4px',
     scrollbarWidth: 'none',
   },
-  chip: {
+  genreChip: {
     padding: '10px 14px',
     borderRadius: '999px',
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.08)',
+    background: 'rgba(255, 255, 255, 0.05)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
     color: 'var(--text-secondary)',
     fontSize: '0.8rem',
-    fontWeight: '700',
+    fontWeight: '800',
   },
-  chipActive: {
-    background: 'linear-gradient(135deg, var(--accent-red), #ff8a54)',
-    color: '#fff',
+  genreChipActive: {
+    background: 'linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-secondary) 100%)',
+    color: '#050c16',
+    boxShadow: '0 0 15px rgba(0, 255, 255, 0.3)',
   },
-  summaryBar: {
-    maxWidth: '1400px',
-    margin: '0 auto 16px auto',
-    padding: '0 4px',
+  summaryPanel: {
+    width: 'min(1440px, calc(100vw - 48px))',
+    margin: '0 auto 16px',
+    padding: '16px 18px',
+    borderRadius: '24px',
+    background: 'rgba(255, 255, 255, 0.04)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
     display: 'flex',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    gap: '12px',
+    alignItems: 'center',
+    gap: '14px',
     flexWrap: 'wrap',
   },
+  summaryText: {
+    display: 'grid',
+    gap: '4px',
+  },
   summaryLabel: {
-    textTransform: 'uppercase',
-    letterSpacing: '0.16em',
-    fontSize: '0.72rem',
     color: 'var(--text-muted)',
-    fontWeight: '700',
+    fontSize: '0.72rem',
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: '0.14em',
   },
   summaryValue: {
-    color: 'var(--accent-amber)',
-    fontSize: '0.95rem',
+    color: 'var(--text-primary)',
+    fontSize: '0.96rem',
+  },
+  summaryStats: {
+    display: 'flex',
+    gap: '8px',
+    flexWrap: 'wrap',
+  },
+  statPill: {
+    padding: '9px 12px',
+    borderRadius: '999px',
+    background: 'rgba(255, 255, 255, 0.05)',
+    color: 'var(--text-secondary)',
+    fontSize: '0.76rem',
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
   },
   grid: {
-    maxWidth: '1400px',
+    width: 'min(1440px, calc(100vw - 48px))',
     margin: '0 auto',
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
     gap: '18px',
   },
   gridTablet: {
-    gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+    width: 'min(1440px, calc(100vw - 28px))',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
     gap: '14px',
   },
   gridMobile: {
+    width: '100%',
     gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
     gap: '12px',
   },
-  cardWrap: {
+  cardShell: {
     position: 'relative',
   },
-  card: {
+  cardButton: {
+    width: '100%',
+    textAlign: 'left',
     display: 'grid',
-    gap: '12px',
+    gap: '8px',
   },
-  posterWrapper: {
+  posterWrap: {
     position: 'relative',
-    borderRadius: '22px',
+    aspectRatio: '2 / 3',
+    borderRadius: '14px',
     overflow: 'hidden',
-    aspectRatio: '3 / 4',
-    background: 'var(--bg-tertiary)',
-    boxShadow: 'var(--shadow-card)',
-  },
-  cardWatchlistBtn: {
-    position: 'absolute',
-    bottom: '10px',
-    right: '10px',
-    zIndex: 2,
+    background: '#0d1a2d',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    transition: 'all 450ms cubic-bezier(0.34, 1.56, 0.64, 1)',
   },
   poster: {
     width: '100%',
     height: '100%',
     objectFit: 'cover',
+    transition: 'transform 500ms cubic-bezier(0.4, 0, 0.2, 1)',
   },
-  overlay: {
+  posterOverlay: {
     position: 'absolute',
     inset: 0,
-    background: 'linear-gradient(180deg, rgba(0,0,0,0.05) 5%, rgba(7,17,31,0.84) 100%)',
+    background: 'linear-gradient(180deg, rgba(0,0,0,0) 25%, rgba(0,0,0,0.08) 45%, rgba(5,12,22,0.9) 100%)',
+    pointerEvents: 'none',
   },
-  rankBadge: {
+  posterTop: {
     position: 'absolute',
-    top: '14px',
-    left: '14px',
-    width: '42px',
-    height: '42px',
+    top: '10px',
+    left: '10px',
+    right: '10px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: '6px',
+    zIndex: 1,
+  },
+  typeBadge: {
+    padding: '5px 10px',
+    borderRadius: '6px',
+    background: 'rgba(5, 12, 22, 0.6)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
+    color: '#ffffff',
+    fontSize: '0.62rem',
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: '0.12em',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+  },
+  ratingBadge: {
+    padding: '5px 9px',
+    borderRadius: '6px',
+    background: 'rgba(5, 12, 22, 0.6)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
+    color: 'var(--accent-cyan)',
+    fontSize: '0.68rem',
+    fontWeight: '900',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+  },
+  posterBottom: {
+    position: 'absolute',
+    left: '10px',
+    right: '10px',
+    bottom: '10px',
+    zIndex: 1,
+  },
+  posterTitle: {
+    color: '#fff',
+    fontSize: '0.88rem',
+    fontWeight: '700',
+    lineHeight: '1.3',
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
+    overflow: 'hidden',
+    marginBottom: '6px',
+    textShadow: '0 2px 10px rgba(0,0,0,0.6)',
+    letterSpacing: '-0.01em',
+  },
+  posterMeta: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    flexWrap: 'wrap',
+  },
+  genrePill: {
+    padding: '3px 8px',
+    borderRadius: '6px',
+    background: 'rgba(255,255,255,0.12)',
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: '0.62rem',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+  },
+  yearText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: '0.68rem',
+    fontWeight: '600',
+  },
+  hoverOverlay: {
+    position: 'absolute',
+    inset: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '10px',
+    background: 'rgba(0,0,0,0.35)',
+    backdropFilter: 'blur(2px)',
+    zIndex: 2,
+  },
+  playCircle: {
+    width: '50px',
+    height: '50px',
     borderRadius: '50%',
-    background: 'rgba(7,17,31,0.72)',
-    color: 'var(--text-primary)',
+    background: 'rgba(255,255,255,0.95)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '0.78rem',
-    fontWeight: '700',
+    boxShadow: '0 8px 28px rgba(0,0,0,0.35)',
+    paddingLeft: '3px',
   },
-  meta: {
-    position: 'absolute',
-    left: '14px',
-    right: '14px',
-    bottom: '14px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: '10px',
-    alignItems: 'center',
-  },
-  rating: {
-    background: 'rgba(7,17,31,0.78)',
-    padding: '6px 10px',
-    borderRadius: '999px',
-    fontSize: '0.76rem',
-    color: 'var(--accent-amber)',
-    fontWeight: '700',
-  },
-  badge: {
-    background: 'rgba(255,255,255,0.12)',
-    padding: '6px 10px',
-    borderRadius: '999px',
-    fontSize: '0.68rem',
-    fontWeight: '700',
+  hoverLabel: {
+    color: '#fff',
+    fontSize: '0.7rem',
+    fontWeight: '800',
     textTransform: 'uppercase',
-    letterSpacing: '0.12em',
-    color: 'var(--text-primary)',
+    letterSpacing: '0.1em',
+    textShadow: '0 2px 8px rgba(0,0,0,0.5)',
   },
-  info: {
-    padding: '2px 2px 0',
-    display: 'grid',
-    gap: '6px',
-  },
-  infoTop: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: '10px',
-  },
-  cardTitle: {
-    fontSize: '1.02rem',
-    color: 'var(--text-primary)',
-    lineHeight: '1.18',
-    flex: 1,
+  cardInfo: {
+    padding: '0 2px',
   },
   reviewBadge: {
-    padding: '6px 8px',
-    borderRadius: '999px',
-    background: 'rgba(255,200,87,0.16)',
-    color: 'var(--accent-amber)',
-    fontSize: '0.68rem',
-    fontWeight: '800',
+    padding: '4px 8px',
+    borderRadius: '6px',
+    background: 'rgba(255, 209, 102, 0.14)',
+    color: 'var(--accent-tertiary)',
+    fontSize: '0.6rem',
+    fontWeight: '900',
     textTransform: 'uppercase',
     letterSpacing: '0.1em',
   },
   cardMeta: {
-    fontSize: '0.84rem',
-    color: 'var(--text-muted)',
-  },
-  languageMeta: {
-    fontSize: '0.8rem',
-    color: 'var(--accent-cyan)',
-  },
-  collectionMeta: {
-    fontSize: '0.76rem',
-    color: 'var(--accent-amber)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.08em',
-    fontWeight: '700',
-  },
-  hoverPlay: {
-    position: 'absolute',
-    inset: 0,
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    background: 'rgba(7,17,31,0.38)',
-    color: '#fff',
-    animation: 'fadeUp 150ms ease',
+    gap: '5px',
+    flexWrap: 'wrap',
+    color: 'var(--text-muted)',
+    fontSize: '0.72rem',
+  },
+  metaDot: {
+    opacity: 0.4,
+    fontSize: '0.6rem',
+  },
+  watchlistSlot: {
+    position: 'absolute',
+    top: '8px',
+    right: '8px',
+    zIndex: 3,
   },
   loadMoreWrap: {
-    maxWidth: '1400px',
-    margin: '24px auto 0 auto',
-    display: 'flex',
-    justifyContent: 'center',
-    minHeight: '60px',
-    alignItems: 'center',
+    width: 'min(1440px, calc(100vw - 48px))',
+    minHeight: '56px',
+    margin: '22px auto 0',
+    display: 'grid',
+    placeItems: 'center',
   },
-  loadingSpinner: {
-    display: 'flex',
-    gap: '8px',
-    alignItems: 'center',
-  },
-  spinnerDot: {
-    width: '10px',
-    height: '10px',
-    borderRadius: '50%',
-    background: 'var(--accent-cyan)',
-    animation: 'spinnerBounce 0.8s ease-in-out infinite',
-    opacity: 0.7,
-  },
-  loadMoreButton: {
-    padding: '14px 24px',
-    borderRadius: '999px',
-    background: 'linear-gradient(135deg, var(--accent-red), #ff8a54)',
-    color: '#fff',
-    fontWeight: '800',
-  },
-  empty: {
-    maxWidth: '1400px',
-    margin: '0 auto',
-    textAlign: 'center',
-    padding: 'var(--spacing-2xl)',
+  loader: {
     color: 'var(--text-muted)',
+    fontSize: '0.82rem',
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: '0.12em',
   },
   emptyState: {
-    maxWidth: '900px',
+    width: 'min(900px, calc(100vw - 48px))',
     margin: '0 auto',
-    textAlign: 'center',
     padding: '48px 24px',
     borderRadius: '32px',
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.08)',
+    background: 'rgba(255, 255, 255, 0.04)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    textAlign: 'center',
   },
   emptyTitle: {
+    marginBottom: '10px',
     color: 'var(--text-primary)',
-    marginBottom: '12px',
   },
   emptyText: {
     marginBottom: '18px',

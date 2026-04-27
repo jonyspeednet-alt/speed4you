@@ -6,9 +6,8 @@ const NAV_ITEMS = [
     path: '/',
     label: 'Home',
     icon: (active) => (
-      <svg viewBox="0 0 24 24" width="22" height="22" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-        <polyline points="9 22 9 12 15 12 15 22" />
+      <svg viewBox="0 0 24 24" width="20" height="20" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" aria-hidden="true">
+        <path d="M3 10.5L12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1z" />
       </svg>
     ),
   },
@@ -16,15 +15,9 @@ const NAV_ITEMS = [
     path: '/movies',
     label: 'Movies',
     icon: (active) => (
-      <svg viewBox="0 0 24 24" width="22" height="22" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18" />
-        <line x1="7" y1="2" x2="7" y2="22" />
-        <line x1="17" y1="2" x2="17" y2="22" />
-        <line x1="2" y1="12" x2="22" y2="12" />
-        <line x1="2" y1="7" x2="7" y2="7" />
-        <line x1="2" y1="17" x2="7" y2="17" />
-        <line x1="17" y1="17" x2="22" y2="17" />
-        <line x1="17" y1="7" x2="22" y2="7" />
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="16" rx="3" fill={active ? 'currentColor' : 'none'} opacity={active ? '0.18' : '1'} />
+        <path d="M8 4v16M16 4v16M3 9h5M16 9h5M3 15h5M16 15h5" />
       </svg>
     ),
   },
@@ -32,30 +25,29 @@ const NAV_ITEMS = [
     path: '/series',
     label: 'Series',
     icon: (active) => (
-      <svg viewBox="0 0 24 24" width="22" height="22" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-        <line x1="8" y1="21" x2="16" y2="21" />
-        <line x1="12" y1="17" x2="12" y2="21" />
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+        <rect x="3" y="5" width="18" height="12" rx="2" fill={active ? 'currentColor' : 'none'} opacity={active ? '0.18' : '1'} />
+        <path d="M9 21h6M12 17v4" />
       </svg>
     ),
   },
   {
     path: '/tv',
-    label: 'Live TV',
+    label: 'Live',
     icon: (active) => (
-      <svg viewBox="0 0 24 24" width="22" height="22" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
         <circle cx="12" cy="12" r="2" fill="currentColor" />
-        <path d="M16.24 7.76a6 6 0 010 8.49m-8.48-.01a6 6 0 010-8.49m11.31-2.82a10 10 0 010 14.14m-14.14 0a10 10 0 010-14.14" />
+        <path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19 5a10 10 0 0 1 0 14M5 19A10 10 0 0 1 5 5" opacity={active ? '1' : '0.9'} />
       </svg>
     ),
   },
   {
     path: '/browse',
-    label: 'Search',
+    label: 'Browse',
     icon: (active) => (
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <circle cx="11" cy="11" r="8" fill={active ? 'rgba(255,255,255,0.1)' : 'none'} />
-        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" fill={active ? 'currentColor' : 'none'} opacity={active ? '0.18' : '1'} />
+        <path d="M20 20l-4-4" />
       </svg>
     ),
   },
@@ -73,7 +65,6 @@ function BottomNav() {
         const isActive = item.path === '/'
           ? location.pathname === '/'
           : location.pathname.startsWith(item.path);
-        const isPressed = pressedItem === item.path;
 
         return (
           <Link
@@ -82,21 +73,18 @@ function BottomNav() {
             style={{
               ...styles.item,
               ...(isActive ? styles.itemActive : {}),
-              transform: isPressed ? 'scale(0.92)' : 'scale(1)',
+              transform: pressedItem === item.path ? 'scale(0.96)' : 'scale(1)',
             }}
-            aria-current={isActive ? 'page' : undefined}
-            aria-label={item.label}
             onMouseDown={() => setPressedItem(item.path)}
             onMouseUp={() => setPressedItem(null)}
             onTouchStart={() => setPressedItem(item.path)}
             onTouchEnd={() => setPressedItem(null)}
+            aria-current={isActive ? 'page' : undefined}
           >
             <span style={{ ...styles.iconWrap, ...(isActive ? styles.iconWrapActive : {}) }}>
               {item.icon(isActive)}
             </span>
-            <span style={{ ...styles.label, ...(isActive ? styles.labelActive : {}) }}>
-              {item.label}
-            </span>
+            <span style={{ ...styles.label, ...(isActive ? styles.labelActive : {}) }}>{item.label}</span>
           </Link>
         );
       })}
@@ -107,18 +95,19 @@ function BottomNav() {
 const styles = {
   nav: {
     position: 'fixed',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    left: '0',
+    right: '0',
+    bottom: '0',
     zIndex: 1050,
     display: 'flex',
-    alignItems: 'stretch',
-    background: 'linear-gradient(180deg, rgba(7,17,31,0.9), rgba(5,12,22,0.97))',
-    backdropFilter: 'blur(24px)',
-    WebkitBackdropFilter: 'blur(24px)',
-    borderTop: '1px solid rgba(255,255,255,0.07)',
-    paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-    boxShadow: '0 -8px 40px rgba(0,0,0,0.32)',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '8px 10px calc(var(--safe-bottom) + 8px)',
+    borderRadius: '24px 24px 0 0',
+    background: 'rgba(7, 17, 31, 0.94)',
+    borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+    backdropFilter: 'blur(26px)',
+    boxShadow: '0 -10px 24px rgba(0, 0, 0, 0.24)',
   },
   item: {
     flex: 1,
@@ -126,36 +115,37 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '4px',
-    padding: '10px 4px 8px',
+    gap: '5px',
+    minHeight: '48px',
+    padding: '6px 4px',
+    borderRadius: '16px',
     color: 'var(--text-muted)',
-    minHeight: '58px',
-    transition: 'color 180ms ease, transform 120ms ease',
-    textDecoration: 'none',
   },
-  itemActive: { color: 'var(--accent-cyan)' },
+  itemActive: {
+    color: 'var(--text-primary)',
+    background: 'rgba(255, 255, 255, 0.05)',
+  },
   iconWrap: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '40px',
+    display: 'grid',
+    placeItems: 'center',
+    width: '38px',
     height: '30px',
     borderRadius: '12px',
-    transition: 'background 180ms ease, box-shadow 180ms ease',
   },
   iconWrapActive: {
-    background: 'rgba(125,249,255,0.14)',
-    boxShadow: '0 0 12px rgba(125,249,255,0.2)',
+    background: 'linear-gradient(135deg, #fff1df 0%, var(--accent-primary) 50%, var(--accent-secondary) 100%)',
+    color: '#08111d',
+    boxShadow: '0 10px 24px rgba(121, 228, 255, 0.2)',
   },
   label: {
-    fontSize: '0.6rem',
+    fontSize: '0.64rem',
     fontWeight: '700',
-    letterSpacing: '0.05em',
+    letterSpacing: '0.04em',
     textTransform: 'uppercase',
-    lineHeight: 1,
-    transition: 'color 180ms ease',
   },
-  labelActive: { color: 'var(--accent-cyan)' },
+  labelActive: {
+    color: 'var(--text-primary)',
+  },
 };
 
 export default BottomNav;

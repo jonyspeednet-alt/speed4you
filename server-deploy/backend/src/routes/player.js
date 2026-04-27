@@ -4,6 +4,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const { getItemById } = require('../data/store');
 const { loadScannerRoots } = require('../data/store');
+const { AppError } = require('../utils/error');
 
 const router = express.Router();
 const DEFAULT_PLAYER_CACHE_ROOT = '/var/www/html/Extra_Storage/portal-media-cache';
@@ -256,8 +257,7 @@ function resolvePlayableFilePath(sourcePath, videoUrl) {
 function streamFileDirect(resolvedPath, req, res) {
   const stat = safeStat(resolvedPath);
   if (!stat?.isFile()) {
-    res.status(404).json({ error: 'Source file is not available on the server' });
-    return;
+    throw new AppError('Source file is not available on the server', 404, 'NOT_FOUND');
   }
 
   const ext = path.extname(resolvedPath).toLowerCase();
@@ -724,22 +724,21 @@ function copyVideoTranscodeAudio(resolvedPath, res) {
   ]);
 }
 
-router.get('/stream/:contentType/:id', async (req, res) => {
-  const selection = await findSelectedMedia(req);
-
-  if (selection.error) {
-    return res.status(selection.error.status).json({ error: selection.error.message });
-  }
-
-  const { sourcePath, videoUrl } = selection;
-  const resolvedPath = resolvePlayableFilePath(sourcePath, videoUrl);
-  const ext = getSourceExtension(resolvedPath, videoUrl);
-
-  if (!resolvedPath) {
-    return res.status(404).json({ error: 'Source file is not available on the server' });
-  }
-
+router.get('/stream/:contentType/:id', async (req, res, next) => {
   try {
+    const selection = await findSelectedMedia(req);
+
+    if (selection.error) {
+      throw new AppError(selection.error.message, selection.error.status, 'MEDIA_SELECTION_ERROR');
+    }
+
+    const { sourcePath, videoUrl } = selection;
+    const resolvedPath = resolvePlayableFilePath(sourcePath, videoUrl);
+    const ext = getSourceExtension(resolvedPath, videoUrl);
+
+    if (!resolvedPath) {
+      throw new AppError('Source file is not available on the server', 404, 'NOT_FOUND');
+    }
     const strategy = await determineStreamingStrategy(resolvedPath, ext);
 
     if (strategy.mode === 'direct') {
@@ -756,7 +755,7 @@ router.get('/stream/:contentType/:id', async (req, res) => {
     }
 
     if (req.query.requireOptimized === '1') {
-      return res.status(425).json({ error: 'Optimized stream is still preparing' });
+      throw new AppError('Optimized stream is still preparing', 425, 'TOO_EARLY');
     }
 
     if (strategy.mode === 'remux-copy') {
@@ -773,24 +772,25 @@ router.get('/stream/:contentType/:id', async (req, res) => {
   } catch (error) {
     console.error(error);
     if (!res.headersSent) {
-      res.status(500).json({ error: 'Unable to prepare the video stream' });
+      next(error);
     }
   }
 });
 
-router.get('/:contentType/:id', async (req, res) => {
-  const selection = await findSelectedMedia(req);
+router.get('/:contentType/:id', async (req, res, next) => {
+  try {
+    const selection = await findSelectedMedia(req);
 
-  if (selection.error) {
-    return res.status(selection.error.status).json({ error: selection.error.message });
-  }
+    if (selection.error) {
+      throw new AppError(selection.error.message, selection.error.status, 'MEDIA_SELECTION_ERROR');
+    }
 
-  const { videoUrl, sourcePath } = selection;
-  const resolvedPath = resolvePlayableFilePath(sourcePath, videoUrl);
-  const ext = getSourceExtension(resolvedPath, videoUrl);
-  const strategy = resolvedPath
-    ? await determineStreamingStrategy(resolvedPath, ext)
-    : { mode: 'transcode' };
+    const { videoUrl, sourcePath } = selection;
+    const resolvedPath = resolvePlayableFilePath(sourcePath, videoUrl);
+    const ext = getSourceExtension(resolvedPath, videoUrl);
+    const strategy = resolvedPath
+      ? await determineStreamingStrategy(resolvedPath, ext)
+      : { mode: 'transcode' };
 
   const cachePath = resolvedPath && strategy.mode !== 'direct'
     ? buildCacheOutputPath(selection)
@@ -822,22 +822,26 @@ router.get('/:contentType/:id', async (req, res) => {
     }).toString()}`,
     ...buildMetadata(selection),
   });
+  } catch (error) {
+    next(error);
+  }
 });
 
-router.get('/prepare/:contentType/:id', async (req, res) => {
-  const selection = await findSelectedMedia(req);
+router.get('/prepare/:contentType/:id', async (req, res, next) => {
+  try {
+    const selection = await findSelectedMedia(req);
 
-  if (selection.error) {
-    return res.status(selection.error.status).json({ error: selection.error.message });
-  }
+    if (selection.error) {
+      throw new AppError(selection.error.message, selection.error.status, 'MEDIA_SELECTION_ERROR');
+    }
 
-  const { sourcePath, videoUrl } = selection;
-  const resolvedPath = resolvePlayableFilePath(sourcePath, videoUrl);
-  const ext = getSourceExtension(resolvedPath, videoUrl);
+    const { sourcePath, videoUrl } = selection;
+    const resolvedPath = resolvePlayableFilePath(sourcePath, videoUrl);
+    const ext = getSourceExtension(resolvedPath, videoUrl);
 
-  if (!resolvedPath) {
-    return res.status(404).json({ error: 'Source file is not available on the server' });
-  }
+    if (!resolvedPath) {
+      throw new AppError('Source file is not available on the server', 404, 'NOT_FOUND');
+    }
 
   const strategy = await determineStreamingStrategy(resolvedPath, ext);
 
@@ -851,11 +855,14 @@ router.get('/prepare/:contentType/:id', async (req, res) => {
     return res.json({ ready: true, strategy: strategy.mode, cachePath });
   }
 
-  ensureOptimizedCache(selection, resolvedPath, strategy).catch((error) => {
-    console.error(error);
-  });
+    ensureOptimizedCache(selection, resolvedPath, strategy).catch((error) => {
+      console.error(error);
+    });
 
-  res.json({ ready: false, strategy: strategy.mode });
+    res.json({ ready: false, strategy: strategy.mode });
+  } catch (error) {
+    next(error);
+  }
 });
 
 module.exports = router;

@@ -1,68 +1,44 @@
 import { useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useBreakpoint } from '../../../hooks';
 import WatchlistButton from '../../../components/ui/WatchlistButton';
+import { useBreakpoint, useTVMode } from '../../../hooks';
 
-function ContentRail({ title, items, type = 'default', subtitle = 'Curated now', viewAllLink, priorityCount = 0 }) {
+function ContentRail({ title, items, type = 'default', subtitle = 'Curated now', viewAllLink, priorityCount = 0, onQuickView }) {
   const scrollRef = useRef(null);
   const { isMobile, isTablet } = useBreakpoint();
+  const isTVMode = useTVMode();
   const [leftHovered, setLeftHovered] = useState(false);
   const [rightHovered, setRightHovered] = useState(false);
-  const [viewAllHovered, setViewAllHovered] = useState(false);
+
+  const accent = title.includes('Bengali')
+    ? 'var(--accent-violet)'
+    : title.includes('Trending')
+      ? 'var(--accent-pink)'
+      : 'var(--accent-cyan)';
 
   const scroll = (direction) => {
     if (!scrollRef.current) return;
-    scrollRef.current.scrollBy({ left: direction === 'left' ? -360 : 360, behavior: 'smooth' });
+    scrollRef.current.scrollBy({ left: direction === 'left' ? -380 : 380, behavior: 'smooth' });
   };
-
-  const accent = title === 'Popular on ISP Portal'
-    ? 'var(--accent-red)'
-    : title === 'Bengali Picks'
-      ? 'var(--accent-amber)'
-      : 'var(--accent-cyan)';
 
   return (
     <section style={styles.section}>
-      <div style={{ ...styles.header, ...(isMobile ? styles.headerMobile : {}) }}>
-        <div style={styles.headingCopy}>
+      <div style={{ ...styles.header, ...(isTVMode ? styles.headerTV : isMobile ? styles.headerMobile : {}) }}>
+        <div>
           <span style={{ ...styles.eyebrow, color: accent }}>{subtitle}</span>
           <h2 style={{ ...styles.title, ...(isMobile ? styles.titleMobile : {}) }}>{title}</h2>
         </div>
+
         <div style={styles.headerActions}>
-          {viewAllLink && (
-            <Link
-              to={viewAllLink}
-              style={{ ...styles.viewAll, ...(viewAllHovered ? styles.viewAllHover : {}) }}
-              onMouseEnter={() => setViewAllHovered(true)}
-              onMouseLeave={() => setViewAllHovered(false)}
-            >
-              View All
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M5 12h14M12 5l7 7-7 7" />
-              </svg>
-            </Link>
-          )}
+          {viewAllLink ? <a href={viewAllLink} style={styles.viewAll}>Open shelf</a> : null}
           {!isMobile && (
             <div style={styles.controls}>
-              <button
-                onClick={() => scroll('left')}
-                onMouseEnter={() => setLeftHovered(true)}
-                onMouseLeave={() => setLeftHovered(false)}
-                style={{ ...styles.arrowBtn, ...(leftHovered ? styles.arrowBtnHover : {}) }}
-                aria-label={`Scroll ${title} left`}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <button type="button" aria-label={`Scroll ${title} left`} onClick={() => scroll('left')} onMouseEnter={() => setLeftHovered(true)} onMouseLeave={() => setLeftHovered(false)} style={{ ...styles.arrow, ...(leftHovered ? styles.arrowHover : {}) }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
                 </svg>
               </button>
-              <button
-                onClick={() => scroll('right')}
-                onMouseEnter={() => setRightHovered(true)}
-                onMouseLeave={() => setRightHovered(false)}
-                style={{ ...styles.arrowBtn, ...(rightHovered ? styles.arrowBtnHover : {}) }}
-                aria-label={`Scroll ${title} right`}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <button type="button" aria-label={`Scroll ${title} right`} onClick={() => scroll('right')} onMouseEnter={() => setRightHovered(true)} onMouseLeave={() => setRightHovered(false)} style={{ ...styles.arrow, ...(rightHovered ? styles.arrowHover : {}) }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
                 </svg>
               </button>
@@ -71,16 +47,18 @@ function ContentRail({ title, items, type = 'default', subtitle = 'Curated now',
         </div>
       </div>
 
-      <div style={{ ...styles.rail, ...(isMobile ? styles.railMobile : {}) }} ref={scrollRef}>
+      <div style={{ ...styles.rail, ...(isTVMode ? styles.railTV : isMobile ? styles.railMobile : {}) }} ref={scrollRef}>
         {items.map((item, index) => (
           <ContentCard
             key={item.id}
             item={item}
-            type={type}
             index={index}
+            type={type}
             eager={index < priorityCount}
             compact={isMobile}
             tablet={isTablet}
+            tv={isTVMode}
+            onQuickView={() => onQuickView && onQuickView(item)}
           />
         ))}
       </div>
@@ -88,283 +66,245 @@ function ContentRail({ title, items, type = 'default', subtitle = 'Curated now',
   );
 }
 
-function ContentCard({ item, type, index, eager, compact = false, tablet = false }) {
+function ContentCard({ item, type, index, eager, compact, tablet, tv, onQuickView }) {
   const isSeries = type === 'series' || item.type === 'series';
-  const linkPath = isSeries ? `/series/${item.id}` : `/movies/${item.id}`;
-  const rankLabel = String(index + 1).padStart(2, '0');
-  const hasPoster = Boolean(item.poster);
+  const isLandscape = type === 'continue';
   const [hovered, setHovered] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
-
-  const isNew = item.year && Number(item.year) >= new Date().getFullYear();
-  const quality = item.quality || (item.resolution === '4K' ? '4K' : item.resolution === '1080p' ? 'HD' : null);
+  const genre = String(item.genre || 'Featured').split(',')[0].trim();
 
   return (
-    <div
+    <article
+      className={`content-rail-card ${tv ? 'tv-mode-card' : ''}`}
       style={{
         ...styles.cardWrap,
-        ...(compact ? styles.cardWrapMobile : tablet ? styles.cardWrapTablet : {}),
+        ...(isLandscape ? styles.cardWrapLandscape : {}),
+        ...(tv ? (isLandscape ? styles.cardWrapLandscapeTV : styles.cardWrapTV) : compact ? styles.cardWrapMobile : tablet ? styles.cardWrapTablet : {}),
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <Link
-        to={linkPath}
-        style={{ ...styles.card, animationDelay: `${index * 60}ms` }}
+      <button 
+        type="button" 
+        className="content-card-trigger"
+        style={styles.cardButton} 
+        onClick={onQuickView}
+        onFocus={() => tv && setHovered(true)}
+        onBlur={() => tv && setHovered(false)}
       >
         <div
           style={{
-            ...styles.posterWrapper,
-            transform: hovered && !compact ? 'scale(1.03)' : 'scale(1)',
+            ...styles.posterWrap,
+            aspectRatio: isLandscape ? '16 / 9' : '2 / 3',
+            transform: hovered && !compact ? 'translateY(-8px) scale(1.03)' : 'translateY(0) scale(1)',
             boxShadow: hovered && !compact
-              ? '0 24px 48px rgba(0,0,0,0.5), 0 0 28px rgba(255,90,95,0.2)'
-              : 'var(--shadow-card)',
+              ? '0 32px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,255,255,0.2), 0 0 40px rgba(0,255,255,0.1)'
+              : '0 8px 32px rgba(0,0,0,0.4)',
+            borderColor: hovered && !compact ? 'rgba(0,255,255,0.3)' : 'rgba(255,255,255,0.08)',
           }}
         >
-          {!imgLoaded && (
-            <div style={styles.posterPlaceholder} aria-hidden="true">
-              <div style={styles.placeholderShimmer} />
-              <span style={styles.placeholderLabel}>{isSeries ? 'Series' : 'Movie'}</span>
-            </div>
-          )}
-
-          {hasPoster ? (
-            <img
-              src={item.poster}
-              alt={item.title}
-              style={{ ...styles.poster, opacity: imgLoaded ? 1 : 0 }}
-              loading={eager ? 'eager' : 'lazy'}
-              fetchPriority={eager ? 'high' : 'low'}
-              decoding="async"
-              onLoad={() => setImgLoaded(true)}
-            />
-          ) : (
-            <div style={styles.posterFallback}>
-              <span style={styles.posterFallbackType}>{isSeries ? 'Series' : 'Movie'}</span>
-              <strong style={styles.posterFallbackTitle}>{item.title}</strong>
-              <span style={styles.posterFallbackMeta}>{item.year || 'Streaming now'}</span>
-            </div>
-          )}
-
-          <div style={styles.glow} />
-          <div style={styles.rankBadge}>{rankLabel}</div>
-
-          <div style={styles.topBadges}>
-            {isNew && <span style={styles.newBadge}>NEW</span>}
-            {quality && <span style={styles.qualityBadge}>{quality}</span>}
-          </div>
-
-          {type === 'continue' && item.progress && (
-            <div style={styles.progressContainer}>
-              <div style={{ ...styles.progressBar, width: `${item.progress}%` }} />
-            </div>
-          )}
-
-          <div style={styles.cardTopMeta}>
-            {item.rating && (
-              <div style={styles.rating}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="#ffc857" aria-hidden="true">
-                  <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
-                </svg>
-                <span>{item.rating}</span>
-              </div>
-            )}
-            <span style={styles.typeBadge}>{isSeries ? 'Series' : 'Movie'}</span>
-          </div>
-
-          <div style={{
-            ...styles.hoverOverlay,
-            opacity: hovered && !compact ? 1 : 0,
-            pointerEvents: hovered && !compact ? 'auto' : 'none',
-          }}>
-            <div style={{
-              ...styles.playIcon,
-              transform: hovered && !compact ? 'scale(1)' : 'scale(0.8)',
-              transition: 'transform 220ms cubic-bezier(0.34,1.56,0.64,1)',
-            }}>
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            </div>
-          </div>
-
-          {compact && (
-            <div style={styles.mobileWatchlistBtn} onClick={(e) => e.preventDefault()}>
-              <WatchlistButton
-                contentType={isSeries ? 'series' : 'movie'}
-                contentId={item.id}
-                title={item.title}
-                compact
-              />
-            </div>
-          )}
-        </div>
-
-        <div style={styles.cardInfo}>
-          <h3
-            style={{ ...styles.cardTitle, ...(compact ? styles.cardTitleMobile : {}) }}
-            title={item.title}
-          >
-            {item.title}
-          </h3>
-          <div style={styles.cardMeta}>
-            <span style={styles.cardMetaItem}>{item.genre || 'Featured'}</span>
-            <span style={styles.cardMetaDot} aria-hidden="true">·</span>
-            <span style={styles.cardMetaItem}>{item.year || 'Now'}</span>
-          </div>
-          {type === 'continue' && item.progress && (
-            <div style={styles.cardMeta}>
-              <span>{item.progress}% watched</span>
-              <span style={{ color: 'var(--accent-cyan)' }}>Resume</span>
-            </div>
-          )}
-        </div>
-      </Link>
-
-      {!compact && (
-        <div style={{
-          ...styles.desktopWatchlistBtn,
-          opacity: hovered ? 1 : 0,
-          transform: hovered ? 'translateY(0) scale(1)' : 'translateY(8px) scale(0.9)',
-        }}>
-          <WatchlistButton
-            contentType={isSeries ? 'series' : 'movie'}
-            contentId={item.id}
-            title={item.title}
-            compact
+          {!imgLoaded ? <div style={styles.posterPlaceholder}><div style={styles.posterShimmer} /></div> : null}
+          <img
+            src={item.poster}
+            alt={item.title}
+            loading={eager ? 'eager' : 'lazy'}
+            fetchPriority={eager ? 'high' : 'low'}
+            style={{
+              ...styles.poster,
+              opacity: imgLoaded ? 1 : 0,
+              transform: hovered && !compact ? 'scale(1.06)' : 'scale(1)',
+            }}
+            onLoad={() => setImgLoaded(true)}
           />
+          <div style={styles.posterOverlay} />
+
+          {/* Top badges */}
+          <div style={styles.topBadges}>
+            <span style={styles.typeBadge}>{isSeries ? 'Series' : 'Movie'}</span>
+            {item.rating ? (
+              <span style={styles.ratingBadge}>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="var(--accent-tertiary)" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                {item.rating}
+              </span>
+            ) : null}
+          </div>
+
+          {/* Bottom info on poster */}
+          <div style={styles.posterBottom}>
+            <h3 style={styles.posterTitle}>{item.title}</h3>
+            <div style={styles.posterMeta}>
+              <span style={styles.genrePill}>{genre}</span>
+              {item.year ? <span style={styles.yearText}>{item.year}</span> : null}
+              <span style={styles.langText}>{item.language || 'Mixed'}</span>
+            </div>
+          </div>
+
+          {/* Hover play overlay */}
+          {!compact && hovered ? (
+            <div style={styles.hoverOverlay}>
+              <div style={styles.playCircle}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="#08111d" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+              </div>
+              <span style={styles.hoverLabel}>Quick View</span>
+            </div>
+          ) : null}
         </div>
-      )}
-    </div>
+
+        {/* Card info below poster */}
+        <div style={styles.cardInfo}>
+          <div className="content-rail-meta" style={styles.cardMeta}>
+            <span>{genre}</span>
+            <span style={styles.metaDot}>·</span>
+            <span>{item.language || 'Mixed'}</span>
+            {item.year ? <><span style={styles.metaDot}>·</span><span>{item.year}</span></> : null}
+          </div>
+        </div>
+      </button>
+
+      <div style={styles.watchlistSlot}>
+        <WatchlistButton
+          contentType={isSeries ? 'series' : 'movie'}
+          contentId={item.id}
+          title={item.title}
+          compact
+        />
+      </div>
+    </article>
   );
 }
 
 const styles = {
   section: {
-    padding: 'var(--spacing-xl) 0',
+    padding: 'var(--spacing-md) 0 var(--spacing-lg)',
   },
   header: {
+    width: 'min(1440px, calc(100vw - 48px))',
+    margin: '0 auto 14px',
     display: 'flex',
-    alignItems: 'end',
     justifyContent: 'space-between',
-    gap: 'var(--spacing-md)',
-    padding: '0 var(--spacing-lg)',
-    maxWidth: '1400px',
-    margin: '0 auto 20px auto',
+    alignItems: 'end',
+    gap: '14px',
   },
-  headerMobile: { alignItems: 'start' },
-  headingCopy: { display: 'grid', gap: '5px' },
+  headerMobile: {
+    width: 'min(1440px, calc(100vw - 24px))',
+    alignItems: 'start',
+  },
+  headerTV: {
+    width: 'min(1720px, calc(100vw - 96px))',
+    marginBottom: '24px',
+  },
   eyebrow: {
     display: 'inline-block',
-    textTransform: 'uppercase',
-    letterSpacing: '0.18em',
+    marginBottom: '6px',
     fontSize: '0.7rem',
     fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: '0.16em',
   },
   title: {
     color: 'var(--text-primary)',
-    fontSize: '1.9rem',
-    letterSpacing: '-0.025em',
+    fontSize: 'clamp(1.3rem, 2.5vw, 1.8rem)',
   },
-  titleMobile: { fontSize: '1.35rem' },
-  headerActions: { display: 'flex', alignItems: 'center', gap: '10px' },
-  viewAll: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '6px',
-    padding: '9px 16px',
-    borderRadius: '999px',
-    background: 'rgba(255,255,255,0.06)',
-    border: '1px solid rgba(255,255,255,0.1)',
-    color: 'var(--text-secondary)',
-    fontWeight: '700',
-    fontSize: '0.8rem',
-    transition: 'background 150ms ease, color 150ms ease, border-color 150ms ease',
+  titleMobile: {
+    fontSize: '1.35rem',
   },
-  viewAllHover: {
-    background: 'rgba(255,255,255,0.12)',
-    color: 'var(--text-primary)',
-    borderColor: 'rgba(255,255,255,0.18)',
-  },
-  controls: { display: 'flex', gap: '8px' },
-  arrowBtn: {
-    width: '40px',
-    height: '40px',
-    borderRadius: '50%',
-    background: 'rgba(255,255,255,0.07)',
-    border: '1px solid rgba(255,255,255,0.1)',
-    color: 'var(--text-secondary)',
+  headerActions: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    backdropFilter: 'blur(12px)',
-    transition: 'background 150ms ease, color 150ms ease, box-shadow 150ms ease, transform 150ms ease',
-    cursor: 'pointer',
+    gap: '10px',
   },
-  arrowBtnHover: {
-    background: 'rgba(255,255,255,0.14)',
+  viewAll: {
+    padding: '9px 14px',
+    borderRadius: '12px',
+    background: 'rgba(255, 255, 255, 0.04)',
+    border: '1px solid rgba(255, 255, 255, 0.07)',
+    color: 'var(--text-muted)',
+    fontSize: '0.76rem',
+    fontWeight: '700',
+    letterSpacing: '0.04em',
+  },
+  controls: {
+    display: 'flex',
+    gap: '6px',
+  },
+  arrow: {
+    width: '36px',
+    height: '36px',
+    borderRadius: '10px',
+    background: 'rgba(255, 255, 255, 0.04)',
+    border: '1px solid rgba(255, 255, 255, 0.07)',
+    color: 'var(--text-muted)',
+    display: 'grid',
+    placeItems: 'center',
+  },
+  arrowHover: {
+    background: 'rgba(255, 255, 255, 0.1)',
     color: 'var(--text-primary)',
-    boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
-    transform: 'scale(1.08)',
+    borderColor: 'rgba(255,255,255,0.14)',
   },
   rail: {
     display: 'flex',
-    gap: '20px',
-    padding: '4px var(--spacing-lg) 12px',
+    gap: '16px',
+    padding: '6px max(24px, calc((100vw - 1440px) / 2)) 16px',
     overflowX: 'auto',
     scrollSnapType: 'x mandatory',
     scrollbarWidth: 'none',
-    msOverflowStyle: 'none',
   },
-  railMobile: { gap: '14px', padding: '4px var(--spacing-md) 12px' },
+  railMobile: {
+    gap: '12px',
+    padding: '4px 12px 8px',
+  },
+  railTV: {
+    gap: '20px',
+    padding: '6px max(48px, calc((100vw - 1720px) / 2)) 16px',
+  },
   cardWrap: {
+    position: 'relative',
     flex: '0 0 auto',
     width: '220px',
     scrollSnapAlign: 'start',
-    position: 'relative',
   },
-  cardWrapTablet: { width: '190px' },
-  cardWrapMobile: { width: '155px' },
-  card: {
+  cardWrapLandscape: {
+    width: '360px',
+  },
+  cardWrapLandscapeTV: {
+    width: '420px',
+  },
+  cardWrapTV: {
+    width: '280px',
+  },
+  cardWrapTablet: {
+    width: '196px',
+  },
+  cardWrapMobile: {
+    width: '156px',
+  },
+  cardButton: {
+    width: '100%',
+    textAlign: 'left',
     display: 'grid',
     gap: '10px',
-    animation: 'fadeUp 520ms ease both',
-    textDecoration: 'none',
-    width: '100%',
-    minWidth: 0,
   },
-  posterWrapper: {
+  posterWrap: {
     position: 'relative',
-    width: '100%',
-    borderRadius: '20px',
+    aspectRatio: '2 / 3',
+    borderRadius: '14px',
     overflow: 'hidden',
-    aspectRatio: '3 / 4',
-    background: 'var(--bg-tertiary)',
-    border: '1px solid rgba(255,255,255,0.07)',
-    transition: 'transform 300ms ease, box-shadow 300ms ease',
+    background: '#0d1a2d',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    transition: 'all 450ms cubic-bezier(0.34, 1.56, 0.64, 1)',
   },
   posterPlaceholder: {
     position: 'absolute',
     inset: 0,
-    display: 'flex',
-    alignItems: 'flex-end',
-    padding: '14px',
-    background: 'linear-gradient(160deg, #0d1e33, #0a1322)',
+    background: 'rgba(255, 255, 255, 0.03)',
   },
-  placeholderShimmer: {
+  posterShimmer: {
     position: 'absolute',
     inset: 0,
-    background: 'linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.03) 75%)',
+    background: 'linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.1), rgba(255,255,255,0.03))',
     backgroundSize: '200% 100%',
-    animation: 'shimmer 1.8s ease-in-out infinite',
-  },
-  placeholderLabel: {
-    position: 'relative',
-    color: 'rgba(255,255,255,0.18)',
-    fontSize: '0.68rem',
-    textTransform: 'uppercase',
-    letterSpacing: '0.12em',
-    fontWeight: '700',
+    animation: 'shimmer 1.8s linear infinite',
   },
   poster: {
     position: 'absolute',
@@ -372,201 +312,149 @@ const styles = {
     width: '100%',
     height: '100%',
     objectFit: 'cover',
-    transition: 'opacity 300ms ease',
+    transition: 'transform 500ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms ease',
   },
-  posterFallback: {
-    width: '100%',
-    height: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'flex-end',
-    gap: '10px',
-    padding: '18px',
-    background: 'linear-gradient(160deg, rgba(23,47,79,0.96), rgba(7,17,31,0.98) 60%, rgba(163,52,42,0.92))',
-    color: 'var(--text-primary)',
-  },
-  posterFallbackType: {
-    display: 'inline-flex',
-    alignSelf: 'flex-start',
-    padding: '0.3rem 0.65rem',
-    borderRadius: '999px',
-    background: 'rgba(255,255,255,0.08)',
-    border: '1px solid rgba(255,255,255,0.1)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.12em',
-    fontSize: '0.65rem',
-    fontWeight: '700',
-  },
-  posterFallbackTitle: { fontSize: '1.2rem', lineHeight: '1.15', textWrap: 'balance' },
-  posterFallbackMeta: { fontSize: '0.8rem', color: 'var(--text-secondary)' },
-  glow: {
+  posterOverlay: {
     position: 'absolute',
     inset: 0,
-    background: 'linear-gradient(180deg, rgba(0,0,0,0.06) 0%, rgba(7,17,31,0.02) 28%, rgba(7,17,31,0.85) 100%)',
+    background: 'linear-gradient(180deg, rgba(0,0,0,0) 25%, rgba(0,0,0,0.08) 45%, rgba(7,17,31,0.88) 100%)',
     pointerEvents: 'none',
-  },
-  rankBadge: {
-    position: 'absolute',
-    top: '12px',
-    left: '12px',
-    width: '32px',
-    height: '32px',
-    borderRadius: '50%',
-    background: 'rgba(7,17,31,0.75)',
-    border: '1px solid rgba(255,255,255,0.12)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: 'var(--text-primary)',
-    fontSize: '0.72rem',
-    fontWeight: '800',
-    backdropFilter: 'blur(10px)',
   },
   topBadges: {
     position: 'absolute',
-    top: '12px',
-    left: '50px',
+    top: '10px',
+    left: '10px',
+    right: '10px',
     display: 'flex',
-    flexDirection: 'column',
-    gap: '4px',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: '6px',
+    zIndex: 1,
   },
-  newBadge: {
-    padding: '3px 7px',
+  typeBadge: {
+    padding: '5px 10px',
     borderRadius: '6px',
-    background: 'linear-gradient(135deg, var(--accent-red), #ff8a54)',
-    color: '#fff',
-    fontSize: '0.58rem',
-    fontWeight: '800',
-    letterSpacing: '0.1em',
+    background: 'rgba(5, 12, 22, 0.6)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
+    color: '#ffffff',
+    fontSize: '0.62rem',
+    fontWeight: '900',
     textTransform: 'uppercase',
+    letterSpacing: '0.12em',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
   },
-  qualityBadge: {
-    padding: '3px 7px',
+  ratingBadge: {
+    padding: '5px 9px',
     borderRadius: '6px',
-    background: 'rgba(125,249,255,0.16)',
-    border: '1px solid rgba(125,249,255,0.28)',
+    background: 'rgba(5, 12, 22, 0.6)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
     color: 'var(--accent-cyan)',
-    fontSize: '0.58rem',
-    fontWeight: '800',
-    letterSpacing: '0.08em',
-  },
-  progressContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '4px',
-    background: 'rgba(255,255,255,0.15)',
-  },
-  progressBar: {
-    height: '100%',
-    background: 'linear-gradient(90deg, var(--accent-red), var(--accent-amber))',
-    boxShadow: '0 0 6px rgba(255,90,95,0.5)',
-  },
-  cardTopMeta: {
-    position: 'absolute',
-    top: '12px',
-    right: '12px',
-    display: 'grid',
-    gap: '5px',
-    justifyItems: 'end',
-  },
-  rating: {
+    fontSize: '0.7rem',
+    fontWeight: '900',
     display: 'flex',
     alignItems: 'center',
     gap: '4px',
-    background: 'rgba(7,17,31,0.78)',
-    padding: '4px 8px',
-    borderRadius: '999px',
-    fontSize: '0.72rem',
-    fontWeight: '700',
-    color: 'var(--text-primary)',
-    backdropFilter: 'blur(10px)',
-    border: '1px solid rgba(255,200,87,0.2)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
   },
-  typeBadge: {
+  posterBottom: {
+    position: 'absolute',
+    left: '10px',
+    right: '10px',
+    bottom: '10px',
+    zIndex: 1,
+  },
+  posterTitle: {
+    color: '#fff',
+    fontSize: '0.88rem',
+    fontWeight: '700',
+    lineHeight: '1.3',
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
+    overflow: 'hidden',
+    marginBottom: '6px',
+    textShadow: '0 2px 10px rgba(0,0,0,0.6)',
+    letterSpacing: '-0.01em',
+  },
+  posterMeta: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    flexWrap: 'wrap',
+  },
+  genrePill: {
+    padding: '3px 8px',
+    borderRadius: '6px',
     background: 'rgba(255,255,255,0.12)',
-    padding: '4px 8px',
-    borderRadius: '999px',
+    color: 'rgba(255,255,255,0.9)',
     fontSize: '0.62rem',
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: '0.1em',
-    color: 'var(--text-primary)',
-    backdropFilter: 'blur(8px)',
+    letterSpacing: '0.06em',
+  },
+  yearText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: '0.68rem',
+    fontWeight: '600',
+  },
+  langText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: '0.66rem',
+    fontWeight: '600',
   },
   hoverOverlay: {
     position: 'absolute',
     inset: 0,
     display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'rgba(7,17,31,0.42)',
-    transition: 'opacity 200ms ease',
+    gap: '10px',
+    background: 'rgba(0,0,0,0.35)',
+    backdropFilter: 'blur(2px)',
+    zIndex: 2,
   },
-  playIcon: {
-    width: '56px',
-    height: '56px',
+  playCircle: {
+    width: '50px',
+    height: '50px',
     borderRadius: '50%',
-    background: 'rgba(255,255,255,0.2)',
-    border: '1.5px solid rgba(255,255,255,0.3)',
-    color: '#fff',
+    background: 'rgba(255,255,255,0.95)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    backdropFilter: 'blur(12px)',
-    boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+    boxShadow: '0 8px 28px rgba(0,0,0,0.35)',
+    paddingLeft: '3px',
   },
-  mobileWatchlistBtn: {
-    position: 'absolute',
-    bottom: '10px',
-    right: '10px',
-  },
-  desktopWatchlistBtn: {
-    position: 'absolute',
-    top: '10px',
-    right: '10px',
-    transition: 'opacity 200ms ease, transform 220ms cubic-bezier(0.34,1.56,0.64,1)',
-    zIndex: 2,
+  hoverLabel: {
+    color: '#fff',
+    fontSize: '0.7rem',
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: '0.1em',
+    textShadow: '0 2px 8px rgba(0,0,0,0.5)',
   },
   cardInfo: {
-    display: 'grid',
-    gap: '5px',
-    width: '100%',
-    minWidth: 0,
+    padding: '0 2px',
   },
-  cardTitle: {
-    fontSize: '1rem',
-    color: 'var(--text-primary)',
-    lineHeight: '1.25',
-    overflow: 'hidden',
-    display: '-webkit-box',
-    WebkitLineClamp: 2,
-    WebkitBoxOrient: 'vertical',
-    fontWeight: '700',
-    minWidth: 0,
-  },
-  cardTitleMobile: { fontSize: '0.85rem' },
   cardMeta: {
     display: 'flex',
     alignItems: 'center',
     gap: '5px',
     color: 'var(--text-muted)',
-    fontSize: '0.76rem',
-    width: '100%',
-    minWidth: 0,
-    overflow: 'hidden',
+    fontSize: '0.72rem',
+    textTransform: 'capitalize',
   },
-  cardMetaItem: {
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    minWidth: 0,
-    flex: '1 1 0',
+  metaDot: {
+    opacity: 0.4,
+    fontSize: '0.6rem',
   },
-  cardMetaDot: {
-    opacity: 0.5,
-    flexShrink: 0,
+  watchlistSlot: {
+    position: 'absolute',
+    top: '8px',
+    right: '8px',
+    zIndex: 3,
   },
 };
 

@@ -16,6 +16,15 @@ const {
   upsertScannedItem,
 } = require('../data/store');
 const { enrichItemWithMetadata } = require('./metadata-enricher');
+const {
+  buildSeriesSeasons: buildSeriesSeasonsFromParser,
+  cleanTitle,
+  countEpisodeLikeFiles,
+  hasSequentialEpisodePattern,
+  looksLikeSeasonFolder,
+  parseEpisodeIdentity,
+  slugify,
+} = require('./scanner-series-parser');
 
 const VIDEO_EXTENSIONS = new Set(
   String(process.env.SCANNER_VIDEO_EXTENSIONS || '.mp4,.mkv,.avi,.mov,.wmv,.m4v,.webm,.ts,.m2ts,.mpg,.mpeg,.3gp,.flv,.vob')
@@ -37,10 +46,31 @@ const DEFAULT_MOVIE_DEPTH = Math.max(1, Number(process.env.SCANNER_DEFAULT_MOVIE
 const DEFAULT_BATCH_SIZE = 25;
 const DEFAULT_MEDIA_LIBRARY_ROOT = process.env.SCANNER_MEDIA_ROOT || '/var/www/html';
 const ENABLE_AUTO_DISCOVER_ROOTS = process.env.SCANNER_AUTO_DISCOVER_ROOTS !== 'false';
+const AUTO_DISCOVER_MAX_DEPTH = Math.max(1, Number(process.env.SCANNER_AUTO_DISCOVER_MAX_DEPTH || 3));
+const AUTO_SCAN_INTERVAL_MINUTES = Math.max(0, Number(process.env.SCANNER_AUTO_SCAN_INTERVAL_MINUTES || 0));
 const SKIP_DISCOVERY_NAMES = new Set(['portal', 'uploads', 'assets', 'css', 'js', 'api']);
+const SKIP_DISCOVERY_PATTERNS = [
+  /\bcache\b/i,
+  /\bbackup\b/i,
+  /\btmp\b/i,
+  /\btemp\b/i,
+  /\bthumbnail\b/i,
+  /\bposter\b/i,
+  /\bpreview\b/i,
+  /\btrailer\b/i,
+  /\bsubtitle\b/i,
+];
+const BLOCKED_AUTO_ROOT_PATTERNS = [
+  /\bebook\b/i,
+  /\bsoftware\b/i,
+  /\btutorial\b/i,
+  /\bdocs?\b/i,
+  /\bdocumentary\b/i,
+];
 
 let currentScanJob = null;
 let currentScanChild = null;
+let autoScanTimer = null;
 
 function isPosixAbsolutePath(value) {
   return /^\/[^/]+/.test(String(value || '').trim());
@@ -97,25 +127,9 @@ function waitForImmediate() {
   return new Promise((resolve) => setImmediate(resolve));
 }
 
-function slugify(value) {
-  return String(value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .trim();
-}
-
 function toPublicUrl(root, absolutePath) {
   const relativePath = path.relative(root.scanPath, absolutePath).split(path.sep).join('/');
   return `${root.publicBaseUrl}/${relativePath.split('/').map(encodeURIComponent).join('/')}`.replace(/%2520/g, '%20');
-}
-
-function cleanTitle(name) {
-  return name
-    .replace(/\.[^.]+$/, '')
-    .replace(/[._]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
 }
 
 function extractYear(value) {
@@ -123,99 +137,57 @@ function extractYear(value) {
   return match ? Number(match[0]) : null;
 }
 
-function parseSeasonNumber(seasonName, fallbackNumber) {
-  const match = String(seasonName || '').match(/\b(\d+)\b/);
-  if (match) {
-    return Number(match[1]);
-  }
-  return fallbackNumber;
+function buildSeriesSeasons(root, seriesFolderName, seriesPath, preferredSeasonLabel = 'Season 1') {
+  return buildSeriesSeasonsFromParser(root, seriesFolderName, seriesPath, {
+    listFiles,
+    listDirectories,
+    listVideoFiles,
+    toPublicUrl,
+    preferredSeasonLabel,
+  });
 }
 
-function parseEpisodeNumber(filename, fallbackNumber) {
-  const identity = parseEpisodeIdentity(filename);
-  if (Number.isFinite(identity.episode) && identity.episode > 0) {
-    return identity.episode;
+function detectSeriesFolder(root, folderPath, files = [], nestedDirectories = []) {
+  if (root.type === 'series') {
+    return true;
   }
-  return fallbackNumber;
+
+  const directVideoFiles = listVideoFiles(files, folderPath, 'series');
+  const directEpisodeLikeCount = countEpisodeLikeFiles(files);
+  if (directEpisodeLikeCount >= 2) {
+    return true;
+  }
+
+  if (directVideoFiles.length >= 2 && hasSequentialEpisodePattern(directVideoFiles)) {
+    return true;
+  }
+
+  const seasonLikeDirectories = nestedDirectories.filter((dirName) => looksLikeSeasonFolder(dirName));
+  if (seasonLikeDirectories.length) {
+    return seasonLikeDirectories.some((dirName) => {
+      const seasonPath = path.join(folderPath, dirName);
+      const seasonFiles = listFiles(seasonPath);
+      const seasonVideoFiles = listVideoFiles(seasonFiles, seasonPath, 'series');
+      return countEpisodeLikeFiles(seasonFiles) >= 1
+        || seasonVideoFiles.length >= 2
+        || hasSequentialEpisodePattern(seasonVideoFiles);
+    });
+  }
+
+  return false;
 }
 
-function parseEpisodeIdentity(filename) {
-  const input = String(filename || '');
-  const basename = cleanTitle(path.basename(input, path.extname(input)));
-
-  // S01E01, Season 1 Episode 1, etc.
-  const seasonEpisodeMatch = basename.match(/\bS(?:eason)?\s*(\d{1,2})\s*[-_. ]*E(?:p(?:isode)?)?\s*(\d{1,3})\b/i)
-    || basename.match(/\b(\d{1,2})x(\d{1,3})\b/i)
-    || basename.match(/\bS(\d{1,2})\s*(\d{2,3})\b/i); // S101 or S0101
-  
-  if (seasonEpisodeMatch) {
-    return {
-      season: Number(seasonEpisodeMatch[1]),
-      episode: Number(seasonEpisodeMatch[2]),
-    };
-  }
-
-  // Episode 1, E01, Ep 1, [01], - 01 -
-  const episodeOnlyMatch = basename.match(/\bE(?:p(?:isode)?)?\s*(\d{1,3})\b/i)
-    || basename.match(/\bEpisode\s*(\d{1,3})\b/i)
-    || basename.match(/\[(\d{1,3})\]/)
-    || basename.match(/\s*-\s*(\d{1,3})\s*-\s*/)
-    || basename.match(/(?:^|[^\d])(\d{1,3})(?:[^\d]|$)(?!.*\d)/);
-
-  if (episodeOnlyMatch) {
-    return {
-      season: null,
-      episode: Number(episodeOnlyMatch[1]),
-    };
-  }
+function assignScannerTaxonomy(item) {
+  const genres = Array.isArray(item.genres) ? item.genres.filter(Boolean) : [];
+  const primaryGenre = genres[0] || '';
+  const fallbackCategory = item.type === 'series' ? 'TV Series' : 'Movies';
 
   return {
-    season: null,
-    episode: null,
+    ...item,
+    category: primaryGenre || item.category || fallbackCategory,
+    collection: item.collection || (item.type === 'series' ? 'Series' : 'Movies'),
+    tags: Array.isArray(item.tags) && item.tags.length ? item.tags : genres,
   };
-}
-
-function sortEpisodeFiles(files = []) {
-  return [...files].sort((left, right) => {
-    const leftIdentity = parseEpisodeIdentity(left);
-    const rightIdentity = parseEpisodeIdentity(right);
-    const leftSeason = Number.isFinite(leftIdentity.season) ? leftIdentity.season : Number.MAX_SAFE_INTEGER;
-    const rightSeason = Number.isFinite(rightIdentity.season) ? rightIdentity.season : Number.MAX_SAFE_INTEGER;
-    const leftEpisode = Number.isFinite(leftIdentity.episode) ? leftIdentity.episode : Number.MAX_SAFE_INTEGER;
-    const rightEpisode = Number.isFinite(rightIdentity.episode) ? rightIdentity.episode : Number.MAX_SAFE_INTEGER;
-
-    if (leftSeason !== rightSeason) {
-      return leftSeason - rightSeason;
-    }
-
-    if (leftEpisode !== rightEpisode) {
-      return leftEpisode - rightEpisode;
-    }
-
-    return left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' });
-  });
-}
-
-function buildEpisodesFromFiles(root, seriesSlug, seasonPath, seasonNumber, files) {
-  const sortedFiles = sortEpisodeFiles(files);
-  const usedEpisodeNumbers = new Set();
-
-  return sortedFiles.map((file, episodeIndex) => {
-    let parsedNumber = parseEpisodeNumber(file, episodeIndex + 1);
-    if (!Number.isFinite(parsedNumber) || parsedNumber <= 0 || usedEpisodeNumbers.has(parsedNumber)) {
-      parsedNumber = episodeIndex + 1;
-    }
-    usedEpisodeNumbers.add(parsedNumber);
-
-    return {
-      id: `${seriesSlug}-${seasonNumber}-${parsedNumber}`,
-      number: parsedNumber,
-      title: cleanTitle(file),
-      videoUrl: toPublicUrl(root, path.join(seasonPath, file)),
-      sourcePath: path.join(seasonPath, file),
-      duration: '',
-    };
-  });
 }
 
 function listDirectoryEntries(dirPath) {
@@ -233,15 +205,43 @@ function normalizePathForCompare(input) {
   return String(input || '').replace(/[\\/]+/g, '/').toLowerCase();
 }
 
+function pathsOverlap(left, right) {
+  const normalizedLeft = normalizePathForCompare(left).replace(/\/+$/, '');
+  const normalizedRight = normalizePathForCompare(right).replace(/\/+$/, '');
+
+  if (!normalizedLeft || !normalizedRight) {
+    return false;
+  }
+
+  return normalizedLeft === normalizedRight
+    || normalizedLeft.startsWith(`${normalizedRight}/`)
+    || normalizedRight.startsWith(`${normalizedLeft}/`);
+}
+
 function shouldSkipDiscoveryDir(name) {
   const normalized = String(name || '').trim().toLowerCase();
   if (!normalized) {
     return true;
   }
+  if (isBlockedAutoRootName(normalized)) {
+    return true;
+  }
   if (SKIP_DISCOVERY_NAMES.has(normalized)) {
     return true;
   }
+  if (SKIP_DISCOVERY_PATTERNS.some((pattern) => pattern.test(normalized))) {
+    return true;
+  }
   return normalized.startsWith('.');
+}
+
+function isBlockedAutoRootName(value) {
+  const normalized = String(value || '').trim();
+  if (!normalized) {
+    return true;
+  }
+
+  return BLOCKED_AUTO_ROOT_PATTERNS.some((pattern) => pattern.test(normalized));
 }
 
 function hasVideoInTree(rootPath, maxDepth = 3) {
@@ -262,12 +262,88 @@ function hasVideoInTree(rootPath, maxDepth = 3) {
   return false;
 }
 
-function inferRootType(label, scanPath) {
-  const source = `${label} ${scanPath}`.toLowerCase();
-  if (/\b(tv|series|season|episode|web series)\b/.test(source)) {
+function inferRootType(label, scanPath, stats = {}) {
+  const source = `${label} ${scanPath}`
+    .toLowerCase()
+    .replace(/[_./\\-]+/g, ' ');
+  if (/\b(tv|series|season|episode|web\s+series|anime)\b/.test(source)) {
     return 'series';
   }
-  return 'movie';
+  if (/\b(movie|movies|film|cinema|dubbed)\b/.test(source)) {
+    return 'movie';
+  }
+  if ((stats.seriesSignals || 0) > (stats.movieSignals || 0) && (stats.seriesSignals || 0) >= 1) {
+    return 'series';
+  }
+  if ((stats.movieSignals || 0) >= 1) {
+    return 'movie';
+  }
+  return '';
+}
+
+function inspectDirectoryShape(dirPath) {
+  const entries = listDirectoryEntries(dirPath);
+  const files = entries.filter((entry) => entry.isFile()).map((entry) => entry.name);
+  const directories = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+  const directMovieVideos = listVideoFiles(files, dirPath, 'movie');
+  const directSeriesVideos = listVideoFiles(files, dirPath, 'series');
+  const seasonLikeDirectories = directories.filter((dirName) => looksLikeSeasonFolder(dirName));
+  const yearDirectories = directories.filter((dirName) => isYearFolderName(dirName));
+  const episodicDirectories = directories.filter((dirName) => {
+    const childPath = path.join(dirPath, dirName);
+    const childFiles = listFiles(childPath);
+    const childDirectories = listDirectories(childPath);
+    return detectSeriesFolder({ type: 'movie' }, childPath, childFiles, childDirectories);
+  });
+
+  return {
+    files,
+    directories,
+    directMovieVideos,
+    directSeriesVideos,
+    seasonLikeDirectories,
+    yearDirectories,
+    episodicDirectories,
+    seriesSignals: Number(seasonLikeDirectories.length > 0)
+      + Number(episodicDirectories.length >= 2)
+      + Number(countEpisodeLikeFiles(files) >= 2)
+      + Number(directSeriesVideos.length >= 2 && hasSequentialEpisodePattern(directSeriesVideos)),
+    movieSignals: Number(yearDirectories.length >= 2)
+      + Number(directMovieVideos.length >= 2)
+      + Number(directories.length >= 2 && directories.every((dirName) => isYearFolderName(dirName) || hasVideoInTree(path.join(dirPath, dirName), 1))),
+  };
+}
+
+function classifyAutoDiscoveredRoot(dirPath) {
+  const dirName = path.basename(dirPath);
+  if (isBlockedAutoRootName(dirName)) {
+    return null;
+  }
+
+  const stats = inspectDirectoryShape(dirPath);
+  const type = inferRootType(dirName, dirPath, stats);
+  if (!type) {
+    return null;
+  }
+
+  if (type === 'series' && (stats.seriesSignals || 0) < 1 && !/\b(tv|series|season|episode|web\s+series|anime)\b/i.test(dirName)) {
+    return null;
+  }
+
+  if (type === 'movie' && (stats.movieSignals || 0) < 1 && !/\b(movie|movies|film|cinema|dubbed)\b/i.test(dirName)) {
+    return null;
+  }
+
+  if (type === 'series' && !hasVideoInTree(dirPath, 4)) {
+    return null;
+  }
+  if (type === 'movie' && !hasVideoInTree(dirPath, 4)) {
+    return null;
+  }
+  return {
+    type,
+    stats,
+  };
 }
 
 function discoverScannerRoots() {
@@ -275,35 +351,56 @@ function discoverScannerRoots() {
     return [];
   }
 
-  const topDirs = listDirectories(DEFAULT_MEDIA_LIBRARY_ROOT);
+  const queue = [{ folderPath: DEFAULT_MEDIA_LIBRARY_ROOT, depth: 0 }];
   const discovered = [];
-  for (const dirName of topDirs) {
-    if (shouldSkipDiscoveryDir(dirName)) {
-      continue;
+  const seenPaths = new Set();
+
+  while (queue.length) {
+    const current = queue.shift();
+    for (const dirName of listDirectories(current.folderPath)) {
+      if (shouldSkipDiscoveryDir(dirName)) {
+        continue;
+      }
+
+      const absolutePath = path.join(current.folderPath, dirName);
+      const normalizedPath = normalizePathForCompare(absolutePath);
+      if (seenPaths.has(normalizedPath)) {
+        continue;
+      }
+      seenPaths.add(normalizedPath);
+
+      const classification = classifyAutoDiscoveredRoot(absolutePath);
+      if (classification) {
+        const relativePath = path.relative(DEFAULT_MEDIA_LIBRARY_ROOT, absolutePath).split(path.sep).join('/');
+        const publicPath = relativePath.split('/').map((segment) => encodeURIComponent(segment)).join('/');
+        const autoId = `auto-${slugify(relativePath)}`;
+        discovered.push({
+          id: autoId,
+          label: `Auto: ${cleanTitle(dirName)}`,
+          type: classification.type,
+          scanPath: absolutePath,
+          publicBaseUrl: `/${publicPath}`.replace(/%2F/g, '/'),
+          language: classification.type === 'series' ? 'English' : 'Unknown',
+          category: classification.type === 'series' ? 'TV Series' : 'Auto Movies',
+          maxDepth: classification.type === 'movie' ? DEFAULT_MOVIE_DEPTH : 2,
+          batchSize: classification.type === 'movie' ? 40 : 30,
+          discovered: true,
+        });
+        continue;
+      }
+
+      if (current.depth < AUTO_DISCOVER_MAX_DEPTH && hasVideoInTree(absolutePath, 2)) {
+        queue.push({ folderPath: absolutePath, depth: current.depth + 1 });
+      }
     }
-    const absolutePath = path.join(DEFAULT_MEDIA_LIBRARY_ROOT, dirName);
-    if (!hasVideoInTree(absolutePath, 3)) {
-      continue;
-    }
-    const type = inferRootType(dirName, absolutePath);
-    discovered.push({
-      id: `auto-${slugify(dirName)}`,
-      label: `Auto: ${cleanTitle(dirName)}`,
-      type,
-      scanPath: absolutePath,
-      publicBaseUrl: `/${encodeURIComponent(dirName).replace(/%2F/g, '/')}`,
-      language: type === 'series' ? 'English' : 'Unknown',
-      category: type === 'series' ? 'TV Series' : 'Auto Movies',
-      maxDepth: type === 'movie' ? DEFAULT_MOVIE_DEPTH : 2,
-      batchSize: type === 'movie' ? 40 : 30,
-      discovered: true,
-    });
   }
+
   return discovered;
 }
 
 function getEffectiveRoots() {
-  const configured = loadScannerRoots().map((root) => ({
+  const persistedRoots = loadScannerRoots();
+  const configured = persistedRoots.filter((root) => !root.discovered && !String(root.id || '').startsWith('auto-')).map((root) => ({
     ...root,
     maxDepth: root.maxDepth ?? (root.type === 'movie' ? DEFAULT_MOVIE_DEPTH : 1),
     batchSize: root.batchSize ?? DEFAULT_BATCH_SIZE,
@@ -314,11 +411,17 @@ function getEffectiveRoots() {
   const configuredPathSet = new Set(configured.map((root) => normalizePathForCompare(root.scanPath)));
   const merged = [...configured];
   for (const root of discovered) {
-    if (!configuredPathSet.has(normalizePathForCompare(root.scanPath))) {
+    const discoveredPath = normalizePathForCompare(root.scanPath);
+    const overlapsConfiguredRoot = configured.some((configuredRoot) => pathsOverlap(configuredRoot.scanPath, root.scanPath));
+    if (!configuredPathSet.has(discoveredPath) && !overlapsConfiguredRoot) {
       merged.push(root);
     }
   }
   return merged;
+}
+
+function listScannerRoots() {
+  return getEffectiveRoots();
 }
 
 function listDirectories(dirPath) {
@@ -689,15 +792,71 @@ async function processMovieRoot(root, summary, progressCallback, scanContext) {
     for (const folderPath of batch) {
       const relativeFolder = path.relative(root.scanPath, folderPath) || '.';
       const files = listFiles(folderPath);
+      const nestedDirectories = listDirectories(folderPath);
       const fingerprint = getFolderFingerprint(folderPath);
       const previousFingerprint = rootState.folders?.[relativeFolder]?.fingerprint;
-      const movieCandidates = buildMovieCandidates(root, folderPath, relativeFolder, files);
+      const isSeriesFolder = relativeFolder !== '.' && detectSeriesFolder(root, folderPath, files, nestedDirectories);
+      const movieCandidates = isSeriesFolder ? [] : buildMovieCandidates(root, folderPath, relativeFolder, files);
 
       updateRootProgress(summary, root.id, {
         processed: Math.min(start + batch.indexOf(folderPath) + 1, candidateFolders.length),
       });
 
       if (!movieCandidates.length) {
+        if (!isSeriesFolder) {
+          continue;
+        }
+
+        const { seasons, seriesFiles } = buildSeriesSeasons(root, path.basename(folderPath), folderPath);
+        if (!seasons.length) {
+          continue;
+        }
+
+        const item = createBaseScannerItem(root, {
+          title: cleanTitle(path.basename(folderPath)),
+          slug: slugify(path.basename(folderPath)),
+          type: 'series',
+          year: extractYear(relativeFolder) || extractYear(path.basename(folderPath)),
+          poster: pickPoster(root, folderPath, seriesFiles),
+          backdrop: pickBackdrop(root, folderPath, seriesFiles),
+          seasonCount: seasons.length,
+          episodeCount: seasons.reduce((sum, season) => sum + season.episodes.length, 0),
+          seasons,
+          sourcePath: folderPath,
+          sourcePublicPath: toPublicUrl(root, folderPath),
+          scanSignature: `${root.id}:${relativeFolder}`,
+          lastScanRunId: scanContext.runId,
+          lastScanRunAt: scanContext.startedAt,
+        });
+        seenSignatures.add(item.scanSignature);
+
+        const enrichedItem = assignScannerTaxonomy(await enrichItemWithMetadata(item));
+        const result = await upsertScannedItem(enrichedItem);
+        nextRootState.folders[relativeFolder] = {
+          fingerprint,
+          scanSignature: item.scanSignature,
+          title: enrichedItem.title,
+          updatedAt: new Date().toISOString(),
+        };
+
+        if (result.created) {
+          summary.created += 1;
+        }
+        if (result.updated) {
+          summary.updated += 1;
+        }
+        if (result.item.duplicateCount > 0) {
+          summary.duplicateDrafts += 1;
+        }
+        summary.drafts.push(result.item);
+
+        const current = summary.rootResults.find((entry) => entry.id === root.id);
+        updateRootProgress(summary, root.id, {
+          discovered: (current?.discovered || 0) + 1,
+          created: (current?.created || 0) + (result.created ? 1 : 0),
+          updated: (current?.updated || 0) + (result.updated ? 1 : 0),
+          duplicateDrafts: (current?.duplicateDrafts || 0) + (result.item.duplicateCount > 0 ? 1 : 0),
+        });
         continue;
       }
 
@@ -731,7 +890,7 @@ async function processMovieRoot(root, summary, progressCallback, scanContext) {
           lastScanRunAt: scanContext.startedAt,
         });
 
-        const enrichedItem = await enrichItemWithMetadata(item);
+        const enrichedItem = assignScannerTaxonomy(await enrichItemWithMetadata(item));
         const result = await upsertScannedItem(enrichedItem);
         nextRootState.folders[relativeFolder] = {
           fingerprint,
@@ -804,8 +963,6 @@ async function processSeriesRoot(root, summary, progressCallback, scanContext) {
       const fingerprint = getFolderFingerprint(seriesPath);
       const previousFingerprint = rootState.folders?.[relativeFolder]?.fingerprint;
       const seriesFiles = listFiles(seriesPath);
-      const seasonFolderNames = listDirectories(seriesPath);
-
       updateRootProgress(summary, root.id, {
         processed: Math.min(start + batch.indexOf(folderName) + 1, seriesFolders.length),
       });
@@ -817,42 +974,7 @@ async function processSeriesRoot(root, summary, progressCallback, scanContext) {
         continue;
       }
 
-      const seasons = [];
-
-      if (seasonFolderNames.length) {
-        for (const [seasonIndex, seasonName] of seasonFolderNames.entries()) {
-          const seasonPath = path.join(seriesPath, seasonName);
-          const seasonFiles = listFiles(seasonPath);
-          const episodeFiles = listVideoFiles(seasonFiles, seasonPath, 'series');
-
-          if (!episodeFiles.length) {
-            continue;
-          }
-
-          const seriesSlug = slugify(folderName);
-          const seasonNumber = parseSeasonNumber(seasonName, seasonIndex + 1);
-          seasons.push({
-            id: `${seriesSlug}-season-${seasonNumber}`,
-            number: seasonNumber,
-            title: cleanTitle(seasonName),
-            sourcePath: seasonPath,
-            episodes: buildEpisodesFromFiles(root, seriesSlug, seasonPath, seasonNumber, episodeFiles),
-          });
-        }
-      } else {
-        const episodeFiles = listVideoFiles(seriesFiles, seriesPath, 'series');
-
-        if (episodeFiles.length) {
-          const seriesSlug = slugify(folderName);
-          seasons.push({
-            id: `${seriesSlug}-season-1`,
-            number: 1,
-            title: 'Season 1',
-            sourcePath: seriesPath,
-            episodes: buildEpisodesFromFiles(root, seriesSlug, seriesPath, 1, episodeFiles),
-          });
-        }
-      }
+      const { seasons } = buildSeriesSeasons(root, folderName, seriesPath);
 
       if (!seasons.length) {
         continue;
@@ -876,7 +998,7 @@ async function processSeriesRoot(root, summary, progressCallback, scanContext) {
       });
       seenSignatures.add(item.scanSignature);
 
-      const enrichedItem = await enrichItemWithMetadata(item);
+      const enrichedItem = assignScannerTaxonomy(await enrichItemWithMetadata(item));
       const result = await upsertScannedItem(enrichedItem);
       nextRootState.folders[relativeFolder] = {
         fingerprint,
@@ -1231,12 +1353,38 @@ function bootstrapScannerRuntime() {
   }
 }
 
+function bootstrapAutoScanScheduler() {
+  if (AUTO_SCAN_INTERVAL_MINUTES <= 0 || autoScanTimer) {
+    return;
+  }
+
+  const intervalMs = AUTO_SCAN_INTERVAL_MINUTES * 60 * 1000;
+  autoScanTimer = setInterval(() => {
+    if (currentScanJob?.status === 'running') {
+      return;
+    }
+    startScanJob([]);
+  }, intervalMs);
+
+  if (typeof autoScanTimer.unref === 'function') {
+    autoScanTimer.unref();
+  }
+}
+
 bootstrapScannerRuntime();
+bootstrapAutoScanScheduler();
 
 module.exports = {
   getCurrentScanJob,
   getScannerHealth,
+  listScannerRoots,
   scanSelectedRoots,
   startScanJob,
   stopScanJob,
+  __test__: {
+    classifyAutoDiscoveredRoot,
+    parseEpisodeIdentity,
+    detectSeriesFolder,
+    assignScannerTaxonomy,
+  },
 };
