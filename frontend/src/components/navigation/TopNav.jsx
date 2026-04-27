@@ -1,77 +1,86 @@
 import { useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import MobileNav from './MobileNav';
 import ProfileMenu from './ProfileMenu';
-import { useBreakpoint } from '../../hooks';
+import { useBreakpoint, useTVMode } from '../../hooks';
 
 const navItems = [
   { path: '/', label: 'Home' },
   { path: '/movies', label: 'Movies' },
   { path: '/series', label: 'Series' },
   { path: '/tv', label: 'Live TV' },
-  { path: '/browse', label: 'Discover' },
+  { path: '/browse', label: 'Browse' },
   { path: '/watchlist', label: 'Watchlist' },
 ];
 
 function TopNav() {
   const location = useLocation();
-  const navigate = useNavigate();
   const [isScrolled, setIsScrolled] = useState(false);
-  const [searchText, setSearchText] = useState('');
   const [hoveredLink, setHoveredLink] = useState(null);
-  const [searchFocused, setSearchFocused] = useState(false);
-  const { isMobile, isTablet, isSmallMobile } = useBreakpoint();
+  const { isMobile, isTablet, isSmallMobile, width } = useBreakpoint();
+  const isTVMode = useTVMode();
+  const isDesktop = !isMobile && !isTablet;
+  const isCompactDesktop = isDesktop && width < 1520;
+  const isWideDesktop = isDesktop && width >= 1520;
+  const isTightDesktop = isDesktop && width < 1380;
+  const isVeryTightDesktop = isDesktop && width < 1280;
+  const showSubtitle = isDesktop && width >= 1560;
+  const showFullSearchText = isDesktop && width >= 1480;
+  const showLiveChip = isDesktop && width >= 1600;
+  const visibleNavItems = isTightDesktop ? navItems.filter((item) => item.path !== '/watchlist') : navItems;
 
   const user = (() => {
     const storedUser = localStorage.getItem('user');
     if (!storedUser) return null;
-    try { return JSON.parse(storedUser); } catch { return null; }
+    try {
+      return JSON.parse(storedUser);
+    } catch {
+      return null;
+    }
   })();
 
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 28);
+    const handleScroll = () => setIsScrolled(window.scrollY > 24);
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  function submitSearch(event) {
-    event.preventDefault();
-    const params = new URLSearchParams();
-    if (searchText.trim()) params.set('q', searchText.trim());
-    navigate(`/browse${params.toString() ? `?${params.toString()}` : ''}`);
-  }
-
   return (
     <nav
       aria-label="Primary"
+      className="top-nav-container"
       style={{
         ...styles.nav,
         ...(isMobile ? styles.navMobile : isTablet ? styles.navTablet : {}),
         ...(isScrolled ? styles.navScrolled : {}),
       }}
     >
-      <div style={{ ...styles.container, ...(isMobile ? styles.containerMobile : isTablet ? styles.containerTablet : {}) }}>
+      <div style={{ ...styles.container, ...(isCompactDesktop ? styles.containerCompactDesktop : {}), ...(isMobile ? styles.containerMobile : {}) }}>
         <Link to="/" style={{ ...styles.logo, ...(isSmallMobile ? styles.logoCompact : {}) }}>
-          <span style={styles.logoBadge}>ISP</span>
+          <span style={styles.logoMark}>S4U</span>
           <div style={{ ...styles.logoCopy, ...(isSmallMobile ? styles.logoCopyCompact : {}) }}>
-            <span style={styles.logoText}>Entertainment Portal</span>
-            {!isSmallMobile && <span style={styles.logoSub}>Premium local streaming</span>}
+            <span style={styles.logoTitle}>Entertainment Portal</span>
+            {!isSmallMobile && showSubtitle && <span style={styles.logoSubtitle}>Movies, series and live TV in one place</span>}
           </div>
         </Link>
 
         {!isMobile && (
-          <ul style={{ ...styles.navLinks, ...(isTablet ? styles.navLinksTablet : {}) }}>
-            {navItems.map((item) => {
-              const isActive = location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path));
+          <ul style={{ ...styles.links, ...(isTablet ? styles.linksTablet : {}), ...(isCompactDesktop ? styles.linksCompactDesktop : {}) }}>
+            {visibleNavItems.map((item) => {
+              const isActive = item.path === '/'
+                ? location.pathname === '/'
+                : location.pathname.startsWith(item.path);
+
               return (
                 <li key={item.path}>
                   <Link
                     to={item.path}
+                    className="top-nav-link"
                     style={{
-                      ...styles.navLink,
-                      ...(isTablet ? styles.navLinkTablet : {}),
-                      ...(isActive ? styles.navLinkActive : {}),
-                      ...(hoveredLink === item.path && !isActive ? styles.navLinkHover : {}),
+                      ...styles.link,
+                      ...(isTablet || isCompactDesktop ? styles.linkTablet : {}),
+                      ...(isActive ? styles.linkActive : {}),
+                      ...(hoveredLink === item.path && !isActive ? styles.linkHover : {}),
                     }}
                     onMouseEnter={() => setHoveredLink(item.path)}
                     onMouseLeave={() => setHoveredLink(null)}
@@ -85,48 +94,41 @@ function TopNav() {
         )}
 
         {!isMobile && (
-          <div style={{ ...styles.commandStrip, ...(isTablet ? styles.commandStripTablet : {}) }}>
-            <form
-              onSubmit={submitSearch}
+          <div style={{ ...styles.actions, ...(isTablet ? styles.actionsTablet : {}), ...(isCompactDesktop ? styles.actionsCompactDesktop : {}) }}>
+            <button
+              type="button"
+              className="top-nav-search"
               style={{
-                ...styles.searchForm,
-                ...(isTablet ? styles.searchFormTablet : {}),
-                ...(searchFocused ? styles.searchFormFocused : {}),
+                ...styles.searchButton,
+                ...(isCompactDesktop ? styles.searchButtonCompactDesktop : {}),
+                ...(isWideDesktop ? styles.searchButtonWideDesktop : {}),
+                ...(isVeryTightDesktop ? styles.searchButtonVeryTightDesktop : {}),
               }}
-              role="search"
-              aria-label="Search catalog"
+              onClick={() => window.dispatchEvent(new Event('open-global-search'))}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" style={styles.searchIcon}>
-                <circle cx="11" cy="11" r="8" />
-                <path d="M21 21l-4.35-4.35" />
-              </svg>
-              <input
-                type="search"
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                placeholder={isTablet ? 'Search...' : 'Search movies, series, year...'}
-                style={styles.searchInput}
-                onFocus={() => setSearchFocused(true)}
-                onBlur={() => setSearchFocused(false)}
-              />
-              <button type="submit" style={styles.searchSubmit}>Find</button>
-            </form>
+              <span style={styles.searchIconWrap}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="M21 21l-4.35-4.35" />
+                </svg>
+              </span>
+              <span style={styles.searchText}>
+                {isVeryTightDesktop ? '' : isTablet || !showFullSearchText ? 'Search' : 'Search movies, actors, genres'}
+              </span>
+              {showFullSearchText && !isVeryTightDesktop && <span style={styles.searchHint}>CTRL+K</span>}
+            </button>
 
-            {!isTablet && (
-              <Link to="/watchlist" style={styles.ctaBtn}>My Queue</Link>
-            )}
-
-            {!isTablet && (
-              <div style={styles.liveBadge}>
+            {showLiveChip && (
+              <Link to="/tv" className="top-nav-button" style={styles.liveChip}>
                 <span style={styles.liveDot} />
-                <span>Live Catalog</span>
-              </div>
+                <span>Live now</span>
+              </Link>
             )}
           </div>
         )}
 
-        <div style={styles.rightSection}>
-          {!isMobile && <ProfileMenu user={user} />}
+        <div style={{ ...styles.rightSide, ...(isCompactDesktop ? styles.rightSideCompactDesktop : {}) }}>
+          {!isMobile && <ProfileMenu user={user} compact={isCompactDesktop || !showLiveChip} />}
           {isMobile && <MobileNav />}
         </div>
       </div>
@@ -140,161 +142,241 @@ const styles = {
     top: '18px',
     left: '18px',
     right: '18px',
-    minHeight: '72px',
     zIndex: 1100,
-    borderRadius: '28px',
-    background: 'linear-gradient(135deg, rgba(9,20,37,0.78), rgba(9,20,37,0.46))',
-    border: '1px solid rgba(255,255,255,0.09)',
-    backdropFilter: 'blur(18px)',
-    boxShadow: '0 20px 44px rgba(4,10,20,0.26)',
-    transition: 'top 0.3s ease, background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
-    animation: 'fadeUp 420ms ease',
+    borderRadius: '30px',
+    background: 'rgba(5, 12, 22, 0.45)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    backdropFilter: 'blur(32px)',
+    WebkitBackdropFilter: 'blur(32px)',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+    transition: 'all var(--transition-normal)',
   },
-  navTablet: { left: '14px', right: '14px', top: '14px' },
-  navMobile: { left: '10px', right: '10px', top: '10px', minHeight: '64px', borderRadius: '22px' },
+  navTablet: {
+    top: '14px',
+    left: '14px',
+    right: '14px',
+  },
+  navMobile: {
+    top: '10px',
+    left: '10px',
+    right: '10px',
+    borderRadius: '24px',
+  },
   navScrolled: {
-    top: '12px',
-    background: 'linear-gradient(135deg, rgba(7,17,31,0.92), rgba(13,26,43,0.74))',
-    borderColor: 'rgba(255,255,255,0.12)',
-    boxShadow: '0 20px 46px rgba(4,10,20,0.34)',
+    top: '10px',
+    background: 'rgba(7, 17, 31, 0.9)',
+    borderColor: 'var(--border-strong)',
+    boxShadow: 'var(--shadow-card)',
   },
   container: {
-    maxWidth: '1440px',
+    minHeight: '74px',
+    width: '100%',
+    maxWidth: '1720px',
     margin: '0 auto',
-    padding: '10px 18px 10px 22px',
-    minHeight: '72px',
     display: 'flex',
     alignItems: 'center',
     gap: '14px',
+    padding: '10px 14px 10px 18px',
   },
-  containerTablet: { padding: '10px 14px 10px 18px', gap: '10px' },
-  containerMobile: { minHeight: '64px', padding: '8px 10px 8px 14px', gap: '10px' },
-  logo: { display: 'flex', alignItems: 'center', gap: '14px', fontWeight: '700', flexShrink: 0 },
-  logoBadge: {
-    color: '#fffdf8',
-    fontSize: '0.74rem',
-    letterSpacing: '0.18em',
+  containerMobile: {
+    minHeight: '62px',
+    width: '100%',
+    padding: '8px 10px 8px 14px',
+  },
+  containerCompactDesktop: {
+    gap: '10px',
+    padding: '10px 12px 10px 14px',
+  },
+  logo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '14px',
+    flexShrink: 0,
+    flex: '0 0 auto',
+    minWidth: 0,
+  },
+  logoCompact: {
+    gap: '10px',
+  },
+  logoMark: {
+    display: 'grid',
+    placeItems: 'center',
+    width: '48px',
+    height: '48px',
     borderRadius: '16px',
-    padding: '0.62rem 0.85rem',
-    background: 'linear-gradient(135deg, var(--accent-red), #ff9151)',
-    boxShadow: '0 10px 24px rgba(255,90,95,0.3)',
-    animation: 'glowPulse 3.8s ease-in-out infinite',
+    background: 'linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-violet) 100%)',
+    color: '#050c16',
+    fontFamily: 'var(--font-family-display)',
+    fontSize: '1rem',
+    fontWeight: '900',
+    letterSpacing: '0.12em',
+    boxShadow: '0 0 20px rgba(0, 255, 255, 0.4)',
   },
-  logoCopy: { display: 'grid', gap: '2px' },
-  logoCompact: { gap: '10px', minWidth: 0 },
-  logoCopyCompact: { minWidth: 0 },
-  logoText: {
+  logoCopy: {
+    display: 'grid',
+    gap: '2px',
+    minWidth: 0,
+  },
+  logoCopyCompact: {
+    minWidth: 0,
+  },
+  logoTitle: {
     color: 'var(--text-primary)',
+    fontWeight: '800',
     fontSize: '0.98rem',
-    letterSpacing: '0.02em',
+    letterSpacing: '-0.02em',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
   },
-  logoSub: {
+  logoSubtitle: {
     color: 'var(--text-muted)',
     fontSize: '0.72rem',
     letterSpacing: '0.08em',
     textTransform: 'uppercase',
     fontWeight: '700',
   },
-  navLinks: { display: 'flex', gap: '6px', flex: 1, justifyContent: 'center', minWidth: 0 },
-  navLinksTablet: { gap: '2px', flex: '0 0 auto' },
-  navLink: {
-    color: 'var(--text-secondary)',
-    fontSize: '0.88rem',
-    fontWeight: '700',
-    padding: '10px 13px',
+  links: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    flex: '0 1 auto',
+    justifyContent: 'flex-start',
+    minWidth: 0,
+    overflow: 'hidden',
+  },
+  linksTablet: {
+    gap: '2px',
+    flex: '0 1 auto',
+  },
+  linksCompactDesktop: {
+    gap: '2px',
+    flex: '0 1 auto',
+    overflow: 'hidden',
+  },
+  link: {
+    padding: '10px 14px',
     borderRadius: '999px',
+    color: 'var(--text-secondary)',
+    fontSize: '0.86rem',
+    fontWeight: '700',
     letterSpacing: '0.01em',
     whiteSpace: 'nowrap',
   },
-  navLinkTablet: { fontSize: '0.8rem', padding: '8px 9px' },
-  navLinkActive: {
-    color: 'var(--text-primary)',
-    background: 'rgba(255,255,255,0.1)',
-    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08)',
+  linkTablet: {
+    padding: '8px 10px',
+    fontSize: '0.8rem',
   },
-  navLinkHover: {
-    color: 'var(--text-primary)',
-    background: 'rgba(255,255,255,0.06)',
+  linkActive: {
+    color: '#050c16',
+    background: 'linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-secondary) 100%)',
+    boxShadow: '0 8px 20px rgba(0, 255, 255, 0.3)',
   },
-  commandStrip: { display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' },
-  commandStripTablet: { gap: '6px' },
-  rightSection: { display: 'flex', alignItems: 'center', gap: '12px', marginLeft: 'auto' },
-  searchForm: {
-    position: 'relative',
-    borderRadius: '999px',
+  linkHover: {
+    color: 'var(--text-primary)',
+    background: 'rgba(255, 255, 255, 0.06)',
+  },
+  actions: {
     display: 'flex',
     alignItems: 'center',
-    minWidth: '220px',
-    maxWidth: '420px',
-    flex: '1 1 260px',
-    padding: '6px 8px 6px 36px',
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    transition: 'border-color 180ms ease, background 180ms ease, box-shadow 180ms ease',
-  },
-  searchFormFocused: {
-    background: 'rgba(255,255,255,0.08)',
-    borderColor: 'rgba(125,249,255,0.4)',
-    boxShadow: '0 0 0 3px rgba(125,249,255,0.1)',
-  },
-  searchFormTablet: { minWidth: '140px', flex: '1 1 160px' },
-  searchIcon: { position: 'absolute', left: '14px', color: 'var(--text-muted)' },
-  searchInput: {
-    width: '100%',
+    gap: '8px',
+    marginLeft: 'auto',
+    flex: '0 0 auto',
     minWidth: 0,
-    border: 'none',
-    outline: 'none',
-    background: 'transparent',
-    color: 'var(--text-primary)',
-    fontSize: '0.88rem',
-    padding: '8px 10px 8px 0',
   },
-  searchSubmit: {
-    padding: '9px 14px',
-    borderRadius: '999px',
-    background: 'rgba(125,249,255,0.12)',
-    border: '1px solid rgba(125,249,255,0.2)',
-    color: 'var(--accent-cyan)',
-    fontSize: '0.78rem',
-    fontWeight: '800',
-    letterSpacing: '0.04em',
-    textTransform: 'uppercase',
-    cursor: 'pointer',
+  actionsTablet: {
+    gap: '6px',
   },
-  ctaBtn: {
-    padding: '10px 14px',
+  actionsCompactDesktop: {
+    gap: '6px',
+    marginLeft: 'auto',
+  },
+  searchButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    minWidth: '220px',
+    maxWidth: '360px',
+    padding: '8px 10px',
     borderRadius: '999px',
-    background: 'rgba(125,249,255,0.1)',
-    border: '1px solid rgba(125,249,255,0.18)',
-    color: 'var(--accent-cyan)',
-    fontSize: '0.8rem',
-    fontWeight: '700',
-    letterSpacing: '0.02em',
+    background: 'rgba(255, 255, 255, 0.05)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    color: 'var(--text-secondary)',
+  },
+  searchButtonCompactDesktop: {
+    minWidth: '150px',
+    maxWidth: '190px',
+  },
+  searchButtonVeryTightDesktop: {
+    minWidth: '52px',
+    maxWidth: '52px',
+    padding: '8px',
+    gap: '0',
+  },
+  searchButtonWideDesktop: {
+    minWidth: '250px',
+    maxWidth: '330px',
+  },
+  searchIconWrap: {
+    display: 'grid',
+    placeItems: 'center',
+    width: '34px',
+    height: '34px',
+    borderRadius: '50%',
+    background: 'rgba(255, 255, 255, 0.06)',
+    color: 'var(--accent-secondary)',
+    flexShrink: 0,
+  },
+  searchText: {
+    flex: 1,
+    minWidth: 0,
+    textAlign: 'left',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
+    fontSize: '0.84rem',
+    fontWeight: '700',
   },
-  liveBadge: {
+  searchHint: {
+    padding: '8px 10px',
+    borderRadius: '999px',
+    background: 'rgba(255, 255, 255, 0.06)',
+    color: 'var(--text-muted)',
+    fontSize: '0.72rem',
+    fontWeight: '800',
+    letterSpacing: '0.06em',
+  },
+  liveChip: {
     display: 'inline-flex',
     alignItems: 'center',
     gap: '8px',
-    padding: '10px 12px',
+    padding: '11px 14px',
     borderRadius: '999px',
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    color: 'var(--text-secondary)',
-    fontSize: '0.74rem',
-    fontWeight: '700',
-    whiteSpace: 'nowrap',
+    background: 'rgba(255, 143, 83, 0.12)',
+    border: '1px solid rgba(255, 143, 83, 0.22)',
+    color: '#ffd8bd',
+    fontSize: '0.78rem',
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
   },
   liveDot: {
     width: '8px',
     height: '8px',
     borderRadius: '50%',
-    background: 'var(--accent-cyan)',
-    boxShadow: '0 0 0 6px rgba(125,249,255,0.14)',
+    background: 'var(--accent-primary)',
+    boxShadow: '0 0 0 6px rgba(255, 143, 83, 0.18)',
     animation: 'livePulse 1.8s ease-in-out infinite',
+  },
+  rightSide: {
+    display: 'flex',
+    alignItems: 'center',
+    marginLeft: '12px',
+    flex: '0 0 auto',
+  },
+  rightSideCompactDesktop: {
+    marginLeft: '10px',
+    flexShrink: 0,
   },
 };
 
