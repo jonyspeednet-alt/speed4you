@@ -4,6 +4,7 @@ import Button from '../ui/Button';
 function ErrorState({
   title = 'Something went wrong',
   message = 'An unexpected error occurred. Please try again.',
+  description = '',
   onRetry,
   errorType = 'general',
 }) {
@@ -64,6 +65,7 @@ function ErrorState({
       <div style={styles.content}>
         <h2 style={styles.title}>{title}</h2>
         <p style={styles.message}>{message}</p>
+        {description && <p style={styles.description}>{description}</p>}
 
         {errorType === 'network' && (
           <div style={styles.helpText}>
@@ -149,8 +151,15 @@ const styles = {
   message: {
     fontSize: '1rem',
     color: 'var(--text-secondary)',
+    marginBottom: 'var(--spacing-md)',
+    lineHeight: '1.6',
+  },
+  description: {
+    fontSize: '0.88rem',
+    color: 'var(--text-muted)',
     marginBottom: 'var(--spacing-lg)',
     lineHeight: '1.6',
+    fontStyle: 'italic',
   },
   helpText: {
     textAlign: 'left',

@@ -10,27 +10,16 @@ const {
   upsertScannedItem,
 } = require('../src/data/store');
 const { enrichItemWithMetadata } = require('../src/services/metadata-enricher');
+const {
+  buildSeriesSeasons,
+  cleanTitle,
+  slugify,
+} = require('../src/services/scanner-series-parser');
 
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.m4v', '.webm']);
 const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
 const DUPLICATE_HOLD_DIR_NAME = process.env.MEDIA_NORMALIZER_DUPLICATE_DIR || '_duplicate_hold';
 const DEFAULT_MOVIE_DEPTH = 1;
-
-function cleanTitle(name) {
-  return String(name || '')
-    .replace(/\.[^.]+$/, '')
-    .replace(/[._]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function slugify(value) {
-  return String(value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .trim();
-}
 
 function extractYear(value) {
   const match = String(value || '').match(/\b(19|20)\d{2}\b/);
@@ -167,62 +156,6 @@ function buildMovieCandidates(root, folderPath, relativeFolder, files) {
   }];
 }
 
-function parseSeasonNumber(seasonName, fallbackNumber) {
-  const match = String(seasonName || '').match(/\b(\d+)\b/);
-  return match ? Number(match[1]) : fallbackNumber;
-}
-
-function parseEpisodeIdentity(filename) {
-  const input = cleanTitle(path.basename(String(filename || ''), path.extname(String(filename || ''))));
-  const seasonEpisodeMatch = input.match(/\bS(?:eason)?\s*(\d{1,2})\s*[-_. ]*E(?:p(?:isode)?)?\s*(\d{1,3})\b/i)
-    || input.match(/\b(\d{1,2})x(\d{1,3})\b/i);
-  if (seasonEpisodeMatch) {
-    return { season: Number(seasonEpisodeMatch[1]), episode: Number(seasonEpisodeMatch[2]) };
-  }
-  const episodeOnlyMatch = input.match(/\bE(?:p(?:isode)?)?\s*(\d{1,3})\b/i)
-    || input.match(/\bEpisode\s*(\d{1,3})\b/i)
-    || input.match(/(?:^|[^\d])(\d{1,3})(?:[^\d]|$)(?!.*\d)/);
-  if (episodeOnlyMatch) {
-    return { season: null, episode: Number(episodeOnlyMatch[1]) };
-  }
-  return { season: null, episode: null };
-}
-
-function sortEpisodeFiles(files = []) {
-  return [...files].sort((left, right) => {
-    const leftIdentity = parseEpisodeIdentity(left);
-    const rightIdentity = parseEpisodeIdentity(right);
-    const leftSeason = Number.isFinite(leftIdentity.season) ? leftIdentity.season : Number.MAX_SAFE_INTEGER;
-    const rightSeason = Number.isFinite(rightIdentity.season) ? rightIdentity.season : Number.MAX_SAFE_INTEGER;
-    const leftEpisode = Number.isFinite(leftIdentity.episode) ? leftIdentity.episode : Number.MAX_SAFE_INTEGER;
-    const rightEpisode = Number.isFinite(rightIdentity.episode) ? rightIdentity.episode : Number.MAX_SAFE_INTEGER;
-    if (leftSeason !== rightSeason) return leftSeason - rightSeason;
-    if (leftEpisode !== rightEpisode) return leftEpisode - rightEpisode;
-    return left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' });
-  });
-}
-
-function buildEpisodesFromFiles(root, seriesSlug, seasonPath, seasonNumber, files) {
-  const sortedFiles = sortEpisodeFiles(files);
-  const usedEpisodeNumbers = new Set();
-
-  return sortedFiles.map((file, index) => {
-    let episodeNumber = parseEpisodeIdentity(file).episode || (index + 1);
-    if (!Number.isFinite(episodeNumber) || episodeNumber <= 0 || usedEpisodeNumbers.has(episodeNumber)) {
-      episodeNumber = index + 1;
-    }
-    usedEpisodeNumbers.add(episodeNumber);
-    return {
-      id: `${seriesSlug}-${seasonNumber}-${episodeNumber}`,
-      number: episodeNumber,
-      title: cleanTitle(file),
-      videoUrl: toPublicUrl(root, path.join(seasonPath, file)),
-      sourcePath: path.join(seasonPath, file),
-      duration: '',
-    };
-  });
-}
-
 function createBaseScannerItem(root, values) {
   return {
     language: root.language,
@@ -280,31 +213,23 @@ async function reconcileSeriesRoot(root, summary) {
     const seasons = [];
 
     if (seasonFolderNames.length) {
-      for (const [seasonIndex, seasonName] of seasonFolderNames.entries()) {
-        const seasonPath = path.join(seriesPath, seasonName);
-        const episodeFiles = listFiles(seasonPath).filter((file) => VIDEO_EXTENSIONS.has(path.extname(file).toLowerCase()));
-        if (!episodeFiles.length) continue;
-        const seriesSlug = slugify(folderName);
-        const seasonNumber = parseSeasonNumber(seasonName, seasonIndex + 1);
-        seasons.push({
-          id: `${seriesSlug}-season-${seasonNumber}`,
-          number: seasonNumber,
-          title: cleanTitle(seasonName),
-          sourcePath: seasonPath,
-          episodes: buildEpisodesFromFiles(root, seriesSlug, seasonPath, seasonNumber, episodeFiles),
-        });
-      }
+      const built = buildSeriesSeasons(root, folderName, seriesPath, {
+        listFiles: (targetPath) => listFiles(targetPath),
+        listDirectories: (targetPath) => listDirectories(targetPath),
+        listVideoFiles: (files, targetPath) => files.filter((file) => VIDEO_EXTENSIONS.has(path.extname(file).toLowerCase())),
+        toPublicUrl,
+      });
+      seasons.push(...built.seasons);
     } else {
       const episodeFiles = seriesFiles.filter((file) => VIDEO_EXTENSIONS.has(path.extname(file).toLowerCase()));
       if (episodeFiles.length) {
-        const seriesSlug = slugify(folderName);
-        seasons.push({
-          id: `${seriesSlug}-season-1`,
-          number: 1,
-          title: 'Season 1',
-          sourcePath: seriesPath,
-          episodes: buildEpisodesFromFiles(root, seriesSlug, seriesPath, 1, episodeFiles),
+        const built = buildSeriesSeasons(root, folderName, seriesPath, {
+          listFiles: (targetPath) => listFiles(targetPath),
+          listDirectories: (targetPath) => listDirectories(targetPath),
+          listVideoFiles: (files, targetPath) => files.filter((file) => VIDEO_EXTENSIONS.has(path.extname(file).toLowerCase())),
+          toPublicUrl,
         });
+        seasons.push(...built.seasons);
       }
     }
 

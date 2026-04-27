@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { moviesService, playerService, progressService, seriesService } from '../services';
 import { useBreakpoint } from '../hooks';
 
@@ -131,6 +131,19 @@ function PlayerPage() {
   const [scrubTime, setScrubTime] = useState(0);
   const [hasOptimizedFallbacked, setHasOptimizedFallbacked] = useState(false);
   const streamUrlBaseRef = useRef('');
+  
+  const swipeStartRef = useRef(null);
+  const swipeCurrentRef = useRef(null);
+  const swipeTimeoutRef = useRef(null);
+  const swipeHandledRef = useRef(false);
+  const previewSeekDeltaRef = useRef(0);
+  const [gestureFeedback, setGestureFeedback] = useState('');
+  const [rippleData, setRippleData] = useState(null);
+  const [toastData, setToastData] = useState(null);
+  const [brightness, setBrightness] = useState(1);
+  const [isHoveringControls, setIsHoveringControls] = useState(false);
+  const [autoPlayCountdown, setAutoPlayCountdown] = useState(null);
+  const navigate = useNavigate();
   const seasonNumber = toPositiveInt(searchParams.get('season'), 1);
   const episodeNumber = toPositiveInt(searchParams.get('episode'), 1);
   const hasEpisodeSelection = searchParams.has('season') || searchParams.has('episode');
@@ -439,8 +452,9 @@ function PlayerPage() {
   useEffect(() => {
     function scheduleHide() {
       clearTimeout(hideTimerRef.current);
+      if (isHoveringControls) return;
       hideTimerRef.current = setTimeout(() => {
-        if (!isScrubbing && isPlaying) {
+        if (!isScrubbing && isPlaying && !isHoveringControls) {
           setShowControls(false);
         }
       }, CONTROLS_HIDE_DELAY);
@@ -451,7 +465,26 @@ function PlayerPage() {
     }
 
     return () => clearTimeout(hideTimerRef.current);
-  }, [isPlaying, isScrubbing, showControls]);
+  }, [isPlaying, isScrubbing, showControls, isHoveringControls]);
+
+  const playNextEpisode = () => {
+    setAutoPlayCountdown(null);
+    if (content?.type === 'series') {
+      navigate(`/play/${contentId}?season=${content.season}&episode=${content.episode + 1}`);
+    }
+  };
+
+  useEffect(() => {
+    if (autoPlayCountdown === null) return;
+    if (autoPlayCountdown <= 0) {
+      playNextEpisode();
+      return;
+    }
+    const timer = setTimeout(() => {
+      setAutoPlayCountdown(prev => prev - 1);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [autoPlayCountdown]);
 
   const persistProgress = useCallback(async (position, duration) => {
     if (!content?.type || !contentId || !Number.isFinite(position) || position <= 0) {
@@ -490,9 +523,11 @@ function PlayerPage() {
         return;
       }
 
+      setShowControls(true);
+
       const key = event.key.toLowerCase();
 
-      if (event.key === ' ') {
+      if (event.key === ' ' || event.key === 'Enter') {
         event.preventDefault();
         if (videoRef.current.paused) {
           videoRef.current.play();
@@ -501,6 +536,9 @@ function PlayerPage() {
           videoRef.current.pause();
           setIsPlaying(false);
         }
+      } else if (event.key === 'Escape' || event.key === 'Backspace') {
+        event.preventDefault();
+        navigate(-1);
       } else if (event.key === 'ArrowRight' || key === 'l') {
         event.preventDefault();
         const duration = videoRef.current.duration || activeDuration || 0;
@@ -517,6 +555,18 @@ function PlayerPage() {
         setCurrentTime(nextTime);
         setScrubTime(nextTime);
         persistProgress(nextTime, duration);
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        setVolume((v) => clamp(v + 10, 0, 100));
+        setToastData({ icon: 'volume', value: clamp(volume + 10, 0, 100) });
+        if (swipeTimeoutRef.current) clearTimeout(swipeTimeoutRef.current);
+        swipeTimeoutRef.current = setTimeout(() => setToastData(null), 1000);
+      } else if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        setVolume((v) => clamp(v - 10, 0, 100));
+        setToastData({ icon: 'volume', value: clamp(volume - 10, 0, 100) });
+        if (swipeTimeoutRef.current) clearTimeout(swipeTimeoutRef.current);
+        swipeTimeoutRef.current = setTimeout(() => setToastData(null), 1000);
       } else if (key === 'm') {
         event.preventDefault();
         setIsMuted((current) => !current);
@@ -597,11 +647,21 @@ function PlayerPage() {
     setIsPlaying(false);
   };
 
-  const toggleFullscreen = () => {
+  const toggleFullscreen = async () => {
     if (!document.fullscreenElement) {
-      videoRef.current?.requestFullscreen?.();
+      try {
+        await videoRef.current?.requestFullscreen?.();
+        if (isMobile && window.screen?.orientation?.lock) {
+          await window.screen.orientation.lock('landscape').catch(() => {});
+        }
+      } catch (err) {
+        // Ignore fullscreen errors
+      }
     } else {
       document.exitFullscreen();
+      if (isMobile && window.screen?.orientation?.unlock) {
+        window.screen.orientation.unlock();
+      }
     }
   };
 
@@ -664,7 +724,69 @@ function PlayerPage() {
     setIsPictureInPicture(true);
   };
 
+  const handleSurfaceTouchStart = (event) => {
+    const touch = event.touches[0];
+    if (!touch) return;
+    swipeStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
+    swipeCurrentRef.current = { x: touch.clientX, y: touch.clientY };
+    swipeHandledRef.current = false;
+    previewSeekDeltaRef.current = 0;
+  };
+
+  const handleSurfaceTouchMove = (event) => {
+    if (!swipeStartRef.current) return;
+    const touch = event.touches[0];
+    if (!touch) return;
+    
+    swipeCurrentRef.current = { x: touch.clientX, y: touch.clientY };
+    const dx = swipeCurrentRef.current.x - swipeStartRef.current.x;
+    const dy = swipeCurrentRef.current.y - swipeStartRef.current.y;
+    
+    if (Math.abs(dx) > 30 && Math.abs(dx) > Math.abs(dy)) {
+      swipeHandledRef.current = true;
+      const rect = event.currentTarget.getBoundingClientRect();
+      const skipSeconds = Math.round((dx / rect.width) * 3) * 10;
+      if (skipSeconds !== 0) {
+        previewSeekDeltaRef.current = skipSeconds;
+        setGestureFeedback(skipSeconds > 0 ? `+${skipSeconds}s` : `${skipSeconds}s`);
+        if (swipeTimeoutRef.current) clearTimeout(swipeTimeoutRef.current);
+      }
+    } else if (Math.abs(dy) > 30 && Math.abs(dy) > Math.abs(dx)) {
+      swipeHandledRef.current = true;
+      const rect = event.currentTarget.getBoundingClientRect();
+      const isRightSide = swipeStartRef.current.x > rect.left + rect.width / 2;
+      const change = -(dy / rect.height);
+      
+      if (isRightSide) {
+        const newVolume = Math.max(0, Math.min(100, volume + change * 200));
+        setVolume(newVolume);
+        setIsMuted(newVolume === 0);
+        setToastData({ icon: newVolume === 0 ? 'mute' : 'volume', value: Math.round(newVolume) });
+      } else {
+        const newBrightness = Math.max(0.2, Math.min(1, brightness + change * 2));
+        setBrightness(newBrightness);
+        setToastData({ icon: 'sun', value: Math.round(newBrightness * 100) });
+      }
+      
+      swipeStartRef.current.y = touch.clientY;
+      if (swipeTimeoutRef.current) clearTimeout(swipeTimeoutRef.current);
+      swipeTimeoutRef.current = setTimeout(() => setToastData(null), 1000);
+    }
+  };
+
   const handleSurfaceTouchEnd = (event) => {
+    if (previewSeekDeltaRef.current !== 0) {
+      skipBy(previewSeekDeltaRef.current);
+      previewSeekDeltaRef.current = 0;
+      if (swipeTimeoutRef.current) clearTimeout(swipeTimeoutRef.current);
+      swipeTimeoutRef.current = setTimeout(() => setGestureFeedback(''), 1000);
+    }
+
+    const wasHandled = swipeHandledRef.current;
+    swipeStartRef.current = null;
+    swipeCurrentRef.current = null;
+    if (wasHandled) return;
+
     if (!videoRef.current) {
       return;
     }
@@ -685,15 +807,21 @@ function PlayerPage() {
       const isRightZone = x > rect.width * 0.65;
       if (isLeftZone) {
         skipBy(-10);
+        setRippleData({ side: 'left', text: '-10s' });
       } else if (isRightZone) {
         skipBy(10);
+        setRippleData({ side: 'right', text: '+10s' });
       } else {
         togglePlayback();
       }
+      if (swipeTimeoutRef.current) clearTimeout(swipeTimeoutRef.current);
+      swipeTimeoutRef.current = setTimeout(() => setRippleData(null), 600);
       lastTapRef.current = { time: 0, x: 0 };
       return;
     }
 
+    // Single tap to toggle controls
+    setShowControls((c) => !c);
     lastTapRef.current = { time: now, x };
   };
 
@@ -741,6 +869,9 @@ function PlayerPage() {
         onPlay={() => {
           setIsPlaying(true);
           scheduleInvisibleVideoCheck();
+          if (isMobile && window.screen?.orientation?.lock) {
+            window.screen.orientation.lock('landscape').catch(() => {});
+          }
         }}
         onPause={() => {
           setIsPlaying(false);
@@ -806,6 +937,9 @@ function PlayerPage() {
         onEnded={() => {
           clearInvisibleVideoCheck();
           progressService.markComplete(content.type, contentId || 1);
+          if (content?.type === 'series') {
+            setAutoPlayCountdown(10);
+          }
         }}
         onError={() => {
           clearInvisibleVideoCheck();
@@ -820,20 +954,67 @@ function PlayerPage() {
 
       <div
         style={styles.gestureSurface}
-        onClick={() => setShowControls((c) => !c)}
-        onDoubleClick={(event) => {
-          const rect = event.currentTarget.getBoundingClientRect();
-          const x = event.clientX - rect.left;
-          if (x < rect.width * 0.35) {
-            skipBy(-10);
-          } else if (x > rect.width * 0.65) {
-            skipBy(10);
-          } else {
-            togglePlayback();
-          }
+        onClick={(e) => {
+          if (isMobile) return;
+          if (e.detail === 2) return;
+          togglePlayback();
         }}
+        onDoubleClick={() => {
+          if (isMobile) return;
+          toggleFullscreen();
+        }}
+        onTouchStart={handleSurfaceTouchStart}
+        onTouchMove={handleSurfaceTouchMove}
         onTouchEnd={handleSurfaceTouchEnd}
       />
+
+      <div style={{ ...styles.brightnessOverlay, opacity: 1 - brightness }} />
+
+      {/* Auto-Play Next Overlay */}
+      {autoPlayCountdown !== null && (
+        <div style={styles.autoPlayOverlay}>
+          <div style={styles.autoPlayBox}>
+            <h2 style={styles.autoPlayTitle}>Next Episode Starting...</h2>
+            <div style={styles.autoPlayCounter}>{autoPlayCountdown}</div>
+            <div style={styles.autoPlayButtons}>
+              <button style={styles.autoPlayBtnCancel} onClick={() => setAutoPlayCountdown(null)}>Cancel</button>
+              <button style={styles.autoPlayBtnNext} onClick={playNextEpisode}>Play Now</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Ripple Feedback */}
+      {rippleData && (
+        <div style={{ ...styles.rippleOverlay, ...(rippleData.side === 'left' ? styles.rippleLeft : styles.rippleRight) }}>
+          <div style={styles.rippleCircle}>
+            <svg viewBox="0 0 24 24" width="48" height="48" fill="currentColor" aria-hidden="true" style={rippleData.side === 'left' ? { transform: 'scaleX(-1)' } : {}}>
+              <path d="M13 19l9-7-9-7v14z" /><path d="M2 19l9-7-9-7v14z" />
+            </svg>
+            <span style={styles.rippleText}>{rippleData.text}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Feedback */}
+      {toastData && (
+        <div style={styles.toastContainer}>
+          <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor" aria-hidden="true" style={{ marginBottom: '8px' }}>
+            {toastData.icon === 'sun' && <path d="M12 2.25a.75.75 0 01.75.75v2.25a.75.75 0 01-1.5 0V3a.75.75 0 01.75-.75zM7.5 12a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM18.894 6.166a.75.75 0 00-1.06-1.06l-1.591 1.59a.75.75 0 101.06 1.061l1.591-1.59zM21.75 12a.75.75 0 01-.75.75h-2.25a.75.75 0 010-1.5H21a.75.75 0 01.75.75zM17.834 18.894a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 10-1.061 1.06l1.59 1.591zM12 18a.75.75 0 01.75.75V21a.75.75 0 01-1.5 0v-2.25A.75.75 0 0112 18zM5.106 17.834a.75.75 0 001.06 1.06l1.591-1.59a.75.75 0 10-1.06-1.061l-1.591 1.59zM2.25 12a.75.75 0 01.75-.75h2.25a.75.75 0 010 1.5H3a.75.75 0 01-.75-.75zM6.166 5.106a.75.75 0 00-1.06 1.06l1.59 1.591a.75.75 0 101.061-1.06l-1.59-1.591z" />}
+            {toastData.icon === 'volume' && <path d="M13.5 4.06c0-1.336-1.616-2.005-2.56-1.06l-4.5 4.5H4.508c-1.141 0-2.318.664-2.66 1.905A9.76 9.76 0 001.5 12c0 .898.121 1.768.35 2.595.341 1.24 1.518 1.905 2.659 1.905h1.93l4.5 4.5c.945.945 2.56.276 2.56-1.06V4.06zM18.584 5.106a.75.75 0 011.06 0c3.808 3.807 3.808 9.98 0 13.788a.75.75 0 11-1.06-1.06 8.25 8.25 0 000-11.668.75.75 0 010-1.06zM15.932 7.757a.75.75 0 011.061 0 6 6 0 010 8.486.75.75 0 01-1.06-1.061 4.5 4.5 0 000-6.364.75.75 0 010-1.06z" />}
+            {toastData.icon === 'mute' && <path d="M13.5 4.06c0-1.336-1.616-2.005-2.56-1.06l-4.5 4.5H4.508c-1.141 0-2.318.664-2.66 1.905A9.76 9.76 0 001.5 12c0 .898.121 1.768.35 2.595.341 1.24 1.518 1.905 2.659 1.905h1.93l4.5 4.5c.945.945 2.56.276 2.56-1.06V4.06zM17.78 9.22a.75.75 0 10-1.06 1.06L18.44 12l-1.72 1.72a.75.75 0 001.06 1.06l1.72-1.72 1.72 1.72a.75.75 0 101.06-1.06L20.56 12l1.72-1.72a.75.75 0 00-1.06-1.06l-1.72 1.72-1.72-1.72z" />}
+          </svg>
+          <div style={styles.toastTrack}>
+            <div style={{ ...styles.toastFill, width: `${toastData.value}%` }} />
+          </div>
+        </div>
+      )}
+
+      {gestureFeedback && (
+        <div style={styles.gestureFeedback}>
+          {gestureFeedback}
+        </div>
+      )}
 
       <div style={{ ...styles.chrome, ...(isMobile ? styles.chromeMobile : {}) }} />
       <div style={{ ...styles.vignette, ...(isMobile ? styles.vignetteMobile : {}) }} />
@@ -860,6 +1041,9 @@ function PlayerPage() {
       {/* ── Desktop controls panel ── */}
       {!isMobile && (
         <div
+          className="player-desktop-controls"
+          onMouseEnter={() => setIsHoveringControls(true)}
+          onMouseLeave={() => setIsHoveringControls(false)}
           style={{
             ...styles.controls,
             opacity: showControls ? 1 : 0,
@@ -899,6 +1083,11 @@ function PlayerPage() {
                 <button style={styles.pillControl} onClick={() => skipBy(10)} aria-label="Skip 10 seconds">
                   <Icon size={16}><path d="M13 19l9-7-9-7v14z" /><path d="M2 19l9-7-9-7v14z" /></Icon>
                 </button>
+                {content.type === 'series' && (
+                  <button style={styles.pillControl} onClick={playNextEpisode} aria-label="Next Episode">
+                    <Icon size={16}><path d="M5 4l10 8-10 8V4z" /><path d="M19 4h-2v16h2V4z" /></Icon>
+                  </button>
+                )}
               </div>
               <div style={styles.timeGroup}>
                 <span style={styles.timeStrong}>{formatTime(activeTime)}</span>
@@ -940,19 +1129,20 @@ function PlayerPage() {
 
       {/* ══════════════════════════════════════════════════════
           MOBILE — Netflix / YouTube style overlay controls
-          Pinned to bottom, overlays the video directly.
+          Full screen overlay with centered controls.
       ══════════════════════════════════════════════════════ */}
       {isMobile && (
         <div
           style={{
             ...styles.mobilePlayerStack,
             opacity: showControls ? 1 : 0,
-            pointerEvents: showControls ? 'auto' : 'none',
-            transition: 'opacity 200ms ease',
+            pointerEvents: 'none',
+            background: showControls ? 'rgba(0,0,0,0.55)' : 'transparent',
+            transition: 'opacity 200ms ease, background 300ms ease',
           }}
         >
           {/* 1. Top bar: back + title */}
-          <div style={styles.mobileTopBar}>
+          <div style={{...styles.mobileTopBar, pointerEvents: showControls ? 'auto' : 'none'}}>
             <Link to="/" style={styles.mobileBackBtn} aria-label="Back to portal">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M19 12H5M12 5l-7 7 7 7" />
@@ -972,33 +1162,44 @@ function PlayerPage() {
 
           {/* 2. Center play / skip buttons */}
           <div style={styles.mobileCenterControls}>
-            <button style={styles.mobileGhostControl} onClick={() => skipBy(-10)} aria-label="Rewind 10 seconds">
-              <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true">
+            <button style={{...styles.mobileGhostControl, pointerEvents: showControls ? 'auto' : 'none'}} onClick={() => skipBy(-10)} aria-label="Rewind 10 seconds">
+              <svg viewBox="0 0 24 24" width="36" height="36" fill="currentColor" aria-hidden="true">
                 <path d="M11 19L2 12l9-7v14z" /><path d="M22 19l-9-7 9-7v14z" />
               </svg>
-              <span style={styles.mobileSkipLabel}>-10</span>
+              <span style={styles.mobileSkipLabel}>10</span>
             </button>
 
             <button
-              style={styles.mobilePlayControl}
+              style={{...styles.mobilePlayControl, pointerEvents: showControls ? 'auto' : 'none'}}
               onClick={togglePlayback}
               onMouseDown={startHoldSpeedBoost} onMouseUp={endHoldSpeedBoost}
               onMouseLeave={endHoldSpeedBoost} onTouchStart={startHoldSpeedBoost} onTouchEnd={endHoldSpeedBoost}
               aria-label={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying
-                ? <svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
-                : <svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor" aria-hidden="true"><polygon points="8 5 19 12 8 19 8 5" /></svg>
+                ? <svg viewBox="0 0 24 24" width="46" height="46" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
+                : <svg viewBox="0 0 24 24" width="46" height="46" fill="currentColor" aria-hidden="true"><polygon points="8 5 19 12 8 19 8 5" /></svg>
               }
             </button>
 
-            <button style={styles.mobileGhostControl} onClick={() => skipBy(10)} aria-label="Skip 10 seconds">
-              <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true">
+            <button style={{...styles.mobileGhostControl, pointerEvents: showControls ? 'auto' : 'none'}} onClick={() => skipBy(10)} aria-label="Skip 10 seconds">
+              <svg viewBox="0 0 24 24" width="36" height="36" fill="currentColor" aria-hidden="true">
                 <path d="M13 19l9-7-9-7v14z" /><path d="M2 19l9-7-9-7v14z" />
               </svg>
-              <span style={styles.mobileSkipLabel}>+10</span>
+              <span style={styles.mobileSkipLabel}>10</span>
             </button>
+
+            {content.type === 'series' && (
+              <button onClick={playNextEpisode} aria-label="Next Episode" style={{...styles.mobileGhostControl, marginLeft: '8px', pointerEvents: showControls ? 'auto' : 'none'}}>
+                <svg viewBox="0 0 24 24" width="36" height="36" fill="currentColor" aria-hidden="true">
+                  <path d="M5 4l10 8-10 8V4z" /><path d="M19 4h-2v16h2V4z" />
+                </svg>
+                <span style={styles.mobileSkipLabel}>NEXT</span>
+              </button>
+            )}
           </div>
+
+          <div style={{...styles.mobileBottomSection, pointerEvents: showControls ? 'auto' : 'none'}}>
 
           {/* 3. Scrubber + time */}
           <div style={styles.mobileScrubRow}>
@@ -1082,6 +1283,7 @@ function PlayerPage() {
             <div style={styles.metaBadge}>{qualityLabel}</div>
             <div style={styles.metaBadge}>{bufferHealth}</div>
           </div>
+          </div>
         </div>
       )}
     </div>
@@ -1106,7 +1308,7 @@ const styles = {
     transform: 'translateZ(0)', WebkitTransform: 'translateZ(0)',
     backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden',
   },
-  gestureSurface: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 4, background: 'transparent' },
+  gestureSurface: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 4, background: 'transparent', touchAction: 'none' },
 
   /* gradient overlays */
   chrome: {
@@ -1118,21 +1320,91 @@ const styles = {
   vignette: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 5, background: 'radial-gradient(circle at center, transparent 48%, rgba(0,0,0,0.46) 100%)', pointerEvents: 'none' },
   vignetteMobile: { background: 'none' },
 
+  brightnessOverlay: {
+    position: 'absolute', inset: 0,
+    background: '#000', pointerEvents: 'none', zIndex: 4,
+    transition: 'opacity 100ms linear',
+  },
+  gestureFeedback: {
+    position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+    background: 'rgba(0,0,0,0.6)', color: '#fff', padding: '16px 24px',
+    borderRadius: '16px', fontSize: '1.5rem', fontWeight: 'bold',
+    zIndex: 20, pointerEvents: 'none', backdropFilter: 'blur(8px)',
+  },
+  
+  /* new ripple */
+  rippleOverlay: {
+    position: 'absolute', top: 0, bottom: 0, width: '50%', zIndex: 20,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    pointerEvents: 'none', overflow: 'hidden',
+  },
+  rippleLeft: { left: 0 },
+  rippleRight: { right: 0 },
+  rippleCircle: {
+    width: '120px', height: '120px', borderRadius: '50%',
+    background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(4px)',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+    color: '#fff', animation: 'ripplePop 0.4s ease-out forwards',
+  },
+  rippleText: { fontSize: '0.85rem', fontWeight: 'bold', marginTop: '4px' },
+  
+  /* new toast */
+  toastContainer: {
+    position: 'absolute', top: '40px', left: '50%', transform: 'translateX(-50%)',
+    background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+    padding: '16px 24px', borderRadius: '16px', color: '#fff',
+    display: 'flex', flexDirection: 'column', alignItems: 'center',
+    zIndex: 25, pointerEvents: 'none', animation: 'toastDrop 0.2s ease-out',
+  },
+  toastTrack: { width: '120px', height: '4px', background: 'rgba(255,255,255,0.3)', borderRadius: '2px', overflow: 'hidden' },
+  toastFill: { height: '100%', background: '#fff', borderRadius: '2px', transition: 'width 0.1s linear' },
+
+  /* Auto-Play Overlay */
+  autoPlayOverlay: {
+    position: 'absolute', inset: 0, zIndex: 30,
+    background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+  autoPlayBox: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center',
+    gap: '24px', textAlign: 'center',
+  },
+  autoPlayTitle: {
+    color: '#fff', fontSize: '1.4rem', fontWeight: 'bold', margin: 0,
+  },
+  autoPlayCounter: {
+    fontSize: '4rem', fontWeight: '800', color: 'var(--accent-amber)',
+    lineHeight: 1, textShadow: '0 4px 16px rgba(255, 200, 87, 0.4)',
+  },
+  autoPlayButtons: {
+    display: 'flex', gap: '16px', marginTop: '12px',
+  },
+  autoPlayBtnCancel: {
+    padding: '12px 24px', borderRadius: '8px', border: 'none',
+    background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: '1rem', fontWeight: 'bold',
+    cursor: 'pointer', transition: 'background 0.2s',
+  },
+  autoPlayBtnNext: {
+    padding: '12px 32px', borderRadius: '8px', border: 'none',
+    background: 'var(--accent-amber)', color: '#000', fontSize: '1rem', fontWeight: 'bold',
+    cursor: 'pointer', transition: 'transform 0.2s', boxShadow: '0 4px 12px rgba(255,200,87,0.3)',
+  },
+
   /* desktop back / top info */
-  back: { position: 'absolute', top: '24px', left: '24px', zIndex: 10, color: '#fff', padding: '10px 14px', borderRadius: '10px', background: 'rgba(10,14,20,0.82)', border: '1px solid rgba(255,255,255,0.14)', backdropFilter: 'blur(10px)', fontWeight: '700', transition: 'opacity 180ms ease' },
-  topInfo: { position: 'absolute', top: '24px', right: '24px', zIndex: 10, maxWidth: '560px', padding: '12px 14px', borderRadius: '12px', background: 'rgba(10,14,20,0.78)', border: '1px solid rgba(255,255,255,0.12)', backdropFilter: 'blur(10px)', transition: 'opacity 180ms ease' },
-  title: { color: '#fff', fontSize: 'clamp(1.05rem, 2.2vw, 1.35rem)', marginBottom: '4px', lineHeight: 1.25 },
-  episode: { color: 'rgba(255,255,255,0.78)', fontSize: '0.86rem', lineHeight: 1.4 },
-  streamStatus: { marginTop: '6px', color: 'rgba(255,255,255,0.82)', lineHeight: 1.4, fontSize: '0.78rem' },
-  streamHint: { marginTop: '4px', color: 'rgba(119,222,255,0.95)', lineHeight: 1.4, fontWeight: '700', fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.1em' },
+  back: { position: 'absolute', top: '32px', left: '32px', zIndex: 10, color: '#fff', padding: '12px 20px', borderRadius: '12px', background: 'rgba(5, 12, 22, 0.4)', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.05em', transition: 'all 200ms ease' },
+  topInfo: { position: 'absolute', top: '32px', right: '32px', zIndex: 10, maxWidth: '600px', padding: '16px 20px', borderRadius: '16px', background: 'rgba(5, 12, 22, 0.4)', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', transition: 'opacity 200ms ease' },
+  title: { color: '#fff', fontSize: 'clamp(1.2rem, 2.5vw, 1.6rem)', fontWeight: '900', marginBottom: '6px', lineHeight: '1.1', letterSpacing: '-0.02em' },
+  episode: { color: 'var(--accent-cyan)', fontWeight: '800', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em' },
+  streamStatus: { marginTop: '8px', color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem' },
+  streamHint: { marginTop: '6px', color: 'var(--accent-pink)', fontWeight: '900', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.12em' },
 
   /* desktop controls container */
   controls: {
-    position: 'absolute', left: '20px', right: '20px', bottom: '18px', zIndex: 10,
-    padding: '12px 14px', borderRadius: '12px',
-    background: 'rgba(10,14,20,0.84)', border: '1px solid rgba(255,255,255,0.12)',
-    backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
-    boxShadow: '0 16px 44px rgba(0,0,0,0.3)', transition: 'opacity 200ms ease',
+    position: 'absolute', left: '32px', right: '32px', bottom: '32px', zIndex: 10,
+    padding: '24px', borderRadius: '24px',
+    background: 'rgba(5, 12, 22, 0.5)', border: '1px solid rgba(255,255,255,0.1)',
+    backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)',
+    boxShadow: '0 20px 50px rgba(0,0,0,0.6)', transition: 'all 300ms ease',
   },
   /* mobile: transparent, full-width, pinned bottom — overlay on video */
   controlsMobile: {
@@ -1145,41 +1417,40 @@ const styles = {
   scrubberWrap: { position: 'relative', marginBottom: '12px', height: '20px', display: 'flex', alignItems: 'center' },
   scrubberTrack: { position: 'absolute', left: 0, right: 0, height: '4px', borderRadius: '999px', background: 'rgba(255,255,255,0.2)', overflow: 'hidden' },
   bufferedTrack: { position: 'absolute', top: 0, bottom: 0, left: 0, borderRadius: '999px', background: 'rgba(255,255,255,0.28)' },
-  progressTrack: { position: 'absolute', top: 0, bottom: 0, left: 0, borderRadius: '999px', background: '#e50914' },
-  scrubber: { position: 'relative', width: '100%', margin: 0, appearance: 'none', background: 'transparent', cursor: 'pointer', height: '20px' },
+  progressTrack: { position: 'absolute', top: 0, bottom: 0, left: 0, borderRadius: '999px', background: 'linear-gradient(90deg, var(--accent-cyan), var(--accent-secondary))', boxShadow: '0 0 10px rgba(0, 255, 255, 0.5)' },
+  scrubber: { position: 'relative', width: '100%', margin: 0, appearance: 'none', background: 'transparent', cursor: 'pointer', height: '20px', zIndex: 2 },
 
   /* desktop control rows */
-  controlsRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' },
-  primaryCluster: { display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' },
-  playbackActions: { display: 'flex', alignItems: 'center', gap: '10px' },
-  controlGroup: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' },
-  timeGroup: { display: 'inline-flex', alignItems: 'baseline', gap: '4px', padding: '8px 10px', borderRadius: '8px', background: 'rgba(255,255,255,0.08)' },
-  timeStrong: { color: '#fff', fontSize: '1rem', fontFamily: 'monospace', fontWeight: '700' },
-  time: { color: 'rgba(255,255,255,0.72)', fontSize: '0.92rem', fontFamily: 'monospace' },
-  metaBadge: { padding: '8px 10px', borderRadius: '8px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: '0.72rem', letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: '700' },
-  volumeControl: { display: 'flex', alignItems: 'center', gap: '10px' },
-  secondaryControl: { minHeight: '40px', padding: '8px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontWeight: '700' },
-  volumeSlider: { width: '112px', accentColor: '#e50914' },
-  select: { minHeight: '40px', padding: '8px 10px', borderRadius: '8px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff' },
-  heroControl: { minWidth: '62px', padding: '10px 12px', borderRadius: '10px', background: '#fff', color: '#0b1220', fontWeight: '900', fontFamily: 'monospace' },
-  pillControl: { minWidth: '58px', padding: '10px 12px', borderRadius: '10px', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', fontWeight: '800', fontFamily: 'monospace' },
+  controlsRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '20px', flexWrap: 'wrap' },
+  primaryCluster: { display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' },
+  playbackActions: { display: 'flex', alignItems: 'center', gap: '12px' },
+  controlGroup: { display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', justifyContent: 'flex-end' },
+  timeGroup: { display: 'inline-flex', alignItems: 'baseline', gap: '6px', padding: '10px 16px', borderRadius: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' },
+  timeStrong: { color: 'var(--accent-cyan)', fontSize: '1.1rem', fontFamily: 'monospace', fontWeight: '900' },
+  time: { color: 'rgba(255,255,255,0.5)', fontSize: '0.95rem', fontFamily: 'monospace', fontWeight: '700' },
+  metaBadge: { padding: '10px 14px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: '800' },
+  volumeControl: { display: 'flex', alignItems: 'center', gap: '12px' },
+  secondaryControl: { minHeight: '44px', padding: '10px 16px', borderRadius: '12px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontWeight: '800', fontSize: '0.85rem' },
+  volumeSlider: { width: '120px', accentColor: 'var(--accent-cyan)' },
+  select: { minHeight: '44px', padding: '10px 16px', borderRadius: '12px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontWeight: '700' },
+  heroControl: { minWidth: '70px', padding: '12px', borderRadius: '12px', background: '#fff', color: '#050c16', fontWeight: '900', boxShadow: '0 0 20px rgba(255,255,255,0.2)' },
+  pillControl: { minWidth: '60px', padding: '12px', borderRadius: '12px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontWeight: '900' },
 
   /* ══════════════════════════════════════════════════════════
      MOBILE — Netflix / YouTube style overlay
   ══════════════════════════════════════════════════════════ */
 
-  /* Full-width gradient panel pinned to bottom, overlays video */
+  /* Full-width gradient panel covering the screen */
   mobilePlayerStack: {
-    position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 10,
-    paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-    background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.7) 55%, transparent 100%)',
-    display: 'flex', flexDirection: 'column',
+    position: 'absolute', inset: 0, zIndex: 10,
+    display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
   },
 
   /* top bar: back + title + time */
   mobileTopBar: {
     display: 'flex', alignItems: 'center', gap: '8px',
-    padding: '14px 16px 6px',
+    padding: 'env(safe-area-inset-top, 16px) max(16px, env(safe-area-inset-right)) 16px max(16px, env(safe-area-inset-left))',
+    background: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, transparent 100%)',
   },
   mobileBackBtn: {
     display: 'inline-flex', alignItems: 'center', gap: '6px',
@@ -1193,11 +1464,11 @@ const styles = {
     overflow: 'hidden', padding: '0 6px',
   },
   mobileTitleText: {
-    color: '#fff', fontSize: '0.9rem', fontWeight: '700',
+    color: '#fff', fontSize: '1.05rem', fontWeight: '700',
     lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
   },
   mobileEpisodeText: {
-    color: 'rgba(255,255,255,0.6)', fontSize: '0.74rem',
+    color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem',
     lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
   },
   mobileStreamStatus: { color: 'rgba(255,255,255,0.6)', fontSize: '0.68rem', lineHeight: 1.2 },
@@ -1205,27 +1476,35 @@ const styles = {
   /* center play / skip */
   mobileCenterControls: {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    gap: '28px', padding: '10px 16px 14px',
+    gap: '48px', padding: '16px', flex: 1,
   },
   mobilePlayControl: {
-    width: '68px', height: '68px', borderRadius: '50%',
-    background: 'rgba(255,255,255,0.18)', border: '2px solid rgba(255,255,255,0.55)',
+    width: '84px', height: '84px', borderRadius: '50%',
+    background: 'rgba(0,0,0,0.4)', border: '2px solid rgba(255,255,255,0.8)',
     color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    flexShrink: 0,
+    flexShrink: 0, backdropFilter: 'blur(8px)',
   },
   mobileGhostControl: {
-    width: '54px', height: '54px', borderRadius: '50%',
-    background: 'rgba(255,255,255,0.1)', border: '1.5px solid rgba(255,255,255,0.28)',
+    width: '64px', height: '64px', borderRadius: '50%',
+    background: 'transparent',
     color: '#fff', display: 'flex', flexDirection: 'column',
-    alignItems: 'center', justifyContent: 'center', gap: '3px', flexShrink: 0,
+    alignItems: 'center', justifyContent: 'center', gap: '2px', flexShrink: 0,
   },
   mobileSkipLabel: {
-    fontSize: '0.64rem', fontWeight: '800', letterSpacing: '0.04em',
-    color: 'rgba(255,255,255,0.85)',
+    fontSize: '0.74rem', fontWeight: '800', letterSpacing: '0.04em',
+    color: 'rgba(255,255,255,0.95)',
+  },
+
+  /* bottom section wrapper */
+  mobileBottomSection: {
+    paddingBottom: 'env(safe-area-inset-bottom, 16px)',
+    paddingLeft: 'max(16px, env(safe-area-inset-left))',
+    paddingRight: 'max(16px, env(safe-area-inset-right))',
+    background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%)',
   },
 
   /* scrubber + time */
-  mobileScrubRow: { padding: '0 16px 4px' },
+  mobileScrubRow: { padding: '8px 0 4px' },
   mobileScrubberWrap: {
     position: 'relative', height: '20px', display: 'flex', alignItems: 'center',
     marginBottom: '4px',
@@ -1257,7 +1536,7 @@ const styles = {
   /* secondary action row */
   mobileActionRow: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-around',
-    padding: '8px 10px 12px', gap: '4px',
+    padding: '12px 0 12px', gap: '4px',
   },
   mobileActionBtn: {
     position: 'relative', flex: 1,
@@ -1279,7 +1558,7 @@ const styles = {
   },
 
   /* meta badges */
-  mobileMetaRow: { display: 'flex', gap: '6px', padding: '0 16px 8px', flexWrap: 'wrap' },
+  mobileMetaRow: { display: 'flex', gap: '6px', padding: '0 0 8px', flexWrap: 'wrap' },
 
   /* legacy stubs */
   mobileSecondaryRow: { display: 'none' },

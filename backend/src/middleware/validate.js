@@ -1,47 +1,54 @@
 const Joi = require('joi');
+const { AppError } = require('../utils/error');
 
-function validateQuery(schema) {
-  return (req, res, next) => {
-    const { value, error } = schema.validate(req.query, {
-      abortEarly: false,
-      stripUnknown: true,
-      convert: true,
-    });
-
-    if (error) {
-      return res.status(400).json({
-        error: 'Invalid query parameters',
-        details: error.details.map((detail) => detail.message),
-      });
-    }
-
-    req.validatedQuery = value;
-    return next();
+/**
+ * Middleware to validate request data against a Joi schema.
+ * @param {Object} schemas - Object containing schemas for body, query, and/or params.
+ */
+const validate = (schemas) => (req, res, next) => {
+  const options = {
+    abortEarly: false, // Include all errors
+    allowUnknown: true, // Allow unknown keys that will be ignored
+    stripUnknown: true, // Remove unknown keys from the validated output
   };
-}
 
-function validateBody(schema) {
-  return (req, res, next) => {
-    const { value, error } = schema.validate(req.body, {
-      abortEarly: false,
-      stripUnknown: true,
-      convert: true,
-    });
+  const validationErrors = [];
 
-    if (error) {
-      return res.status(400).json({
-        error: 'Invalid request body',
-        details: error.details.map((detail) => detail.message),
-      });
+  ['body', 'query', 'params'].forEach((key) => {
+    if (schemas[key]) {
+      const { error, value } = schemas[key].validate(req[key], options);
+      if (error) {
+        validationErrors.push(
+          ...error.details.map((detail) => ({
+            location: key,
+            path: detail.path.join('.'),
+            message: detail.message,
+          }))
+        );
+      } else {
+        // Replace request data with validated (and stripped) value
+        req[key] = value;
+        if (key === 'body') req.validatedBody = value;
+        if (key === 'query') req.validatedQuery = value;
+        if (key === 'params') req.validatedParams = value;
+      }
     }
+  });
 
-    req.validatedBody = value;
-    return next();
-  };
-}
+  if (validationErrors.length > 0) {
+    return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR', validationErrors));
+  }
 
-module.exports = {
-  Joi,
-  validateQuery,
-  validateBody,
+  next();
 };
+
+const validateBody = (schema) => validate({ body: schema });
+const validateQuery = (schema) => validate({ query: schema });
+const validateParams = (schema) => validate({ params: schema });
+
+module.exports = validate;
+module.exports.validate = validate;
+module.exports.validateBody = validateBody;
+module.exports.validateQuery = validateQuery;
+module.exports.validateParams = validateParams;
+module.exports.Joi = Joi;

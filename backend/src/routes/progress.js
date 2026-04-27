@@ -8,6 +8,7 @@ const {
   upsertWatchProgress,
 } = require('../data/store');
 const { resolveUserId, requireStateUser } = require('../middleware/resolve-user-id');
+const { AppError } = require('../utils/error');
 
 function getUserId(req) {
   return req.stateUserId || resolveUserId(req);
@@ -27,7 +28,7 @@ router.get('/', requireStateUser, async (req, res, next) => {
 
     const userProgress = entries.map((entry) => {
       const item = itemsMap.get(Number(entry.contentId));
-      return item ? { ...item, ...entry, last_position: entry.position } : { ...entry, last_position: entry.position };
+      return item ? { ...item, ...entry, id: Number(entry.contentId), progressId: entry.id, last_position: entry.position } : { ...entry, last_position: entry.position };
     });
 
     res.json({ items: userProgress });
@@ -42,7 +43,7 @@ router.post('/', requireStateUser, async (req, res, next) => {
     const { contentType, contentId, position, duration } = req.body;
 
     if (!contentType || !contentId) {
-      return res.status(400).json({ error: 'contentType and contentId required' });
+      throw new AppError('contentType and contentId required', 400, 'BAD_REQUEST');
     }
 
     await upsertWatchProgress(userId, { contentType, contentId, position, duration, completed: false });
@@ -66,7 +67,7 @@ async function buildContinueWatching(userId) {
 
   return activeEntries
     .filter((entry) => itemsMap.has(Number(entry.contentId)))
-    .map((entry) => ({ ...itemsMap.get(Number(entry.contentId)), ...entry, last_position: entry.position }));
+    .map((entry) => ({ ...itemsMap.get(Number(entry.contentId)), ...entry, id: Number(entry.contentId), progressId: entry.id, last_position: entry.position }));
 }
 
 router.get('/continue-watching', requireStateUser, async (req, res, next) => {

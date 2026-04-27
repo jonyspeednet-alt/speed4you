@@ -100,10 +100,20 @@ const poolStats = {
   },
 };
 
+async function closePool() {
+  if (activePool) {
+    console.log('[database] Closing database pool...');
+    await activePool.end();
+    activePool = null;
+    initPromise = null;
+  }
+}
+
 module.exports = {
   query,
   pool: poolStats,
   getPool,
+  closePool,
   get isInMemory() {
     return usingInMemory;
   },

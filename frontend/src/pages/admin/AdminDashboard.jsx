@@ -1,84 +1,37 @@
 import { Link } from 'react-router-dom';
-import { useCallback, useEffect, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminService } from '../../services';
 import { useBreakpoint } from '../../hooks';
 
 const AdminDashboard = () => {
   const { isMobile, isTablet } = useBreakpoint();
-  const [dashboard, setDashboard] = useState({
-    stats: {},
-    recentContent: [],
-    scannerDrafts: [],
+  const queryClient = useQueryClient();
+
+  // Fetch Dashboard Stats
+  const { data: dashboard = { stats: {}, recentContent: [], scannerDrafts: [] }, isLoading: dashboardLoading, error: dashboardError } = useQuery({
+    queryKey: ['admin', 'dashboard'],
+    queryFn: () => adminService.getDashboard(),
   });
-  const [error, setError] = useState('');
-  const [normalizer, setNormalizer] = useState({ running: false, state: null, recentLogLines: [] });
-  const [normalizerBusy, setNormalizerBusy] = useState(false);
-  const [normalizerError, setNormalizerError] = useState('');
-  const [dashboardLoading, setDashboardLoading] = useState(true);
-  const [lastUpdated, setLastUpdated] = useState('');
 
-  const loadDashboard = useCallback(async () => {
-    try {
-      setDashboardLoading(true);
-      const response = await adminService.getDashboard();
-      setDashboard(response);
-      setError('');
-      setLastUpdated(new Date().toISOString());
-    } catch (loadError) {
-      setError(loadError.message || 'Failed to load admin dashboard.');
-    } finally {
-      setDashboardLoading(false);
-    }
-  }, []);
+  // Fetch Normalizer Status (polling)
+  const { data: normalizer = { running: false, state: null, recentLogLines: [] }, error: normalizerError } = useQuery({
+    queryKey: ['admin', 'normalizer', 'status'],
+    queryFn: () => adminService.getMediaNormalizerStatus(),
+    refetchInterval: 2000, // Poll every 2 seconds
+  });
 
-  useEffect(() => {
-    loadDashboard();
-  }, [loadDashboard]);
-
-  useEffect(() => {
-    let active = true;
-
-    const loadStatus = () => {
-      adminService.getMediaNormalizerStatus()
-        .then((response) => {
-          if (!active) {
-            return;
-          }
-          setNormalizer(response || { running: false, state: null, recentLogLines: [] });
-          setNormalizerError('');
-        })
-        .catch((loadError) => {
-          if (!active) {
-            return;
-          }
-          setNormalizerError(loadError.message || 'Failed to load media normalizer status.');
-        });
-    };
-
-    loadStatus();
-    const timer = setInterval(loadStatus, 2000);
-    return () => {
-      active = false;
-      clearInterval(timer);
-    };
-  }, []);
+  // Normalizer Action Mutation
+  const normalizerMutation = useMutation({
+    mutationFn: (action) => action === 'start' 
+      ? adminService.startMediaNormalizer() 
+      : adminService.stopMediaNormalizer(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'normalizer', 'status'] });
+    },
+  });
 
   const handleNormalizerAction = async (action) => {
-    try {
-      setNormalizerBusy(true);
-      setNormalizerError('');
-      if (action === 'start') {
-        const response = await adminService.startMediaNormalizer();
-        setNormalizer(response.status || response);
-      } else {
-        const response = await adminService.stopMediaNormalizer();
-        setNormalizer(response.status || response);
-      }
-    } catch (actionError) {
-      setNormalizerError(actionError.message || 'Failed to update normalizer status.');
-    } finally {
-      setNormalizerBusy(false);
-    }
+    normalizerMutation.mutate(action);
   };
 
   const stats = [
@@ -87,8 +40,10 @@ const AdminDashboard = () => {
     { label: 'Draft Content', value: dashboard.stats.draftContent || 0, change: 'review pending' },
     { label: 'Published', value: dashboard.stats.publishedContent || 0, change: 'live on portal' },
   ];
+
   const currentProgress = normalizer.state?.currentFileProgress || null;
   const percentValue = Math.max(0, Math.min(100, Number(currentProgress?.percent || 0)));
+
   const formatSeconds = (seconds) => {
     const total = Math.max(0, Math.floor(Number(seconds || 0)));
     const hh = Math.floor(total / 3600);
@@ -110,14 +65,23 @@ const AdminDashboard = () => {
         <div style={styles.heroActions}>
           <Link to="/admin/content/new" style={styles.primaryAction}>Add New Content</Link>
           <Link to="/admin/content" style={styles.secondaryAction}>Open Content Library</Link>
-          <button type="button" style={styles.secondaryAction} onClick={loadDashboard} disabled={dashboardLoading}>
+          <button 
+            type="button" 
+            style={styles.secondaryAction} 
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['admin', 'dashboard'] })} 
+            disabled={dashboardLoading}
+          >
             {dashboardLoading ? 'Refreshing...' : 'Refresh Dashboard'}
           </button>
         </div>
-        <span style={styles.kicker}>Last sync: {lastUpdated ? formatSeconds((Date.now() - Date.parse(lastUpdated)) / 1000) : 'now'}</span>
+        <span style={styles.kicker}>Status: {dashboardLoading ? 'Updating...' : 'Live'}</span>
       </section>
 
-      {error ? <div style={styles.errorBox}>{error}</div> : null}
+      {dashboardError ? (
+        <div style={styles.errorBox}>
+          <strong>Dashboard Error:</strong> {dashboardError.message || 'Unknown error'}
+        </div>
+      ) : null}
 
       <div style={styles.stats}>
         {stats.map((stat) => (
@@ -234,7 +198,7 @@ const AdminDashboard = () => {
                 type="button"
                 style={styles.primaryAction}
                 onClick={() => handleNormalizerAction('start')}
-                disabled={normalizerBusy || normalizer.running}
+                disabled={normalizerMutation.isPending || normalizer.running}
               >
                 Start Worker
               </button>
@@ -242,12 +206,16 @@ const AdminDashboard = () => {
                 type="button"
                 style={styles.secondaryAction}
                 onClick={() => handleNormalizerAction('stop')}
-                disabled={normalizerBusy || !normalizer.running}
+                disabled={normalizerMutation.isPending || !normalizer.running}
               >
                 Stop Worker
               </button>
             </div>
-            {normalizerError ? <div style={styles.errorInline}>{normalizerError}</div> : null}
+            {normalizerError ? (
+              <div style={styles.errorInline}>
+                {normalizerError.message || 'Status check failed'}
+              </div>
+            ) : null}
             <div style={styles.logBox}>
               {(normalizer.recentLogLines || []).length
                 ? normalizer.recentLogLines.slice(-8).map((line, index) => (
@@ -267,7 +235,7 @@ const styles = {
   heroCard: {
     padding: '28px',
     borderRadius: '32px',
-    background: 'linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03))',
+    background: 'linear-gradient(135deg, rgba(0,240,181,0.08), rgba(0,240,181,0.02))',
     border: '1px solid rgba(255,255,255,0.08)',
     display: 'grid',
     gridTemplateColumns: 'minmax(0, 1fr) auto',
@@ -284,11 +252,11 @@ const styles = {
   kicker: { display: 'inline-block', marginBottom: '10px', color: 'var(--accent-cyan)', textTransform: 'uppercase', letterSpacing: '0.16em', fontSize: '0.72rem', fontWeight: '700' },
   heroTitle: { color: 'var(--text-primary)', maxWidth: '18ch' },
   heroActions: { display: 'flex', gap: '12px', flexWrap: 'wrap' },
-  primaryAction: { padding: '14px 20px', borderRadius: '999px', background: 'linear-gradient(135deg, var(--accent-red), #ff8a54)', color: '#fff', fontWeight: '700', boxShadow: '0 12px 30px rgba(255,90,95,0.24)' },
+  primaryAction: { padding: '14px 20px', borderRadius: '999px', background: 'linear-gradient(135deg, var(--accent-cyan), #05d5a1)', color: '#000', fontWeight: '800', boxShadow: '0 12px 30px rgba(0, 240, 181, 0.24)' },
   secondaryAction: { padding: '14px 20px', borderRadius: '999px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)', fontWeight: '700' },
   errorBox: { padding: '14px 18px', borderRadius: '18px', background: 'rgba(255, 90, 95, 0.12)', color: '#ff8a8a', border: '1px solid rgba(255, 90, 95, 0.24)' },
   stats: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '18px' },
-  statCard: { padding: '24px', borderRadius: '28px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', display: 'grid', gap: '8px' },
+  statCard: { padding: '24px', borderRadius: '28px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', display: 'grid', gap: '8px', transition: 'transform 0.2s, box-shadow 0.2s', cursor: 'default' },
   statLabel: { color: 'var(--text-muted)', fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: '700' },
   statValue: { fontSize: '2rem', fontWeight: '700', color: 'var(--text-primary)' },
   statChange: { color: '#4ade80', fontSize: '0.86rem', fontWeight: '700' },
@@ -299,7 +267,7 @@ const styles = {
   sectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'end', gap: '16px', marginBottom: '16px' },
   sectionEyebrow: { display: 'inline-block', marginBottom: '6px', color: 'var(--accent-amber)', textTransform: 'uppercase', letterSpacing: '0.14em', fontSize: '0.72rem', fontWeight: '700' },
   sectionTitle: { fontSize: '1.5rem', color: 'var(--text-primary)' },
-  viewAll: { color: 'var(--accent-red)', fontSize: '0.9rem', fontWeight: '700' },
+  viewAll: { color: 'var(--accent-cyan)', fontSize: '0.9rem', fontWeight: '700' },
   tableWrap: { overflowX: 'auto' },
   table: { width: '100%', borderCollapse: 'separate', borderSpacing: '0 10px' },
   itemTitle: { display: 'block', color: 'var(--text-primary)' },
@@ -310,12 +278,12 @@ const styles = {
   editBtn: { padding: '8px 14px', background: 'rgba(255,255,255,0.08)', borderRadius: '999px', color: 'var(--text-primary)', fontSize: '0.82rem', fontWeight: '700', display: 'inline-flex' },
   actions: { display: 'grid', gap: '12px' },
   actionBtn: { padding: '14px 18px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', borderRadius: '22px', fontWeight: '700', border: '1px solid rgba(255,255,255,0.08)' },
-  noteCard: { padding: '20px', borderRadius: '24px', background: 'linear-gradient(135deg, rgba(255,200,87,0.08), rgba(255,255,255,0.04))', border: '1px solid rgba(255,255,255,0.08)' },
+  noteCard: { padding: '20px', borderRadius: '24px', background: 'linear-gradient(135deg, rgba(0,240,181,0.08), rgba(255,255,255,0.04))', border: '1px solid rgba(0,240,181,0.1)' },
   noteText: { lineHeight: '1.8' },
   normalizerCard: { padding: '20px', borderRadius: '24px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', display: 'grid', gap: '12px' },
   normalizerHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' },
   normalizerStats: { display: 'grid', gap: '6px', color: 'var(--text-muted)', fontSize: '0.84rem' },
-  logBox: { marginTop: '6px', padding: '10px 12px', borderRadius: '12px', background: 'rgba(0,0,0,0.22)', border: '1px solid rgba(255,255,255,0.08)', maxHeight: '180px', overflowY: 'auto', fontSize: '0.75rem', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', color: 'var(--text-secondary)', lineHeight: '1.45' },
+  logBox: { marginTop: '6px', padding: '12px 16px', borderRadius: '12px', background: '#0d1117', border: '1px solid #30363d', maxHeight: '200px', overflowY: 'auto', fontSize: '0.8rem', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', color: '#00F0B5', lineHeight: '1.6', boxShadow: 'inset 0 4px 8px rgba(0,0,0,0.4)' },
   errorInline: { padding: '8px 10px', borderRadius: '10px', background: 'rgba(255, 90, 95, 0.12)', color: '#ff8a8a', border: '1px solid rgba(255, 90, 95, 0.22)', fontSize: '0.82rem' },
   progressCard: { padding: '10px 12px', borderRadius: '12px', background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(255,255,255,0.08)', display: 'grid', gap: '8px' },
   progressTopRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' },

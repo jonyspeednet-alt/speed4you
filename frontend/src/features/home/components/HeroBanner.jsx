@@ -1,12 +1,24 @@
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useBreakpoint } from '../../../hooks';
 import StarRating from '../../../components/ui/StarRating';
 import WatchlistButton from '../../../components/ui/WatchlistButton';
 
-function HeroBanner({ content }) {
+function HeroBanner({ content: contentItems }) {
   const { isMobile, isTablet } = useBreakpoint();
   const bgRef = useRef(null);
+  const [activeIndex, setActiveIndex] = React.useState(0);
+  
+  React.useEffect(() => {
+    if (!Array.isArray(contentItems) || contentItems.length <= 1) return;
+    const interval = setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % contentItems.length);
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [contentItems]);
+
+  const content = Array.isArray(contentItems) ? contentItems[activeIndex] : contentItems;
+  if (!content) return null;
 
   // Parallax scroll effect (desktop only)
   useEffect(() => {
@@ -24,6 +36,7 @@ function HeroBanner({ content }) {
   const isSeries = content.type === 'series';
   const isPlaceholder = Boolean(content.isPlaceholder);
   const heroChips = [content.genre, content.language, content.year].filter(Boolean).slice(0, 3);
+  
   const insightItems = [
     { label: 'Format', value: isPlaceholder ? 'Spotlight' : isSeries ? 'Series' : 'Movie' },
     { label: 'Rating', value: content.rating || 'N/A', isRating: true },
@@ -48,6 +61,18 @@ function HeroBanner({ content }) {
         ) : null}
         <div style={styles.backdropWash} />
         <div style={styles.overlay} />
+        {Array.isArray(contentItems) && contentItems.length > 1 && (
+          <div style={styles.carouselDots}>
+            {contentItems.map((_, i) => (
+              <button 
+                key={i} 
+                onClick={() => setActiveIndex(i)}
+                style={i === activeIndex ? styles.dotActive : styles.dot}
+                aria-label={`Go to slide ${i + 1}`}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       <div style={{ ...styles.contentWrap, ...(isMobile ? styles.contentWrapMobile : isTablet ? styles.contentWrapTablet : {}) }}>
@@ -67,7 +92,7 @@ function HeroBanner({ content }) {
 
         <div style={{ ...styles.copyPanel, ...(isMobile ? styles.copyPanelMobile : {}) }}>
           <div style={styles.kickerRow}>
-            <span style={styles.liveBadge}>Featured Tonight</span>
+            <span style={styles.liveBadge}>FEATURED TONIGHT</span>
             <span style={styles.genre}>{content.genre}</span>
             <span style={styles.year}>{content.year}</span>
           </div>
@@ -97,22 +122,22 @@ function HeroBanner({ content }) {
           <div style={{ ...styles.actions, ...(isMobile ? styles.actionsMobile : {}) }}>
             <Link to={isPlaceholder ? '/browse?sort=latest' : `/watch/${content.id}`} style={{ ...styles.playBtn, ...(isMobile ? styles.playBtnMobile : {}) }}>
               {isPlaceholder ? (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={styles.buttonIcon} aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style={styles.buttonIcon} aria-hidden="true">
                   <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z" />
                 </svg>
               ) : (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={styles.buttonIcon} aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style={styles.buttonIcon} aria-hidden="true">
                   <path d="M8 5v14l11-7z" />
                 </svg>
               )}
-              <span>{isPlaceholder ? 'Browse Latest' : isSeries ? 'Play From Start' : 'Watch Now'}</span>
+              <span>{isPlaceholder ? 'Browse Latest' : isSeries ? 'Start Watching' : 'Play Now'}</span>
             </Link>
 
             <Link to={isPlaceholder ? '/search' : isSeries ? `/series/${content.id}` : `/movies/${content.id}`} style={{ ...styles.infoBtn, ...(isMobile ? styles.infoBtnMobile : {}) }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={styles.buttonIcon} aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style={styles.buttonIcon} aria-hidden="true">
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
               </svg>
-              <span>{isPlaceholder ? 'Open Search' : 'View Details'}</span>
+              <span>{isPlaceholder ? 'Search Portal' : 'Details'}</span>
             </Link>
 
             {!isPlaceholder && (
@@ -124,48 +149,6 @@ function HeroBanner({ content }) {
             )}
           </div>
         </div>
-        {!isMobile && <div style={{ ...styles.sidePanel, ...(isTablet ? styles.sidePanelTablet : {}) }}>
-          <div style={styles.sideCard}>
-            <span style={styles.sideLabel}>Tonight's Mix</span>
-            <h2 style={styles.sideTitle}>{isPlaceholder ? 'Catalog is warming up.' : 'Fast pick, premium feel.'}</h2>
-            <p style={styles.sideText}>
-              {isPlaceholder
-                ? 'The hero now avoids fake demo movies. As soon as published content is available, this spotlight automatically switches to a real title from the live portal catalog.'
-                : 'Cleaner artwork, clearer metadata, and stronger rotation keep the hero from feeling stuck on the same title every reload.'}
-            </p>
-            <div style={styles.sideStats}>
-              <div style={styles.sideStat}>
-                <span style={styles.sideStatLabel}>Status</span>
-                <strong style={styles.sideStatValue}>{isPlaceholder ? 'Waiting for live titles' : 'Live spotlight'}</strong>
-              </div>
-              <div style={styles.sideStat}>
-                <span style={styles.sideStatLabel}>Refresh</span>
-                <strong style={styles.sideStatValue}>{isPlaceholder ? 'Auto after publish' : 'Rotates through the day'}</strong>
-              </div>
-            </div>
-          </div>
-
-          <div style={styles.sidePosterCard}>
-            <span style={styles.sidePosterBadge}>{isPlaceholder ? 'Portal Spotlight' : isSeries ? 'Series Spotlight' : 'Movie Spotlight'}</span>
-            <div style={styles.sidePoster}>
-              {hasPoster ? (
-                <img
-                  src={content.poster}
-                  alt={content.title}
-                  style={styles.sidePosterImage}
-                  loading="eager"
-                  fetchPriority="high"
-                  decoding="async"
-                />
-              ) : (
-                <div style={styles.sidePosterFallback}>
-                  <span style={styles.sidePosterMini}>{isPlaceholder ? 'Fresh drops will appear here' : 'Featured tonight'}</span>
-                  <strong style={styles.sidePosterTitle}>{content.title}</strong>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>}
       </div>
     </section>
   );
@@ -174,21 +157,22 @@ function HeroBanner({ content }) {
 const styles = {
   hero: {
     position: 'relative',
-    minHeight: '88vh',
+    minHeight: '92vh',
     overflow: 'hidden',
-    paddingTop: '84px',
+    paddingTop: 'var(--nav-height-desktop)',
+    background: 'var(--bg-primary)',
   },
   heroTablet: {
-    minHeight: '70vh',
-    paddingTop: '76px',
+    minHeight: '75vh',
   },
   heroMobile: {
-    paddingTop: '64px',
+    paddingTop: 'var(--nav-height-mobile)',
     minHeight: 'min(100svh, 100dvh)',
   },
   background: {
     position: 'absolute',
     inset: 0,
+    zIndex: 0,
   },
   bgImage: {
     position: 'absolute',
@@ -196,25 +180,26 @@ const styles = {
     width: '100%',
     height: '100%',
     objectFit: 'cover',
-    objectPosition: 'center top',
-    transform: 'scale(1.04)',
-    filter: 'saturate(1.08) contrast(1.04)',
-    transition: 'opacity 220ms ease',
+    objectPosition: 'center 20%',
+    transform: 'scale(1.1)',
+    filter: 'saturate(1.1) contrast(1.1)',
+    transition: 'opacity 0.8s ease-in-out',
+    animation: 'softFloat 20s ease-in-out infinite alternate',
   },
   bgFallback: {
     width: '100%',
     height: '100%',
-    background: 'radial-gradient(circle at 20% 20%, rgba(125,249,255,0.18), transparent 24%), radial-gradient(circle at 80% 18%, rgba(255,90,95,0.22), transparent 20%), linear-gradient(135deg, #08111d 0%, #12233a 50%, #33161c 100%)',
+    background: 'linear-gradient(135deg, #050b16 0%, #0a1222 100%)',
   },
   backdropWash: {
     position: 'absolute',
     inset: 0,
-    background: 'linear-gradient(112deg, rgba(7,17,31,0.92) 12%, rgba(7,17,31,0.5) 48%, rgba(255,90,95,0.12) 100%)',
+    background: 'linear-gradient(112deg, rgba(5,11,22,0.95) 15%, rgba(5,11,22,0.4) 50%, rgba(0,245,212,0.1) 100%)',
   },
   overlay: {
     position: 'absolute',
     inset: 0,
-    background: 'radial-gradient(circle at 82% 20%, rgba(125,249,255,0.16), transparent 16%), linear-gradient(to top, rgba(5,12,22,0.98) 4%, rgba(5,12,22,0.28) 48%, rgba(5,12,22,0.8) 100%)',
+    background: 'linear-gradient(to top, var(--bg-primary) 2%, rgba(5,11,22,0.2) 40%, rgba(5,11,22,0.7) 100%)',
   },
   contentWrap: {
     position: 'relative',
@@ -224,9 +209,8 @@ const styles = {
     minHeight: 'calc(88vh - 84px)',
     padding: 'var(--spacing-3xl) var(--spacing-lg)',
     display: 'grid',
-    gridTemplateColumns: 'minmax(0, 1.2fr) minmax(280px, 360px)',
+    gridTemplateColumns: 'minmax(0, 800px)',
     alignItems: 'end',
-    gap: 'var(--spacing-2xl)',
     animation: 'fadeUp 620ms ease both',
   },
   contentWrapTablet: {
@@ -264,18 +248,12 @@ const styles = {
   copyPanel: {
     padding: 'var(--spacing-2xl)',
     borderRadius: 'var(--radius-xl)',
-    background: 'linear-gradient(180deg, rgba(7,17,31,0.42), rgba(7,17,31,0.7))',
-    backdropFilter: 'blur(12px)',
-    border: '1px solid var(--border-color)',
-    boxShadow: 'var(--shadow-hero)',
-    maxWidth: '760px',
+    background: 'transparent',
+    maxWidth: '800px',
   },
   copyPanelMobile: {
     padding: '0',
     background: 'transparent',
-    border: 'none',
-    boxShadow: 'none',
-    backdropFilter: 'none',
   },
   kickerRow: {
     display: 'flex',
@@ -307,12 +285,12 @@ const styles = {
     fontSize: '0.92rem',
   },
   title: {
-    fontSize: 'clamp(3.4rem, 6vw, 6rem)',
+    fontSize: 'clamp(3rem, 5vw, 4.5rem)',
     marginBottom: 'var(--spacing-md)',
-    maxWidth: '9ch',
+    maxWidth: '12ch',
     textWrap: 'balance',
     color: 'var(--text-primary)',
-    textShadow: '0 6px 24px rgba(0, 0, 0, 0.28)',
+    textShadow: '0 4px 18px rgba(0, 0, 0, 0.4)',
   },
   titleMobile: {
     fontSize: 'clamp(2rem, 8vw, 2.8rem)',

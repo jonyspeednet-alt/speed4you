@@ -1,7 +1,7 @@
 import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { authService } from '../services';
-import { useBreakpoint } from '../hooks';
+import { useBreakpoint, useTVMode } from '../hooks';
 
 const adminNavItems = [
   { path: '/admin', label: 'Dashboard', icon: 'DB', hint: 'Pulse and analytics' },
@@ -68,6 +68,7 @@ function getSectionMeta(pathname) {
 function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
+  useTVMode();
   const [authState, setAuthState] = useState(() => (localStorage.getItem('token') ? 'checking' : 'unauthenticated'));
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [quickSearch, setQuickSearch] = useState('');

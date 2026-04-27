@@ -178,6 +178,7 @@ function ContentLibraryPage() {
   const [duplicateReview, setDuplicateReview] = useState(null);
   const [duplicateCleanupLoading, setDuplicateCleanupLoading] = useState(false);
   const [pruneLoading, setPruneLoading] = useState(false);
+  const [vacuumLoading, setVacuumLoading] = useState(false);
   const [selectedRootIds, setSelectedRootIds] = useState([]);
   const [selectedContentIds, setSelectedContentIds] = useState([]);
   const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
@@ -729,6 +730,24 @@ function ContentLibraryPage() {
     }
   };
 
+  
+  const handleVacuumDatabase = async () => {
+    try {
+      setVacuumLoading(true);
+      setError('');
+      setScanStateLabel('Running database maintenance...');
+      const res = await adminService.runVacuum();
+      setScanStateLabel(res?.success ? 'Database maintenance completed successfully.' : 'Maintenance failed.');
+      await loadAuxiliaryData();
+    } catch (e) {
+      setError(e.message || 'Failed to run database maintenance.');
+      setScanStateLabel('');
+    } finally {
+      setVacuumLoading(false);
+      setTimeout(() => setScanStateLabel(''), 4000);
+    }
+  };
+
   const handlePruneCatalog = async () => {
     try {
       setPruneLoading(true);
@@ -974,6 +993,14 @@ function ContentLibraryPage() {
               title="Remove junk files and missing items from catalog"
             >
               {pruneLoading ? 'Pruning...' : 'Prune Catalog'}
+            </button>
+            <button
+              onClick={handleVacuumDatabase}
+              disabled={vacuumLoading || loading}
+              style={styles.secondaryBtn}
+              title="Run Postgres VACUUM ANALYZE to optimize queries"
+            >
+              {vacuumLoading ? 'Optimizing...' : 'Optimize DB'}
             </button>
             <Link to="/admin/content/new" style={styles.ghostBtn}>Add Manual Content</Link>
           </div>
@@ -1772,7 +1799,7 @@ const styles = {
   liveDot: { width: '8px', height: '8px', borderRadius: '50%', background: 'currentColor', boxShadow: '0 0 0 6px rgba(125,249,255,0.12)' },
   heroActionStack: { display: 'grid', gap: '8px' },
   heroMeta: { display: 'grid', gap: '4px', color: 'var(--text-secondary)', fontSize: '0.82rem' },
-  primaryBtn: { padding: '12px 16px', borderRadius: '999px', background: 'linear-gradient(135deg, #ff744f, #ffb347)', color: '#fff', fontWeight: '800' },
+  primaryBtn: { padding: '12px 16px', borderRadius: '999px', background: 'linear-gradient(135deg, var(--accent-cyan), #05d5a1)', color: '#000', fontWeight: '800' },
   secondaryBtn: { padding: '12px 16px', borderRadius: '999px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-primary)', fontWeight: '700', textAlign: 'center' },
   ghostBtn: { padding: '12px 16px', borderRadius: '999px', background: 'rgba(125,249,255,0.08)', border: '1px solid rgba(125,249,255,0.16)', color: 'var(--accent-cyan)', fontWeight: '700', textAlign: 'center', textDecoration: 'none' },
   errorBox: { padding: '14px 18px', borderRadius: '18px', background: 'rgba(255, 90, 95, 0.12)', color: '#ff8a8a', border: '1px solid rgba(255, 90, 95, 0.24)' },
@@ -1791,13 +1818,13 @@ const styles = {
   liveRootCard: { padding: '12px 14px', borderRadius: '16px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', display: 'grid', gap: '8px' },
   metricsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '10px' },
   metricCard: { padding: '14px 16px', borderRadius: '18px', background: panelBg, border: '1px solid rgba(255,255,255,0.08)', display: 'grid', gap: '4px' },
-  metricCardAccent: { padding: '14px 16px', borderRadius: '18px', background: 'linear-gradient(135deg, rgba(255,116,79,0.18), rgba(125,249,255,0.12))', border: '1px solid rgba(255,255,255,0.08)', display: 'grid', gap: '4px' },
+  metricCardAccent: { padding: '14px 16px', borderRadius: '18px', background: 'linear-gradient(135deg, rgba(0,240,181,0.18), rgba(125,249,255,0.12))', border: '1px solid rgba(255,255,255,0.08)', display: 'grid', gap: '4px' },
   metricLabel: { color: 'var(--text-muted)', fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: '700' },
   metricValue: { color: 'var(--text-primary)', fontSize: '1.45rem' },
   metricHint: { color: 'var(--text-muted)' },
   rootGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' },
   rootCard: { padding: '14px', borderRadius: '18px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-secondary)', display: 'grid', gap: '8px', textAlign: 'left' },
-  rootCardActive: { background: 'linear-gradient(135deg, rgba(255,116,79,0.14), rgba(125,249,255,0.1))', color: 'var(--text-primary)', borderColor: 'rgba(125,249,255,0.18)' },
+  rootCardActive: { background: 'linear-gradient(135deg, rgba(0,240,181,0.14), rgba(125,249,255,0.1))', color: 'var(--text-primary)', borderColor: 'rgba(125,249,255,0.18)' },
   rootCardBroken: { borderColor: 'rgba(255, 90, 95, 0.35)' },
   rootHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' },
   rootName: { color: 'var(--text-primary)' },
@@ -1836,7 +1863,7 @@ const styles = {
   select: { padding: '11px 14px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', color: 'var(--text-primary)', fontSize: '0.92rem', width: '100%' },
   quickFilterBar: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
   quickChip: { padding: '8px 12px', borderRadius: '999px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-secondary)', fontWeight: '700', fontSize: '0.82rem' },
-  quickChipActive: { background: 'linear-gradient(135deg, rgba(255,116,79,0.18), rgba(125,249,255,0.12))', color: 'var(--text-primary)', borderColor: 'rgba(125,249,255,0.18)' },
+  quickChipActive: { background: 'linear-gradient(135deg, rgba(0,240,181,0.18), rgba(125,249,255,0.12))', color: 'var(--text-primary)', borderColor: 'rgba(125,249,255,0.18)' },
   quickChipClear: { padding: '8px 12px', borderRadius: '999px', background: 'rgba(255,90,95,0.12)', border: '1px solid rgba(255,90,95,0.18)', color: '#ff9ea2', fontWeight: '700', fontSize: '0.82rem' },
   bulkBar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '12px 14px', borderRadius: '16px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', flexWrap: 'wrap' },
   bulkInput: { padding: '9px 12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', color: 'var(--text-primary)', fontSize: '0.82rem', minWidth: '150px' },
