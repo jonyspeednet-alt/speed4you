@@ -467,12 +467,12 @@ function PlayerPage() {
     return () => clearTimeout(hideTimerRef.current);
   }, [isPlaying, isScrubbing, showControls, isHoveringControls]);
 
-  const playNextEpisode = () => {
+  const playNextEpisode = useCallback(() => {
     setAutoPlayCountdown(null);
     if (content?.type === 'series') {
       navigate(`/play/${contentId}?season=${content.season}&episode=${content.episode + 1}`);
     }
-  };
+  }, [content, contentId, navigate]);
 
   useEffect(() => {
     if (autoPlayCountdown === null) return;
