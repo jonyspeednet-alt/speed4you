@@ -74,8 +74,17 @@ app.use(helmet({
       styleSrc: ["'self'", 'https:'],
       workerSrc: ["'self'", 'blob:'],
       connectSrc: ["'self'", ...corsOrigins],
+      upgradeInsecureRequests: [],
     },
-  } : false,
+  } : {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https:'],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      connectSrc: ["'self'", 'http://127.0.0.1:*', 'http://localhost:*', ...corsOrigins],
+    },
+  },
   // Enforce HTTPS in production
   hsts: isProduction ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
 }));
@@ -176,12 +185,13 @@ if (fs.existsSync(frontendDistPath)) {
 
   // Handle SPA routing: serve index.html for all non-API routes
   app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api/')) {
+    const isApiRequest = req.path.startsWith('/api/') || req.path.startsWith('/portal-api/api/');
+    if (isApiRequest) {
       return next();
     }
     
-    // Explicitly handle /health to avoid sending index.html
-    if (req.path === '/health' || req.path === '/health/scanner') {
+    // Explicitly handle health routes to avoid sending index.html
+    if (req.path === '/health' || req.path.startsWith('/health/')) {
       return next();
     }
 
@@ -191,7 +201,8 @@ if (fs.existsSync(frontendDistPath)) {
 }
 
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api/')) {
+  const isApiRequest = req.path.startsWith('/api/') || req.path.startsWith('/portal-api/api/');
+  if (isApiRequest) {
     return res.status(404).json({
       ok: false,
       error: {
