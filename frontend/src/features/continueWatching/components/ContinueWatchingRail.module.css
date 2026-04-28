@@ -1,0 +1,140 @@
+
+.section {
+  padding: var(--spacing-lg) 0;
+  margin-bottom: var(--spacing-lg);
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-md);
+  padding: 0 var(--page-padding);
+}
+
+.rail {
+  display: flex;
+  gap: var(--spacing-md);
+  padding: 0 var(--page-padding);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none; /* Firefox */
+}
+
+.rail::-webkit-scrollbar {
+  display: none; /* Safari and Chrome */
+}
+
+.card {
+  flex: 0 0 auto;
+  width: 280px;
+  scroll-snap-align: start;
+  text-decoration: none;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  position: relative;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+.posterWrapper {
+  position: relative;
+  aspect-ratio: 16/9;
+  background: var(--bg-tertiary);
+}
+
+.poster {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.progressContainer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.progressBar {
+  height: 100%;
+  background: var(--accent-red);
+  border-radius: 0 2px 2px 0;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.card:hover .overlay {
+  opacity: 1;
+}
+
+.playIcon {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(229, 9, 20, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  transform: scale(0.8);
+  transition: transform var(--transition-fast);
+}
+
+.card:hover .playIcon {
+    transform: scale(1);
+}
+
+.info {
+  padding: var(--spacing-md);
+}
+
+.cardTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: var(--spacing-xs);
+}
+
+.progressText {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.emptyState {
+    padding: var(--spacing-xl) var(--page-padding);
+    text-align: center;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-lg);
+}
+
+.emptyState p {
+    font-size: 1rem;
+    color: var(--text-muted);
+}
+
+.emptyState a {
+    color: var(--accent-blue);
+    text-decoration: none;
+    font-weight: 600;
+}
