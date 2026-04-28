@@ -22,14 +22,17 @@ test('validateQuery returns 400 on invalid query', async () => {
   };
 
   await new Promise((resolve) => {
-    middleware(req, res, () => {
+    middleware(req, res, (err) => {
+      if (err) {
+        res.status(err.status || 500).json({ error: err.message });
+      }
       resolve();
     });
     setTimeout(resolve, 10);
   });
 
   assert.equal(res.statusCode, 400);
-  assert.equal(payload.error, 'Invalid query parameters');
+  assert.equal(payload.error, 'Validation failed');
 });
 
 test('validateQuery populates validatedQuery on valid input', async () => {
