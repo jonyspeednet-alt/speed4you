@@ -6,16 +6,8 @@ on:
       - main
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-      DEPLOY_REMOTE_BACKEND_PATH: /home/speed4you/backend
-      DEPLOY_REMOTE_FRONTEND_PATH: /home/speed4you/frontend
-      DEPLOY_REMOTE_PID_FILE: /home/speed4you/backend.pid
-      DEPLOY_REMOTE_BACKUP_BASE: /home/speed4you/backups
-      DEPLOY_REMOTE_SERVICE_NAME: speed4you-portal.service
-      DEPLOY_REMOTE_PORT: 5000
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -34,56 +26,34 @@ jobs:
       - name: Prepare deployment package
         run: node scripts/prepare-deploy.cjs
 
-      - name: Setup SSH key
+      - name: Upload deployment artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-package
+          path: |
+            server-deploy/
+            scripts/deploy.sh
+          retention-days: 1
+
+      - name: Notify deployment ready
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p ${{ secrets.DEPLOY_PORT }} ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          echo "✅ Build completed successfully!"
+          echo "📦 Deployment package ready"
+          echo "🔔 Local webhook listener will handle deployment"
+          echo "📍 Make sure webhook listener is running on your local machine"
 
-      - name: Copy files to server via SCP
-        run: |
-          scp -r -P ${{ secrets.DEPLOY_PORT }} \
-            -i ~/.ssh/deploy_key \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            server-deploy scripts/deploy.sh \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/speed4you/staging-area/
-
-      - name: Execute remote deployment script
-        run: |
-          ssh -p ${{ secrets.DEPLOY_PORT }} \
-            -i ~/.ssh/deploy_key \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'DEPLOY_SCRIPT'
-          set -e
-          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          STAGING_BASE=${DEPLOY_REMOTE_STAGING_BASE:-/home/speed4you/portal-deploy-staging}
-          REMOTE_STAGING_AREA="/home/speed4you/staging-area"
-          STAGING_ROOT="$STAGING_BASE/$TIMESTAMP"
-          
-          echo "Creating final deployment directory: $STAGING_ROOT"
-          mkdir -p "$STAGING_ROOT"
-
-          echo "Moving files from staging area to final directory"
-          mv "$REMOTE_STAGING_AREA/server-deploy/dist" "$STAGING_ROOT/dist" 2>/dev/null || true
-          mv "$REMOTE_STAGING_AREA/server-deploy/backend" "$STAGING_ROOT/backend" 2>/dev/null || true
-          mv "$REMOTE_STAGING_AREA/deploy.sh" "$STAGING_ROOT/deploy.sh" 2>/dev/null || true
-
-          # Clean up the staging area for the next deployment
-          rm -rf "$REMOTE_STAGING_AREA/server-deploy" 2>/dev/null || true
-
-          chmod +x "$STAGING_ROOT/deploy.sh" 2>/dev/null || true
-
-          echo "✅ Deployment files prepared successfully"
-          echo "Deployment directory: $STAGING_ROOT"
-          ls -la "$STAGING_ROOT/"
-          DEPLOY_SCRIPT
-
-      - name: Deployment Status
-        if: success()
-        run: |
-          echo "✅ Deployment completed successfully!"
-          echo "Files deployed to: /home/speed4you/portal-deploy-staging/"
-          echo "Live at: https://data.speed4you.net/portal/"
+  # This job is for self-hosted runner (optional)
+  # Uncomment if you setup self-hosted runner
+  # deploy-local:
+  #   needs: build
+  #   runs-on: self-hosted
+  #   steps:
+  #     - name: Download artifacts
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: deployment-package
+  #
+  #     - name: Deploy to local server
+  #       run: |
+  #         # Your deployment script here
+  #         echo "Deploying to local server..."
