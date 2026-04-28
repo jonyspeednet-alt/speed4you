@@ -1,3 +1,4 @@
+
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useInfiniteQuery } from '@tanstack/react-query';
@@ -205,7 +206,7 @@ function BrowsePage({ type }) {
       ? 'Track longer stories with tighter discovery, clearer metadata, and cleaner results.'
       : 'Explore the full catalog with a redesigned discovery workspace built for speed.';
 
-  const activeFilterCount = [selectedGenre !== 'All', selectedLanguage !== 'All', selectedCollection !== 'All', deferredSearchText.trim().length > 0, sortBy !== 'latest'].filter(Boolean).length;
+  const activeFilterCount = [selectedGenre !== 'All', selectedLanguage !== 'All', selectedCollection !== 'All', sortBy !== 'latest'].filter(Boolean).length;
 
   function resetFilters() {
     setSelectedGenre('All');
@@ -213,83 +214,65 @@ function BrowsePage({ type }) {
     setSelectedCollection('All');
     setSortBy('latest');
     setSearchText('');
+    setFiltersOpen(false);
   }
 
   return (
     <div style={{ ...styles.page, ...(isMobile ? styles.pageMobile : {}) }}>
       <section style={{ ...styles.hero, ...(isMobile ? styles.heroMobile : isTablet ? styles.heroTablet : {}) }}>
-        <div style={styles.heroCopy}>
-          <span style={styles.heroEyebrow}>Discovery workspace</span>
-          <h1 style={styles.heroTitle}>{pageTitle}</h1>
+        <div style={styles.heroContent}>
+          <div style={styles.heroHeader}>
+            <h1 style={styles.heroTitle}>{pageTitle}</h1>
+            <div style={styles.searchBar}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={styles.searchIcon} aria-hidden="true">
+                <circle cx="11" cy="11" r="8" />
+                <path d="M21 21l-4.35-4.35" />
+              </svg>
+              <input
+                type="text"
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+                placeholder="Search by title, genre, year..."
+                style={styles.searchInput}
+              />
+            </div>
+          </div>
+
           <p style={styles.heroDescription}>{pageDescription}</p>
 
-          <div style={styles.searchBar}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={styles.searchIcon} aria-hidden="true">
-              <circle cx="11" cy="11" r="8" />
-              <path d="M21 21l-4.35-4.35" />
-            </svg>
-            <input
-              type="text"
-              value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
-              placeholder="Search title, year, language, genre..."
-              style={styles.searchInput}
-            />
-          </div>
-
-          <div style={{ ...styles.chipRow, ...(isMobile ? styles.chipRowMobile : {}) }}>
-            {TRENDING_SEARCHES.map((term) => (
-              <button key={term} type="button" onClick={() => setSearchText(term)} style={styles.trendingChip}>
-                {term}
-              </button>
-            ))}
-          </div>
-
-          {suggestions.length > 0 ? (
-            <div style={{ ...styles.suggestions, ...(isMobile ? styles.chipRowMobile : {}) }}>
-              {suggestions.map((item) => (
-                <button key={`${item.type}-${item.id}`} type="button" onClick={() => setSearchText(item.title)} style={styles.suggestionChip}>
-                  {item.title}
+          <div style={{ ...styles.actionsRow, ...(isMobile ? styles.actionsRowMobile : {}) }}>
+            <button type="button" onClick={() => setFiltersOpen(true)} style={styles.filterTrigger}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></svg>
+              <span>Filters</span>
+              {activeFilterCount > 0 && <span style={styles.filterCountBadge}>{activeFilterCount}</span>}
+            </button>
+            <div style={{ ...styles.chipRow, ...(isMobile ? styles.chipRowMobile : {}) }}>
+              {genreOptions.slice(0, 8).map((genre) => (
+                <button
+                  key={genre}
+                  type="button"
+                  onClick={() => setSelectedGenre(genre)}
+                  style={{ ...styles.genreChip, ...(selectedGenre === genre ? styles.genreChipActive : {}) }}
+                >
+                  {genre}
                 </button>
               ))}
             </div>
-          ) : null}
-        </div>
-
-        <aside style={styles.filterPanel}>
-          {isMobile ? (
-            <button type="button" onClick={() => setFiltersOpen((value) => !value)} style={styles.mobileFilterToggle}>
-              <span>{activeFilterCount ? `Filters (${activeFilterCount})` : 'Filters'}</span>
-              <span>{filtersOpen ? 'Hide' : 'Show'}</span>
-            </button>
-          ) : null}
-
-          <div style={{ ...styles.filterInner, ...(isMobile && !filtersOpen ? styles.filterInnerHidden : {}) }}>
-            <FilterField label="Genre" value={selectedGenre} onChange={setSelectedGenre} options={genreOptions} />
-            <FilterField label="Language" value={selectedLanguage} onChange={setSelectedLanguage} options={languageOptions} />
-            <FilterField label="Sort" value={sortBy} onChange={setSortBy} options={['latest', 'popular', 'trending', 'rating', 'featured']} />
-            <FilterField label="Collection" value={selectedCollection} onChange={setSelectedCollection} options={collectionOptions} />
-
-            <div style={styles.filterFooter}>
-              <button type="button" onClick={resetFilters} style={styles.resetButton}>Reset</button>
-              <span style={styles.filterStatus}>{activeFilterCount ? `${activeFilterCount} active filters` : 'All titles visible'}</span>
-            </div>
           </div>
-        </aside>
+        </div>
       </section>
-
-      <div style={{ ...styles.genreStrip, ...(isMobile ? styles.genreStripMobile : {}) }}>
-        {genreOptions.slice(0, 8).map((genre) => (
-          <button
-            key={genre}
-            type="button"
-            onClick={() => setSelectedGenre(genre)}
-            style={{ ...styles.genreChip, ...(selectedGenre === genre ? styles.genreChipActive : {}) }}
-          >
-            {genre}
-          </button>
-        ))}
-      </div>
+      
+      <FilterDrawer isOpen={filtersOpen} onClose={() => setFiltersOpen(false)}>
+        <h2 style={styles.drawerTitle}>Filters</h2>
+        <FilterField label="Genre" value={selectedGenre} onChange={setSelectedGenre} options={genreOptions} />
+        <FilterField label="Language" value={selectedLanguage} onChange={setSelectedLanguage} options={languageOptions} />
+        <FilterField label="Sort By" value={sortBy} onChange={setSortBy} options={['latest', 'popular', 'trending', 'rating', 'featured']} />
+        <FilterField label="Collection" value={selectedCollection} onChange={setSelectedCollection} options={collectionOptions} />
+        <div style={styles.filterFooter}>
+          <button type="button" onClick={resetFilters} style={styles.resetButton}>Reset Filters</button>
+          <span style={styles.filterStatus}>{total} titles visible</span>
+        </div>
+      </FilterDrawer>
 
       <section style={styles.summaryPanel}>
         <div style={styles.summaryText}>
@@ -334,7 +317,7 @@ function BrowsePage({ type }) {
         <div style={styles.emptyState}>
           <h2 style={styles.emptyTitle}>No content matched this selection.</h2>
           <p style={styles.emptyText}>Try broader filters, another language, or a simpler search term.</p>
-          <button type="button" onClick={resetFilters} style={styles.resetButton}>Clear filters</button>
+          <button type="button" onClick={resetFilters} style={{...styles.resetButton, minWidth: 140}}>Clear filters</button>
         </div>
       ) : null}
 
@@ -342,6 +325,29 @@ function BrowsePage({ type }) {
     </div>
   );
 }
+
+function FilterDrawer({ isOpen, onClose, children }) {
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
+  return (
+    <>
+      <div style={{ ...styles.drawerBackdrop, ...(isOpen ? styles.drawerBackdropOpen : {}) }} onClick={onClose} />
+      <aside style={{ ...styles.drawer, ...(isOpen ? styles.drawerOpen : {}) }}>
+        {children}
+      </aside>
+    </>
+  );
+}
+
 
 function FilterField({ label, value, onChange, options }) {
   return (
@@ -365,58 +371,56 @@ const styles = {
   hero: {
     width: 'min(1440px, calc(100vw - 48px))',
     margin: '0 auto 16px',
-    display: 'grid',
-    gridTemplateColumns: 'minmax(0, 1fr) 360px',
-    gap: '18px',
     padding: '24px',
     borderRadius: '34px',
     background: 'rgba(13, 26, 45, 0.45)',
     border: '1px solid rgba(255, 255, 255, 0.08)',
-    backdropFilter: 'blur(32px)',
-    WebkitBackdropFilter: 'blur(32px)',
+    backdropFilter: 'blur(40px)',
+    WebkitBackdropFilter: 'blur(40px)',
     boxShadow: '0 32px 64px rgba(0,0,0,0.5)',
   },
   heroTablet: {
     width: 'min(1440px, calc(100vw - 28px))',
-    gridTemplateColumns: '1fr',
   },
   heroMobile: {
     width: '100%',
-    gridTemplateColumns: '1fr',
     padding: '16px',
     borderRadius: '26px',
   },
-  heroCopy: {
+  heroContent: {
     display: 'grid',
-    gap: '14px',
+    gap: '16px',
   },
-  heroEyebrow: {
-    color: 'var(--accent-pink)',
-    fontSize: '0.72rem',
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: '0.16em',
+  heroHeader: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '16px',
   },
   heroTitle: {
     color: '#ffffff',
-    fontSize: 'clamp(2.4rem, 5vw, 4rem)',
+    fontSize: 'clamp(2rem, 4vw, 3.2rem)',
     fontWeight: '900',
     letterSpacing: '-0.02em',
   },
   heroDescription: {
-    maxWidth: '58ch',
-    fontSize: '1rem',
-    lineHeight: '1.7',
+    maxWidth: '70ch',
+    fontSize: '0.96rem',
+    lineHeight: '1.65',
     color: 'rgba(255, 255, 255, 0.7)',
+    marginLeft: '2px'
   },
   searchBar: {
     position: 'relative',
-    minHeight: '62px',
+    flexGrow: 1,
+    maxWidth: 480,
+    minHeight: '52px',
     display: 'flex',
     alignItems: 'center',
     padding: '0 18px 0 48px',
-    borderRadius: '16px',
-    background: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: '14px',
+    background: 'rgba(0, 0, 0, 0.2)',
     border: '1px solid rgba(255, 255, 255, 0.08)',
   },
   searchIcon: {
@@ -432,64 +436,106 @@ const styles = {
     color: '#ffffff',
     fontSize: '1rem',
   },
+  actionsRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    flexWrap: 'wrap',
+    marginTop: '8px',
+  },
+  actionsRowMobile: {
+    flexWrap: 'nowrap',
+  },
+  filterTrigger: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '8px',
+    minHeight: '46px',
+    padding: '0 18px',
+    borderRadius: '12px',
+    background: 'rgba(255, 255, 255, 0.06)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    color: 'var(--text-primary)',
+    fontSize: '0.9rem',
+    fontWeight: '800',
+  },
+  filterCountBadge: {
+    display: 'grid',
+    placeItems: 'center',
+    minWidth: '20px',
+    height: '20px',
+    borderRadius: '99px',
+    background: 'var(--accent-cyan)',
+    color: '#050c16',
+    fontSize: '0.72rem',
+    fontWeight: '900',
+    lineHeight: 1,
+  },
   chipRow: {
     display: 'flex',
     flexWrap: 'wrap',
     gap: '10px',
-  },
-  chipRowMobile: {
-    flexWrap: 'nowrap',
     overflowX: 'auto',
+    flexGrow: 1,
     paddingBottom: '4px',
     scrollbarWidth: 'none',
   },
-  trendingChip: {
+  chipRowMobile: {
+    flexWrap: 'nowrap',
+  },
+  genreChip: {
     padding: '10px 14px',
     borderRadius: '999px',
-    background: 'rgba(121, 228, 255, 0.1)',
-    border: '1px solid rgba(121, 228, 255, 0.18)',
-    color: 'var(--accent-secondary)',
+    background: 'rgba(255, 255, 255, 0.05)',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
+    color: 'var(--text-secondary)',
     fontSize: '0.8rem',
     fontWeight: '800',
   },
-  suggestions: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '10px',
+  genreChipActive: {
+    background: 'linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-secondary) 100%)',
+    color: '#050c16',
+    boxShadow: '0 0 15px rgba(0, 255, 255, 0.3)',
   },
-  suggestionChip: {
-    padding: '10px 14px',
-    borderRadius: '999px',
-    background: 'rgba(255, 255, 255, 0.06)',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
-    color: 'var(--text-primary)',
-    fontSize: '0.8rem',
-    fontWeight: '700',
+  drawerBackdrop: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0,0,0,0.6)',
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
+    zIndex: 90,
+    opacity: 0,
+    pointerEvents: 'none',
+    transition: 'opacity 300ms ease',
   },
-  filterPanel: {
-    padding: '18px',
-    borderRadius: '28px',
-    background: 'rgba(255, 255, 255, 0.04)',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
+  drawerBackdropOpen: {
+    opacity: 1,
+    pointerEvents: 'auto',
   },
-  mobileFilterToggle: {
-    width: '100%',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '12px 14px',
-    borderRadius: '16px',
-    background: 'rgba(255, 255, 255, 0.06)',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
-    color: 'var(--text-primary)',
-    fontWeight: '800',
-  },
-  filterInner: {
+  drawer: {
+    position: 'fixed',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: 'min(420px, 90vw)',
+    padding: '24px',
+    background: '#0d1a2d',
+    borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
+    boxShadow: '-20px 0 50px rgba(0,0,0,0.5)',
+    zIndex: 100,
+    transform: 'translateX(100%)',
+    transition: 'transform 350ms cubic-bezier(0.4, 0, 0.2, 1)',
     display: 'grid',
-    gap: '12px',
+    gap: '16px',
+    alignContent: 'flex-start',
   },
-  filterInnerHidden: {
-    display: 'none',
+  drawerOpen: {
+    transform: 'translateX(0)',
+  },
+  drawerTitle: {
+    fontSize: '1.5rem',
+    fontWeight: 800,
+    marginBottom: '12px',
   },
   filterField: {
     display: 'grid',
@@ -506,24 +552,25 @@ const styles = {
     minHeight: '48px',
     padding: '0 14px',
     borderRadius: '16px',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
-    background: 'rgba(255, 255, 255, 0.06)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    background: 'rgba(0, 0, 0, 0.2)',
     color: 'var(--text-primary)',
+    fontSize: '1rem',
   },
   filterFooter: {
+    marginTop: '12px',
     display: 'flex',
-    flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: '10px',
     alignItems: 'center',
+    gap: '12px',
   },
   filterStatus: {
     color: 'var(--text-muted)',
     fontSize: '0.82rem',
   },
   resetButton: {
-    minHeight: '44px',
-    padding: '0 20px',
+    minHeight: '48px',
+    padding: '0 24px',
     borderRadius: '12px',
     background: 'linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-secondary) 100%)',
     color: '#050c16',
@@ -531,35 +578,7 @@ const styles = {
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
     fontSize: '0.76rem',
-    boxShadow: '0 0 15px rgba(0, 255, 255, 0.2)',
-  },
-  genreStrip: {
-    width: 'min(1440px, calc(100vw - 48px))',
-    margin: '0 auto 14px',
-    display: 'flex',
-    gap: '10px',
-    flexWrap: 'wrap',
-  },
-  genreStripMobile: {
-    width: '100%',
-    flexWrap: 'nowrap',
-    overflowX: 'auto',
-    paddingBottom: '4px',
-    scrollbarWidth: 'none',
-  },
-  genreChip: {
-    padding: '10px 14px',
-    borderRadius: '999px',
-    background: 'rgba(255, 255, 255, 0.05)',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
-    color: 'var(--text-secondary)',
-    fontSize: '0.8rem',
-    fontWeight: '800',
-  },
-  genreChipActive: {
-    background: 'linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-secondary) 100%)',
-    color: '#050c16',
-    boxShadow: '0 0 15px rgba(0, 255, 255, 0.3)',
+    boxShadow: '0 0 20px rgba(0, 255, 255, 0.25)',
   },
   summaryPanel: {
     width: 'min(1440px, calc(100vw - 48px))',

@@ -1,30 +1,46 @@
 import { Link } from 'react-router-dom';
+import styles from './ContinueWatchingRail.module.css';
+import Skeleton from '../../../components/feedback/Skeleton';
+import EmptyState from '../../../components/feedback/EmptyState';
 
-function ContinueWatchingRail({ items }) {
-  if (!items || items.length === 0) return null;
+function ContinueWatchingRail({ items, isLoading }) {
+  if (isLoading) {
+    return <ContinueWatchingRailSkeleton />;
+  }
+
+  if (!items || items.length === 0) {
+    return (
+      <div className={styles.section}>
+         <h2 className={styles.title}>Continue Watching</h2>
+        <EmptyState message="You haven't started watching anything yet.">
+          <p>New to the platform? <Link to="/browse">Browse our library</Link> to get started.</p>
+        </EmptyState>
+      </div>
+    );
+  }
 
   return (
-    <div style={styles.section}>
-      <h2 style={styles.title}>Continue Watching</h2>
-      <div style={styles.rail}>
+    <div className={styles.section}>
+      <h2 className={styles.title}>Continue Watching</h2>
+      <div className={styles.rail}>
         {items.map((item) => (
-          <Link key={item.id} to={`/watch/${item.id}`} style={styles.card}>
-            <div style={styles.posterWrapper}>
-              <img src={item.poster} alt={item.title} style={styles.poster} loading="lazy" />
-              <div style={styles.progressContainer}>
-                <div style={{...styles.progressBar, width: `${item.progress}%`}} />
+          <Link key={item.id} to={`/watch/${item.id}`} className={styles.card}>
+            <div className={styles.posterWrapper}>
+              <img src={item.poster} alt={item.title} className={styles.poster} loading="lazy" />
+              <div className={styles.progressContainer}>
+                <div style={{ width: `${item.progress}%` }} className={styles.progressBar} />
               </div>
-              <div style={styles.overlay}>
-                <div style={styles.playIcon}>
+              <div className={styles.overlay}>
+                <div className={styles.playIcon}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M8 5v14l11-7z" />
                   </svg>
                 </div>
               </div>
             </div>
-            <div style={styles.info}>
-              <h3 style={styles.cardTitle}>{item.title}</h3>
-              <span style={styles.progressText}>{item.progress}% watched</span>
+            <div className={styles.info}>
+              <h3 className={styles.cardTitle}>{item.title}</h3>
+              <span className={styles.progressText}>{Math.round(item.progress)}% watched</span>
             </div>
           </Link>
         ))}
@@ -33,89 +49,24 @@ function ContinueWatchingRail({ items }) {
   );
 }
 
-const styles = {
-  section: {
-    padding: 'var(--spacing-lg) 0',
-  },
-  title: {
-    fontSize: '1.25rem',
-    fontWeight: '600',
-    color: 'var(--text-primary)',
-    marginBottom: 'var(--spacing-md)',
-    padding: '0 var(--spacing-lg)',
-  },
-  rail: {
-    display: 'flex',
-    gap: 'var(--spacing-md)',
-    padding: '0 var(--spacing-lg)',
-    overflowX: 'auto',
-    WebkitOverflowScrolling: 'touch',
-    scrollSnapType: 'x mandatory',
-  },
-  card: {
-    flex: '0 0 auto',
-    width: '200px',
-    scrollSnapAlign: 'start',
-    textDecoration: 'none',
-  },
-  posterWrapper: {
-    position: 'relative',
-    borderRadius: 'var(--radius-md)',
-    overflow: 'hidden',
-    aspectRatio: '16/9',
-    background: 'var(--bg-tertiary)',
-  },
-  poster: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
-  },
-  progressContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '4px',
-    background: 'rgba(255,255,255,0.2)',
-  },
-  progressBar: {
-    height: '100%',
-    background: 'var(--accent-red)',
-  },
-  overlay: {
-    position: 'absolute',
-    inset: 0,
-    background: 'rgba(0,0,0,0.5)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    opacity: 0,
-    transition: 'opacity var(--transition-fast)',
-  },
-  playIcon: {
-    width: '40px',
-    height: '40px',
-    borderRadius: '50%',
-    background: 'var(--accent-red)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  info: {
-    padding: 'var(--spacing-sm) 0',
-  },
-  cardTitle: {
-    fontSize: '0.9rem',
-    fontWeight: '500',
-    color: 'var(--text-primary)',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-  },
-  progressText: {
-    fontSize: '0.75rem',
-    color: 'var(--text-muted)',
-  },
-};
+
+function ContinueWatchingRailSkeleton() {
+  return (
+    <div className={styles.section}>
+      <h2 className={styles.title}><Skeleton width="200px" /></h2>
+      <div className={styles.rail}>
+        {[...Array(5)].map((_, index) => (
+          <div key={index} className={styles.card}>
+            <Skeleton style={{ aspectRatio: '16/9', borderRadius: 'var(--radius-lg)'}} />
+            <div className={styles.info}>
+              <Skeleton width="80%" style={{ marginBottom: 'var(--spacing-xs)' }} />
+              <Skeleton width="50%" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default ContinueWatchingRail;
