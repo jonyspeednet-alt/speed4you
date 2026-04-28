@@ -33,6 +33,7 @@ export default defineConfig(({ mode }) => {
           drop_debugger: isProd,
         },
       },
+      rolldown: false, 
       rollupOptions: {
         output: {
           // Better asset naming for cache busting
