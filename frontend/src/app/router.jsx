@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
+import { createHashRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { RouteErrorBoundary } from '../components/feedback/ErrorBoundary.jsx';
 import MainSiteLayout from '../layouts/MainSiteLayout';
 import AdminLayout from '../layouts/AdminLayout';
@@ -18,7 +18,6 @@ const AdminDashboard = lazy(() => import('../pages/admin/AdminDashboard'));
 const AddContentPage = lazy(() => import('../pages/admin/AddContentPage'));
 const ContentLibraryPage = lazy(() => import('../pages/admin/ContentLibraryPage'));
 
-const basename = import.meta.env.VITE_ROUTER_BASENAME || '/';
 function withRouteFallback(element, routeType = 'default') {
   const getFallback = () => {
     switch (routeType) {
@@ -59,7 +58,7 @@ function withRouteFallback(element, routeType = 'default') {
   );
 }
 
-const router = createBrowserRouter([
+const router = createHashRouter([
   {
     path: '/',
     element: <MainSiteLayout />,
@@ -154,9 +153,7 @@ const router = createBrowserRouter([
     path: '/login',
     element: withRouteFallback(<LoginPage />, 'default'),
   },
-], {
-  basename,
-});
+]);
 
 function AppRouter() {
   return <RouterProvider router={router} />;
