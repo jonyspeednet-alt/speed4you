@@ -8,6 +8,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -27,7 +29,7 @@ jobs:
         run: node scripts/prepare-deploy.cjs
 
       - name: Transfer and Execute Deployment
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.0.3 # Pinned to a stable version
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
