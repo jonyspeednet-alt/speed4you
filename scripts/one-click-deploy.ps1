@@ -279,7 +279,7 @@ $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $stagingRoot = "$($deployConfig.RemoteStagingBase)/$timestamp"
 $remoteDistPath = "$stagingRoot/dist"
 $remoteBackendUploadPath = "$stagingRoot/backend"
-$localDistPath = Join-Path $projectRoot 'server-deploy\frontend\dist'
+$localDistPath = Join-Path $projectRoot 'server-deploy\dist'
 $localBackendPath = Join-Path $projectRoot 'server-deploy\backend'
 $localDeployEnvPath = Join-Path $projectRoot 'backend\.env.deploy'
 

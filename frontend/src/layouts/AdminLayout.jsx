@@ -530,8 +530,8 @@ const s = {
     flexShrink: 0,
   },
   pageTitle: {
-    fontSize: '1rem',
-    fontWeight: '600',
+    fontSize: '1.2rem',
+    fontWeight: '700',
     color: TEXT,
     margin: 0,
     overflow: 'hidden',

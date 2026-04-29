@@ -533,7 +533,6 @@ const styles = {
     paddingBottom: '8px',
     paddingTop: '4px',
     scrollbarWidth: 'none',
-    WebkitOverflowScrolling: 'touch',
   },
   quickChip: {
     padding: '10px 14px',
