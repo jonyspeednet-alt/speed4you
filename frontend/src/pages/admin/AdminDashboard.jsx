@@ -308,7 +308,7 @@ const s = {
     gridTemplateColumns: 'repeat(4, 1fr)',
     gap: '12px',
   },
-  statsGridMobile: { gridTemplateColumns: 'repeat(2, 1fr)' },
+  statsGridMobile: { gridTemplateColumns: '1fr' },
   statCard: {
     padding: '20px',
     borderRadius: '10px',
@@ -348,8 +348,8 @@ const s = {
   linkBtn: { fontSize: '0.8rem', color: ACCENT, fontWeight: '500', textDecoration: 'none' },
 
   // Table
-  tableWrap: { overflowX: 'auto', margin: '0 -20px', padding: '0 20px' },
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' },
+  tableWrap: { overflowX: 'auto', margin: 0, padding: 0, borderRadius: '10px', background: SURFACE2 },
+  table: { width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', minWidth: '100%' },
   th: {
     padding: '8px 12px',
     textAlign: 'left',
