@@ -25,6 +25,7 @@ coverage/
 .tmp/
 
 # Deployment secrets — NEVER commit these
+.env.deploy
 .env.deploy.local
 deploy_key
 deploy_key.pub
