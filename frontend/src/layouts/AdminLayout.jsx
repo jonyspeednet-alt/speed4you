@@ -58,6 +58,9 @@ const NAV = [
   },
 ];
 
+const appBasePath = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+const loginPath = `${appBasePath}/login`.replace(/\/{2,}/g, '/');
+
 function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -88,7 +91,7 @@ function AdminLayout() {
     authService.logout().catch(() => null).finally(() => {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      window.location.href = '/login';
+      window.location.href = loginPath;
     });
   };
 

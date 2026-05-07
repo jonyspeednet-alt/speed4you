@@ -62,8 +62,14 @@ function redirectToLogin() {
     return;
   }
 
-  const nextPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-  const loginUrl = new URL('/login', window.location.origin);
+  const appBasePath = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+  const pathname = window.location.pathname;
+  const routePath = appBasePath && pathname.startsWith(appBasePath)
+    ? pathname.slice(appBasePath.length) || '/'
+    : pathname;
+  const nextPath = `${routePath}${window.location.search}${window.location.hash}`;
+  const loginPath = `${appBasePath}/login`.replace(/\/{2,}/g, '/');
+  const loginUrl = new URL(loginPath, window.location.origin);
   if (nextPath && nextPath !== '/login') {
     loginUrl.searchParams.set('next', nextPath);
   }
