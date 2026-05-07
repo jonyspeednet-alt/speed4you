@@ -35,7 +35,8 @@ GitHub → Your Repository → Settings → Secrets and variables → Actions
 | `DEPLOY_SUDO_PASSWORD` | `Speed##ftpsn` |
 | `DEPLOY_ENV_FILE_CONTENT` | আপনার backend .env file এর content |
 | `DEPLOY_REMOTE_CORS_ALLOWED_ORIGINS` | `https://data.speed4you.net` |
-| `DEPLOY_REMOTE_PLAYER_CACHE_ROOT` | `/home/speed4you/cache` |
+| `DEPLOY_REMOTE_PLAYER_CACHE_ROOT` | `/var/www/html/Extra_Storage/portal-media-cache` |
+
 
 ### DEPLOY_SSH_KEY এর Value:
 ```
@@ -57,7 +58,8 @@ mkdir -p /home/speed4you/backups
 mkdir -p /home/speed4you/cache
 chmod 755 /home/speed4you/portal-deploy-staging
 chmod 755 /home/speed4you/backups
-chmod 755 /home/speed4you/cache
+chmod 755 /var/www/html/Extra_Storage/portal-media-cache
+
 ```
 
 ### Step 4: Test করুন

@@ -1,11 +1,17 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const {
+  PLAYER_CACHE_ROOT: cacheRoot,
+  FFMPEG_BIN,
+  FFPROBE_BIN,
+  buildPlayerCachePath,
+  isCacheReadyStat,
+} = require('../src/config/player-cache');
+const { SUPPORTED_VIDEO_EXTENSIONS } = require('../src/services/player-media');
 
 const catalogPath = path.resolve(__dirname, '../src/data/catalog.json');
-const DEFAULT_PLAYER_CACHE_ROOT = '/var/www/html/Extra_Storage/portal-media-cache';
-const cacheRoot = process.env.PLAYER_CACHE_ROOT || DEFAULT_PLAYER_CACHE_ROOT;
-const SUPPORTED_VIDEO_EXTENSIONS = new Set(['.mp4', '.m4v', '.webm', '.mov', '.mkv', '.avi', '.wmv', '.mpg', '.mpeg', '.ts', '.m2ts']);
+
 
 function safeStat(targetPath) {
   try {
@@ -153,7 +159,8 @@ function runCommand(bin, args, options = {}) {
 }
 
 async function probeMedia(resolvedPath) {
-  const raw = await runCommand('/usr/bin/ffprobe', [
+  const raw = await runCommand(FFPROBE_BIN, [
+
     '-v', 'error',
     '-show_streams',
     '-show_format',

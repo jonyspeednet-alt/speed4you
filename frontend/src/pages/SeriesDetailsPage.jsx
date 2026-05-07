@@ -159,8 +159,13 @@ export default function SeriesDetailsPage() {
   const currentSeason = seasons[activeSeason] || null;
   const firstSeason = seasons[0] || null;
   const firstEpisode = firstSeason?.episodes?.[0] || null;
+  const lastSeason = seasons[seasons.length - 1] || firstSeason;
+  const lastEpisode = lastSeason?.episodes?.[lastSeason?.episodes?.length - 1] || firstEpisode;
   const firstSeasonNum = toPositiveInt(firstSeason?.number ?? firstSeason?.id, 1);
   const firstEpNum = toPositiveInt(firstEpisode?.number ?? firstEpisode?.id, 1);
+  const lastSeasonNum = toPositiveInt(lastSeason?.number ?? lastSeason?.id, seasons.length || 1);
+  const lastEpNum = toPositiveInt(lastEpisode?.number ?? lastEpisode?.id, 1);
+  const showContinueLatest = lastEpisode && (lastSeasonNum !== firstSeasonNum || lastEpNum !== firstEpNum);
   const genres = Array.isArray(series.genres) && series.genres.length
     ? series.genres
     : String(series.genre || '').split(',').map((g) => g.trim()).filter(Boolean);
@@ -246,16 +251,26 @@ export default function SeriesDetailsPage() {
 
             {/* Actions */}
             <div style={{ ...s.actions, ...(isMobile ? s.actionsMobile : {}) }}>
-              <Link
-                to={`/watch/${series.id}?season=${firstSeasonNum}&episode=${firstEpNum}`}
-                style={{ ...s.playBtn, ...(isMobile ? s.btnFull : {}) }}
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-                Watch Now
-              </Link>
-              <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+              <div style={s.primaryActions}>
+                <Link
+                  to={`/watch/${series.id}?season=${firstSeasonNum}&episode=${firstEpNum}`}
+                  style={{ ...s.playBtn, ...(isMobile ? s.btnFull : {}) }}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                  Start from S1
+                </Link>
+                {showContinueLatest ? (
+                  <Link
+                    to={`/watch/${series.id}?season=${lastSeasonNum}&episode=${lastEpNum}`}
+                    style={{ ...s.secondaryBtn, ...(isMobile ? s.btnFull : {}) }}
+                  >
+                    Continue latest
+                  </Link>
+                ) : null}
+              </div>
+              <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <WatchlistButton contentType="series" contentId={series.id} title={series.title} />
                 <ShareButton title={series.title} url={`${window.location.origin}/series/${series.id}`} />
               </div>
@@ -311,7 +326,7 @@ export default function SeriesDetailsPage() {
               </div>
             </div>
 
-            <div style={s.episodeList}>
+            <div style={{ ...s.episodeList, ...(isMobile ? s.episodeListMobile : {}) }}>
               {(currentSeason.episodes || []).length === 0 ? (
                 <div style={s.emptyEpisodes}>No episodes available for this season.</div>
               ) : (
@@ -351,7 +366,7 @@ export default function SeriesDetailsPage() {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const s = {
-  page: { minHeight: '100vh', paddingTop: 88, position: 'relative', overflow: 'hidden' },
+  page: { minHeight: '100vh', paddingTop: 88, position: 'relative', overflow: 'hidden', background: '#050c16' },
 
   auroraOrb: {
     position: 'absolute',
@@ -418,6 +433,12 @@ const s = {
     border: '1px solid rgba(255,255,255,0.12)',
     aspectRatio: '2/3',
   },
+  posterWrapMobile: {
+    width: '100%',
+    maxWidth: '360px',
+    margin: '0 auto',
+    aspectRatio: '2/3',
+  },
   posterGlow: {
     position: 'absolute',
     inset: 0,
@@ -427,6 +448,8 @@ const s = {
   poster: { width: '100%', height: '100%', objectFit: 'cover' },
 
   infoPanel: { display: 'flex', flexDirection: 'column', gap: '20px' },
+  infoPanelMobile: { gap: '16px' },
+  eyebrowRow: { display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' },
   eyebrow: {
     color: 'var(--accent-pink)',
     textTransform: 'uppercase',
@@ -453,6 +476,9 @@ const s = {
     letterSpacing: '-0.03em',
     textShadow: '0 10px 30px rgba(0,0,0,0.5)',
   },
+  titleMobile: { fontSize: 'clamp(2.2rem, 8vw, 3.4rem)' },
+
+  metaRow: { display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' },
   ratingBox: {
     display: 'flex',
     alignItems: 'center',
@@ -468,11 +494,13 @@ const s = {
     fontSize: '1rem',
   },
   metaChip: {
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: 'rgba(255, 255, 255, 0.75)',
     fontWeight: '700',
-    fontSize: '0.9rem',
-    letterSpacing: '0.05em',
+    fontSize: '0.92rem',
+    letterSpacing: '0.04em',
   },
+
+  genreRow: { display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' },
   genreTag: {
     padding: '8px 16px',
     borderRadius: '12px',
@@ -483,7 +511,17 @@ const s = {
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
+    whiteSpace: 'nowrap',
   },
+
+  descWrap: { display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '760px' },
+  description: { margin: 0, color: 'rgba(255,255,255,0.85)', fontSize: '1rem', lineHeight: 1.75 },
+  descClamped: { display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
+  readMore: { appearance: 'none', border: 'none', background: 'none', color: 'var(--accent-cyan)', cursor: 'pointer', fontWeight: '900', letterSpacing: '0.08em', textTransform: 'uppercase', padding: 0 },
+
+  actions: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '18px', flexWrap: 'wrap' },
+  actionsMobile: { flexDirection: 'column', alignItems: 'stretch' },
+  primaryActions: { display: 'flex', flexWrap: 'wrap', gap: '14px', alignItems: 'center' },
   playBtn: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -498,19 +536,119 @@ const s = {
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
     boxShadow: '0 0 30px rgba(0, 255, 255, 0.3)',
+    textDecoration: 'none',
+    whiteSpace: 'nowrap',
+  },
+  secondaryBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '16px 30px',
+    borderRadius: '14px',
+    background: 'rgba(255,255,255,0.08)',
+    border: '1px solid rgba(255,255,255,0.12)',
+    color: '#ffffff',
+    fontWeight: '800',
+    fontSize: '0.95rem',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    textDecoration: 'none',
+    cursor: 'pointer',
+    transition: 'background 180ms ease, transform 180ms ease',
+  },
+  btnFull: { width: '100%' },
+
+  body: { position: 'relative', zIndex: 2, width: 'min(1440px, calc(100vw - 48px))', margin: '0 auto', padding: '0 24px 64px', display: 'flex', flexDirection: 'column', gap: '28px' },
+  seasonTabsWrap: {
+    position: 'sticky',
+    top: 96,
+    zIndex: 3,
+    background: 'rgba(5,12,22,0.92)',
+    backdropFilter: 'blur(18px)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: '22px',
+    padding: '10px 12px',
+    marginBottom: '24px',
+    overflowX: 'auto',
+  },
+  seasonTabs: { display: 'flex', gap: '12px', alignItems: 'center' },
+  seasonTab: {
+    display: 'inline-flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    minWidth: '130px',
+    padding: '14px 18px',
+    borderRadius: '16px',
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    color: 'rgba(255,255,255,0.82)',
+    cursor: 'pointer',
+    transition: 'transform 180ms ease, border-color 180ms ease, background 180ms ease',
+    textAlign: 'left',
   },
   seasonTabActive: {
-    background: 'rgba(0, 255, 255, 0.15)',
+    background: 'rgba(0, 255, 255, 0.16)',
     borderColor: 'var(--accent-cyan)',
     color: '#ffffff',
-    boxShadow: '0 0 15px rgba(0, 255, 255, 0.2)',
+    transform: 'translateY(-1px)',
+    boxShadow: '0 18px 40px rgba(0, 255, 255, 0.12)',
   },
+  seasonTabLabel: { fontSize: '0.95rem', fontWeight: '800', letterSpacing: '0.02em' },
+  seasonTabCount: { marginTop: '6px', fontSize: '0.8rem', color: 'rgba(255,255,255,0.65)' },
   seasonTabCountActive: { color: 'var(--accent-cyan)' },
-  episodeCardHover: {
-    background: 'rgba(13, 26, 45, 0.6)',
-    borderColor: 'rgba(0, 255, 255, 0.3)',
-    transform: 'translateY(-4px)',
-    boxShadow: '0 12px 32px rgba(0,0,0,0.5)',
+
+  episodeSection: { display: 'flex', flexDirection: 'column', gap: '18px' },
+  episodeSectionHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '18px', flexWrap: 'wrap' },
+  episodeSectionTitle: { margin: 0, fontSize: 'clamp(1.8rem, 3vw, 2.5rem)', fontWeight: '900', letterSpacing: '-0.04em' },
+  episodeSectionMeta: { margin: 0, color: 'var(--text-muted)', fontSize: '0.95rem' },
+  episodeList: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '18px' },
+  episodeListMobile: { gridTemplateColumns: '1fr' },
+  emptyEpisodes: { padding: '32px', borderRadius: '18px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-muted)', textAlign: 'center' },
+
+  episodeCard: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+    padding: '18px',
+    borderRadius: '22px',
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    color: '#ffffff',
+    textDecoration: 'none',
+    transition: 'transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease',
+  },
+  episodeCardMobile: { flexDirection: 'row' },
+  epNumBadge: {
+    width: '54px',
+    minWidth: '54px',
+    height: '54px',
+    borderRadius: '18px',
+    background: 'rgba(255,255,255,0.08)',
+    border: '1px solid rgba(255,255,255,0.12)',
+    color: '#ffffff',
+    display: 'grid',
+    placeItems: 'center',
+    fontWeight: '900',
+    fontSize: '0.95rem',
+  },
+  epNumBadgeMobile: { width: '44px', height: '44px', borderRadius: '14px' },
+  epNum: { fontSize: '0.95rem', fontWeight: '900' },
+  epInfo: { flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' },
+  epTitleRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' },
+  epTitle: { margin: 0, fontSize: '1rem', fontWeight: '900' },
+  epDuration: { color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: '700' },
+  epDesc: { margin: 0, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 },
+
+  epPlay: {
+    width: '48px',
+    height: '48px',
+    borderRadius: '16px',
+    border: '1px solid rgba(255,255,255,0.1)',
+    display: 'grid',
+    placeItems: 'center',
+    color: 'rgba(255,255,255,0.9)',
+    background: 'rgba(255,255,255,0.04)',
+    transition: 'all 180ms ease',
   },
   epPlayHover: {
     background: 'var(--accent-cyan)',
@@ -518,6 +656,8 @@ const s = {
     color: '#050c16',
     boxShadow: '0 0 15px rgba(0, 255, 255, 0.4)',
   },
+
+  browseMore: { display: 'flex', justifyContent: 'flex-end', flexWrap: 'wrap', gap: '12px' },
   browseBtn: {
     padding: '12px 24px',
     borderRadius: '12px',
@@ -528,5 +668,22 @@ const s = {
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
+    textDecoration: 'none',
   },
+
+  errorState: {
+    minHeight: '60vh',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '16px',
+    color: '#ffffff',
+    textAlign: 'center',
+    padding: '40px 16px',
+  },
+  backLink: { marginTop: '12px', color: 'var(--accent-cyan)', textDecoration: 'none', fontWeight: '900' },
+
+  skeletonBlock: { background: 'rgba(255,255,255,0.08)', borderRadius: '24px' },
+  skeletonLine: { background: 'rgba(255,255,255,0.08)', borderRadius: '999px' },
 };
