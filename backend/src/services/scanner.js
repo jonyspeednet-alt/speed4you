@@ -69,6 +69,13 @@ const BLOCKED_AUTO_ROOT_PATTERNS = [
   /\btutorial\b/i,
   /\bdocs?\b/i,
   /\bdocumentary\b/i,
+  /\brequested?\b/i,
+  /\binbox\b/i,
+  /\bpending\b/i,
+  /\bqueue\b/i,
+  /\bdownloads?\b/i,
+  /\bimports?\b/i,
+  /\bstaging\b/i,
 ];
 
 let currentScanJob = null;
@@ -245,6 +252,47 @@ function isBlockedAutoRootName(value) {
   }
 
   return BLOCKED_AUTO_ROOT_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+function shouldSkipCandidateDirectory(name) {
+  const normalized = String(name || '').trim().toLowerCase();
+  if (!normalized) {
+    return true;
+  }
+
+  if (SKIP_DISCOVERY_NAMES.has(normalized)) {
+    return true;
+  }
+
+  if (SKIP_DISCOVERY_PATTERNS.some((pattern) => pattern.test(normalized))) {
+    return true;
+  }
+
+  if (/(^|[\s._-])(sample|trailer|extras?|bonus|featurettes?|screens?|subs?|subtitles?|captions?|thumbnails?|covers?|posters?|proof|cache|backup|tmp|temp)([\s._-]|$)/i.test(normalized)) {
+    return true;
+  }
+
+  return normalized.startsWith('.');
+}
+
+function isLikelyMovieCandidateFolder(rootPath, folderPath) {
+  const relativeFolder = path.relative(rootPath, folderPath) || '.';
+  if (relativeFolder === '.') {
+    return true;
+  }
+
+  const folderName = path.basename(folderPath);
+  if (shouldSkipCandidateDirectory(folderName)) {
+    return false;
+  }
+
+  const files = listFiles(folderPath);
+  if (listVideoFiles(files, folderPath, 'movie').length > 0) {
+    return true;
+  }
+
+  const nestedDirectories = listDirectories(folderPath).filter((dirName) => !shouldSkipCandidateDirectory(dirName));
+  return detectSeriesFolder({ type: 'movie' }, folderPath, files, nestedDirectories);
 }
 
 function hasVideoInTree(rootPath, maxDepth = 3) {
@@ -935,6 +983,14 @@ async function processMovieRoot(root, summary, progressCallback, scanContext) {
     await waitForImmediate();
   }
 
+  updateRootProgress(summary, root.id, {
+    status: 'finalizing',
+    processed: candidateFolders.length,
+  });
+  if (progressCallback) {
+    progressCallback(buildProgressPayload(summary, { activeRootId: root.id }));
+  }
+
   const deletedCount = await retryAsync(() => deleteScannerItemsNotInSignatures(root.id, [...seenSignatures]));
   summary.deleted += deletedCount;
   const current = summary.rootResults.find((entry) => entry.id === root.id);
@@ -946,7 +1002,11 @@ async function processMovieRoot(root, summary, progressCallback, scanContext) {
   await saveRootState(root.id, nextRootState);
   updateRootProgress(summary, root.id, {
     status: 'completed',
+    processed: candidateFolders.length,
   });
+  if (progressCallback) {
+    progressCallback(buildProgressPayload(summary, { activeRootId: root.id }));
+  }
 }
 
 async function processSeriesRoot(root, summary, progressCallback, scanContext) {
@@ -962,19 +1022,27 @@ async function processSeriesRoot(root, summary, progressCallback, scanContext) {
     status: 'running',
     totalCandidates: seriesFolders.length,
   });
+  if (progressCallback) {
+    progressCallback(buildProgressPayload(summary, { activeRootId: root.id }));
+  }
 
   for (let start = 0; start < seriesFolders.length; start += root.batchSize || DEFAULT_BATCH_SIZE) {
     const batch = seriesFolders.slice(start, start + (root.batchSize || DEFAULT_BATCH_SIZE));
 
-    for (const folderName of batch) {
+    for (const [offset, folderName] of batch.entries()) {
       const seriesPath = path.join(root.scanPath, folderName);
       const relativeFolder = folderName;
       const fingerprint = getFolderFingerprint(seriesPath);
       const previousFingerprint = rootState.folders?.[relativeFolder]?.fingerprint;
       const seriesFiles = listFiles(seriesPath);
+      const processedCount = Math.min(start + offset + 1, seriesFolders.length);
       updateRootProgress(summary, root.id, {
-        processed: Math.min(start + batch.indexOf(folderName) + 1, seriesFolders.length),
+        processed: processedCount,
       });
+      if (progressCallback && (processedCount === seriesFolders.length || processedCount % PROGRESS_EMIT_INTERVAL === 0)) {
+        progressCallback(buildProgressPayload(summary, { activeRootId: root.id }));
+      }
+
 
       if (previousFingerprint && previousFingerprint === fingerprint && await getItemByScanSignature(`${root.id}:${folderName}`)) {
         seenSignatures.add(`${root.id}:${folderName}`);
@@ -1043,6 +1111,14 @@ async function processSeriesRoot(root, summary, progressCallback, scanContext) {
     await waitForImmediate();
   }
 
+  updateRootProgress(summary, root.id, {
+    status: 'finalizing',
+    processed: seriesFolders.length,
+  });
+  if (progressCallback) {
+    progressCallback(buildProgressPayload(summary, { activeRootId: root.id }));
+  }
+
   const deletedCount = await retryAsync(() => deleteScannerItemsNotInSignatures(root.id, [...seenSignatures]));
   summary.deleted += deletedCount;
   const current = summary.rootResults.find((entry) => entry.id === root.id);
@@ -1054,7 +1130,11 @@ async function processSeriesRoot(root, summary, progressCallback, scanContext) {
   await saveRootState(root.id, nextRootState);
   updateRootProgress(summary, root.id, {
     status: 'completed',
+    processed: seriesFolders.length,
   });
+  if (progressCallback) {
+    progressCallback(buildProgressPayload(summary, { activeRootId: root.id }));
+  }
 }
 
 function summarizeRoot(root) {
