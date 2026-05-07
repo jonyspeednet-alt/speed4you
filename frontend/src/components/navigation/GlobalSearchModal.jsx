@@ -34,11 +34,59 @@ function GlobalSearchModal() {
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
-      inputRef.current.focus();
+      // Delay focus on mobile so the modal mounts/positions stably
+      // before the soft keyboard pushes the visual viewport around.
+      // This prevents the iOS/Android "shake" when opening from the
+      // mobile menu.
+      if (isMobile) {
+        const id = window.setTimeout(() => {
+          inputRef.current?.focus({ preventScroll: true });
+        }, 220);
+        return () => window.clearTimeout(id);
+      }
+      inputRef.current.focus({ preventScroll: true });
     } else {
       setQuery('');
       setResults([]);
     }
+  }, [isOpen, isMobile]);
+
+  // Lock body scroll while the modal is open and preserve the scroll
+  // position. Using position:fixed + top:-scrollY is the iOS-safe
+  // pattern that prevents the page from jumping/shaking when the
+  // modal opens (especially when handed off from MobileNav, which
+  // also toggles body.overflow).
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const scrollY = window.scrollY || window.pageYOffset || 0;
+    const body = document.body;
+    const previous = {
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+      overflow: body.style.overflow,
+    };
+
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.left = '0';
+    body.style.right = '0';
+    body.style.width = '100%';
+    body.style.overflow = 'hidden';
+
+    return () => {
+      body.style.position = previous.position;
+      body.style.top = previous.top;
+      body.style.left = previous.left;
+      body.style.right = previous.right;
+      body.style.width = previous.width;
+      body.style.overflow = previous.overflow;
+      // Restore the user's previous scroll position without animation.
+      window.scrollTo(0, scrollY);
+    };
   }, [isOpen]);
 
   useEffect(() => {
@@ -125,14 +173,25 @@ function GlobalSearchModal() {
 
 const styles = {
   overlay: {
-    position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(5, 12, 22, 0.6)',
-    backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', paddingTop: '10vh'
+    position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(5, 12, 22, 0.78)',
+    backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', paddingTop: '10vh',
+    // Promote the overlay to its own compositor layer so the heavy
+    // blur does not repaint the page underneath every frame.
+    willChange: 'opacity',
+    contain: 'layout paint',
+    overscrollBehavior: 'contain'
   },
   modal: {
-    width: '100%', maxWidth: '600px', background: 'rgba(13, 26, 45, 0.85)', borderRadius: '24px',
+    width: '100%', maxWidth: '600px', background: 'rgba(13, 26, 45, 0.92)', borderRadius: '24px',
     border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden', boxShadow: '0 32px 64px rgba(0,0,0,0.6)'
   },
-  modalMobile: { width: '90%', maxWidth: 'none' },
+  modalMobile: {
+    width: 'calc(100% - 20px)',
+    maxWidth: 'none',
+    // Anchor close to the top on mobile so the soft keyboard does
+    // not visibly push the modal around when it opens.
+    marginTop: '-6vh'
+  },
   header: { display: 'flex', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)' },
   icon: { color: 'var(--text-muted)', marginRight: '16px' },
   input: { flex: 1, background: 'transparent', border: 'none', color: '#fff', fontSize: '1.2rem', outline: 'none' },
