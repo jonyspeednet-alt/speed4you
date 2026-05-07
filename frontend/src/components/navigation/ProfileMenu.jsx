@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
+const appBasePath = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+const loginPath = `${appBasePath}/login`.replace(/\/{2,}/g, '/');
+
 function ProfileMenu({ user, compact = false }) {
   const [isOpen, setIsOpen] = useState(false);
   const [hoveredItem, setHoveredItem] = useState(null);
@@ -120,7 +123,7 @@ function ProfileMenu({ user, compact = false }) {
             onClick={() => {
               localStorage.removeItem('token');
               localStorage.removeItem('user');
-              window.location.href = '/login';
+              window.location.href = loginPath;
             }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

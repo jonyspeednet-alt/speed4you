@@ -142,6 +142,25 @@ router.get('/trending', asyncRoute(async (req, res) => {
   res.json({ items });
 }));
 
+router.get('/local-trending', asyncRoute(async (req, res) => {
+  const limit = normalizePositiveInt(req.query.limit, 10, { min: 1, max: 100 });
+  const items = await getPublishedItems({}, 0, limit, 'trending');
+  setApiCacheHeaders(res, req.originalUrl);
+  res.json(items);
+}));
+
+router.get('/recommendations', asyncRoute(async (req, res) => {
+  const limit = normalizePositiveInt(req.query.limit, 10, { min: 1, max: 100 });
+  const seed = String(req.query.seed || '');
+  const items = await getPublishedItems({}, 0, Math.min(limit + 5, 100), 'popular');
+  const recommendations = items
+    .filter((item) => String(item?.id || '') !== seed)
+    .slice(0, limit);
+
+  setApiCacheHeaders(res, req.originalUrl);
+  res.json(recommendations);
+}));
+
 router.get('/homepage', asyncRoute(async (req, res) => {
   const limit = normalizePositiveInt(req.query.limit, HOMEPAGE_LIMIT, { min: 1, max: 100 });
   setApiCacheHeaders(res, req.originalUrl);
