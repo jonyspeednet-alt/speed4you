@@ -59,7 +59,8 @@ gh secret set DEPLOY_REMOTE_CORS_ALLOWED_ORIGINS --body "https://data.speed4you.
 Write-Host "✅ DEPLOY_REMOTE_CORS_ALLOWED_ORIGINS set"
 
 # 7. DEPLOY_REMOTE_PLAYER_CACHE_ROOT
-gh secret set DEPLOY_REMOTE_PLAYER_CACHE_ROOT --body "/home/speed4you/cache" --repo $repo
+gh secret set DEPLOY_REMOTE_PLAYER_CACHE_ROOT --body "/var/www/html/Extra_Storage/portal-media-cache" --repo $repo
+
 Write-Host "✅ DEPLOY_REMOTE_PLAYER_CACHE_ROOT set"
 
 # 8. DEPLOY_ENV_FILE_CONTENT
@@ -80,5 +81,6 @@ Write-Host "   chmod 600 ~/.ssh/authorized_keys"
 Write-Host "3. Create deployment directories on server:"
 Write-Host "   mkdir -p /home/speed4you/portal-deploy-staging"
 Write-Host "   mkdir -p /home/speed4you/backups"
-Write-Host "   mkdir -p /home/speed4you/cache"
+Write-Host "   mkdir -p /var/www/html/Extra_Storage/portal-media-cache"
+
 Write-Host "`n🚀 Then push to main branch to trigger deployment!"

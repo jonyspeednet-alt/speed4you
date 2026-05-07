@@ -13,7 +13,10 @@
     "media:audit-player": "node scripts/audit-player-library.js",
     "media:optimize-cache": "node scripts/optimize-media-cache.js",
     "media:prewarm-player": "node scripts/prewarm-player-cache.js",
+    "media:cache-report": "node scripts/manage-player-cache.js --report",
+    "media:cache-maintain": "node scripts/manage-player-cache.js --report --remove-stale-partials",
     "media:normalize-library": "node scripts/normalize-media-library.js"
+
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

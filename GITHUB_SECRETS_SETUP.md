@@ -51,7 +51,8 @@ https://data.speed4you.net
 
 ### DEPLOY_REMOTE_PLAYER_CACHE_ROOT
 ```
-/home/speed4you/cache
+/var/www/html/Extra_Storage/portal-media-cache
+
 ```
 
 ## Environment Variables (Workflow file এ set করা আছে):
