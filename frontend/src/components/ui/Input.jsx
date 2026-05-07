@@ -9,19 +9,20 @@ function Input({
 }) {
   return (
     <div style={styles.container}>
-      {label && <label style={styles.label}>{label}</label>}
+      {label && <label className="field-label" style={styles.label}>{label}</label>}
       <input
         type={type}
         value={value}
         onChange={onChange}
         placeholder={placeholder}
+        className="input-field"
         style={{
           ...styles.input,
           ...(error ? styles.inputError : {}),
         }}
         {...props}
       />
-      {error && <span style={styles.error}>{error}</span>}
+      {error && <span className="field-error" style={styles.error}>{error}</span>}
     </div>
   );
 }

@@ -717,15 +717,15 @@ function AddContentPage() {
   );
 }
 
-const ACCENT = '#6366f1';
-const ACCENT_LIGHT = 'rgba(99,102,241,0.1)';
-const ACCENT_BORDER = 'rgba(99,102,241,0.25)';
-const SURFACE = '#111318';
-const SURFACE2 = '#181b22';
-const BORDER = 'rgba(255,255,255,0.07)';
-const TEXT = '#f1f5f9';
-const TEXT2 = '#94a3b8';
-const TEXT3 = '#475569';
+const ACCENT = 'var(--accent-primary, #6366f1)';
+const ACCENT_LIGHT = 'var(--accent-light, rgba(99,102,241,0.12))';
+const ACCENT_BORDER = 'var(--accent-border, rgba(99,102,241,0.3))';
+const SURFACE = 'var(--surface, #111318)';
+const SURFACE2 = 'var(--surface-2, #181b22)';
+const BORDER = 'var(--border-color, rgba(255,255,255,0.07))';
+const TEXT = 'var(--text, #f1f5f9)';
+const TEXT2 = 'var(--text-2, #94a3b8)';
+const TEXT3 = 'var(--text-3, #475569)';
 
 const styles = {
   page: { display: 'grid', gap: '20px' },

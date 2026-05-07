@@ -21,17 +21,17 @@ function ContentRail({ title, items, type = 'default', subtitle = 'Curated now',
   };
 
   return (
-    <section style={styles.section}>
-      <div style={{ ...styles.header, ...(isTVMode ? styles.headerTV : isMobile ? styles.headerMobile : {}) }}>
+    <section className="content-rail-section" style={styles.section}>
+      <div className={`content-rail-header${isMobile ? ' content-rail-header--mobile' : ''}`} style={{ ...styles.header, ...(isTVMode ? styles.headerTV : isMobile ? styles.headerMobile : {}) }}>
         <div>
-          <span style={{ ...styles.eyebrow, color: accent }}>{subtitle}</span>
-          <h2 style={{ ...styles.title, ...(isMobile ? styles.titleMobile : {}) }}>{title}</h2>
+          <span className="content-rail-eyebrow" style={{ ...styles.eyebrow, color: accent }}>{subtitle}</span>
+          <h2 className="content-rail-title" style={{ ...styles.title, ...(isMobile ? styles.titleMobile : {}) }}>{title}</h2>
         </div>
 
-        <div style={styles.headerActions}>
-          {viewAllLink ? <a href={viewAllLink} style={styles.viewAll}>Open shelf</a> : null}
+        <div className="content-rail-actions" style={styles.headerActions}>
+          {viewAllLink ? <a className="content-rail-view-all" href={viewAllLink} style={styles.viewAll}>Open shelf</a> : null}
           {!isMobile && (
-            <div style={styles.controls}>
+            <div className="content-rail-controls" style={styles.controls}>
               <button type="button" aria-label={`Scroll ${title} left`} onClick={() => scroll('left')} onMouseEnter={() => setLeftHovered(true)} onMouseLeave={() => setLeftHovered(false)} style={{ ...styles.arrow, ...(leftHovered ? styles.arrowHover : {}) }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
@@ -47,7 +47,7 @@ function ContentRail({ title, items, type = 'default', subtitle = 'Curated now',
         </div>
       </div>
 
-      <div style={{ ...styles.rail, ...(isTVMode ? styles.railTV : isMobile ? styles.railMobile : {}) }} ref={scrollRef}>
+      <div className="content-rail-list" style={{ ...styles.rail, ...(isTVMode ? styles.railTV : isMobile ? styles.railMobile : {}) }} ref={scrollRef}>
         {items.map((item, index) => (
           <ContentCard
             key={item.id}
