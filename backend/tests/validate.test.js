@@ -3,34 +3,27 @@ const assert = require('node:assert/strict');
 
 const { Joi, validateQuery } = require('../src/middleware/validate');
 
-test('validateQuery returns 400 on invalid query', async () => {
+test('validateQuery forwards AppError on invalid query', async () => {
   const schema = Joi.object({
     page: Joi.number().integer().min(1).required(),
   });
   const middleware = validateQuery(schema);
   const req = { query: { page: '0' } };
-  let payload = null;
-  const res = {
-    status(code) {
-      this.statusCode = code;
-      return this;
-    },
-    json(value) {
-      payload = value;
-      return this;
-    },
-  };
+  const res = {};
 
-  await new Promise((resolve) => {
-    middleware(req, res, () => {
-      resolve();
+  const error = await new Promise((resolve) => {
+    middleware(req, res, (err) => {
+      resolve(err || null);
     });
-    setTimeout(resolve, 10);
   });
 
-  assert.equal(res.statusCode, 400);
-  assert.equal(payload.error, 'Invalid query parameters');
+  assert.ok(error);
+  assert.equal(error.status, 400);
+
+  assert.equal(error.code, 'VALIDATION_ERROR');
+  assert.equal(error.message, 'Validation failed');
 });
+
 
 test('validateQuery populates validatedQuery on valid input', async () => {
   const schema = Joi.object({
