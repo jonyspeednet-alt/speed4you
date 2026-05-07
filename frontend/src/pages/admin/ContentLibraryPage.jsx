@@ -1261,13 +1261,14 @@ function ContentLibraryPage() {
                   <div style={styles.empty}>Loading recent scanner logs...</div>
                 ) : null}
                 {logs.map((log, index) => (
-                  <div key={`${index}-${log.startedAt || log.endedAt || log.status}`} style={styles.logCard}>
+                  <div key={`${index}-${log.startedAt || log.completedAt || log.endedAt || log.status}`} style={styles.logCard}>
                     <strong>{log.status || 'completed'}</strong>
                     <span style={styles.metaLine}>
-                      {formatWhen(log.startedAt || log.endedAt)} | Added {log.createdCount || 0} | Updated {log.updatedCount || 0}
+                      {formatWhen(log.startedAt || log.completedAt || log.endedAt)} | Added {log.created ?? log.createdCount ?? 0} | Updated {log.updated ?? log.updatedCount ?? 0}
                     </span>
                   </div>
                 ))}
+
               </div>
             </section>
           </div>

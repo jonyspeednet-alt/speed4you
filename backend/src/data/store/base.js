@@ -102,6 +102,8 @@ async function ensureContentStore() {
       if (!db.isInMemory) {
         await db.query('CREATE EXTENSION IF NOT EXISTS pg_trgm');
         await db.query('CREATE INDEX IF NOT EXISTS idx_content_catalog_payload_gin ON content_catalog USING GIN (payload)');
+        await db.query("CREATE INDEX IF NOT EXISTS idx_content_catalog_scan_signature ON content_catalog ((payload->>'scanSignature'))");
+        await db.query("CREATE INDEX IF NOT EXISTS idx_content_catalog_scanner_root ON content_catalog (source_type, source_root_id)");
         await db.query("CREATE INDEX IF NOT EXISTS idx_content_catalog_search ON content_catalog USING GIN (LOWER(COALESCE(payload->>'title', '') || ' ' || COALESCE(payload->>'genre', '') || ' ' || COALESCE(payload->>'language', '') || ' ' || COALESCE(payload->>'category', '') || ' ' || COALESCE(payload->>'description', '') || ' ' || COALESCE(payload->>'originalTitle', '') || ' ' || COALESCE(payload->>'year', '')) gin_trgm_ops)");
       }
       await db.query('CREATE INDEX IF NOT EXISTS idx_content_catalog_status ON content_catalog (status)');

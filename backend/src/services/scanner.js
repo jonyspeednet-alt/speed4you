@@ -11,11 +11,14 @@ const {
   loadScannerState,
   normalizeTitleKey,
   recordScannerRun,
+  refreshScannerCaches,
   saveScannerRuntime,
   saveScannerState,
   upsertScannedItem,
 } = require('../data/store');
-const { enrichItemWithMetadata } = require('./metadata-enricher');
+
+const { enrichItemWithMetadata, getEnhancedCacheStats } = require('./scanner-enhanced-metadata');
+const { retryAsync } = require('./scanner-error-handler');
 const {
   buildSeriesSeasons: buildSeriesSeasonsFromParser,
   cleanTitle,
@@ -839,7 +842,7 @@ async function processMovieRoot(root, summary, progressCallback, scanContext) {
         };
 
         const enrichedItem = assignScannerTaxonomy(await enrichItemWithMetadata(item));
-        const result = await upsertScannedItem(enrichedItem);
+        const result = await retryAsync(() => upsertScannedItem(enrichedItem));
 
         // Update cache title after enrichment
         nextRootState.folders[relativeFolder].title = enrichedItem.title;
@@ -866,13 +869,14 @@ async function processMovieRoot(root, summary, progressCallback, scanContext) {
       }
 
       if (previousFingerprint && previousFingerprint === fingerprint && await hasAllCandidatesInCatalog(movieCandidates)) {
+        movieCandidates.forEach((candidate) => seenSignatures.add(candidate.scanSignature));
         summary.unchanged += movieCandidates.length;
         const current = summary.rootResults.find((entry) => entry.id === root.id);
         updateRootProgress(summary, root.id, { unchanged: (current?.unchanged || 0) + movieCandidates.length });
         continue;
       }
 
-      await deleteItemsByScanSignatures(getLegacyMovieSignatures(root, relativeFolder, folderPath, movieCandidates));
+      await retryAsync(() => deleteItemsByScanSignatures(getLegacyMovieSignatures(root, relativeFolder, folderPath, movieCandidates)));
 
       for (const candidate of movieCandidates) {
         if (seenSignatures.has(candidate.scanSignature)) {
@@ -896,7 +900,7 @@ async function processMovieRoot(root, summary, progressCallback, scanContext) {
         });
 
         const enrichedItem = assignScannerTaxonomy(await enrichItemWithMetadata(item));
-        const result = await upsertScannedItem(enrichedItem);
+        const result = await retryAsync(() => upsertScannedItem(enrichedItem));
         nextRootState.folders[relativeFolder] = {
           fingerprint,
           scanSignature: candidate.scanSignature,
@@ -931,7 +935,7 @@ async function processMovieRoot(root, summary, progressCallback, scanContext) {
     await waitForImmediate();
   }
 
-  const deletedCount = await deleteScannerItemsNotInSignatures(root.id, [...seenSignatures]);
+  const deletedCount = await retryAsync(() => deleteScannerItemsNotInSignatures(root.id, [...seenSignatures]));
   summary.deleted += deletedCount;
   const current = summary.rootResults.find((entry) => entry.id === root.id);
   updateRootProgress(summary, root.id, {
@@ -973,6 +977,7 @@ async function processSeriesRoot(root, summary, progressCallback, scanContext) {
       });
 
       if (previousFingerprint && previousFingerprint === fingerprint && await getItemByScanSignature(`${root.id}:${folderName}`)) {
+        seenSignatures.add(`${root.id}:${folderName}`);
         summary.unchanged += 1;
         const current = summary.rootResults.find((entry) => entry.id === root.id);
         updateRootProgress(summary, root.id, { unchanged: (current?.unchanged || 0) + 1 });
@@ -1004,7 +1009,7 @@ async function processSeriesRoot(root, summary, progressCallback, scanContext) {
       seenSignatures.add(item.scanSignature);
 
       const enrichedItem = assignScannerTaxonomy(await enrichItemWithMetadata(item));
-      const result = await upsertScannedItem(enrichedItem);
+      const result = await retryAsync(() => upsertScannedItem(enrichedItem));
       nextRootState.folders[relativeFolder] = {
         fingerprint,
         scanSignature: enrichedItem.scanSignature,
@@ -1038,7 +1043,7 @@ async function processSeriesRoot(root, summary, progressCallback, scanContext) {
     await waitForImmediate();
   }
 
-  const deletedCount = await deleteScannerItemsNotInSignatures(root.id, [...seenSignatures]);
+  const deletedCount = await retryAsync(() => deleteScannerItemsNotInSignatures(root.id, [...seenSignatures]));
   summary.deleted += deletedCount;
   const current = summary.rootResults.find((entry) => entry.id === root.id);
   updateRootProgress(summary, root.id, {
@@ -1115,6 +1120,7 @@ function getScannerHealth() {
     remoteRoots,
     roots,
     recentRuns: runs,
+    metadataCache: getEnhancedCacheStats(),
     currentJob: serializeJob(currentScanJob),
   };
 }
@@ -1230,7 +1236,7 @@ function attachChildHandlers(child) {
         error: '',
         summary: message.summary,
       };
-      void updateRuntimeJob(currentScanJob);
+      void refreshScannerCaches().catch(() => {}).finally(() => updateRuntimeJob(currentScanJob));
       currentScanChild = null;
       return;
     }

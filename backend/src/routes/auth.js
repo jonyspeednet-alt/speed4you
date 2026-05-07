@@ -16,6 +16,17 @@ const loginLimiter = rateLimit({
   message: { error: 'Too many login attempts. Please try again later.' },
 });
 
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
+
+function extractBearerToken(headerValue) {
+  const header = String(headerValue || '').trim();
+  if (!header.toLowerCase().startsWith('bearer ')) {
+    return '';
+  }
+  return header.slice(7).trim();
+}
+
+
 const loginSchema = Joi.object({
   username: Joi.string().trim().alphanum().min(2).max(64).required(),
   password: Joi.string().min(1).max(256).required(),
@@ -40,8 +51,9 @@ router.post('/login', loginLimiter, validateBody(loginSchema), async (req, res, 
     const token = jwt.sign(
       { id: admin.id, username: admin.username, role: admin.role },
       getJwtSecret(),
-      { expiresIn: '24h' }
+      { expiresIn: JWT_EXPIRES_IN }
     );
+
 
     res.json({ token, user: { id: admin.id, username: admin.username, role: admin.role } });
   } catch (error) {
@@ -50,11 +62,12 @@ router.post('/login', loginLimiter, validateBody(loginSchema), async (req, res, 
 });
 
 function verifyToken(req, res, next) {
-  const token = req.headers.authorization?.replace('Bearer ', '');
+  const token = extractBearerToken(req.headers.authorization);
 
   if (!token) {
     return next(new AppError('No token provided', 401, 'UNAUTHORIZED'));
   }
+
 
   try {
     const decoded = jwt.verify(token, getJwtSecret());
@@ -72,11 +85,12 @@ router.post('/logout', (req, res) => {
 });
 
 router.post('/refresh', (req, res, next) => {
-  const token = req.headers.authorization?.replace('Bearer ', '');
+  const token = extractBearerToken(req.headers.authorization);
 
   if (!token) {
     return next(new AppError('No token provided', 401, 'UNAUTHORIZED'));
   }
+
 
   try {
     const secret = getJwtSecret();
@@ -84,8 +98,9 @@ router.post('/refresh', (req, res, next) => {
     const refreshedToken = jwt.sign(
       { id: decoded.id, username: decoded.username, role: decoded.role },
       secret,
-      { expiresIn: '24h' }
+      { expiresIn: JWT_EXPIRES_IN }
     );
+
 
     return res.json({
       token: refreshedToken,
