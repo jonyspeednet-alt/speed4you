@@ -89,23 +89,165 @@ async function upsertScannedItem(payload) {
   await ensureContentStore();
   const existing = await db.query("SELECT id, payload FROM content_catalog WHERE payload->>'scanSignature' = $1 LIMIT 1", [payload.scanSignature]);
   const current = existing.rows[0]?.payload || null;
-  const shouldAutoPublish = payload.metadataStatus === 'matched';
-  const nextStatus = payload.status
-    || current?.status
-    || (shouldAutoPublish ? (process.env.SCANNER_DEFAULT_STATUS || 'published') : 'draft');
-  const nextPublishedAt = nextStatus === 'published'
-    ? (payload.publishedAt || current?.publishedAt || now)
-    : '';
 
+  // ── NEW ITEM ──────────────────────────────────────────────────────────────
   if (!current) {
-    const item = normalizeItem({ id: await allocateNextCatalogId(), createdAt: now, updatedAt: now, sourceType: 'scanner', ...payload, titleKey: normalizeTitleKey(payload.title), status: nextStatus, publishedAt: nextPublishedAt, lastScanRunId: payload.lastScanRunId || '', lastScanRunAt: payload.lastScanRunAt || now });
+    const shouldAutoPublish = payload.metadataStatus === 'matched';
+    const nextStatus = payload.status
+      || (shouldAutoPublish ? (process.env.SCANNER_DEFAULT_STATUS || 'published') : 'draft');
+    const nextPublishedAt = nextStatus === 'published' ? (payload.publishedAt || now) : '';
+
+    const item = normalizeItem({
+      id: await allocateNextCatalogId(),
+      createdAt: now,
+      updatedAt: now,
+      sourceType: 'scanner',
+      ...payload,
+      titleKey: normalizeTitleKey(payload.title),
+      status: nextStatus,
+      publishedAt: nextPublishedAt,
+      lastScanRunId: payload.lastScanRunId || '',
+      lastScanRunAt: payload.lastScanRunAt || now,
+    });
     const insertCols = extractTypedColumns(item);
-    await db.query(`INSERT INTO content_catalog (id, payload, created_at, updated_at, status, content_type, title, title_key, language, category, collection, source_type, source_root_id, last_scan_run_id, year, rating, featured, featured_order, trending_score, duplicate_count, metadata_status, published_at, released_at) VALUES ($1, $2::jsonb, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)`, [item.id, JSON.stringify(item), now, now, insertCols.status, insertCols.content_type, insertCols.title, insertCols.title_key, insertCols.language, insertCols.category, insertCols.collection, insertCols.source_type, insertCols.source_root_id, insertCols.last_scan_run_id, insertCols.year, insertCols.rating, insertCols.featured, insertCols.featured_order, insertCols.trending_score, insertCols.duplicate_count, insertCols.metadata_status, insertCols.published_at, insertCols.released_at]);
+    await db.query(
+      `INSERT INTO content_catalog
+        (id, payload, created_at, updated_at, status, content_type, title, title_key,
+         language, category, collection, source_type, source_root_id, last_scan_run_id,
+         year, rating, featured, featured_order, trending_score, duplicate_count,
+         metadata_status, published_at, released_at)
+       VALUES ($1,$2::jsonb,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
+      [item.id, JSON.stringify(item), now, now,
+       insertCols.status, insertCols.content_type, insertCols.title, insertCols.title_key,
+       insertCols.language, insertCols.category, insertCols.collection,
+       insertCols.source_type, insertCols.source_root_id, insertCols.last_scan_run_id,
+       insertCols.year, insertCols.rating, insertCols.featured, insertCols.featured_order,
+       insertCols.trending_score, insertCols.duplicate_count, insertCols.metadata_status,
+       insertCols.published_at, insertCols.released_at],
+    );
     return { item: await getItemById(item.id), created: true, updated: false };
   }
-  const item = normalizeItem({ ...current, ...payload, id: current.id, sourceType: 'scanner', titleKey: normalizeTitleKey(payload.title || current.title), status: nextStatus, publishedAt: nextPublishedAt, createdAt: current.createdAt || now, updatedAt: now, lastScanRunId: payload.lastScanRunId || current.lastScanRunId || '', lastScanRunAt: payload.lastScanRunAt || now });
+
+  // ── EXISTING ITEM — preserve user-managed fields ─────────────────────────
+  // Fields that the admin may have manually edited must NOT be overwritten by
+  // scanner re-runs.  Only update scan-derived technical fields.
+  const isUserManaged = current.status === 'published' || current.status === 'archived';
+  const preservedStatus     = isUserManaged ? current.status    : (payload.status || current.status || 'draft');
+  const preservedPublishedAt = preservedStatus === 'published'
+    ? (current.publishedAt || payload.publishedAt || now)
+    : (current.publishedAt || '');
+
+  // Fields always preserved from existing record (admin edits)
+  const adminPreserved = {
+    adminNotes:     current.adminNotes     || '',
+    featuredOrder:  current.featuredOrder  != null ? current.featuredOrder  : 0,
+    featured:       current.featured       != null ? current.featured       : false,
+    trendingScore:  current.trendingScore  != null ? current.trendingScore  : 0,
+    editorialScore: current.editorialScore != null ? current.editorialScore : 0,
+    tags:           Array.isArray(current.tags) && current.tags.length ? current.tags : payload.tags || [],
+    collection:     current.collection     || payload.collection || '',
+    category:       current.category       || payload.category   || '',
+  };
+
+  // For metadata: only update if scan found a better match or current is pending
+  const shouldUpdateMetadata = !isUserManaged
+    || current.metadataStatus === 'pending'
+    || current.metadataStatus === 'not_found';
+  const metaFields = shouldUpdateMetadata
+    ? {
+        tmdbId:              payload.tmdbId              || current.tmdbId,
+        imdbId:              payload.imdbId              || current.imdbId,
+        description:         payload.description         || current.description || '',
+        genres:              payload.genres?.length ? payload.genres : (current.genres || []),
+        metadataStatus:      payload.metadataStatus      || current.metadataStatus,
+        metadataProvider:    payload.metadataProvider    || current.metadataProvider || '',
+        metadataConfidence:  payload.metadataConfidence  ?? current.metadataConfidence,
+        metadataUpdatedAt:   payload.metadataUpdatedAt   || current.metadataUpdatedAt || '',
+        rating:              payload.rating              ?? current.rating,
+        year:                payload.year                ?? current.year,
+        originalTitle:       payload.originalTitle       || current.originalTitle || '',
+        originalLanguage:    payload.originalLanguage    || current.originalLanguage || '',
+      }
+    : {
+        tmdbId:             current.tmdbId,
+        imdbId:             current.imdbId,
+        description:        current.description || '',
+        genres:             current.genres || [],
+        metadataStatus:     current.metadataStatus,
+        metadataProvider:   current.metadataProvider || '',
+        metadataConfidence: current.metadataConfidence,
+        metadataUpdatedAt:  current.metadataUpdatedAt || '',
+        rating:             current.rating,
+        year:               current.year,
+        originalTitle:      current.originalTitle || '',
+        originalLanguage:   current.originalLanguage || '',
+      };
+
+  const item = normalizeItem({
+    ...current,
+    // scan-derived fields (always refreshed)
+    title:            payload.title            || current.title,
+    titleKey:         normalizeTitleKey(payload.title || current.title),
+    slug:             payload.slug             || current.slug || '',
+    poster:           payload.poster           || current.poster || '',
+    backdrop:         payload.backdrop         || current.backdrop || '',
+    videoUrl:         payload.videoUrl         || current.videoUrl || '',
+    sourcePath:       payload.sourcePath       || current.sourcePath || '',
+    sourcePublicPath: payload.sourcePublicPath || current.sourcePublicPath || '',
+    seasons:          payload.seasons          || current.seasons || [],
+    seasonCount:      payload.seasonCount      ?? current.seasonCount ?? 0,
+    episodeCount:     payload.episodeCount     ?? current.episodeCount ?? 0,
+    sourceRootId:     payload.sourceRootId     || current.sourceRootId || '',
+    sourceRootLabel:  payload.sourceRootLabel  || current.sourceRootLabel || '',
+    language:         current.language         || payload.language || '',
+    lastScanRunId:    payload.lastScanRunId    || current.lastScanRunId || '',
+    lastScanRunAt:    payload.lastScanRunAt    || now,
+    lastScannedAt:    now,
+    // metadata fields
+    ...metaFields,
+    // admin-preserved fields
+    ...adminPreserved,
+    // locked fields
+    id:          current.id,
+    createdAt:   current.createdAt || now,
+    updatedAt:   now,
+    sourceType:  'scanner',
+    status:      preservedStatus,
+    publishedAt: preservedPublishedAt,
+  });
+
+  // Skip DB write entirely if nothing meaningful changed
+  const scanFieldsChanged = item.title        !== current.title
+    || item.poster       !== (current.poster || '')
+    || item.videoUrl     !== (current.videoUrl || '')
+    || item.sourcePath   !== (current.sourcePath || '')
+    || item.seasonCount  !== (current.seasonCount ?? 0)
+    || item.episodeCount !== (current.episodeCount ?? 0)
+    || item.lastScanRunId !== (current.lastScanRunId || '')
+    || (shouldUpdateMetadata && item.metadataStatus !== current.metadataStatus);
+
+  if (!scanFieldsChanged) {
+    return { item: normalizeItem(current), created: false, updated: false };
+  }
+
   const updateCols = extractTypedColumns(item);
-  await db.query(`UPDATE content_catalog SET payload = $2::jsonb, updated_at = NOW(), status = $3, content_type = $4, title = $5, title_key = $6, language = $7, category = $8, collection = $9, source_type = $10, source_root_id = $11, last_scan_run_id = $12, year = $13, rating = $14, featured = $15, featured_order = $16, trending_score = $17, duplicate_count = $18, metadata_status = $19, published_at = $20, released_at = $21 WHERE id = $1`, [item.id, JSON.stringify(item), updateCols.status, updateCols.content_type, updateCols.title, updateCols.title_key, updateCols.language, updateCols.category, updateCols.collection, updateCols.source_type, updateCols.source_root_id, updateCols.last_scan_run_id, updateCols.year, updateCols.rating, updateCols.featured, updateCols.featured_order, updateCols.trending_score, updateCols.duplicate_count, updateCols.metadata_status, updateCols.published_at, updateCols.released_at]);
+  await db.query(
+    `UPDATE content_catalog
+     SET payload = $2::jsonb, updated_at = NOW(), status = $3, content_type = $4,
+         title = $5, title_key = $6, language = $7, category = $8, collection = $9,
+         source_type = $10, source_root_id = $11, last_scan_run_id = $12,
+         year = $13, rating = $14, featured = $15, featured_order = $16,
+         trending_score = $17, duplicate_count = $18, metadata_status = $19,
+         published_at = $20, released_at = $21
+     WHERE id = $1`,
+    [item.id, JSON.stringify(item),
+     updateCols.status, updateCols.content_type, updateCols.title, updateCols.title_key,
+     updateCols.language, updateCols.category, updateCols.collection,
+     updateCols.source_type, updateCols.source_root_id, updateCols.last_scan_run_id,
+     updateCols.year, updateCols.rating, updateCols.featured, updateCols.featured_order,
+     updateCols.trending_score, updateCols.duplicate_count, updateCols.metadata_status,
+     updateCols.published_at, updateCols.released_at],
+  );
   return { item: await getItemById(item.id), created: false, updated: true };
 }
 
@@ -113,11 +255,31 @@ async function deleteScannerItemsNotInSignatures(sourceRootId, scanSignatures = 
   const rootId = String(sourceRootId || '').trim();
   if (!rootId) return 0;
   const signatures = [...new Set((scanSignatures || []).filter(Boolean))];
+
+  // SAFE DELETE: only remove items that are NOT user-managed (draft/pending).
+  // published, archived items are NEVER auto-deleted — admin must remove manually.
+  // This prevents the create/delete loop when media paths fluctuate.
+  const PROTECTED_STATUSES = ['published', 'archived'];
+
   let result;
   if (signatures.length) {
-    result = await db.query(`DELETE FROM content_catalog WHERE source_type = $1 AND source_root_id = $2 AND COALESCE(payload->>'scanSignature', '') <> ALL($3::text[])`, ['scanner', rootId, signatures]);
+    result = await db.query(
+      `DELETE FROM content_catalog
+       WHERE source_type = $1
+         AND source_root_id = $2
+         AND status <> ALL($3::text[])
+         AND COALESCE(payload->>'scanSignature', '') <> ALL($4::text[])`,
+      ['scanner', rootId, PROTECTED_STATUSES, signatures],
+    );
   } else {
-    result = await db.query(`DELETE FROM content_catalog WHERE source_type = $1 AND source_root_id = $2`, ['scanner', rootId]);
+    // No signatures seen at all — only delete non-protected items
+    result = await db.query(
+      `DELETE FROM content_catalog
+       WHERE source_type = $1
+         AND source_root_id = $2
+         AND status <> ALL($3::text[])`,
+      ['scanner', rootId, PROTECTED_STATUSES],
+    );
   }
   return Number(result.rowCount || 0);
 }
