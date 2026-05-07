@@ -350,13 +350,15 @@ function ContentLibraryPage() {
         ]);
         const baseRoots = rootsRes?.items || [];
         const healthRoots = healthRes?.roots || [];
-        const nextRoots = baseRoots.map((root) => {
-          const healthRoot = healthRoots.find((entry) => entry.id === root.id);
-          return healthRoot ? { ...root, ...healthRoot } : root;
-        });
+        const nextRoots = baseRoots
+          .map((root) => {
+            const healthRoot = healthRoots.find((entry) => entry.id === root.id);
+            return healthRoot ? { ...root, ...healthRoot } : root;
+          })
+          .sort((left, right) => Number(isAutoDiscoveredRoot(left)) - Number(isAutoDiscoveredRoot(right)));
         setRoots(nextRoots);
         setHealth(healthRes || {});
-        setSelectedRootIds((current) => (current.length ? current : nextRoots.map((root) => root.id)));
+        setSelectedRootIds((current) => (current.length ? current : getDefaultSelectedRootIds(nextRoots)));
       } catch (e) {
         console.error('Failed to load roots/health', e);
       }
@@ -1108,7 +1110,7 @@ function ContentLibraryPage() {
                 <h3 style={styles.sectionTitle}>Source Roots</h3>
               </div>
               <div style={styles.catalogTools}>
-                <span style={styles.summaryPill}>Select folders before scanning</span>
+                <span style={styles.summaryPill}>Configured roots selected by default</span>
                 <button type="button" onClick={selectAllRoots} style={styles.secondaryMiniBtn}>Select All</button>
                 <button type="button" onClick={clearRootSelection} style={styles.secondaryMiniBtn}>Clear</button>
               </div>
@@ -1145,7 +1147,9 @@ function ContentLibraryPage() {
                       <span style={(root.checkable === false || root.exists) ? styles.okText : styles.warnText}>
                         {root.pathStatusLabel || (root.exists ? 'Available' : 'Missing')}
                       </span>
-                      <span style={styles.rootToggle}>{active ? 'Selected' : 'Click to select'}</span>
+                      <span style={styles.rootToggle}>
+                        {active ? 'Selected' : (isAutoDiscoveredRoot(root) ? 'Click to opt in' : 'Click to select')}
+                      </span>
                     </div>
                   </button>
                 );
