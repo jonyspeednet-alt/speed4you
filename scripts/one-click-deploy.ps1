@@ -77,6 +77,20 @@ function Initialize-DeploySettings {
   }
 }
 
+function Get-DeploySettingsSearchPaths {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$ProjectRoot
+  )
+
+  return @(
+    (Join-Path $ProjectRoot '.env.deploy.local'),
+    (Join-Path $ProjectRoot '.env.deploy'),
+    (Join-Path $ProjectRoot 'backend\.env.deploy'),
+    (Join-Path $ProjectRoot 'backend\.env.deploy.local')
+  )
+}
+
 function Get-RequiredSetting {
   param(
     [Parameter(Mandatory = $true)]
@@ -89,6 +103,231 @@ function Get-RequiredSetting {
   }
 
   return $value
+}
+
+function ConvertFrom-SecureStringToPlainText {
+  param(
+    [Parameter(Mandatory = $true)]
+    [securestring]$Value
+  )
+
+  $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Value)
+  try {
+    return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+  } finally {
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+  }
+}
+
+function Read-DeploySetting {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Name,
+    [string]$DefaultValue = '',
+    [switch]$Secret
+  )
+
+  $prompt = if ([string]::IsNullOrWhiteSpace($DefaultValue)) {
+    $Name
+  } else {
+    "$Name [$DefaultValue]"
+  }
+
+  if ($Secret) {
+    $secureValue = Read-Host -Prompt $prompt -AsSecureString
+    $value = ConvertFrom-SecureStringToPlainText -Value $secureValue
+  } else {
+    $value = Read-Host -Prompt $prompt
+  }
+
+  if ([string]::IsNullOrWhiteSpace($value)) {
+    return $DefaultValue
+  }
+
+  return $value
+}
+
+function Format-EnvValue {
+  param(
+    [AllowEmptyString()]
+    [string]$Value
+  )
+
+  if ($Value -match '^\s|\s$|[\r\n]') {
+    return '"' + ($Value -replace '"', '\"') + '"'
+  }
+
+  return $Value
+}
+
+function Get-DeploySettingDefaults {
+  return [ordered]@{
+    DEPLOY_HOST = '203.0.113.2'
+    DEPLOY_PORT = '2973'
+    DEPLOY_USER = 'speed4you'
+    DEPLOY_PASSWORD = ''
+    DEPLOY_HOST_KEY = ''
+    DEPLOY_REMOTE_FRONTEND_PATH = '/home/speed4you/frontend'
+    DEPLOY_REMOTE_BACKEND_PATH = '/home/speed4you/backend'
+    DEPLOY_REMOTE_PID_FILE = '/home/speed4you/backend.pid'
+    DEPLOY_REMOTE_PORT = '5000'
+    DEPLOY_REMOTE_STAGING_BASE = '/home/speed4you/portal-deploy-staging'
+    DEPLOY_REMOTE_BACKUP_BASE = '/home/speed4you/backups'
+    DEPLOY_SUDO_PASSWORD = ''
+    DEPLOY_REMOTE_SERVICE_NAME = 'speed4you-portal.service'
+    DEPLOY_REMOTE_CORS_ALLOWED_ORIGINS = 'https://data.speed4you.net'
+    DEPLOY_REMOTE_PLAYER_CACHE_ROOT = '/home/speed4you/cache'
+    DEPLOY_PUBLIC_PORTAL_URL = 'https://data.speed4you.net/portal/'
+  }
+}
+
+function Set-ProcessDeploySetting {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Name,
+    [AllowEmptyString()]
+    [string]$Value
+  )
+
+  [Environment]::SetEnvironmentVariable($Name, $Value, 'Process')
+}
+
+function Save-DeploySettingsFile {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path,
+    [Parameter(Mandatory = $true)]
+    [System.Collections.Specialized.OrderedDictionary]$Settings
+  )
+
+  $lines = @(
+    '# Local one-click deploy settings. This file is ignored by git.',
+    '# Keep it private because it contains server credentials.'
+  )
+  foreach ($key in $Settings.Keys) {
+    $lines += "$key=$(Format-EnvValue -Value $Settings[$key])"
+  }
+
+  $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+  [System.IO.File]::WriteAllLines($Path, $lines, $utf8NoBom)
+}
+
+function Complete-DeploySettingsFile {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$ProjectRoot,
+    [Parameter(Mandatory = $true)]
+    [string[]]$RequiredNames
+  )
+
+  $settingsPath = Join-Path $ProjectRoot '.env.deploy.local'
+  $defaults = Get-DeploySettingDefaults
+  $settings = [ordered]@{}
+  foreach ($key in $defaults.Keys) {
+    $currentValue = [Environment]::GetEnvironmentVariable($key)
+    if ([string]::IsNullOrWhiteSpace($currentValue)) {
+      $settings[$key] = $defaults[$key]
+    } else {
+      $settings[$key] = $currentValue
+    }
+  }
+
+  $missingNames = @(
+    $RequiredNames | Where-Object {
+      [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_))
+    }
+  )
+
+  if ($missingNames.Count -eq 0) {
+    return $false
+  }
+
+  Write-Host ''
+  if (Test-Path -LiteralPath $settingsPath) {
+    Write-Host "Deploy settings are incomplete. Updating $settingsPath"
+  } else {
+    Write-Host "No deploy settings file found. Creating $settingsPath"
+  }
+  Write-Host 'Press Enter to accept defaults where shown.'
+  Write-Host ''
+  Write-Host 'For DEPLOY_HOST_KEY, run this in another PowerShell window if you do not already have it:'
+  Write-Host '"C:\Program Files\PuTTY\plink.exe" -P 2973 speed4you@203.0.113.2 exit'
+  Write-Host ''
+
+  foreach ($name in $missingNames) {
+    $defaultValue = $settings[$name]
+    $isSecret = $name -in @('DEPLOY_PASSWORD', 'DEPLOY_SUDO_PASSWORD')
+    $value = Read-DeploySetting -Name $name -DefaultValue $defaultValue -Secret:$isSecret
+    $settings[$name] = $value
+    Set-ProcessDeploySetting -Name $name -Value $value
+  }
+
+  foreach ($key in $settings.Keys) {
+    if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($key)) -and -not [string]::IsNullOrWhiteSpace($settings[$key])) {
+      Set-ProcessDeploySetting -Name $key -Value $settings[$key]
+    }
+  }
+
+  Save-DeploySettingsFile -Path $settingsPath -Settings $settings
+  Write-Host "Saved deploy settings to $settingsPath"
+  return $true
+}
+
+function Assert-RequiredSettings {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string[]]$Names,
+    [Parameter(Mandatory = $true)]
+    [string]$ProjectRoot
+  )
+
+  $missingNames = @()
+  foreach ($name in $Names) {
+    $value = [Environment]::GetEnvironmentVariable($name)
+    if ([string]::IsNullOrWhiteSpace($value)) {
+      $missingNames += $name
+    }
+  }
+
+  if ($missingNames.Count -eq 0) {
+    return
+  }
+
+  $searchedPaths = (Get-DeploySettingsSearchPaths -ProjectRoot $ProjectRoot) -join "`n  - "
+  $templatePath = Join-Path $ProjectRoot '.env.deploy.local'
+  $missingList = $missingNames -join ', '
+
+  $message = @"
+Missing required deploy setting(s): $missingList
+
+Create $templatePath with these values, or set them as environment variables before running one-click-deploy.bat.
+
+The script checks:
+  - $searchedPaths
+
+Example .env.deploy.local:
+DEPLOY_HOST=203.0.113.2
+DEPLOY_PORT=2973
+DEPLOY_USER=speed4you
+DEPLOY_PASSWORD=your_ssh_password
+DEPLOY_HOST_KEY=ssh-ed25519 255 SHA256:your_putty_host_key_fingerprint
+DEPLOY_REMOTE_FRONTEND_PATH=/home/speed4you/frontend
+DEPLOY_REMOTE_BACKEND_PATH=/home/speed4you/backend
+DEPLOY_REMOTE_PID_FILE=/home/speed4you/backend.pid
+DEPLOY_REMOTE_PORT=5000
+DEPLOY_REMOTE_STAGING_BASE=/home/speed4you/portal-deploy-staging
+DEPLOY_REMOTE_BACKUP_BASE=/home/speed4you/backups
+DEPLOY_SUDO_PASSWORD=your_sudo_password
+DEPLOY_REMOTE_SERVICE_NAME=speed4you-portal.service
+DEPLOY_REMOTE_CORS_ALLOWED_ORIGINS=https://data.speed4you.net
+DEPLOY_REMOTE_PLAYER_CACHE_ROOT=/home/speed4you/cache
+DEPLOY_PUBLIC_PORTAL_URL=https://data.speed4you.net/portal/
+
+To get DEPLOY_HOST_KEY, run PuTTY plink once against the server and copy the host key line:
+"C:\Program Files\PuTTY\plink.exe" -P 2973 speed4you@203.0.113.2 exit
+"@
+
+  throw $message
 }
 
 function Get-OptionalSetting {
@@ -121,9 +360,87 @@ function Get-DefaultPublicHealthUrl {
   }
 }
 
+function Get-FrontendBasePath {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$PortalUrl
+  )
+
+  try {
+    $portalUri = [Uri]$PortalUrl
+    $basePath = $portalUri.AbsolutePath
+    if ([string]::IsNullOrWhiteSpace($basePath)) {
+      return '/'
+    }
+
+    if (-not $basePath.EndsWith('/')) {
+      $basePath = "$basePath/"
+    }
+
+    return $basePath
+  } catch {
+    throw "Could not derive VITE_APP_BASE from DEPLOY_PUBLIC_PORTAL_URL: $PortalUrl"
+  }
+}
+
+function Assert-FrontendAssetBase {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Html,
+    [Parameter(Mandatory = $true)]
+    [string]$ExpectedBase
+  )
+
+  if ($ExpectedBase -eq '/') {
+    return
+  }
+
+  if ($Html -match '(src|href)="/assets/') {
+    throw "Frontend asset base is wrong. Expected assets under $ExpectedBase but index.html references /assets/. Set VITE_APP_BASE=$ExpectedBase and rebuild."
+  }
+
+  $expectedAssetPrefix = [Regex]::Escape($ExpectedBase.TrimEnd('/') + '/assets/')
+  if ($Html -notmatch "(src|href)=`"$expectedAssetPrefix") {
+    throw "Could not find frontend assets under expected base $ExpectedBase in index.html."
+  }
+}
+
 $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $projectRoot
 Initialize-DeploySettings -ProjectRoot $projectRoot
+
+$requiredDeploySettings = @(
+  'DEPLOY_HOST',
+  'DEPLOY_PORT',
+  'DEPLOY_USER',
+  'DEPLOY_PASSWORD',
+  'DEPLOY_HOST_KEY',
+  'DEPLOY_REMOTE_FRONTEND_PATH',
+  'DEPLOY_REMOTE_BACKEND_PATH',
+  'DEPLOY_REMOTE_PORT',
+  'DEPLOY_SUDO_PASSWORD',
+  'DEPLOY_REMOTE_CORS_ALLOWED_ORIGINS',
+  'DEPLOY_REMOTE_PLAYER_CACHE_ROOT',
+  'DEPLOY_PUBLIC_PORTAL_URL'
+)
+
+$missingDeploySettings = @(
+  $requiredDeploySettings | Where-Object {
+    [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_))
+  }
+)
+if ($missingDeploySettings.Count -gt 0) {
+  if (Complete-DeploySettingsFile -ProjectRoot $projectRoot -RequiredNames $requiredDeploySettings) {
+    Import-EnvFile -Path (Join-Path $projectRoot '.env.deploy.local') | Out-Null
+  }
+}
+
+Assert-RequiredSettings -Names $requiredDeploySettings -ProjectRoot $projectRoot
+
+if ([Environment]::GetEnvironmentVariable('DEPLOY_SETUP_ONLY') -eq '1') {
+  Write-Host 'Deploy settings validation completed.'
+  exit 0
+}
 
 $deployConfig = @{
   Host = Get-RequiredSetting 'DEPLOY_HOST'
@@ -263,11 +580,23 @@ function Invoke-WebRequestWithRetry {
 
 Write-Host 'Building frontend...'
 Push-Location (Join-Path $projectRoot 'frontend')
+$frontendBasePath = Get-FrontendBasePath -PortalUrl $deployConfig.PublicPortalUrl
+$previousViteAppBase = [Environment]::GetEnvironmentVariable('VITE_APP_BASE', 'Process')
+[Environment]::SetEnvironmentVariable('VITE_APP_BASE', $frontendBasePath, 'Process')
+Write-Host "Using frontend base path: $frontendBasePath"
 npm run build
 if ($LASTEXITCODE -ne 0) {
   throw 'Frontend build failed.'
 }
 Pop-Location
+
+$localFrontendIndexPath = Join-Path $projectRoot 'frontend\dist\index.html'
+Assert-FrontendAssetBase -Html (Get-Content -LiteralPath $localFrontendIndexPath -Raw) -ExpectedBase $frontendBasePath
+if ([string]::IsNullOrWhiteSpace($previousViteAppBase)) {
+  [Environment]::SetEnvironmentVariable('VITE_APP_BASE', $null, 'Process')
+} else {
+  [Environment]::SetEnvironmentVariable('VITE_APP_BASE', $previousViteAppBase, 'Process')
+}
 
 Write-Host 'Preparing deploy package...'
 node (Join-Path $projectRoot 'scripts\prepare-deploy.cjs')
@@ -279,7 +608,7 @@ $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $stagingRoot = "$($deployConfig.RemoteStagingBase)/$timestamp"
 $remoteDistPath = "$stagingRoot/dist"
 $remoteBackendUploadPath = "$stagingRoot/backend"
-$localDistPath = Join-Path $projectRoot 'server-deploy\dist'
+$localDistPath = Join-Path $projectRoot 'server-deploy\frontend\dist'
 $localBackendPath = Join-Path $projectRoot 'server-deploy\backend'
 $localDeployEnvPath = Join-Path $projectRoot 'backend\.env.deploy'
 
@@ -562,6 +891,7 @@ Write-Host 'Verifying public site and backend health...'
 try {
   $portalResponse = Invoke-WebRequestWithRetry -Uri $deployConfig.PublicPortalUrl
   $healthResponse = Invoke-WebRequestWithRetry -Uri $deployConfig.PublicHealthUrl
+  Assert-FrontendAssetBase -Html $portalResponse.Content -ExpectedBase (Get-FrontendBasePath -PortalUrl $deployConfig.PublicPortalUrl)
   Write-Host "Portal status: $($portalResponse.StatusCode)"
   Write-Host "Health status: $($healthResponse.StatusCode)"
 } catch {
