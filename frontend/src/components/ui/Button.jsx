@@ -92,11 +92,14 @@ const Button = ({
     large: { padding: '15px 32px', fontSize: '1.05rem', gap: '10px' },
   };
 
+  const classNames = ['button', `button-${variant}`, `button-${size}`].join(' ');
+
   return (
     <button
       ref={buttonRef}
       type={type}
       disabled={isDisabled}
+      className={classNames}
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}

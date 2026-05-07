@@ -57,6 +57,7 @@ function clearStoredSession() {
   localStorage.removeItem('user');
 }
 
+
 function redirectToLogin() {
   if (typeof window === 'undefined') {
     return;

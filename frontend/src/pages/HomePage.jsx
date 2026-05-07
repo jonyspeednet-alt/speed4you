@@ -220,16 +220,16 @@ function HomePage() {
 
         const [homepageResponse, recommendations, localTrending, publishedCatalog] = await Promise.all([
           contentService.getHomepage(HOMEPAGE_POOL_LIMIT).catch(() => ({})),
-          seedContentId ? contentService.getRecommendations(seedContentId).catch(() => []) : Promise.resolve([]),
-          contentService.getLocalTrending().catch(() => []),
+          seedContentId ? contentService.getRecommendations(seedContentId).catch(() => ({ items: [] })) : Promise.resolve({ items: [] }),
+          contentService.getLocalTrending().catch(() => ({ items: [] })),
           fetchAllPublishedCatalog(),
         ]);
 
         const nextContent = buildHomepageContent({
           ...homepageResponse,
           continueWatching: continueWatchingResponse?.items,
-          recommendations,
-          localTrending,
+          recommendations: recommendations?.items,
+          localTrending: localTrending?.items,
           publishedCatalog
         });
 
@@ -262,7 +262,9 @@ function HomePage() {
           <div style={styles.loadingNote}>Building your portal...</div>
         ) : null}
 
-        <ContinueWatchingRail items={content.continueWatching} isLoading={loading && !content.continueWatching} />
+        {content.continueWatching?.length > 0 ? (
+          <ContinueWatchingRail items={content.continueWatching} isLoading={loading && !content.continueWatching} />
+        ) : null}
 
         {content.recommendations?.length > 0 ? (
           <ContentRail
