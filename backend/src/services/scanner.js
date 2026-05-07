@@ -830,14 +830,19 @@ async function processMovieRoot(root, summary, progressCallback, scanContext) {
         });
         seenSignatures.add(item.scanSignature);
 
-        const enrichedItem = assignScannerTaxonomy(await enrichItemWithMetadata(item));
-        const result = await upsertScannedItem(enrichedItem);
+        // Save fingerprint BEFORE enrichment so re-runs skip unchanged folders
         nextRootState.folders[relativeFolder] = {
           fingerprint,
           scanSignature: item.scanSignature,
-          title: enrichedItem.title,
+          title: item.title,
           updatedAt: new Date().toISOString(),
         };
+
+        const enrichedItem = assignScannerTaxonomy(await enrichItemWithMetadata(item));
+        const result = await upsertScannedItem(enrichedItem);
+
+        // Update cache title after enrichment
+        nextRootState.folders[relativeFolder].title = enrichedItem.title;
 
         if (result.created) {
           summary.created += 1;
@@ -1359,16 +1364,29 @@ function bootstrapAutoScanScheduler() {
   }
 
   const intervalMs = AUTO_SCAN_INTERVAL_MINUTES * 60 * 1000;
-  autoScanTimer = setInterval(() => {
-    if (currentScanJob?.status === 'running') {
-      return;
-    }
-    startScanJob([]);
-  }, intervalMs);
 
-  if (typeof autoScanTimer.unref === 'function') {
-    autoScanTimer.unref();
+  // Use chained setTimeout instead of setInterval so the next scan is
+  // always scheduled AFTER the current one completes — preventing overlap.
+  function scheduleNext() {
+    autoScanTimer = setTimeout(() => {
+      autoScanTimer = null;
+      if (currentScanJob?.status === 'running') {
+        // Still running — wait one more interval before trying again
+        scheduleNext();
+        return;
+      }
+      startScanJob([]);
+      // Schedule the next run after the interval (scan may still be running;
+      // the running-check above guards against true overlap)
+      scheduleNext();
+    }, intervalMs);
+
+    if (typeof autoScanTimer.unref === 'function') {
+      autoScanTimer.unref();
+    }
   }
+
+  scheduleNext();
 }
 
 bootstrapScannerRuntime();
