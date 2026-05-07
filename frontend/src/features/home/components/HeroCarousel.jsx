@@ -147,6 +147,7 @@ function HeroCarousel({ content, items }) {
     return (
         <section
             ref={sectionRef}
+            className={`hero-carousel ${isTablet ? 'hero-carousel--tablet' : ''} ${isMobile ? 'hero-carousel--mobile' : ''} ${isTVMode ? 'hero-carousel--tv' : ''}`.trim()}
             style={{
                 ...styles.hero,
                 ...(isTablet ? styles.heroTablet : {}),
@@ -158,7 +159,7 @@ function HeroCarousel({ content, items }) {
             onTouchEnd={handleTouchEnd}
             aria-label="Featured content carousel"
         >
-            <div style={styles.background}>
+            <div className="hero-carousel__background" style={styles.background}>
                 <div style={styles.bgFallback} />
                 {heroImage ? (
                     <img
@@ -179,54 +180,54 @@ function HeroCarousel({ content, items }) {
                 <div style={styles.bottomFade} />
             </div>
 
-            <div style={{ 
+            <div className="hero-carousel__layout" style={{ 
                 ...styles.layout, 
                 ...(isTablet ? styles.layoutTablet : {}), 
                 ...(isMobile ? styles.layoutMobile : {}),
                 ...(isTVMode ? styles.layoutTV : {})
             }}>
-                <div style={{ 
+                <div className="hero-carousel__copy" style={{ 
                     ...styles.copyPanel, 
                     ...(isMobile ? styles.copyPanelMobile : {}),
                     ...(isTVMode ? styles.copyPanelTV : {})
                 }}>
-                    <div style={styles.kickerRow}>
-                        <span style={styles.liveBadge}>{eyebrow}</span>
-                        {contentItem.genre ? <span style={styles.genre}>{contentItem.genre}</span> : null}
-                        {contentItem.year ? <span style={styles.year}>{contentItem.year}</span> : null}
+                    <div className="hero-carousel__kicker-row" style={styles.kickerRow}>
+                        <span className="hero-carousel__kicker-badge" style={styles.liveBadge}>{eyebrow}</span>
+                        {contentItem.genre ? <span className="hero-carousel__kicker-chip" style={styles.genre}>{contentItem.genre}</span> : null}
+                        {contentItem.year ? <span className="hero-carousel__kicker-chip" style={styles.year}>{contentItem.year}</span> : null}
                     </div>
 
-                    <h1 style={{ ...styles.title, ...(isMobile ? styles.titleMobile : {}) }}>{title}</h1>
-                    <p style={{ ...styles.description, ...(isMobile ? styles.descriptionMobile : {}) }}>{description}</p>
+                    <h1 className="hero-carousel__copy-title" style={{ ...styles.title, ...(isMobile ? styles.titleMobile : {}) }}>{title}</h1>
+                    <p className="hero-carousel__copy-description" style={{ ...styles.description, ...(isMobile ? styles.descriptionMobile : {}) }}>{description}</p>
 
-                    <div style={styles.chipRow}>
+                    <div className="hero-carousel__chip-row" style={styles.chipRow}>
                         {heroChips.map((chip) => (
-                            <span key={chip} style={styles.heroChip}>{chip}</span>
+                            <span key={chip} className="hero-carousel__chip" style={styles.heroChip}>{chip}</span>
                         ))}
                     </div>
 
-                    <div style={{ ...styles.metricRow, ...(isMobile ? styles.metricRowMobile : {}) }}>
+                    <div className="hero-carousel__metric-row" style={{ ...styles.metricRow, ...(isMobile ? styles.metricRowMobile : {}) }}>
                         {insightItems.map((item) => (
-                            <div key={item.label} style={{ ...styles.metricStat, ...(isMobile ? styles.metricStatMobile : {}) }}>
-                                <span style={styles.metricLabel}>{item.label}</span>
+                            <div key={item.label} className="hero-carousel__metric-stat" style={{ ...styles.metricStat, ...(isMobile ? styles.metricStatMobile : {}) }}>
+                                <span className="hero-carousel__metric-label" style={styles.metricLabel}>{item.label}</span>
                                 {item.isRating && contentItem.rating ? (
                                     <StarRating rating={contentItem.rating} size="sm" showNumber />
                                 ) : (
-                                    <strong style={styles.metricValue}>{item.value}</strong>
+                                    <strong className="hero-carousel__metric-value" style={styles.metricValue}>{item.value}</strong>
                                 )}
                             </div>
                         ))}
                     </div>
 
-                    <div style={{ ...styles.actions, ...(isMobile ? styles.actionsMobile : {}) }}>
-                        <Link to={isPlaceholder ? '/browse?sort=latest' : `/watch/${contentItem.id}`} style={{ ...styles.playBtn, ...(isMobile ? styles.playBtnMobile : {}) }}>
+                    <div className="hero-carousel__actions" style={{ ...styles.actions, ...(isMobile ? styles.actionsMobile : {}) }}>
+                        <Link className="hero-carousel__button hero-carousel__button--primary" to={isPlaceholder ? '/browse?sort=latest' : `/watch/${contentItem.id}`} style={{ ...styles.playBtn, ...(isMobile ? styles.playBtnMobile : {}) }}>
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style={styles.buttonIcon} aria-hidden="true">
                                 {isPlaceholder ? <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z" /> : <path d="M8 5v14l11-7z" />}
                             </svg>
                             <span>{isPlaceholder ? 'Browse Latest' : isSeries ? 'Start Watching' : 'Play Now'}</span>
                         </Link>
 
-                        <Link to={isPlaceholder ? '/search' : isSeries ? `/series/${contentItem.id}` : `/movies/${contentItem.id}`} style={{ ...styles.infoBtn, ...(isMobile ? styles.infoBtnMobile : {}) }}>
+                        <Link className="hero-carousel__button hero-carousel__button--secondary" to={isPlaceholder ? '/search' : isSeries ? `/series/${contentItem.id}` : `/movies/${contentItem.id}`} style={{ ...styles.infoBtn, ...(isMobile ? styles.infoBtnMobile : {}) }}>
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style={styles.buttonIcon} aria-hidden="true">
                                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
                             </svg>
@@ -234,7 +235,7 @@ function HeroCarousel({ content, items }) {
                         </Link>
 
                         {!isPlaceholder ? (
-                            <div style={styles.watchlistWrap}>
+                            <div className="hero-carousel__watchlist" style={styles.watchlistWrap}>
                                 <WatchlistButton contentType={isSeries ? 'series' : 'movie'} contentId={contentItem.id} title={title} />
                             </div>
                         ) : null}
@@ -338,8 +339,11 @@ const styles = {
     hero: {
         position: 'relative',
         zIndex: 3,
+        width: '100%',
+        maxWidth: '100vw',
         height: 'clamp(640px, 85vh, 880px)',
         overflow: 'hidden',
+        overflowX: 'hidden',
         background: '#050c16',
         borderBottomLeftRadius: '48px',
         borderBottomRightRadius: '48px',
@@ -358,6 +362,9 @@ const styles = {
         position: 'absolute',
         inset: 0,
         zIndex: 0,
+        overflow: 'hidden',
+        width: '100%',
+        height: '100%',
     },
     bgFallback: {
         position: 'absolute',
@@ -369,6 +376,8 @@ const styles = {
         inset: 0,
         width: '100%',
         height: '100%',
+        minWidth: '100%',
+        minHeight: '100%',
         objectFit: 'cover',
         objectPosition: 'center 15%',
         transform: 'scale(1.1)',
@@ -418,13 +427,14 @@ const styles = {
         position: 'relative',
         zIndex: 2,
         width: 'min(1440px, calc(100vw - 48px))',
+        maxWidth: '100%',
         margin: '0 auto',
         height: 'calc(clamp(540px, 74vh, 760px) - var(--nav-occupied-desktop))',
         padding: 'clamp(24px, 4vw, 52px) 0 76px',
         display: 'grid',
         gridTemplateColumns: 'minmax(0, 1fr) minmax(300px, 340px)',
         gap: '24px',
-        alignItems: 'center',
+        alignItems: 'stretch',
     },
     layoutTablet: {
         width: 'min(100vw - 32px, 1200px)',
@@ -439,6 +449,14 @@ const styles = {
         gridTemplateColumns: '1fr', /* Single column to focus on centered content */
         textAlign: 'center',
         justifyItems: 'center',
+    },
+    copyPanel: {
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        gap: '18px',
+        height: '100%',
+        width: '100%',
     },
     copyPanelTV: {
         maxWidth: '1200px',

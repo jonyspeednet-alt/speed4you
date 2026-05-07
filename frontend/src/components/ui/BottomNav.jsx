@@ -60,7 +60,7 @@ function BottomNav() {
   if (location.pathname.startsWith('/watch/')) return null;
 
   return (
-    <nav style={styles.nav} aria-label="Bottom navigation">
+    <nav className="bottom-nav" aria-label="Bottom navigation">
       {NAV_ITEMS.map((item) => {
         const isActive = item.path === '/'
           ? location.pathname === '/'
@@ -70,6 +70,7 @@ function BottomNav() {
           <Link
             key={item.path}
             to={item.path}
+            className={`bottom-nav-item${isActive ? ' active' : ''}`}
             style={{
               ...styles.item,
               ...(isActive ? styles.itemActive : {}),
@@ -81,10 +82,10 @@ function BottomNav() {
             onTouchEnd={() => setPressedItem(null)}
             aria-current={isActive ? 'page' : undefined}
           >
-            <span style={{ ...styles.iconWrap, ...(isActive ? styles.iconWrapActive : {}) }}>
+            <span className={`bottom-nav-icon${isActive ? ' active' : ''}`} style={{ ...styles.iconWrap, ...(isActive ? styles.iconWrapActive : {}) }}>
               {item.icon(isActive)}
             </span>
-            <span style={{ ...styles.label, ...(isActive ? styles.labelActive : {}) }}>{item.label}</span>
+            <span className={`bottom-nav-label${isActive ? ' active' : ''}`} style={{ ...styles.label, ...(isActive ? styles.labelActive : {}) }}>{item.label}</span>
           </Link>
         );
       })}
