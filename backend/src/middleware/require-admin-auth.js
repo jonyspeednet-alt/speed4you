@@ -1,9 +1,16 @@
 const jwt = require('jsonwebtoken');
 const { getJwtSecret } = require('../config/auth');
 
+function extractBearerToken(headerValue) {
+  const header = String(headerValue || '').trim();
+  if (!header.toLowerCase().startsWith('bearer ')) {
+    return '';
+  }
+  return header.slice(7).trim();
+}
+
 function requireAdminAuth(req, res, next) {
-  const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+  const token = extractBearerToken(req.headers.authorization);
 
   if (!token) {
     return res.status(401).json({ error: 'Authentication required' });
@@ -11,6 +18,10 @@ function requireAdminAuth(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, getJwtSecret());
+    const role = String(decoded?.role || '').toLowerCase();
+    if (!['admin', 'super_admin'].includes(role)) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
     req.user = decoded;
     return next();
   } catch {
@@ -19,3 +30,4 @@ function requireAdminAuth(req, res, next) {
 }
 
 module.exports = requireAdminAuth;
+

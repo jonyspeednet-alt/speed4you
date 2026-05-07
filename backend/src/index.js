@@ -6,7 +6,9 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
+const { randomUUID } = require('crypto');
 const { getScannerHealth } = require('./services/scanner');
+
 const { compressionMiddleware, setStaticCacheHeaders } = require('./middleware/response-optimizer');
 const { ensureContentStore, closePool } = require('./data/store');
 const logger = require('./utils/logger');
@@ -58,6 +60,35 @@ function buildCorsOriginChecker() {
   };
 }
 
+function sanitizeScannerHealthForPublic(health) {
+  const roots = Array.isArray(health?.roots)
+    ? health.roots.map((root) => ({
+        id: root.id,
+        label: root.label,
+        type: root.type,
+        exists: root.exists,
+        checkable: root.checkable,
+        pathStatus: root.pathStatus,
+        pathStatusLabel: root.pathStatusLabel,
+        estimatedCandidates: root.estimatedCandidates,
+        lastCompletedAt: root.lastCompletedAt,
+      }))
+    : [];
+
+  return {
+    checkedAt: health?.checkedAt || new Date().toISOString(),
+    totalRoots: Number(health?.totalRoots || 0),
+    healthyRoots: Number(health?.healthyRoots || 0),
+    brokenRoots: Number(health?.brokenRoots || 0),
+    remoteRoots: Number(health?.remoteRoots || 0),
+    roots,
+    recentRuns: Array.isArray(health?.recentRuns) ? health.recentRuns.slice(0, 5) : [],
+    currentJob: health?.currentJob || null,
+    metadataCache: health?.metadataCache || {},
+  };
+}
+
+
 app.use(helmet({
   contentSecurityPolicy: isProduction ? {
     directives: {
@@ -107,9 +138,9 @@ const globalApiLimiter = rateLimit({
   skip: (req) =>
     !req.path.startsWith('/api/')
     || isReadOnlyPublicApiRequest(req)
-    || req.ip === '127.0.0.1'
-    || req.ip === '::1',
+    || (!isProduction && isLocalRequest(req)),
 });
+
 
 // Stricter limiter for public content endpoints (unauthenticated)
 const publicContentLimiter = rateLimit({
@@ -141,8 +172,11 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/health/scanner', (req, res) => {
-  res.json(getScannerHealth());
+  const health = getScannerHealth();
+  const includeSensitive = String(process.env.SCANNER_HEALTH_PUBLIC_VERBOSE || '').toLowerCase() === 'true';
+  res.json(includeSensitive ? health : sanitizeScannerHealthForPublic(health));
 });
+
 
 // Group API routes to allow mounting at multiple points
 const apiRouter = express.Router();
@@ -220,7 +254,8 @@ app.use((err, req, res, next) => {
     : (err.code || (statusCode === 400 ? 'BAD_REQUEST' : statusCode === 401 ? 'UNAUTHORIZED' : statusCode === 403 ? 'FORBIDDEN' : statusCode === 404 ? 'NOT_FOUND' : 'INTERNAL_SERVER_ERROR'));
   const message = isPayloadTooLarge
     ? 'Uploaded file exceeds configured size limit'
-    : (err.message || 'Internal Server Error');
+    : (statusCode >= 500 && isProduction ? 'Internal Server Error' : (err.message || 'Internal Server Error'));
+
 
   res.status(statusCode).json({
     ok: false,
@@ -254,8 +289,17 @@ async function startServer() {
   const shutdown = async (signal) => {
     logger.info(`Received ${signal}. Starting graceful shutdown...`);
 
+    const forceShutdownTimer = setTimeout(() => {
+      logger.error('Could not close connections in time, forcefully shutting down');
+      process.exit(1);
+    }, 10000);
+    if (typeof forceShutdownTimer.unref === 'function') {
+      forceShutdownTimer.unref();
+    }
+
     server.close(async () => {
       logger.info('HTTP server closed.');
+      clearTimeout(forceShutdownTimer);
       try {
         await closePool();
         logger.info('Graceful shutdown completed.');
@@ -265,13 +309,8 @@ async function startServer() {
         process.exit(1);
       }
     });
-
-    // If server doesn't close in 10s, force exit
-    setTimeout(() => {
-      logger.error('Could not close connections in time, forcefully shutting down');
-      process.exit(1);
-    }, 10000);
   };
+
 
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
