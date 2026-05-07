@@ -69,8 +69,9 @@ https://data.speed4you.net
 
 #### 7. DEPLOY_REMOTE_PLAYER_CACHE_ROOT
 ```
-/home/speed4you/cache
+/var/www/html/Extra_Storage/portal-media-cache
 ```
+
 
 #### 8. DEPLOY_ENV_FILE_CONTENT
 ```
@@ -105,7 +106,8 @@ mkdir -p /home/speed4you/backups
 mkdir -p /home/speed4you/cache
 chmod 755 /home/speed4you/portal-deploy-staging
 chmod 755 /home/speed4you/backups
-chmod 755 /home/speed4you/cache
+chmod 755 /var/www/html/Extra_Storage/portal-media-cache
+
 ```
 
 ### Step 3: Verify SSH Connection (from your local machine)

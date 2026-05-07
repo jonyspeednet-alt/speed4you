@@ -1,13 +1,18 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const {
+  PLAYER_CACHE_ROOT: cacheRoot,
+  FFPROBE_BIN,
+  buildPlayerCachePath,
+  isCacheReadyStat,
+} = require('../src/config/player-cache');
+const { SUPPORTED_VIDEO_EXTENSIONS } = require('../src/services/player-media');
 
 const catalogPath = path.resolve(__dirname, '../src/data/catalog.json');
-const DEFAULT_PLAYER_CACHE_ROOT = '/var/www/html/Extra_Storage/portal-media-cache';
 const defaultOutputPath = path.resolve(__dirname, '../src/data/player-audit.json');
-const cacheRoot = process.env.PLAYER_CACHE_ROOT || DEFAULT_PLAYER_CACHE_ROOT;
-const SUPPORTED_VIDEO_EXTENSIONS = new Set(['.mp4', '.m4v', '.webm', '.mov', '.mkv', '.avi', '.wmv', '.mpg', '.mpeg', '.ts', '.m2ts']);
 const DIRECT_PLAY_EXTENSIONS = new Set(['.mp4', '.m4v', '.webm']);
+
 
 function safeStat(targetPath) {
   try {
@@ -348,7 +353,8 @@ async function main() {
       const probeData = await probeMedia(resolvedPath);
       const profile = collectProfile(probeData, extension);
       const cachePath = buildCachePath(entry);
-      const cacheReady = (safeStat(cachePath)?.size || 0) > 1024 * 1024;
+      const cacheReady = isCacheReadyStat(safeStat(cachePath));
+
 
       incrementCounter(summary.extensions, extension || 'unknown');
       incrementCounter(summary.videoCodecs, profile.videoCodec || 'unknown');
