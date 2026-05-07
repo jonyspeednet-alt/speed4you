@@ -46,7 +46,8 @@ EOF
 chmod 600 ~/.ssh/authorized_keys
 mkdir -p /home/speed4you/portal-deploy-staging
 mkdir -p /home/speed4you/backups
-mkdir -p /home/speed4you/cache
+mkdir -p /var/www/html/Extra_Storage/portal-media-cache
+
 ```
 
 - [ ] **GitHub Secrets** - Add these to your GitHub repository:
@@ -57,7 +58,8 @@ mkdir -p /home/speed4you/cache
   - `DEPLOY_SUDO_PASSWORD` = `Speed##ftpsn`
   - `DEPLOY_ENV_FILE_CONTENT` = (your backend .env)
   - `DEPLOY_REMOTE_CORS_ALLOWED_ORIGINS` = `https://data.speed4you.net`
-  - `DEPLOY_REMOTE_PLAYER_CACHE_ROOT` = `/home/speed4you/cache`
+  - `DEPLOY_REMOTE_PLAYER_CACHE_ROOT` = `/var/www/html/Extra_Storage/portal-media-cache`
+
 
 - [ ] **Test SSH Connection**:
 ```bash

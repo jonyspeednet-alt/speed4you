@@ -89,6 +89,28 @@ async function getItemByScanSignature(scanSignature) {
   return payload ? normalizeItem(payload) : null;
 }
 
+async function getScanSignaturesByRootId(sourceRootId) {
+  await ensureContentStore();
+  const rootId = String(sourceRootId || '').trim();
+  if (!rootId) {
+    return [];
+  }
+
+  const result = await db.query(
+    `SELECT DISTINCT payload->>'scanSignature' AS scan_signature
+     FROM content_catalog
+     WHERE source_type = $1
+       AND source_root_id = $2
+       AND COALESCE(payload->>'scanSignature', '') <> ''`,
+    ['scanner', rootId],
+  );
+
+  return result.rows
+    .map((row) => String(row.scan_signature || '').trim())
+    .filter(Boolean);
+}
+
+
 async function deleteItemsByScanSignatures(scanSignatures = []) {
   const signatures = new Set((scanSignatures || []).filter(Boolean));
   if (!signatures.size) return 0;

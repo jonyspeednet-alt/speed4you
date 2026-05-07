@@ -51,6 +51,8 @@ const DEFAULT_MEDIA_LIBRARY_ROOT = process.env.SCANNER_MEDIA_ROOT || '/var/www/h
 const ENABLE_AUTO_DISCOVER_ROOTS = process.env.SCANNER_AUTO_DISCOVER_ROOTS !== 'false';
 const AUTO_DISCOVER_MAX_DEPTH = Math.max(1, Number(process.env.SCANNER_AUTO_DISCOVER_MAX_DEPTH || 3));
 const AUTO_SCAN_INTERVAL_MINUTES = Math.max(0, Number(process.env.SCANNER_AUTO_SCAN_INTERVAL_MINUTES || 0));
+const SCANNER_AUTO_RESUME_ON_RESTART = process.env.SCANNER_AUTO_RESUME_ON_RESTART !== 'false';
+const SCANNER_AUTO_RESUME_DELAY_MS = Math.max(1000, Number(process.env.SCANNER_AUTO_RESUME_DELAY_MS || 5000));
 const SKIP_DISCOVERY_NAMES = new Set(['portal', 'uploads', 'assets', 'css', 'js', 'api']);
 const SKIP_DISCOVERY_PATTERNS = [
   /\bcache\b/i,
@@ -81,6 +83,9 @@ const BLOCKED_AUTO_ROOT_PATTERNS = [
 let currentScanJob = null;
 let currentScanChild = null;
 let autoScanTimer = null;
+let resumeScanTimer = null;
+let signalHandlersRegistered = false;
+
 
 function isPosixAbsolutePath(value) {
   return /^\/[^/]+/.test(String(value || '').trim());
@@ -684,10 +689,15 @@ function getLegacyMovieSignatures(root, relativeFolder, folderPath, movieCandida
   return [...legacySignatures];
 }
 
-function hasAllCandidatesInCatalog(candidates = []) {
+function hasAllCandidatesInCatalog(candidates = [], existingSignatureSet = null) {
+  if (existingSignatureSet instanceof Set) {
+    return Promise.resolve(candidates.every((candidate) => existingSignatureSet.has(candidate.scanSignature)));
+  }
+
   return Promise.all(candidates.map((candidate) => getItemByScanSignature(candidate.scanSignature)))
     .then((items) => items.every(Boolean));
 }
+
 
 function createBaseScannerItem(root, values) {
   return {
@@ -717,33 +727,134 @@ async function saveRootState(rootId, nextRootState) {
   await saveScannerState(state);
 }
 
-function compactSummary(summary) {
-  if (!summary) {
+function toNonNegativeInteger(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 0;
+  }
+  return Math.floor(parsed);
+}
+
+function toIsoOrEmpty(value) {
+  return typeof value === 'string' ? value : '';
+}
+
+function normalizeRootProgressEntry(entry = {}) {
+  return {
+    ...entry,
+    id: String(entry.id || ''),
+    label: String(entry.label || ''),
+    type: String(entry.type || 'movie'),
+    path: String(entry.path || ''),
+    status: String(entry.status || 'pending'),
+    exists: Boolean(entry.exists),
+    checkable: Boolean(entry.checkable),
+    pathStatus: String(entry.pathStatus || ''),
+    pathStatusLabel: String(entry.pathStatusLabel || ''),
+    discovered: toNonNegativeInteger(entry.discovered),
+    processed: toNonNegativeInteger(entry.processed),
+    totalCandidates: toNonNegativeInteger(entry.totalCandidates),
+    created: toNonNegativeInteger(entry.created),
+    updated: toNonNegativeInteger(entry.updated),
+    unchanged: toNonNegativeInteger(entry.unchanged),
+    deleted: toNonNegativeInteger(entry.deleted),
+    duplicateDrafts: toNonNegativeInteger(entry.duplicateDrafts),
+    skipped: toNonNegativeInteger(entry.skipped),
+    errors: Array.isArray(entry.errors) ? entry.errors.map((error) => String(error || '')) : [],
+  };
+}
+
+function normalizeSummary(summary) {
+  if (!summary || typeof summary !== 'object') {
     return null;
   }
 
   return {
     ...summary,
-    drafts: [],
-    errors: Array.isArray(summary.errors) ? summary.errors.slice(0, 10) : [],
-    skipped: Array.isArray(summary.skipped) ? summary.skipped.slice(0, 10) : [],
+    startedAt: toIsoOrEmpty(summary.startedAt),
+    completedAt: toIsoOrEmpty(summary.completedAt),
+    rootsRequested: toNonNegativeInteger(summary.rootsRequested),
+    rootsScanned: toNonNegativeInteger(summary.rootsScanned),
+    created: toNonNegativeInteger(summary.created),
+    updated: toNonNegativeInteger(summary.updated),
+    unchanged: toNonNegativeInteger(summary.unchanged),
+    deleted: toNonNegativeInteger(summary.deleted),
+    duplicateDrafts: toNonNegativeInteger(summary.duplicateDrafts),
+    skipped: Array.isArray(summary.skipped) ? summary.skipped : [],
+    errors: Array.isArray(summary.errors) ? summary.errors.map((error) => String(error || '')) : [],
+    drafts: Array.isArray(summary.drafts) ? summary.drafts : [],
     rootResults: Array.isArray(summary.rootResults)
-      ? summary.rootResults.map((root) => ({
-          ...root,
-          errors: Array.isArray(root.errors) ? root.errors.slice(0, 5) : [],
-        }))
+      ? summary.rootResults.map((root) => normalizeRootProgressEntry(root))
       : [],
   };
 }
 
-function serializeJob(job) {
-  if (!job) {
+function compactSummary(summary) {
+  const normalized = normalizeSummary(summary);
+  if (!normalized) {
+    return null;
+  }
+
+  return {
+    ...normalized,
+    drafts: [],
+    errors: normalized.errors.slice(0, 10),
+    skipped: normalized.skipped.slice(0, 10),
+    rootResults: normalized.rootResults.map((root) => ({
+      ...root,
+      errors: root.errors.slice(0, 5),
+    })),
+  };
+}
+
+function normalizeRuntimeJob(job) {
+  if (!job || typeof job !== 'object') {
     return null;
   }
 
   return {
     ...job,
-    summary: compactSummary(job.summary),
+    id: String(job.id || ''),
+    status: String(job.status || 'idle'),
+    startedAt: toIsoOrEmpty(job.startedAt),
+    completedAt: toIsoOrEmpty(job.completedAt),
+    updatedAt: toIsoOrEmpty(job.updatedAt),
+    rootIds: Array.isArray(job.rootIds) ? job.rootIds.map((id) => String(id || '')).filter(Boolean) : [],
+    error: String(job.error || ''),
+    summary: normalizeSummary(job.summary),
+  };
+}
+
+function logScannerEvent(event, payload = {}) {
+  try {
+    console.info('[scanner]', JSON.stringify({ event, timestamp: new Date().toISOString(), ...payload }));
+  } catch {
+    console.info('[scanner]', event);
+  }
+}
+
+function coerceDeletedCount(rawValue, context = '') {
+  const parsed = Number(rawValue);
+  if (Number.isFinite(parsed) && parsed >= 0) {
+    return Math.floor(parsed);
+  }
+
+  logScannerEvent('deleted_count_invalid', {
+    context,
+    rawValue: String(rawValue),
+  });
+  return 0;
+}
+
+function serializeJob(job) {
+  const normalizedJob = normalizeRuntimeJob(job);
+  if (!normalizedJob) {
+    return null;
+  }
+
+  return {
+    ...normalizedJob,
+    summary: compactSummary(normalizedJob.summary),
   };
 }
 
@@ -760,6 +871,7 @@ async function clearRuntimeJob() {
     queue: [],
   });
 }
+
 
 function buildProgressPayload(summary, extra = {}) {
   return {
@@ -991,11 +1103,14 @@ async function processMovieRoot(root, summary, progressCallback, scanContext) {
     progressCallback(buildProgressPayload(summary, { activeRootId: root.id }));
   }
 
-  const deletedCount = await retryAsync(() => deleteScannerItemsNotInSignatures(root.id, [...seenSignatures]));
-  summary.deleted += deletedCount;
+  const deletedCount = coerceDeletedCount(
+    await retryAsync(() => deleteScannerItemsNotInSignatures(root.id, [...seenSignatures])),
+    `movie:${root.id}`,
+  );
+  summary.deleted = toNonNegativeInteger(summary.deleted) + deletedCount;
   const current = summary.rootResults.find((entry) => entry.id === root.id);
   updateRootProgress(summary, root.id, {
-    deleted: (current?.deleted || 0) + deletedCount,
+    deleted: toNonNegativeInteger(current?.deleted) + deletedCount,
   });
 
   nextRootState.lastCompletedAt = new Date().toISOString();
@@ -1044,13 +1159,19 @@ async function processSeriesRoot(root, summary, progressCallback, scanContext) {
       }
 
 
-      if (previousFingerprint && previousFingerprint === fingerprint && await getItemByScanSignature(`${root.id}:${folderName}`)) {
-        seenSignatures.add(`${root.id}:${folderName}`);
+      const seriesSignature = `${root.id}:${folderName}`;
+      const alreadyExists = existingSignatureSet instanceof Set
+        ? existingSignatureSet.has(seriesSignature)
+        : await getItemByScanSignature(seriesSignature);
+
+      if (previousFingerprint && previousFingerprint === fingerprint && alreadyExists) {
+        seenSignatures.add(seriesSignature);
         summary.unchanged += 1;
         const current = summary.rootResults.find((entry) => entry.id === root.id);
         updateRootProgress(summary, root.id, { unchanged: (current?.unchanged || 0) + 1 });
         continue;
       }
+
 
       const { seasons } = buildSeriesSeasons(root, folderName, seriesPath);
 
@@ -1119,11 +1240,14 @@ async function processSeriesRoot(root, summary, progressCallback, scanContext) {
     progressCallback(buildProgressPayload(summary, { activeRootId: root.id }));
   }
 
-  const deletedCount = await retryAsync(() => deleteScannerItemsNotInSignatures(root.id, [...seenSignatures]));
-  summary.deleted += deletedCount;
+  const deletedCount = coerceDeletedCount(
+    await retryAsync(() => deleteScannerItemsNotInSignatures(root.id, [...seenSignatures])),
+    `series:${root.id}`,
+  );
+  summary.deleted = toNonNegativeInteger(summary.deleted) + deletedCount;
   const current = summary.rootResults.find((entry) => entry.id === root.id);
   updateRootProgress(summary, root.id, {
-    deleted: (current?.deleted || 0) + deletedCount,
+    deleted: toNonNegativeInteger(current?.deleted) + deletedCount,
   });
 
   nextRootState.lastCompletedAt = new Date().toISOString();
@@ -1238,11 +1362,28 @@ async function scanSelectedRoots(selectedRootIds = [], progressCallback, options
       continue;
     }
 
+    let existingSignatureSet = null;
+    try {
+      const rootSignatures = await retryAsync(() => getScanSignaturesByRootId(root.id));
+      existingSignatureSet = new Set(rootSignatures);
+      logScannerEvent('root_signatures_prefetched', {
+        runId: scanContext.runId,
+        rootId: root.id,
+        signatureCount: existingSignatureSet.size,
+      });
+    } catch (signatureError) {
+      logScannerEvent('root_signatures_prefetch_failed', {
+        runId: scanContext.runId,
+        rootId: root.id,
+        error: signatureError.message,
+      });
+    }
+
     try {
       if (root.type === 'series') {
-        await processSeriesRoot(root, summary, progressCallback, scanContext);
+        await processSeriesRoot(root, summary, progressCallback, scanContext, existingSignatureSet);
       } else {
-        await processMovieRoot(root, summary, progressCallback, scanContext);
+        await processMovieRoot(root, summary, progressCallback, scanContext, existingSignatureSet);
       }
       summary.rootsScanned += 1;
     } catch (error) {
@@ -1258,25 +1399,39 @@ async function scanSelectedRoots(selectedRootIds = [], progressCallback, options
     }
   }
 
+
   summary.completedAt = new Date().toISOString();
+  const normalizedSummary = normalizeSummary(summary) || createSummary([]);
   await recordScannerRun({
     id: scanContext.runId,
-    startedAt: summary.startedAt,
-    completedAt: summary.completedAt,
-    rootsRequested: summary.rootsRequested,
-    rootsScanned: summary.rootsScanned,
-    created: summary.created,
-    updated: summary.updated,
-    unchanged: summary.unchanged,
-    deleted: summary.deleted,
-    duplicateDrafts: summary.duplicateDrafts,
-    skipped: summary.skipped,
-    errors: summary.errors,
-    rootResults: summary.rootResults,
+    startedAt: normalizedSummary.startedAt,
+    completedAt: normalizedSummary.completedAt,
+    rootsRequested: normalizedSummary.rootsRequested,
+    rootsScanned: normalizedSummary.rootsScanned,
+    created: normalizedSummary.created,
+    updated: normalizedSummary.updated,
+    unchanged: normalizedSummary.unchanged,
+    deleted: normalizedSummary.deleted,
+    duplicateDrafts: normalizedSummary.duplicateDrafts,
+    skipped: normalizedSummary.skipped,
+    errors: normalizedSummary.errors,
+    rootResults: normalizedSummary.rootResults,
   });
 
-  return summary;
+  logScannerEvent('scan_completed', {
+    runId: scanContext.runId,
+    rootsScanned: normalizedSummary.rootsScanned,
+    rootsRequested: normalizedSummary.rootsRequested,
+    created: normalizedSummary.created,
+    updated: normalizedSummary.updated,
+    deleted: normalizedSummary.deleted,
+    unchanged: normalizedSummary.unchanged,
+    errors: normalizedSummary.errors.length,
+  });
+
+  return normalizedSummary;
 }
+
 
 function attachChildHandlers(child) {
   currentScanChild = child;
@@ -1289,6 +1444,7 @@ function attachChildHandlers(child) {
       updatedAt: new Date().toISOString(),
       error: `Scanner worker error: ${err.message}`,
     };
+    logScannerEvent('worker_error', { runId: currentScanJob?.id || '', error: err.message });
     void updateRuntimeJob(currentScanJob);
     currentScanChild = null;
   });
@@ -1301,7 +1457,7 @@ function attachChildHandlers(child) {
         completedAt: '',
         error: '',
         updatedAt: new Date().toISOString(),
-        summary: message.summary,
+        summary: normalizeSummary(message.summary),
       };
       void updateRuntimeJob(currentScanJob);
       return;
@@ -1314,8 +1470,9 @@ function attachChildHandlers(child) {
         completedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         error: '',
-        summary: message.summary,
+        summary: normalizeSummary(message.summary),
       };
+      logScannerEvent('worker_completed', { runId: currentScanJob?.id || '' });
       void refreshScannerCaches().catch(() => {}).finally(() => updateRuntimeJob(currentScanJob));
       currentScanChild = null;
       return;
@@ -1329,6 +1486,10 @@ function attachChildHandlers(child) {
         updatedAt: new Date().toISOString(),
         error: message.error || 'Scanner worker failed.',
       };
+      logScannerEvent('worker_failed', {
+        runId: currentScanJob?.id || '',
+        error: String(message.error || 'Scanner worker failed.'),
+      });
       void updateRuntimeJob(currentScanJob);
       currentScanChild = null;
     }
@@ -1343,6 +1504,11 @@ function attachChildHandlers(child) {
         updatedAt: new Date().toISOString(),
         error: code === 0 ? '' : `Scanner worker exited with code ${code}`,
       };
+      logScannerEvent('worker_exit', {
+        runId: currentScanJob?.id || '',
+        code: Number(code || 0),
+        status: currentScanJob.status,
+      });
       void updateRuntimeJob(currentScanJob);
     }
     currentScanChild = null;
@@ -1351,7 +1517,13 @@ function attachChildHandlers(child) {
 
 function startScanJob(selectedRootIds = []) {
   if (currentScanJob?.status === 'running') {
+    logScannerEvent('scan_start_skipped_already_running', { runId: currentScanJob.id });
     return currentScanJob;
+  }
+
+  if (resumeScanTimer) {
+    clearTimeout(resumeScanTimer);
+    resumeScanTimer = null;
   }
 
   const rootIds = Array.isArray(selectedRootIds) ? [...selectedRootIds] : [];
@@ -1365,6 +1537,7 @@ function startScanJob(selectedRootIds = []) {
     summary: createSummary(getEffectiveRoots().filter((root) => !rootIds.length || rootIds.includes(root.id))),
     error: '',
   };
+  logScannerEvent('scan_started', { runId: currentScanJob.id, rootIds: currentScanJob.rootIds });
   void updateRuntimeJob(currentScanJob);
 
   const workerPath = path.resolve(__dirname, 'scanner-worker.js');
@@ -1387,6 +1560,7 @@ function startScanJob(selectedRootIds = []) {
       updatedAt: new Date().toISOString(),
       error: `Failed to start scanner worker: ${err.message}`,
     };
+    logScannerEvent('scan_start_failed', { error: err.message });
     void updateRuntimeJob(currentScanJob);
     return currentScanJob;
   }
@@ -1415,6 +1589,7 @@ function stopScanJob() {
     updatedAt: new Date().toISOString(),
     error: 'Scanner stopped by admin.',
   };
+  logScannerEvent('scan_stopped', { runId: currentScanJob.id });
   void updateRuntimeJob(currentScanJob);
   currentScanChild = null;
   return serializeJob(currentScanJob);
@@ -1424,27 +1599,86 @@ function getCurrentScanJob() {
   return serializeJob(currentScanJob);
 }
 
+
+function scheduleResumeScan(rootIds = []) {
+  if (!SCANNER_AUTO_RESUME_ON_RESTART) {
+    return;
+  }
+
+  if (resumeScanTimer) {
+    clearTimeout(resumeScanTimer);
+  }
+
+  resumeScanTimer = setTimeout(() => {
+    resumeScanTimer = null;
+    if (currentScanJob?.status === 'running') {
+      logScannerEvent('auto_resume_skipped_running');
+      return;
+    }
+
+    logScannerEvent('auto_resume_triggered', { rootIds });
+    startScanJob(rootIds);
+  }, SCANNER_AUTO_RESUME_DELAY_MS);
+
+  if (typeof resumeScanTimer.unref === 'function') {
+    resumeScanTimer.unref();
+  }
+
+  logScannerEvent('auto_resume_scheduled', {
+    delayMs: SCANNER_AUTO_RESUME_DELAY_MS,
+    rootIds,
+  });
+}
+
 function bootstrapScannerRuntime() {
   const runtime = loadScannerRuntime();
-  if (runtime.currentJob && runtime.currentJob.status === 'running') {
+  const runtimeJob = normalizeRuntimeJob(runtime.currentJob);
+  if (runtimeJob && runtimeJob.status === 'running') {
     currentScanJob = {
-      ...runtime.currentJob,
+      ...runtimeJob,
       status: 'interrupted',
       completedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       error: 'Scanner process restarted before completion.',
     };
+    logScannerEvent('scan_interrupted_on_bootstrap', {
+      runId: currentScanJob.id,
+      rootIds: currentScanJob.rootIds,
+    });
     void updateRuntimeJob(currentScanJob);
+    scheduleResumeScan(currentScanJob.rootIds || []);
     return;
   }
 
-  currentScanJob = serializeJob(runtime.currentJob) || null;
+  currentScanJob = serializeJob(runtimeJob) || null;
   if (currentScanJob) {
     void updateRuntimeJob(currentScanJob);
   }
 }
 
+function registerScannerSignalHandlers() {
+  if (signalHandlersRegistered) {
+    return;
+  }
+
+  const onSignal = (signal) => {
+    if (currentScanJob?.status === 'running') {
+      logScannerEvent('process_signal_received', {
+        signal,
+        action: 'mark_scan_stopped',
+        runId: currentScanJob.id,
+      });
+      stopScanJob();
+    }
+  };
+
+  process.on('SIGTERM', () => onSignal('SIGTERM'));
+  process.on('SIGINT', () => onSignal('SIGINT'));
+  signalHandlersRegistered = true;
+}
+
 function bootstrapAutoScanScheduler() {
+
   if (AUTO_SCAN_INTERVAL_MINUTES <= 0 || autoScanTimer) {
     return;
   }
@@ -1461,6 +1695,7 @@ function bootstrapAutoScanScheduler() {
         scheduleNext();
         return;
       }
+      logScannerEvent('auto_scan_interval_triggered', { intervalMinutes: AUTO_SCAN_INTERVAL_MINUTES });
       startScanJob([]);
       // Schedule the next run after the interval (scan may still be running;
       // the running-check above guards against true overlap)
@@ -1476,7 +1711,9 @@ function bootstrapAutoScanScheduler() {
 }
 
 bootstrapScannerRuntime();
+registerScannerSignalHandlers();
 bootstrapAutoScanScheduler();
+
 
 module.exports = {
   getCurrentScanJob,

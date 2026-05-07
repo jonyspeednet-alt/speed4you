@@ -38,7 +38,8 @@ chmod 600 ~/.ssh/authorized_keys
 # Create directories
 mkdir -p /home/speed4you/portal-deploy-staging
 mkdir -p /home/speed4you/backups
-mkdir -p /home/speed4you/cache
+mkdir -p /var/www/html/Extra_Storage/portal-media-cache
+
 ```
 
 ### Step 3: Test & Deploy (2 minutes)

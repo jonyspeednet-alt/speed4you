@@ -1,12 +1,18 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const {
+  PLAYER_CACHE_ROOT: cacheRoot,
+  FFMPEG_BIN,
+  FFPROBE_BIN,
+  buildPlayerCachePath,
+  isCacheReadyStat,
+} = require('../src/config/player-cache');
+const { SUPPORTED_VIDEO_EXTENSIONS } = require('../src/services/player-media');
 
 const catalogPath = path.resolve(__dirname, '../src/data/catalog.json');
-const DEFAULT_PLAYER_CACHE_ROOT = '/var/www/html/Extra_Storage/portal-media-cache';
-const cacheRoot = process.env.PLAYER_CACHE_ROOT || DEFAULT_PLAYER_CACHE_ROOT;
-const SUPPORTED_VIDEO_EXTENSIONS = new Set(['.mp4', '.m4v', '.webm', '.mov', '.mkv', '.avi', '.wmv']);
 const DIRECT_PLAY_EXTENSIONS = new Set(['.mp4', '.m4v', '.webm']);
+
 
 function safeStat(targetPath) {
   try {
@@ -280,11 +286,11 @@ async function main() {
     }
 
     const outputPath = buildCachePath(item);
-    const cacheStat = fs.existsSync(outputPath) ? safeStat(outputPath) : null;
-    if (cacheStat?.size > 1024 * 1024) {
+    if (isCacheReadyStat(safeStat(outputPath))) {
       console.log(`ok ${item.id}: cache already exists`);
       continue;
     }
+
 
     const extension = path.extname(inputPath).toLowerCase();
     let strategy;

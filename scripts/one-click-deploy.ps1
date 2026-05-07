@@ -176,7 +176,8 @@ function Get-DeploySettingDefaults {
     DEPLOY_SUDO_PASSWORD = ''
     DEPLOY_REMOTE_SERVICE_NAME = 'speed4you-portal.service'
     DEPLOY_REMOTE_CORS_ALLOWED_ORIGINS = 'https://data.speed4you.net'
-    DEPLOY_REMOTE_PLAYER_CACHE_ROOT = '/home/speed4you/cache'
+    DEPLOY_REMOTE_PLAYER_CACHE_ROOT = '/var/www/html/Extra_Storage/portal-media-cache'
+
     DEPLOY_PUBLIC_PORTAL_URL = 'https://data.speed4you.net/portal/'
   }
 }
@@ -320,7 +321,8 @@ DEPLOY_REMOTE_BACKUP_BASE=/home/speed4you/backups
 DEPLOY_SUDO_PASSWORD=your_sudo_password
 DEPLOY_REMOTE_SERVICE_NAME=speed4you-portal.service
 DEPLOY_REMOTE_CORS_ALLOWED_ORIGINS=https://data.speed4you.net
-DEPLOY_REMOTE_PLAYER_CACHE_ROOT=/home/speed4you/cache
+DEPLOY_REMOTE_PLAYER_CACHE_ROOT=/var/www/html/Extra_Storage/portal-media-cache
+
 DEPLOY_PUBLIC_PORTAL_URL=https://data.speed4you.net/portal/
 
 To get DEPLOY_HOST_KEY, run PuTTY plink once against the server and copy the host key line:
