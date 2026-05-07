@@ -67,6 +67,7 @@ router.get('/scanner/roots', adminController.getScannerRoots);
 router.get('/scanner/drafts', asyncRoute(adminController.getScannerDrafts));
 router.get('/scanner/logs', adminController.getScannerLogs);
 router.get('/scanner/health', asyncRoute(adminController.getScannerHealth));
+router.post('/scanner/cache/clear', asyncRoute(adminController.clearScannerMetadataCache));
 router.get('/scanner/jobs/current', adminController.getCurrentScannerJob);
 router.post('/scanner/run', adminController.runScanner);
 router.post('/scanner/stop', adminController.stopScanner);

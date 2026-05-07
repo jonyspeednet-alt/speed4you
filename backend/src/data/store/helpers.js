@@ -46,17 +46,26 @@ function extractTypedColumns(item) {
 }
 
 function rowToScannerRun(row) {
+  const completedAt = row.completed_at ? row.completed_at.toISOString() : null;
+  const created = Number(row.total_created || 0);
+  const updated = Number(row.total_updated || 0);
+  const deleted = Number(row.total_deleted || 0);
+
   return {
     id:              row.id,
     status:          row.status,
     startedAt:       row.started_at   ? row.started_at.toISOString()   : null,
-    completedAt:     row.completed_at ? row.completed_at.toISOString() : null,
+    completedAt,
+    endedAt:         completedAt,
     rootIds:         row.root_ids     || [],
     rootsRequested:  row.roots_requested,
     rootsScanned:    row.roots_scanned,
-    created:         row.total_created,
-    updated:         row.total_updated,
-    deleted:         row.total_deleted,
+    created,
+    createdCount:    created,
+    updated,
+    updatedCount:    updated,
+    deleted,
+    deletedCount:    deleted,
     unchanged:       row.total_unchanged,
     duplicateDrafts: row.total_duplicate_drafts,
     skipped:         row.skipped      || [],
@@ -65,6 +74,7 @@ function rowToScannerRun(row) {
     error:           row.error        || null,
   };
 }
+
 
 function toSafeInteger(value) {
   const parsed = Number(value);

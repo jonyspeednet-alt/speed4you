@@ -79,19 +79,42 @@ function buildCatalogFilterClauses(filters = {}, params = []) {
     clauses.push(`COALESCE(payload->'tags', '[]'::jsonb) ? ${push(String(filters.tag))}`);
   }
   if (filters.genre) {
-    clauses.push(`payload->>'genre' = ${push(String(filters.genre))}`);
+    const genrePlaceholder = push(String(filters.genre).trim().toLowerCase());
+    clauses.push(
+      `(`
+      + `LOWER(COALESCE(payload->>'genre', '')) = ${genrePlaceholder}`
+      + ` OR LOWER(COALESCE(category, '')) = ${genrePlaceholder}`
+      + ` OR EXISTS (`
+      + `SELECT 1 FROM jsonb_array_elements_text(COALESCE(payload->'genres', '[]'::jsonb)) AS genre_value`
+      + ` WHERE LOWER(genre_value) = ${genrePlaceholder}`
+      + `)`
+      + ` OR EXISTS (`
+      + `SELECT 1 FROM jsonb_array_elements_text(COALESCE(payload->'tags', '[]'::jsonb)) AS tag_value`
+      + ` WHERE LOWER(tag_value) = ${genrePlaceholder}`
+      + `)`
+      + `)`,
+    );
   }
 
   if (filters.search) {
     const term = `%${String(filters.search).trim().toLowerCase()}%`;
     const placeholder = push(term);
     clauses.push(
-      `LOWER(COALESCE(payload->>'title', '') || ' ' || COALESCE(payload->>'genre', '') || ' '` +
-      ` || COALESCE(payload->>'language', '') || ' ' || COALESCE(payload->>'category', '') || ' '` +
-      ` || COALESCE(payload->>'description', '') || ' ' || COALESCE(payload->>'originalTitle', '')` +
-      ` || ' ' || COALESCE(payload->>'year', '')) LIKE ${placeholder}`,
+      `(`
+      + `LOWER(`
+      + `COALESCE(title, '') || ' ' || COALESCE(payload->>'genre', '') || ' '`
+      + ` || COALESCE(language, '') || ' ' || COALESCE(category, '') || ' '`
+      + ` || COALESCE(collection, '') || ' ' || COALESCE(payload->>'description', '') || ' '`
+      + ` || COALESCE(payload->>'originalTitle', '') || ' ' || COALESCE(payload->>'year', '')`
+      + `) LIKE ${placeholder}`
+      + ` OR EXISTS (`
+      + `SELECT 1 FROM jsonb_array_elements_text(COALESCE(payload->'tags', '[]'::jsonb)) AS tag_value`
+      + ` WHERE LOWER(tag_value) LIKE ${placeholder}`
+      + `)`
+      + `)`,
     );
   }
+
 
   return clauses;
 }
