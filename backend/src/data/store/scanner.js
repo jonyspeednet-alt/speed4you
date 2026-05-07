@@ -50,6 +50,22 @@ async function saveScannerRoots(roots) {
   return rootsArray;
 }
 
+async function refreshScannerCaches() {
+  await ensureContentStore();
+  const [rootsResult, runsResult, stateResult] = await Promise.all([
+    db.query('SELECT * FROM scanner_roots ORDER BY created_at ASC'),
+    db.query('SELECT * FROM scanner_runs ORDER BY created_at DESC LIMIT $1', [MAX_SCANNER_RUNS]),
+    db.query("SELECT value FROM app_state WHERE key = 'scanner_state' LIMIT 1"),
+  ]);
+  const roots = rootsResult.rows.map(rowToScannerRoot);
+  const log = { runs: runsResult.rows.map(rowToScannerRun) };
+  const state = stateResult.rows[0]?.value || { roots: {} };
+  appStateCache.set('scanner_roots', roots);
+  appStateCache.set('scanner_log', log);
+  appStateCache.set('scanner_state', state);
+  return { roots, log, state };
+}
+
 async function recordScannerRun(entry) {
   await ensureContentStore();
   await db.query(
@@ -335,6 +351,7 @@ module.exports = {
   saveScannerRuntime,
   loadScannerRoots,
   saveScannerRoots,
+  refreshScannerCaches,
   recordScannerRun,
   getScannerRuns,
   getItemByScanSignature,

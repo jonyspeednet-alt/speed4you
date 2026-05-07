@@ -13,6 +13,7 @@ const {
 } = require('../data/store');
 const { getCurrentScanJob, getScannerHealth, listScannerRoots, startScanJob, stopScanJob } = require('../services/scanner');
 const { fetchMetadataByTmdbId, fetchMetadataFromOmdb } = require('../services/metadata-enricher');
+const { clearMetadataCache, getEnhancedCacheStats } = require('../services/scanner-enhanced-metadata');
 const { getMediaNormalizerStatus, startMediaNormalizer, stopMediaNormalizer } = require('../services/media-normalizer');
 const { getDuplicateReviewReport, runDuplicateCleanup } = require('../services/duplicate-review');
 const { AppError } = require('../utils/error');
@@ -245,14 +246,23 @@ exports.getScannerRoots = (req, res) => {
 
 exports.getScannerDrafts = async (req, res) => {
   const latestOnly = req.query.latestOnly !== 'false';
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
+  const offset = (page - 1) * limit;
   const latestRunId = latestOnly ? getScannerRuns(1)[0]?.id : '';
   const result = await listItems({
     source: 'scanner',
     status: req.query.status || 'draft',
     ...(latestRunId ? { scanRunId: latestRunId } : {}),
-  }, 0, null);
-  res.json(result);
+  }, offset, limit);
+  res.json({
+    ...result,
+    page,
+    limit,
+    hasMore: page * limit < Number(result.total || 0),
+  });
 };
+
 
 exports.getScannerLogs = (req, res) => {
   const limit = Number(req.query.limit || 10);
@@ -262,6 +272,11 @@ exports.getScannerLogs = (req, res) => {
 
 exports.getScannerHealth = async (req, res) => {
   res.json(await getScannerHealth());
+};
+
+exports.clearScannerMetadataCache = async (req, res) => {
+  clearMetadataCache();
+  res.json({ ok: true, metadataCache: getEnhancedCacheStats() });
 };
 
 exports.getCurrentScannerJob = (req, res) => {
