@@ -149,10 +149,15 @@ function MobileNav() {
   }
 
   function handleOpenSearch() {
+    // Dispatch the open event in the SAME tick as closing the
+    // mobile drawer. React will batch both state updates, so the
+    // body-scroll lock is handed off from MobileNav -> GlobalSearchModal
+    // without any in-between frame where the body becomes scrollable.
+    // The previous setTimeout(150) caused a visible page "shake" on
+    // mobile because the address bar / viewport could resize during
+    // that gap.
+    window.dispatchEvent(new Event('open-global-search'));
     setIsOpen(false);
-    setTimeout(() => {
-      window.dispatchEvent(new Event('open-global-search'));
-    }, 150);
   }
 
   const menuTransform = dragDelta > 0 ? `translateY(${dragDelta}px)` : undefined;
