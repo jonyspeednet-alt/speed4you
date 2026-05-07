@@ -30,3 +30,7 @@ coverage/
 deploy_key
 deploy_key.pub
 DEPLOYMENT-SECRETS.md
+
+# Backup and scratch files
+*.backup
+scratch.js
