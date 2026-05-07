@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { createHashRouter, Navigate, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { RouteErrorBoundary } from '../components/feedback/ErrorBoundary.jsx';
 import MainSiteLayout from '../layouts/MainSiteLayout';
 import AdminLayout from '../layouts/AdminLayout';
@@ -58,7 +58,9 @@ function withRouteFallback(element, routeType = 'default') {
   );
 }
 
-const router = createHashRouter([
+const appBasePath = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '/';
+
+const router = createBrowserRouter([
   {
     path: '/',
     element: <MainSiteLayout />,
@@ -162,7 +164,9 @@ const router = createHashRouter([
     path: '/login',
     element: withRouteFallback(<LoginPage />, 'default'),
   },
-]);
+], {
+  basename: appBasePath,
+});
 
 function AppRouter() {
   return <RouterProvider router={router} />;
