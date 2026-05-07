@@ -61,9 +61,6 @@ const NAV = [
   },
 ];
 
-const appBasePath = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
-const loginPath = `${appBasePath}/login`.replace(/\/{2,}/g, '/');
-
 function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
