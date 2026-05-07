@@ -75,6 +75,12 @@ function MobileNav() {
   const [isOpen, setIsOpen] = useState(false);
   const [dragStartY, setDragStartY] = useState(null);
   const [dragDelta, setDragDelta] = useState(0);
+  // When the user taps the in-drawer search, we want the drawer to
+  // disappear *instantly* (no slide-out animation) so it doesn't
+  // overlap with the search modal that's about to render. Two
+  // stacked backdrop-filter blurs animating at the same time is the
+  // main cause of visible stutter on mid-range mobile GPUs.
+  const [skipAnimation, setSkipAnimation] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { isSmallMobile } = useBreakpoint();
@@ -149,15 +155,20 @@ function MobileNav() {
   }
 
   function handleOpenSearch() {
-    // Dispatch the open event in the SAME tick as closing the
-    // mobile drawer. React will batch both state updates, so the
-    // body-scroll lock is handed off from MobileNav -> GlobalSearchModal
-    // without any in-between frame where the body becomes scrollable.
-    // The previous setTimeout(150) caused a visible page "shake" on
-    // mobile because the address bar / viewport could resize during
-    // that gap.
+    // Hide the drawer INSTANTLY (no slide animation) and dispatch
+    // the search-open event in the same tick. React batches both
+    // state updates, so the body-scroll lock is handed off from
+    // MobileNav -> GlobalSearchModal without any frame where the
+    // body becomes scrollable. The previous setTimeout(150) caused
+    // a visible page "shake" on mobile because the address bar /
+    // viewport could resize during that gap, and a slow slide-out
+    // would also stack two heavy backdrop-filter blurs at once.
+    setSkipAnimation(true);
     window.dispatchEvent(new Event('open-global-search'));
     setIsOpen(false);
+    // Re-enable animations on the next interaction so a normal
+    // close still slides smoothly.
+    window.setTimeout(() => setSkipAnimation(false), 50);
   }
 
   const menuTransform = dragDelta > 0 ? `translateY(${dragDelta}px)` : undefined;
@@ -199,6 +210,14 @@ function MobileNav() {
             : 'translateY(110%)',
           opacity: isOpen ? menuOpacity : 0,
           pointerEvents: isOpen ? 'auto' : 'none',
+          // Suppress the slide animation when handing off to the
+          // search modal so the two surfaces don't overlap.
+          transition: skipAnimation ? 'none' : styles.menu.transition,
+          // Drop the heavy backdrop-filter while invisible so the
+          // GPU isn't asked to blur an off-screen surface during
+          // the search modal's appearance.
+          backdropFilter: isOpen ? styles.menu.backdropFilter : 'none',
+          WebkitBackdropFilter: isOpen ? styles.menu.WebkitBackdropFilter : 'none',
         }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
