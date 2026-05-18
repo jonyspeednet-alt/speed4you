@@ -78,15 +78,15 @@ function deployToServer() {
     npm run build
     cd ..
 
-    echo "📦 Preparing deployment package..."
-    node scripts/prepare-deploy.cjs
+    echo "📦 Skipping preparation package (direct upload enabled)..."
+    # node scripts/prepare-deploy.cjs
 
     echo "📤 Copying files to server..."
     scp -r -P ${SSH_PORT} \
       -i ${SSH_KEY} \
       -o StrictHostKeyChecking=no \
       -o UserKnownHostsFile=/dev/null \
-      server-deploy scripts/deploy.sh \
+      backend frontend/dist scripts/deploy.sh \
       ${SSH_USER}@${SSH_HOST}:/home/speed4you/staging-area/
 
     echo "🔧 Executing deployment on server..."
@@ -102,11 +102,11 @@ function deployToServer() {
     STAGING_ROOT="$STAGING_BASE/$TIMESTAMP"
     
     mkdir -p "$STAGING_ROOT"
-    mv "$REMOTE_STAGING_AREA/server-deploy/dist" "$STAGING_ROOT/dist" 2>/dev/null || true
-    mv "$REMOTE_STAGING_AREA/server-deploy/backend" "$STAGING_ROOT/backend" 2>/dev/null || true
+    mv "$REMOTE_STAGING_AREA/dist" "$STAGING_ROOT/dist" 2>/dev/null || true
+    mv "$REMOTE_STAGING_AREA/backend" "$STAGING_ROOT/backend" 2>/dev/null || true
     mv "$REMOTE_STAGING_AREA/deploy.sh" "$STAGING_ROOT/deploy.sh" 2>/dev/null || true
     
-    rm -rf "$REMOTE_STAGING_AREA/server-deploy" 2>/dev/null || true
+    rm -rf "$REMOTE_STAGING_AREA/dist" "$REMOTE_STAGING_AREA/backend" 2>/dev/null || true
     chmod +x "$STAGING_ROOT/deploy.sh" 2>/dev/null || true
     
     echo "✅ Deployment completed!"
