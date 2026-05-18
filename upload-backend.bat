@@ -9,10 +9,10 @@ echo Port: 2973
 echo User: speed4you
 echo.
 echo AFTER LOGIN, upload these files:
-echo   server-deploy\frontend\dist\* 
+echo   frontend\dist\* 
 echo     ^> /var/www/html/portal\
 echo.
-echo   server-deploy\backend\* 
+echo   backend\* 
 echo     ^> /home/speed4you/isp-portal-backend\
 echo.
 echo Press any key to open FileZilla or WinSCP...
