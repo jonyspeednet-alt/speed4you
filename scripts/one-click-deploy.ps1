@@ -600,18 +600,18 @@ if ([string]::IsNullOrWhiteSpace($previousViteAppBase)) {
   [Environment]::SetEnvironmentVariable('VITE_APP_BASE', $previousViteAppBase, 'Process')
 }
 
-Write-Host 'Preparing deploy package...'
-node (Join-Path $projectRoot 'scripts\prepare-deploy.cjs')
-if ($LASTEXITCODE -ne 0) {
-  throw 'Deploy package preparation failed.'
-}
+# Skipping prepare-deploy.cjs as we now upload directly from root folders
+# node (Join-Path $projectRoot 'scripts\prepare-deploy.cjs')
+# if ($LASTEXITCODE -ne 0) {
+#   throw 'Deploy package preparation failed.'
+# }
 
 $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $stagingRoot = "$($deployConfig.RemoteStagingBase)/$timestamp"
 $remoteDistPath = "$stagingRoot/dist"
 $remoteBackendUploadPath = "$stagingRoot/backend"
-$localDistPath = Join-Path $projectRoot 'server-deploy\frontend\dist'
-$localBackendPath = Join-Path $projectRoot 'server-deploy\backend'
+$localDistPath = Join-Path $projectRoot 'frontend\dist'
+$localBackendPath = Join-Path $projectRoot 'backend'
 $localDeployEnvPath = Join-Path $projectRoot 'backend\.env.deploy'
 
 Write-Host 'Creating remote staging folders...'
