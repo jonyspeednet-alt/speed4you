@@ -35,6 +35,18 @@ jobs:
         env:
           VITE_APP_BASE: /portal/
 
+      - name: Record frontend bundle fingerprint
+        id: frontend_bundle
+        run: |
+          set -e
+          bundle=$(grep -oE 'index-[a-z0-9]+\.js' frontend/dist/index.html | head -n 1)
+          if [ -z "$bundle" ]; then
+            echo "Could not find main frontend bundle in frontend/dist/index.html" >&2
+            exit 1
+          fi
+          echo "bundle=$bundle" >> "$GITHUB_OUTPUT"
+          echo "Built frontend main bundle: $bundle"
+
       - name: Install backend dependencies (lockfile only)
         run: npm ci
         working-directory: backend
@@ -81,6 +93,7 @@ jobs:
             DEST=/var/www/html/portal
             if [ -d "$SRC" ]; then
               printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p "$DEST"
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' find "$DEST" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
               printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -r "$SRC/." "$DEST/"
               printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$DEST"
               echo "Frontend copied to $DEST"
@@ -187,6 +200,22 @@ jobs:
 
             echo "Health check failed" >&2
             exit 1
+
+      - name: Verify public frontend bundle
+        env:
+          EXPECTED_BUNDLE: ${{ steps.frontend_bundle.outputs.bundle }}
+        run: |
+          set -e
+          echo "Expected public bundle: $EXPECTED_BUNDLE"
+          html=$(curl -fsSL -H 'Cache-Control: no-cache' -H 'Pragma: no-cache' 'https://data.speed4you.net/portal/?deploy_verify=${{ github.run_id }}')
+          public_bundle=$(printf '%s' "$html" | grep -oE 'index-[a-z0-9]+\.js' | head -n 1 || true)
+          echo "Public bundle: $public_bundle"
+          if [ "$public_bundle" != "$EXPECTED_BUNDLE" ]; then
+            echo "Public portal is not serving the freshly built frontend bundle." >&2
+            echo "Expected $EXPECTED_BUNDLE but got ${public_bundle:-none}." >&2
+            echo "Check nginx /portal root/alias, CDN/proxy cache, and deploy destination /var/www/html/portal." >&2
+            exit 1
+          fi
 
       - name: Deployment summary
         run: |
