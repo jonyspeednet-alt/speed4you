@@ -23,25 +23,43 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: |
-            frontend/package-lock.json
-            backend/package-lock.json
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install frontend dependencies
         run: npm ci
         working-directory: frontend
 
-      - name: Install backend dependencies
-        run: npm ci
-        working-directory: backend
-
       - name: Build frontend
         run: npm run build
         working-directory: frontend
+        env:
+          VITE_APP_BASE: /portal/
 
-      # Skipping prepare-deploy.cjs as we now upload directly from root folders
-      # - name: Prepare deploy package
-      #   run: node scripts/prepare-deploy.cjs
+      - name: Backend npm install (for lockfile refresh)
+        run: npm ci
+        working-directory: backend
+
+      - name: Strip node_modules from backend upload
+        run: rm -rf node_modules
+        working-directory: backend
+
+      - name: Backup data files on server
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ ***REMOVED***s.DEPLOY_HOST }}
+          username: ${{ ***REMOVED***s.DEPLOY_USER }}
+          key: ${{ ***REMOVED***s.DEPLOY_SSH_KEY }}
+          port: ${{ ***REMOVED***s.DEPLOY_PORT }}
+          script: |
+            BACKEND=/home/speed4you/portal-app/backend
+            BACKUP_DIR=/home/speed4you/portal-deploy-backups/current
+            mkdir -p "$BACKUP_DIR"
+            for f in catalog.json scanner-log.json scanner-roots.json scanner-runtime.json scanner-state.json; do
+              if [ -f "$BACKEND/src/data/$f" ]; then
+                cp -a "$BACKEND/src/data/$f" "$BACKUP_DIR/$f"
+              fi
+            done
+            echo "Backup complete"
 
       - name: Upload frontend bundle
         uses: appleboy/scp-action@v0.1.7
@@ -63,44 +81,83 @@ jobs:
           key: ${{ ***REMOVED***s.DEPLOY_SSH_KEY }}
           port: ${{ ***REMOVED***s.DEPLOY_PORT }}
           source: "backend/*"
-          target: "/home/${{ ***REMOVED***s.DEPLOY_USER }}/isp-portal-backend"
+          target: "/home/speed4you/portal-app/backend"
           strip_components: 1
           overwrite: true
 
-      - name: Restart backend service
+      - name: Restore data, install deps, .env, restart, health check
         uses: appleboy/ssh-action@v1.2.0
         env:
           TMDB_API_KEY: ${{ ***REMOVED***s.TMDB_API_KEY }}
           JWT_SECRET: ${{ ***REMOVED***s.JWT_SECRET }}
+          SUDO_PASSWORD: ${{ ***REMOVED***s.SUDO_PASSWORD }}
+          CORS_ALLOWED_ORIGINS: ${{ ***REMOVED***s.CORS_ALLOWED_ORIGINS }}
+          PLAYER_CACHE_ROOT: ${{ ***REMOVED***s.PLAYER_CACHE_ROOT }}
+          DB_HOST: ${{ ***REMOVED***s.DB_HOST }}
+          DB_PORT: ${{ ***REMOVED***s.DB_PORT }}
+          DB_NAME: ${{ ***REMOVED***s.DB_NAME }}
+          DB_USER: ${{ ***REMOVED***s.DB_USER }}
+          DB_PASSWORD: ${{ ***REMOVED***s.DB_PASSWORD }}
         with:
           host: ${{ ***REMOVED***s.DEPLOY_HOST }}
           username: ${{ ***REMOVED***s.DEPLOY_USER }}
           key: ${{ ***REMOVED***s.DEPLOY_SSH_KEY }}
           port: ${{ ***REMOVED***s.DEPLOY_PORT }}
-          envs: TMDB_API_KEY,JWT_SECRET
+          envs: TMDB_API_KEY,JWT_SECRET,SUDO_PASSWORD,CORS_ALLOWED_ORIGINS,PLAYER_CACHE_ROOT,DB_HOST,DB_PORT,DB_NAME,DB_USER,DB_PASSWORD
           script: |
             set -e
-            cd /home/${{ ***REMOVED***s.DEPLOY_USER }}/isp-portal-backend
-            npm ci --omit=dev
-             cat > .env <<EOF
-             PORT=4100
-             JWT_SECRET=${JWT_SECRET}
-             TMDB_API_KEY=${TMDB_API_KEY}
-             EOF
+            BACKEND=/home/speed4you/portal-app/backend
+            BACKUP_DIR=/home/speed4you/portal-deploy-backups/current
+            SUDO_PASSWORD="${SUDO_PASSWORD}"
 
-            if command -v pm2 >/dev/null 2>&1; then
-              # Use PM2 ecosystem config if available, otherwise start directly
-              if [ -f ecosystem.config.js ]; then
-                pm2 describe isp-portal-backend >/dev/null 2>&1 && pm2 restart ecosystem.config.js || pm2 start ecosystem.config.js
-              else
-                pm2 describe isp-portal-backend >/dev/null 2>&1 && pm2 restart isp-portal-backend || pm2 start src/index.js --name isp-portal-backend
+            # Restore production data files overwritten by the upload
+            for f in catalog.json scanner-log.json scanner-roots.json scanner-runtime.json scanner-state.json; do
+              if [ -f "$BACKUP_DIR/$f" ]; then
+                cp -a "$BACKUP_DIR/$f" "$BACKEND/src/data/$f" 2>/dev/null || true
               fi
-              pm2 save
-            elif command -v systemctl >/dev/null 2>&1; then
-              sudo systemctl restart isp-portal-backend || true
-            else
-              echo "No known process manager found. Backend files updated; restart manually if needed."
+            done
+
+            cd "$BACKEND"
+            npm ci --omit=dev
+
+            cat > .env <<EOF
+            PORT=4100
+            JWT_SECRET=${JWT_SECRET}
+            TMDB_API_KEY=${TMDB_API_KEY}
+            CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+            PLAYER_CACHE_ROOT=${PLAYER_CACHE_ROOT}
+            DB_HOST=${DB_HOST}
+            DB_PORT=${DB_PORT}
+            DB_NAME=${DB_NAME}
+            DB_USER=${DB_USER}
+            DB_PASSWORD=${DB_PASSWORD}
+            FFMPEG_PATH=/usr/bin/ffmpeg
+            FFPROBE_PATH=/usr/bin/ffprobe
+            EOF
+
+            echo "Stopping old backend..."
+            if [ -f /home/speed4you/portal-app/backend.pid ]; then
+              OLD_PID=$(cat /home/speed4you/portal-app/backend.pid 2>/dev/null || true)
+              if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+                kill "$OLD_PID" || true
+                sleep 2
+              fi
             fi
+
+            echo "Restarting service..."
+            echo "$SUDO_PASSWORD" | sudo -S -p '' systemctl restart isp-portal-backend.service
+
+            echo "Health check..."
+            for i in $(seq 1 30); do
+              if curl -fsS http://127.0.0.1:4100/health >/dev/null 2>&1; then
+                echo "Health check passed"
+                exit 0
+              fi
+              sleep 2
+            done
+
+            echo "Health check failed" >&2
+            exit 1
 
       - name: Deployment summary
         run: |
