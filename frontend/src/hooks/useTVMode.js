@@ -1,9 +1,33 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 const TV_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'];
 
+/**
+ * useTVMode - Detects and manages TV mode with spatial navigation
+ * Automatically enables with arrow key navigation or large screen (1600px+)
+ * 
+ * @returns {boolean} - Is TV mode active
+ */
 export function useTVMode() {
   const [isTVMode, setIsTVMode] = useState(false);
+
+  // Auto-enable TV mode for large screens
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1600 && !isTVMode) {
+        setIsTVMode(true);
+        document.documentElement.classList.add('tv-mode');
+      } else if (window.innerWidth < 1600 && isTVMode) {
+        setIsTVMode(false);
+        document.documentElement.classList.remove('tv-mode');
+      }
+    };
+
+    window.addEventListener('resize', handleResize, { passive: true });
+    handleResize(); // Check on mount
+
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isTVMode]);
 
   useEffect(() => {
     const getFocusableElements = () => {
@@ -83,11 +107,11 @@ export function useTVMode() {
     };
 
     // Detect TV remote key presses
-    const handleKeyDown = (e) => {
+    const handleKeyDown = useCallback((e) => {
       if (TV_KEYS.includes(e.key)) {
         if (!isTVMode) {
           setIsTVMode(true);
-          document.body.classList.add('tv-mode');
+          document.documentElement.classList.add('tv-mode');
         }
         
         // Auto-focus first element if stuck on body
@@ -110,23 +134,24 @@ export function useTVMode() {
           }
         }
       }
-    };
+    }, [isTVMode]);
 
-    // Detect mouse usage to revert to PC mode
-    const handleMouseMove = () => {
-      if (isTVMode) {
+    // Detect mouse usage to revert to PC mode (only if user explicitly moved mouse)
+    const handleMouseMove = useCallback((e) => {
+      // Only disable TV mode if mouse actually moved (not just touched)
+      if (isTVMode && e.clientX !== 0 && e.clientY !== 0) {
         setIsTVMode(false);
-        document.body.classList.remove('tv-mode');
+        document.documentElement.classList.remove('tv-mode');
       }
-    };
+    }, [isTVMode]);
     
     // Also consider touch as non-TV mode
-    const handleTouchStart = () => {
+    const handleTouchStart = useCallback(() => {
       if (isTVMode) {
         setIsTVMode(false);
-        document.body.classList.remove('tv-mode');
+        document.documentElement.classList.remove('tv-mode');
       }
-    };
+    }, [isTVMode]);
 
     window.addEventListener('keydown', handleKeyDown, true);
     window.addEventListener('mousemove', handleMouseMove, { passive: true });
@@ -136,8 +161,16 @@ export function useTVMode() {
       window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('touchstart', handleTouchStart);
-      document.body.classList.remove('tv-mode');
     };
+  }, [isTVMode]);
+
+  // Update HTML class on mount and when TV mode changes
+  useEffect(() => {
+    if (isTVMode) {
+      document.documentElement.classList.add('tv-mode');
+    } else {
+      document.documentElement.classList.remove('tv-mode');
+    }
   }, [isTVMode]);
 
   return isTVMode;
