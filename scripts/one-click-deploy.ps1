@@ -407,6 +407,39 @@ function Assert-FrontendAssetBase {
   }
 }
 
+function Get-MainFrontendBundleName {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Html
+  )
+
+  $match = [Regex]::Match($Html, 'src="[^"]*/assets/(index-[a-z0-9]+\.js)"')
+  if (-not $match.Success) {
+    throw 'Could not find frontend main bundle in index.html.'
+  }
+
+  return $match.Groups[1].Value
+}
+
+function Assert-PublicBundleMatchesLocalBuild {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$PublicHtml,
+    [Parameter(Mandatory = $true)]
+    [string]$ExpectedMainBundle
+  )
+
+  if ($PublicHtml -notmatch [Regex]::Escape($ExpectedMainBundle)) {
+    $publicBundle = 'unknown'
+    $match = [Regex]::Match($PublicHtml, 'src="[^"]*/assets/(index-[a-z0-9]+\.js)"')
+    if ($match.Success) {
+      $publicBundle = $match.Groups[1].Value
+    }
+
+    throw "Public portal is still serving an old frontend bundle. Expected $ExpectedMainBundle but got $publicBundle. Check remote frontend path, nginx root/alias, and cache/CDN."
+  }
+}
+
 $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $projectRoot
 Initialize-DeploySettings -ProjectRoot $projectRoot
@@ -593,7 +626,10 @@ if ($LASTEXITCODE -ne 0) {
 Pop-Location
 
 $localFrontendIndexPath = Join-Path $projectRoot 'frontend\dist\index.html'
-Assert-FrontendAssetBase -Html (Get-Content -LiteralPath $localFrontendIndexPath -Raw) -ExpectedBase $frontendBasePath
+$localFrontendHtml = Get-Content -LiteralPath $localFrontendIndexPath -Raw
+$localMainBundle = Get-MainFrontendBundleName -Html $localFrontendHtml
+Write-Host "Local frontend main bundle: $localMainBundle"
+Assert-FrontendAssetBase -Html $localFrontendHtml -ExpectedBase $frontendBasePath
 if ([string]::IsNullOrWhiteSpace($previousViteAppBase)) {
   [Environment]::SetEnvironmentVariable('VITE_APP_BASE', $null, 'Process')
 } else {
@@ -894,6 +930,7 @@ try {
   $portalResponse = Invoke-WebRequestWithRetry -Uri $deployConfig.PublicPortalUrl
   $healthResponse = Invoke-WebRequestWithRetry -Uri $deployConfig.PublicHealthUrl
   Assert-FrontendAssetBase -Html $portalResponse.Content -ExpectedBase (Get-FrontendBasePath -PortalUrl $deployConfig.PublicPortalUrl)
+  Assert-PublicBundleMatchesLocalBuild -PublicHtml $portalResponse.Content -ExpectedMainBundle $localMainBundle
   Write-Host "Portal status: $($portalResponse.StatusCode)"
   Write-Host "Health status: $($healthResponse.StatusCode)"
 } catch {
