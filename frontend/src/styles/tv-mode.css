@@ -57,16 +57,19 @@ html.tv-mode,
     cursor: pointer;
 }
 
-.tv-mode button,
-.tv-mode a,
 .tv-mode input,
 .tv-mode select,
-.tv-mode textarea,
-.tv-mode [role="button"] {
+.tv-mode textarea {
+    min-height: 56px;
+    font-size: 1.1rem;
+}
+
+.tv-mode .button,
+.tv-mode .top-nav-link,
+.tv-mode .top-nav-search,
+.tv-mode .carousel-button {
     min-height: 56px;
     min-width: 56px;
-    font-size: 1.1rem;
-    padding: 18px 36px;
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -137,7 +140,6 @@ html.tv-mode,
     line-height: 1.7;
 }
 
-.tv-mode button,
 .tv-mode .button {
     font-size: 1.1rem;
     padding: 18px 36px;
@@ -152,10 +154,14 @@ html.tv-mode,
     padding: 0 4rem;
 }
 
-.tv-mode section,
-.tv-mode article {
-    padding: 3rem 2rem;
-    margin: 2rem 0;
+.tv-mode .container {
+    max-width: min(1720px, calc(100vw - 8rem));
+}
+
+.tv-mode .content-rail-section,
+.tv-mode .content-rail-card {
+    padding-left: 0;
+    padding-right: 0;
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -236,7 +242,6 @@ html.tv-mode,
 .tv-mode textarea,
 .tv-mode select {
     font-size: 1.1rem;
-    padding: 14px 16px;
     min-height: 56px;
     border-radius: 12px;
     border: 2px solid rgba(255, 255, 255, 0.12);
