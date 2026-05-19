@@ -262,8 +262,24 @@ function HomePage() {
           <div style={styles.loadingNote}>Building your portal...</div>
         ) : null}
 
-        {content.continueWatching?.length > 0 ? (
-          <ContinueWatchingRail items={content.continueWatching} isLoading={loading && !content.continueWatching} />
+        {content.movies?.length >= 3 ? (
+          <ContentRail onQuickView={setQuickViewItem} title="Movies" subtitle="Lean-back movie night" items={content.movies} viewAllLink="/movies" />
+        ) : null}
+
+        {content.series?.length >= 1 ? (
+          <ContentRail onQuickView={setQuickViewItem} title="Series" subtitle="Binge-ready stories" items={content.series} type="series" viewAllLink="/series" />
+        ) : null}
+
+        {content.latest?.length >= 1 ? (
+          <ContentRail onQuickView={setQuickViewItem} title="Latest Releases" subtitle="Just added" items={content.latest} viewAllLink="/browse?sort=latest" priorityCount={4} />
+        ) : null}
+
+        {content.popular?.length >= 3 ? (
+          <ContentRail onQuickView={setQuickViewItem} title="Portal Favorites" subtitle="Strong local demand" items={content.popular} viewAllLink="/browse?sort=popular" priorityCount={3} />
+        ) : null}
+
+        {content.bengali?.length >= 2 ? (
+          <ContentRail onQuickView={setQuickViewItem} title="Bengali Picks" subtitle="Local language highlights" items={content.bengali} viewAllLink="/browse?language=Bengali" />
         ) : null}
 
         {content.recommendations?.length > 0 ? (
@@ -290,24 +306,8 @@ function HomePage() {
           <ContentRail onQuickView={setQuickViewItem} title="Trending Right Now" subtitle="Most watched this week" items={content.trending} viewAllLink="/browse?sort=trending" priorityCount={4} />
         ) : null}
 
-        {content.latest?.length >= 1 ? (
-          <ContentRail onQuickView={setQuickViewItem} title="Latest Releases" subtitle="Just added" items={content.latest} viewAllLink="/browse?sort=latest" priorityCount={4} />
-        ) : null}
-
-        {content.popular?.length >= 3 ? (
-          <ContentRail onQuickView={setQuickViewItem} title="Portal Favorites" subtitle="Strong local demand" items={content.popular} viewAllLink="/browse?sort=popular" priorityCount={3} />
-        ) : null}
-
-        {content.movies?.length >= 3 ? (
-          <ContentRail onQuickView={setQuickViewItem} title="Movies" subtitle="Lean-back movie night" items={content.movies} viewAllLink="/movies" />
-        ) : null}
-
-        {content.series?.length >= 1 ? (
-          <ContentRail onQuickView={setQuickViewItem} title="Series" subtitle="Binge-ready stories" items={content.series} type="series" viewAllLink="/series" />
-        ) : null}
-
-        {content.bengali?.length >= 2 ? (
-          <ContentRail onQuickView={setQuickViewItem} title="Bengali Picks" subtitle="Local language highlights" items={content.bengali} viewAllLink="/browse?language=Bengali" />
+        {content.continueWatching?.length > 0 ? (
+          <ContinueWatchingRail items={content.continueWatching} isLoading={loading && !content.continueWatching} />
         ) : null}
 
       </div>
