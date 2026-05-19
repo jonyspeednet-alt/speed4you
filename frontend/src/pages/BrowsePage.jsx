@@ -85,9 +85,10 @@ function BrowseCard({ item, index, isMobile, onQuickView }) {
 
         <div style={styles.cardInfo}>
           <div style={styles.cardMeta}>
-            <span>{item.language}</span>
+            <span>{genre}</span>
             <span style={styles.metaDot}>·</span>
             <span>{item.year}</span>
+            {item.language && item.language !== 'Unknown' ? <><span style={styles.metaDot}>·</span><span>{item.language}</span></> : null}
             {item.runtime ? <><span style={styles.metaDot}>·</span><span>{item.runtime}m</span></> : null}
             {item.metadataStatus === 'needs_review' ? <span style={styles.reviewBadge}>Review</span> : null}
           </div>
