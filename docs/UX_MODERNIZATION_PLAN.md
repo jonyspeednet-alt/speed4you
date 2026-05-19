@@ -1,8 +1,8 @@
 # UX Modernization Plan
 
-Last updated: `2026-04-21`
+Last updated: `2026-05-19`
 Project: `isp-entertainment-portal`
-Status: `Foundation refresh in progress`
+Status: `Phase 1 substantially complete; Phase 2 in progress`
 
 ## Purpose
 
@@ -31,36 +31,36 @@ The `2026-04-21` audit showed the product has a good visual base, but several hi
 ## Execution Strategy
 
 ### Phase 1: Foundation Hardening
-Status: `In progress`
-Target window: `Week 1-2`
+Status: `Substantially complete`
+Target window: `Week 1-2` (completed)
 
 Scope:
 
-- fix API consistency for content endpoints
-- tighten CORS with environment-based allowlist control
-- improve cache headers for static assets
-- add compression-friendly delivery on the Node side
-- reduce first-load JS weight through frontend chunking
+- ✅ fix API consistency for content endpoints (mounted at /api, /portal-api/api, /)
+- ✅ tighten CORS with environment-based allowlist control (CORS_ALLOWED_ORIGINS required in production)
+- ✅ improve cache headers for static assets (setStaticCacheHeaders middleware)
+- ✅ add compression-friendly delivery on the Node side (compressionMiddleware)
+- ✅ reduce first-load JS weight through frontend chunking (Vite manual chunks + lazy loading)
 
 Success criteria:
 
-- `/portal-api/api/content` returns a stable JSON payload
-- production origins are explicitly allowlisted
-- hashed frontend assets ship with long-lived cache headers
-- HTML stays revalidatable while assets become cacheable
-- initial JS entry weight drops through route-level splitting
+- ✅ `/portal-api/api/content` returns a stable JSON payload
+- ✅ production origins are explicitly allowlisted
+- ✅ hashed frontend assets ship with long-lived cache headers
+- ✅ HTML stays revalidatable while assets become cacheable
+- ✅ initial JS entry weight drops through route-level splitting
 
 ### Phase 2: Home Personalization + Search Upgrade
-Status: `Planned`
+Status: `In progress`
 Target window: `Week 3-4`
 
 Scope:
 
-- continue watching rail
-- "because you watched" and local trending sections
-- smarter search suggestions
-- typo-tolerant and mixed Bangla/English query support
-- stronger search empty/fallback states
+- ✅ continue watching rail (ContinueWatchingRail.jsx)
+- ✅ "because you watched" and local trending sections (/api/content/local-trending, /api/content/recommendations)
+- ✅ smarter search suggestions (/api/search/suggestions)
+- ❌ typo-tolerant and mixed Bangla/English query support
+- ✅ stronger search empty/fallback states (NoResultsState, EmptyState components)
 
 ### Phase 3: Playback Premium + TV Resilience
 Status: `Planned`

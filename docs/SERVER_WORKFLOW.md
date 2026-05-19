@@ -2,9 +2,9 @@
 
 ## Access
 
-- Host: `***REMOVED***`
+- Host: `<YOUR_SERVER_IP>`
 - SSH port: `2973`
-- Username: `speed4you`
+- Username: `<YOUR_SSH_USERNAME>`
 - Local helper: [connect-server.bat](c:\Users\Speed Net IT\Documents\codex local ai test\isp-entertainment-portal\connect-server.bat)
 - Local upload helper: [upload-backend.bat](c:\Users\Speed Net IT\Documents\codex local ai test\isp-entertainment-portal\upload-backend.bat)
 
@@ -17,7 +17,7 @@
    - Remote target: `/var/www/html/portal/`
 3. Upload backend files:
    - Local source: `server-deploy/backend/*`
-   - Remote target: `/home/speed4you/isp-portal-backend/`
+   - Remote target: `/home/<YOUR_SSH_USERNAME>/isp-portal-backend/`
 4. Restart backend on server after upload if code changed.
 5. Verify:
    - Public site: `https://data.speed4you.net/portal`
@@ -29,9 +29,9 @@
 - Push to `main` can build and deploy automatically after GitHub Secrets are configured.
 - Backend deploy package is prepared by: [scripts/prepare-deploy.cjs](c:\Users\Speed Net IT\Documents\codex local ai test\isp-entertainment-portal\scripts\prepare-deploy.cjs)
 - Suggested repository ***REMOVED***s:
-  - `DEPLOY_HOST=***REMOVED***`
+  - `DEPLOY_HOST=<YOUR_SERVER_IP>`
   - `DEPLOY_PORT=2973`
-  - `DEPLOY_USER=speed4you`
+  - `DEPLOY_USER=<YOUR_SSH_USERNAME>`
   - `DEPLOY_SSH_KEY=<private key for server access>`
   - `JWT_SECRET=<backend jwt ***REMOVED***>`
   - `TMDB_API_KEY=<tmdb api key>`
