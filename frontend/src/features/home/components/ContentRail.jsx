@@ -155,8 +155,8 @@ function ContentCard({ item, type, index, eager, compact, tablet, tv, onQuickVie
           <div className="content-rail-meta" style={styles.cardMeta}>
             <span>{genre}</span>
             <span style={styles.metaDot}>·</span>
+            {item.year ? <><span>{item.year}</span><span style={styles.metaDot}>·</span></> : null}
             <span>{item.language || 'Mixed'}</span>
-            {item.year ? <><span style={styles.metaDot}>·</span><span>{item.year}</span></> : null}
           </div>
         </div>
       </button>

@@ -139,7 +139,7 @@ jobs:
    ↓
 4. Runner executes the workflow locally
    ↓
-5. Runner connects to your local server (203.0.113.2:2973)
+5. Runner connects to your local server (<YOUR_SERVER_IP>:2973)
    ↓
 6. Deployment happens!
    ↓

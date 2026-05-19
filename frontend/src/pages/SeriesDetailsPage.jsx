@@ -493,20 +493,20 @@ const s = {
     background: 'rgba(0, 255, 255, 0.1)',
     border: '1px solid rgba(0, 255, 255, 0.3)',
     color: 'var(--accent-cyan)',
-    fontSize: '0.75rem',
+    fontSize: '0.78rem',
     fontWeight: '900',
     letterSpacing: '0.05em',
   },
 
   title: {
-    fontSize: 'clamp(2.8rem, 6vw, 5.2rem)',
+    fontSize: 'clamp(2.4rem, 5vw, 4.2rem)',
     fontWeight: '900',
     color: '#ffffff',
-    lineHeight: '0.95',
+    lineHeight: '1.05',
     letterSpacing: '-0.03em',
     textShadow: '0 10px 30px rgba(0,0,0,0.5)',
   },
-  titleMobile: { fontSize: 'clamp(2.2rem, 8vw, 3.4rem)' },
+  titleMobile: { fontSize: 'clamp(2rem, 8vw, 3rem)' },
 
   metaRow: { display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' },
   ratingBox: {
