@@ -137,7 +137,8 @@ function HeroCarousel({ content, items }) {
     const title = contentItem.title || 'Featured spotlight';
     const description = contentItem.description || 'Freshly highlighted content from your portal.';
     const eyebrow = isPlaceholder ? 'CURATED DROP' : isSeries ? 'SERIES SPOTLIGHT' : 'MOVIE PREMIERE';
-    const heroChips = [contentItem.genre, contentItem.language, contentItem.year].filter(Boolean).slice(0, 3);
+    const parsedGenres = typeof contentItem.genre === 'string' ? contentItem.genre.split(',').map(g => g.trim()).filter(Boolean) : [];
+    const heroChips = [...parsedGenres, contentItem.language, contentItem.year].filter(Boolean).slice(0, 4);
     const insightItems = [
         { label: 'Format', value: isPlaceholder ? 'Spotlight' : isSeries ? 'Series' : 'Movie' },
         { label: 'Rating', value: contentItem.rating || 'N/A', isRating: true },
@@ -159,6 +160,50 @@ function HeroCarousel({ content, items }) {
             onTouchEnd={handleTouchEnd}
             aria-label="Featured content carousel"
         >
+            <style>{`
+                @keyframes auroraPulse {
+                    0% { transform: scale(1) translate(0, 0); opacity: 0.15; }
+                    33% { transform: scale(1.1) translate(2%, 2%); opacity: 0.25; }
+                    66% { transform: scale(0.95) translate(-2%, 1%); opacity: 0.1; }
+                    100% { transform: scale(1) translate(0, 0); opacity: 0.15; }
+                }
+                .hero-orb {
+                    animation: auroraPulse 15s ease-in-out infinite;
+                }
+                .hero-orb-2 {
+                    animation-delay: -7.5s;
+                }
+                .hero-btn-primary {
+                    transition: transform 250ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 250ms ease !important;
+                }
+                .hero-btn-primary:hover {
+                    transform: translateY(-4px) scale(1.02) !important;
+                    box-shadow: 0 12px 40px rgba(0, 255, 255, 0.45) !important;
+                }
+                .hero-btn-secondary {
+                    transition: transform 250ms cubic-bezier(0.34, 1.56, 0.64, 1), background 250ms ease, border-color 250ms ease !important;
+                }
+                .hero-btn-secondary:hover {
+                    transform: translateY(-4px) scale(1.02) !important;
+                    background: rgba(255, 255, 255, 0.15) !important;
+                    border-color: rgba(255, 255, 255, 0.3) !important;
+                }
+                .hero-thumbnail-item {
+                    transition: transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 300ms ease, border-color 300ms ease !important;
+                }
+                .hero-thumbnail-item:hover:not(.thumbnail-active) {
+                    transform: translateY(-4px) scale(1.03) !important;
+                    border-color: rgba(255, 255, 255, 0.3) !important;
+                    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4) !important;
+                }
+                .hero-chip-hover {
+                    transition: transform 200ms ease, background 200ms ease !important;
+                }
+                .hero-chip-hover:hover {
+                    transform: translateY(-2px) !important;
+                    background: rgba(255,255,255,0.15) !important;
+                }
+            `}</style>
             <div className="hero-carousel__background" style={styles.background}>
                 <div style={styles.bgFallback} />
                 {heroImage ? (
@@ -173,8 +218,8 @@ function HeroCarousel({ content, items }) {
                         sizes="100vw"
                     />
                 ) : null}
-                <div style={{ ...styles.auroraOrb, ...styles.orb1 }} />
-                <div style={{ ...styles.auroraOrb, ...styles.orb2 }} />
+                <div className="hero-orb" style={{ ...styles.auroraOrb, ...styles.orb1 }} />
+                <div className="hero-orb hero-orb-2" style={{ ...styles.auroraOrb, ...styles.orb2 }} />
                 <div style={styles.backdropWash} />
                 <div style={styles.overlay} />
                 <div style={styles.bottomFade} />
@@ -202,7 +247,7 @@ function HeroCarousel({ content, items }) {
 
                     <div className="hero-carousel__chip-row" style={styles.chipRow}>
                         {heroChips.map((chip) => (
-                            <span key={chip} className="hero-carousel__chip" style={styles.heroChip}>{chip}</span>
+                            <span key={chip} className="hero-carousel__chip hero-chip-hover" style={styles.heroChip}>{chip}</span>
                         ))}
                     </div>
 
@@ -220,14 +265,14 @@ function HeroCarousel({ content, items }) {
                     </div>
 
                     <div className="hero-carousel__actions" style={{ ...styles.actions, ...(isMobile ? styles.actionsMobile : {}) }}>
-                        <Link className="hero-carousel__button hero-carousel__button--primary" to={isPlaceholder ? '/browse?sort=latest' : `/watch/${contentItem.id}`} style={{ ...styles.playBtn, ...(isMobile ? styles.playBtnMobile : {}) }}>
+                        <Link className="hero-carousel__button hero-carousel__button--primary hero-btn-primary" to={isPlaceholder ? '/browse?sort=latest' : `/watch/${contentItem.id}`} style={{ ...styles.playBtn, ...(isMobile ? styles.playBtnMobile : {}) }}>
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style={styles.buttonIcon} aria-hidden="true">
                                 {isPlaceholder ? <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z" /> : <path d="M8 5v14l11-7z" />}
                             </svg>
                             <span>{isPlaceholder ? 'Browse Latest' : isSeries ? 'Start Watching' : 'Play Now'}</span>
                         </Link>
 
-                        <Link className="hero-carousel__button hero-carousel__button--secondary" to={isPlaceholder ? '/search' : isSeries ? `/series/${contentItem.id}` : `/movies/${contentItem.id}`} style={{ ...styles.infoBtn, ...(isMobile ? styles.infoBtnMobile : {}) }}>
+                        <Link className="hero-carousel__button hero-carousel__button--secondary hero-btn-secondary" to={isPlaceholder ? '/search' : isSeries ? `/series/${contentItem.id}` : `/movies/${contentItem.id}`} style={{ ...styles.infoBtn, ...(isMobile ? styles.infoBtnMobile : {}) }}>
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style={styles.buttonIcon} aria-hidden="true">
                                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
                             </svg>
@@ -267,9 +312,10 @@ function HeroCarousel({ content, items }) {
 
                             <div style={styles.thumbnailRow}>
                                 {previewItems.map(({ item, index }) => (
-                                    <button
+                                <button
                                         key={item.id || index}
                                         onClick={() => moveToSlide(index)}
+                                        className={`hero-thumbnail-item ${index === activeIndex ? 'thumbnail-active' : ''}`}
                                         style={{
                                             ...styles.thumbnailItem,
                                             ...(index === activeIndex ? styles.thumbnailItemActive : {}),
@@ -341,7 +387,7 @@ const styles = {
         zIndex: 3,
         width: '100%',
         maxWidth: '100vw',
-        height: 'clamp(640px, 85vh, 880px)',
+        minHeight: 'clamp(640px, 85vh, 880px)',
         overflow: 'hidden',
         overflowX: 'hidden',
         background: '#050c16',
@@ -350,10 +396,10 @@ const styles = {
         marginBottom: '40px',
     },
     heroTablet: {
-        height: 'clamp(540px, 70vh, 680px)',
+        minHeight: 'clamp(540px, 70vh, 680px)',
     },
     heroMobile: {
-        height: 'clamp(480px, 65svh, 600px)',
+        minHeight: 'clamp(480px, 65svh, 600px)',
         borderBottomLeftRadius: '32px',
         borderBottomRightRadius: '32px',
         marginBottom: '24px',
@@ -429,23 +475,23 @@ const styles = {
         width: 'min(1440px, calc(100vw - 48px))',
         maxWidth: '100%',
         margin: '0 auto',
-        height: 'calc(clamp(540px, 74vh, 760px) - var(--nav-occupied-desktop))',
+        minHeight: 'calc(clamp(540px, 74vh, 760px) - var(--nav-occupied-desktop))',
         padding: 'clamp(24px, 4vw, 52px) 0 76px',
         display: 'grid',
         gridTemplateColumns: 'minmax(0, 1fr) minmax(300px, 340px)',
         gap: '24px',
-        alignItems: 'stretch',
+        alignItems: 'center', /* Better vertical alignment */
     },
     layoutTablet: {
         width: 'min(100vw - 32px, 1200px)',
-        height: 'calc(clamp(500px, 66vh, 640px) - var(--nav-occupied-desktop))',
+        minHeight: 'calc(clamp(500px, 66vh, 640px) - var(--nav-occupied-desktop))',
         gridTemplateColumns: 'minmax(0, 1fr) 280px',
         gap: '18px',
         padding: '24px 0 72px',
     },
     layoutTV: {
         width: 'min(1720px, calc(100vw - 120px))',
-        height: 'calc(80vh - var(--nav-occupied-desktop))',
+        minHeight: 'calc(80vh - var(--nav-occupied-desktop))',
         gridTemplateColumns: '1fr', /* Single column to focus on centered content */
         textAlign: 'center',
         justifyItems: 'center',
@@ -453,7 +499,7 @@ const styles = {
     copyPanel: {
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'space-between',
+        justifyContent: 'center', /* Changed from space-between to avoid pushing buttons out */
         gap: '18px',
         height: '100%',
         width: '100%',
@@ -496,10 +542,10 @@ const styles = {
         fontSize: '0.95rem',
     },
     title: {
-        maxWidth: '16ch',
+        maxWidth: '18ch',
         marginBottom: '16px',
         color: '#ffffff',
-        fontSize: 'clamp(2.4rem, 5vw, 4.2rem)',
+        fontSize: 'clamp(2rem, 4.5vw, 4rem)', /* Slightly adjusted for better scaling on long titles */
         fontWeight: '900',
         lineHeight: '1.05',
         textShadow: '0 10px 40px rgba(0,0,0,0.6)',
