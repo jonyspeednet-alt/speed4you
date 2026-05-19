@@ -52,9 +52,14 @@ export default function QuickViewModal({ isOpen, onClose, item }) {
           <div style={styles.titleContent}>
             <h2 style={styles.title}>{item.title}</h2>
             <div style={styles.metaRow}>
-              <span style={styles.rating}>★ {item.rating || 'N/A'}</span>
-              <span style={styles.year}>{item.year || 'Unknown'}</span>
-              <span style={styles.badge}>{isSeries ? 'Series' : 'Movie'}</span>
+              <div style={styles.ratingBox}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--accent-cyan)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
+                <span style={styles.ratingVal}>{item.rating || 'N/A'}</span>
+              </div>
+              <span style={styles.metaChip}>{item.year || 'Unknown'}</span>
+              <span style={styles.typeBadge}>{isSeries ? 'Series' : 'Movie'}</span>
+              {item.runtime && <span style={styles.metaChip}>{item.runtime} min</span>}
+              {(item.language || item.originalLanguage) && <span style={styles.metaChip}>{item.language || item.originalLanguage}</span>}
             </div>
           </div>
         </div>
@@ -83,13 +88,34 @@ export default function QuickViewModal({ isOpen, onClose, item }) {
           </p>
 
           <div style={styles.detailsGrid}>
-            <div style={styles.detailItem}>
-              <span style={styles.detailLabel}>Genre:</span>
-              <span style={styles.detailValue}>{item.genre || 'Uncategorized'}</span>
-            </div>
-            <div style={styles.detailItem}>
-              <span style={styles.detailLabel}>Language:</span>
-              <span style={styles.detailValue}>{item.language || 'Unknown'}</span>
+            {Array.isArray(item.genres) && item.genres.length > 0 ? (
+              <div style={styles.genreRow}>
+                {item.genres.map((g) => (
+                  <span key={g} style={styles.genreTag}>{g}</span>
+                ))}
+              </div>
+            ) : item.genre ? (
+              <div style={styles.genreRow}>
+                {String(item.genre).split(',').map((g) => g.trim()).filter(Boolean).map((g) => (
+                  <span key={g} style={styles.genreTag}>{g}</span>
+                ))}
+              </div>
+            ) : null}
+            <div style={styles.infoRow}>
+              <div style={styles.infoItem}>
+                <span style={styles.infoLabel}>Language</span>
+                <span style={styles.infoValue}>{item.language || item.originalLanguage || 'Unknown'}</span>
+              </div>
+              {item.runtime && (
+                <div style={styles.infoItem}>
+                  <span style={styles.infoLabel}>Runtime</span>
+                  <span style={styles.infoValue}>{item.runtime} min</span>
+                </div>
+              )}
+              <div style={styles.infoItem}>
+                <span style={styles.infoLabel}>Type</span>
+                <span style={styles.infoValue}>{isSeries ? 'Series' : 'Movie'}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -163,11 +189,11 @@ const styles = {
     right: '40px',
   },
   title: {
-    fontSize: 'clamp(2.4rem, 6vw, 3.6rem)',
+    fontSize: 'clamp(2rem, 5vw, 3rem)',
     fontWeight: '900',
     color: '#fff',
     marginBottom: '16px',
-    lineHeight: '0.95',
+    lineHeight: '1.05',
     letterSpacing: '-0.03em',
     textShadow: '0 10px 30px rgba(0,0,0,0.6)',
   },
@@ -175,29 +201,38 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '16px',
+    flexWrap: 'wrap',
   },
-  rating: {
-    color: 'var(--accent-cyan)',
-    fontWeight: '900',
-    fontSize: '1.2rem',
+  ratingBox: {
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
-  },
-  year: {
-    color: 'rgba(255,255,255,0.7)',
-    fontWeight: '700',
-    fontSize: '1.1rem',
-  },
-  badge: {
-    background: 'rgba(255,255,255,0.1)',
+    gap: '8px',
+    background: 'rgba(0, 255, 255, 0.1)',
     padding: '6px 12px',
     borderRadius: '8px',
-    fontSize: '0.8rem',
-    fontWeight: '800',
+    border: '1px solid rgba(0, 255, 255, 0.3)',
+  },
+  ratingVal: {
+    color: 'var(--accent-cyan)',
+    fontWeight: '900',
+    fontSize: '1rem',
+  },
+  metaChip: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '700',
+    fontSize: '0.9rem',
+    letterSpacing: '0.04em',
+  },
+  typeBadge: {
+    padding: '6px 12px',
+    borderRadius: '8px',
+    background: 'rgba(255,255,255,0.08)',
+    border: '1px solid rgba(255,255,255,0.12)',
+    color: '#ffffff',
+    fontSize: '0.78rem',
+    fontWeight: '700',
+    letterSpacing: '0.08em',
     textTransform: 'uppercase',
-    letterSpacing: '0.1em',
-    border: '1px solid rgba(255,255,255,0.1)',
   },
   body: {
     padding: '0 40px 40px',
@@ -209,31 +244,39 @@ const styles = {
     flexWrap: 'wrap',
   },
   playBtn: {
-    display: 'flex',
+    display: 'inline-flex',
     alignItems: 'center',
-    gap: '10px',
+    justifyContent: 'center',
+    gap: '12px',
     background: 'linear-gradient(135deg, var(--accent-cyan), var(--accent-secondary))',
     color: '#050c16',
-    padding: '14px 32px',
+    padding: '16px 36px',
     borderRadius: '14px',
     fontWeight: '900',
-    fontSize: '1.1rem',
+    fontSize: '1rem',
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
     boxShadow: '0 0 30px rgba(0, 255, 255, 0.3)',
+    textDecoration: 'none',
     transition: 'transform 0.2s',
+    whiteSpace: 'nowrap',
   },
   infoBtn: {
-    display: 'flex',
+    display: 'inline-flex',
     alignItems: 'center',
+    justifyContent: 'center',
     background: 'rgba(255,255,255,0.08)',
     color: '#fff',
     padding: '14px 28px',
     borderRadius: '14px',
-    fontWeight: '700',
-    fontSize: '1.1rem',
+    fontWeight: '800',
+    fontSize: '0.95rem',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
     border: '1px solid rgba(255,255,255,0.12)',
     backdropFilter: 'blur(12px)',
+    textDecoration: 'none',
+    cursor: 'pointer',
     transition: 'background 0.2s',
   },
   overview: {
@@ -244,29 +287,51 @@ const styles = {
     maxWidth: '60ch',
   },
   detailsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-    gap: '24px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '20px',
     padding: '24px',
     borderRadius: '20px',
     background: 'rgba(255,255,255,0.03)',
     border: '1px solid rgba(255,255,255,0.06)',
   },
-  detailItem: {
+  genreRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+  },
+  genreTag: {
+    padding: '6px 14px',
+    borderRadius: '12px',
+    background: 'rgba(255, 255, 255, 0.05)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    color: '#ffffff',
+    fontSize: '0.78rem',
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    whiteSpace: 'nowrap',
+  },
+  infoRow: {
+    display: 'flex',
+    gap: '24px',
+    flexWrap: 'wrap',
+  },
+  infoItem: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '6px',
+    gap: '4px',
   },
-  detailLabel: {
+  infoLabel: {
     color: 'rgba(255,255,255,0.4)',
-    fontSize: '0.75rem',
+    fontSize: '0.72rem',
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: '0.1em',
   },
-  detailValue: {
+  infoValue: {
     color: '#fff',
     fontWeight: '700',
-    fontSize: '1rem',
+    fontSize: '0.95rem',
   },
 };
