@@ -9,10 +9,10 @@
 
 html.tv-mode,
 .tv-mode {
-  --touch-target: 56px;
-  --focus-outline: 6px;
-  --focus-offset: 8px;
-  --focus-glow: 80px;
+    --touch-target: 56px;
+    --focus-outline: 6px;
+    --focus-offset: 8px;
+    --focus-glow: 80px;
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -21,12 +21,12 @@ html.tv-mode,
 
 .tv-mode :focus-visible,
 .tv-mode :focus {
-  outline: var(--focus-outline) solid var(--accent-cyan);
-  outline-offset: var(--focus-offset);
-  box-shadow: 0 0 var(--focus-glow) rgba(0, 255, 255, 0.4);
-  transform: scale(1.08);
-  border-radius: 4px;
-  transition: all 300ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    outline: var(--focus-outline) solid var(--accent-cyan);
+    outline-offset: var(--focus-offset);
+    box-shadow: 0 0 var(--focus-glow) rgba(0, 255, 255, 0.4);
+    transform: scale(1.08);
+    border-radius: 4px;
+    transition: all 300ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .tv-mode button:focus-visible,
@@ -34,10 +34,11 @@ html.tv-mode,
 .tv-mode input:focus-visible,
 .tv-mode select:focus-visible,
 .tv-mode textarea:focus-visible {
-  outline: var(--focus-outline) solid var(--accent-cyan);
-  outline-offset: var(--focus-offset);
-  box-shadow: 0 0 var(--focus-glow) rgba(0, 255, 255, 0.5), 
-              inset 0 0 20px rgba(0, 255, 255, 0.1);
+    outline: var(--focus-outline) solid var(--accent-cyan);
+    outline-offset: var(--focus-offset);
+    box-shadow:
+        0 0 var(--focus-glow) rgba(0, 255, 255, 0.5),
+        inset 0 0 20px rgba(0, 255, 255, 0.1);
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -45,15 +46,15 @@ html.tv-mode,
    ────────────────────────────────────────────────────────────── */
 
 .tv-mode {
-  /* Enable spatial navigation */
-  nav-down: auto;
-  nav-left: auto;
-  nav-right: auto;
-  nav-up: auto;
+    /* Enable spatial navigation */
+    nav-down: auto;
+    nav-left: auto;
+    nav-right: auto;
+    nav-up: auto;
 }
 
 .tv-mode [tabindex] {
-  cursor: pointer;
+    cursor: pointer;
 }
 
 .tv-mode button,
@@ -62,10 +63,10 @@ html.tv-mode,
 .tv-mode select,
 .tv-mode textarea,
 .tv-mode [role="button"] {
-  min-height: 56px;
-  min-width: 56px;
-  font-size: 1.1rem;
-  padding: 18px 36px;
+    min-height: 56px;
+    min-width: 56px;
+    font-size: 1.1rem;
+    padding: 18px 36px;
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -73,17 +74,17 @@ html.tv-mode,
    ────────────────────────────────────────────────────────────── */
 
 .tv-mode .keyboard-hint {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  background: rgba(7, 17, 31, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
-  padding: 16px 20px;
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 13px;
-  z-index: 1000;
-  backdrop-filter: blur(16px);
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(7, 17, 31, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    padding: 16px 20px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 13px;
+    z-index: 1000;
+    backdrop-filter: blur(16px);
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -91,24 +92,24 @@ html.tv-mode,
    ────────────────────────────────────────────────────────────── */
 
 .tv-mode .hero-layout {
-  grid-template-columns: 1fr 1fr;
-  gap: 3rem;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
 }
 
 .tv-mode .content-rail {
-  margin: 2rem 0;
+    margin: 2rem 0;
 }
 
 .tv-mode .card-deck {
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 2rem;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 2rem;
 }
 
 .tv-mode .card,
 .tv-mode .glass,
 .tv-mode .glass-strong {
-  padding: 2rem 2.5rem;
-  border-radius: 24px;
+    padding: 2rem 2.5rem;
+    border-radius: 24px;
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -116,30 +117,30 @@ html.tv-mode,
    ────────────────────────────────────────────────────────────── */
 
 .tv-mode h1 {
-  font-size: clamp(2.5rem, 4vw, 4rem);
-  line-height: 1.1;
+    font-size: clamp(2.5rem, 4vw, 4rem);
+    line-height: 1.1;
 }
 
 .tv-mode h2 {
-  font-size: clamp(2rem, 3vw, 3rem);
-  line-height: 1.15;
+    font-size: clamp(2rem, 3vw, 3rem);
+    line-height: 1.15;
 }
 
 .tv-mode h3 {
-  font-size: clamp(1.5rem, 2.5vw, 2.5rem);
-  line-height: 1.2;
+    font-size: clamp(1.5rem, 2.5vw, 2.5rem);
+    line-height: 1.2;
 }
 
 .tv-mode p,
 .tv-mode body {
-  font-size: clamp(1rem, 1.8vw, 1.5rem);
-  line-height: 1.7;
+    font-size: clamp(1rem, 1.8vw, 1.5rem);
+    line-height: 1.7;
 }
 
 .tv-mode button,
 .tv-mode .button {
-  font-size: 1.1rem;
-  padding: 18px 36px;
+    font-size: 1.1rem;
+    padding: 18px 36px;
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -147,14 +148,14 @@ html.tv-mode,
    ────────────────────────────────────────────────────────────── */
 
 .tv-mode .container {
-  width: min(1720px, calc(100vw - 8rem));
-  padding: 0 4rem;
+    width: min(1720px, calc(100vw - 8rem));
+    padding: 0 4rem;
 }
 
 .tv-mode section,
 .tv-mode article {
-  padding: 3rem 2rem;
-  margin: 2rem 0;
+    padding: 3rem 2rem;
+    margin: 2rem 0;
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -162,13 +163,17 @@ html.tv-mode,
    ────────────────────────────────────────────────────────────── */
 
 .tv-mode .card-hover:hover {
-  transform: translateY(-12px) scale(1.03);
-  box-shadow: var(--shadow-card), 0 0 60px rgba(0, 255, 255, 0.15);
+    transform: translateY(-12px) scale(1.03);
+    box-shadow:
+        var(--shadow-card),
+        0 0 60px rgba(0, 255, 255, 0.15);
 }
 
 .tv-mode .card-hover:focus-visible {
-  transform: translateY(-12px) scale(1.08);
-  box-shadow: var(--shadow-card), 0 0 80px rgba(0, 255, 255, 0.25);
+    transform: translateY(-12px) scale(1.08);
+    box-shadow:
+        var(--shadow-card),
+        0 0 80px rgba(0, 255, 255, 0.25);
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -176,22 +181,22 @@ html.tv-mode,
    ────────────────────────────────────────────────────────────── */
 
 .tv-mode .top-nav-container {
-  padding: 16px 24px;
-  border-radius: 28px;
+    padding: 16px 24px;
+    border-radius: 28px;
 }
 
 .tv-mode .top-nav-link {
-  padding: 12px 20px;
-  min-width: 120px;
-  text-align: center;
-  border-radius: 16px;
-  font-size: 1rem;
-  font-weight: 600;
+    padding: 12px 20px;
+    min-width: 120px;
+    text-align: center;
+    border-radius: 16px;
+    font-size: 1rem;
+    font-weight: 600;
 }
 
 .tv-mode .top-nav-link:focus-visible {
-  background: rgba(0, 255, 255, 0.2);
-  transform: scale(1.1);
+    background: rgba(0, 255, 255, 0.2);
+    transform: scale(1.1);
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -199,28 +204,28 @@ html.tv-mode,
    ────────────────────────────────────────────────────────────── */
 
 .tv-mode .button-primary {
-  min-width: 200px;
-  padding: 20px 40px;
-  font-size: 1.15rem;
-  border-radius: 20px;
+    min-width: 200px;
+    padding: 20px 40px;
+    font-size: 1.15rem;
+    border-radius: 20px;
 }
 
 .tv-mode .button-primary:focus-visible {
-  transform: scale(1.1);
-  box-shadow: 0 0 60px rgba(255, 90, 95, 0.4);
+    transform: scale(1.1);
+    box-shadow: 0 0 60px rgba(255, 90, 95, 0.4);
 }
 
 .tv-mode .button-secondary,
 .tv-mode .button-ghost {
-  min-width: 160px;
-  padding: 18px 36px;
-  font-size: 1.1rem;
+    min-width: 160px;
+    padding: 18px 36px;
+    font-size: 1.1rem;
 }
 
 .tv-mode .button-secondary:focus-visible,
 .tv-mode .button-ghost:focus-visible {
-  transform: scale(1.1);
-  box-shadow: 0 0 60px rgba(0, 255, 255, 0.3);
+    transform: scale(1.1);
+    box-shadow: 0 0 60px rgba(0, 255, 255, 0.3);
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -230,19 +235,19 @@ html.tv-mode,
 .tv-mode input,
 .tv-mode textarea,
 .tv-mode select {
-  font-size: 1.1rem;
-  padding: 14px 16px;
-  min-height: 56px;
-  border-radius: 12px;
-  border: 2px solid rgba(255, 255, 255, 0.12);
+    font-size: 1.1rem;
+    padding: 14px 16px;
+    min-height: 56px;
+    border-radius: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.12);
 }
 
 .tv-mode input:focus-visible,
 .tv-mode textarea:focus-visible,
 .tv-mode select:focus-visible {
-  border-color: var(--accent-cyan);
-  background: rgba(0, 255, 255, 0.05);
-  box-shadow: 0 0 40px rgba(0, 255, 255, 0.2);
+    border-color: var(--accent-cyan);
+    background: rgba(0, 255, 255, 0.05);
+    box-shadow: 0 0 40px rgba(0, 255, 255, 0.2);
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -250,26 +255,26 @@ html.tv-mode,
    ────────────────────────────────────────────────────────────── */
 
 .tv-mode .modal {
-  max-width: 1200px;
-  padding: 3rem;
-  border-radius: 28px;
+    max-width: 1200px;
+    padding: 3rem;
+    border-radius: 28px;
 }
 
 .tv-mode .modal-header {
-  font-size: 2rem;
-  margin-bottom: 2rem;
+    font-size: 2rem;
+    margin-bottom: 2rem;
 }
 
 .tv-mode .modal-body {
-  font-size: 1.1rem;
-  line-height: 1.8;
-  margin-bottom: 2rem;
+    font-size: 1.1rem;
+    line-height: 1.8;
+    margin-bottom: 2rem;
 }
 
 .tv-mode .modal-footer {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1.5rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -278,32 +283,32 @@ html.tv-mode,
 
 .tv-mode ul,
 .tv-mode ol {
-  font-size: 1.1rem;
-  line-height: 2;
+    font-size: 1.1rem;
+    line-height: 2;
 }
 
 .tv-mode li {
-  padding: 12px 0;
-  padding-left: 24px;
+    padding: 12px 0;
+    padding-left: 24px;
 }
 
 .tv-mode .dropdown,
 .tv-mode .menu {
-  font-size: 1.1rem;
+    font-size: 1.1rem;
 }
 
 .tv-mode .dropdown-item,
 .tv-mode .menu-item {
-  padding: 16px 20px;
-  min-height: 56px;
-  display: flex;
-  align-items: center;
+    padding: 16px 20px;
+    min-height: 56px;
+    display: flex;
+    align-items: center;
 }
 
 .tv-mode .dropdown-item:focus-visible,
 .tv-mode .menu-item:focus-visible {
-  background: rgba(0, 255, 255, 0.1);
-  transform: translateX(8px);
+    background: rgba(0, 255, 255, 0.1);
+    transform: translateX(8px);
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -311,28 +316,28 @@ html.tv-mode,
    ────────────────────────────────────────────────────────────── */
 
 .tv-mode .media-card {
-  min-width: 320px;
-  aspect-ratio: 16 / 9;
-  border-radius: 20px;
-  overflow: hidden;
-  border: 2px solid rgba(255, 255, 255, 0.08);
+    min-width: 320px;
+    aspect-ratio: 16 / 9;
+    border-radius: 20px;
+    overflow: hidden;
+    border: 2px solid rgba(255, 255, 255, 0.08);
 }
 
 .tv-mode .media-card:focus-within {
-  border-color: var(--accent-cyan);
-  box-shadow: 0 0 60px rgba(0, 255, 255, 0.25);
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 60px rgba(0, 255, 255, 0.25);
 }
 
 .tv-mode .media-card-title {
-  font-size: 1.1rem;
-  font-weight: 600;
-  padding: 12px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    padding: 12px;
 }
 
 .tv-mode .media-card-description {
-  font-size: 0.95rem;
-  padding: 0 12px 12px;
-  opacity: 0.8;
+    font-size: 0.95rem;
+    padding: 0 12px 12px;
+    opacity: 0.8;
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -340,24 +345,24 @@ html.tv-mode,
    ────────────────────────────────────────────────────────────── */
 
 .tv-mode .carousel-button {
-  width: 72px;
-  height: 72px;
-  font-size: 1.5rem;
-  border-radius: 50%;
+    width: 72px;
+    height: 72px;
+    font-size: 1.5rem;
+    border-radius: 50%;
 }
 
 .tv-mode .carousel-button:focus-visible {
-  transform: scale(1.15);
+    transform: scale(1.15);
 }
 
 .tv-mode .carousel-dot {
-  width: 16px;
-  height: 16px;
+    width: 16px;
+    height: 16px;
 }
 
 .tv-mode .carousel-dot.active {
-  width: 40px;
-  height: 16px;
+    width: 40px;
+    height: 16px;
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -365,24 +370,24 @@ html.tv-mode,
    ────────────────────────────────────────────────────────────── */
 
 .tv-mode [role="tablist"] {
-  gap: 1rem;
-  padding: 1rem;
+    gap: 1rem;
+    padding: 1rem;
 }
 
 .tv-mode [role="tab"] {
-  padding: 16px 24px;
-  font-size: 1.05rem;
-  min-width: 160px;
-  text-align: center;
+    padding: 16px 24px;
+    font-size: 1.05rem;
+    min-width: 160px;
+    text-align: center;
 }
 
 .tv-mode [role="tab"]:focus-visible {
-  background: rgba(0, 255, 255, 0.15);
-  transform: scale(1.05);
+    background: rgba(0, 255, 255, 0.15);
+    transform: scale(1.05);
 }
 
 .tv-mode [role="tab"][aria-selected="true"] {
-  border-bottom: 4px solid var(--accent-cyan);
+    border-bottom: 4px solid var(--accent-cyan);
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -390,15 +395,15 @@ html.tv-mode,
    ────────────────────────────────────────────────────────────── */
 
 .tv-mode .badge {
-  padding: 10px 16px;
-  font-size: 0.95rem;
-  border-radius: 18px;
+    padding: 10px 16px;
+    font-size: 0.95rem;
+    border-radius: 18px;
 }
 
 .tv-mode .chip {
-  padding: 12px 20px;
-  font-size: 1rem;
-  border-radius: 20px;
+    padding: 12px 20px;
+    font-size: 1rem;
+    border-radius: 20px;
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -406,11 +411,11 @@ html.tv-mode,
    ────────────────────────────────────────────────────────────── */
 
 .tv-mode .tooltip {
-  font-size: 1rem;
-  padding: 12px 16px;
-  border-radius: 12px;
-  background: rgba(7, 17, 31, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+    font-size: 1rem;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: rgba(7, 17, 31, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -418,19 +423,23 @@ html.tv-mode,
    ────────────────────────────────────────────────────────────── */
 
 .tv-mode .skeleton {
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.05) 25%,
-    rgba(255, 255, 255, 0.1) 50%,
-    rgba(255, 255, 255, 0.05) 75%
-  );
-  background-size: 200% 100%;
-  animation: loading 2s infinite;
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.05) 25%,
+        rgba(255, 255, 255, 0.1) 50%,
+        rgba(255, 255, 255, 0.05) 75%
+    );
+    background-size: 200% 100%;
+    animation: loading 2s infinite;
 }
 
 @keyframes loading {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -439,16 +448,16 @@ html.tv-mode,
 
 .tv-mode .alert,
 .tv-mode .notification {
-  padding: 2rem;
-  border-radius: 20px;
-  font-size: 1.1rem;
-  margin: 1rem 0;
+    padding: 2rem;
+    border-radius: 20px;
+    font-size: 1.1rem;
+    margin: 1rem 0;
 }
 
 .tv-mode .alert-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -456,123 +465,51 @@ html.tv-mode,
    ────────────────────────────────────────────────────────────── */
 
 .tv-mode {
-  scroll-behavior: smooth;
-  scroll-padding-top: 120px;
+    scroll-behavior: smooth;
+    scroll-padding-top: 120px;
 }
 
 .tv-mode ::-webkit-scrollbar {
-  width: 16px;
-  height: 16px;
+    width: 16px;
+    height: 16px;
 }
 
 .tv-mode ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.05);
 }
 
 .tv-mode ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(0, 255, 255, 0.4), rgba(255, 0, 128, 0.4));
-  border-radius: 8px;
-  border: 3px solid rgba(255, 255, 255, 0.02);
+    background: linear-gradient(
+        180deg,
+        rgba(0, 255, 255, 0.4),
+        rgba(255, 0, 128, 0.4)
+    );
+    border-radius: 8px;
+    border: 3px solid rgba(255, 255, 255, 0.02);
 }
 
 .tv-mode ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(0, 255, 255, 0.6), rgba(255, 0, 128, 0.6));
+    background: linear-gradient(
+        180deg,
+        rgba(0, 255, 255, 0.6),
+        rgba(255, 0, 128, 0.6)
+    );
 }
 
 /* ──────────────────────────────────────────────────────────────
    TV PERFORMANCE OPTIMIZATIONS
    ────────────────────────────────────────────────────────────── */
 
-.tv-mode img {
-  image-rendering: high-quality;
-}
-
+.tv-mode img,
 .tv-mode video {
-  image-rendering: high-quality;
+    max-width: 100%;
 }
 
-/* Reduce animations for TV mode (some TVs are slow) */
-@media (prefers-reduced-motion: reduce), .tv-mode.reduce-motion {
-  * {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
-/* ──────────────────────────────────────────────────────────────
-   4K ULTRA ENHANCEMENTS
-   ────────────────────────────────────────────────────────────── */
-
-@media (min-width: 2500px) {
-  html.tv-mode,
-  .tv-mode {
-    --touch-target: 64px;
-    --focus-outline: 8px;
-    --focus-offset: 12px;
-    --focus-glow: 120px;
-  }
-
-  .tv-mode h1 {
-    font-size: 4rem;
-  }
-
-  .tv-mode h2 {
-    font-size: 3rem;
-  }
-
-  .tv-mode p,
-  .tv-mode body {
-    font-size: 1.5rem;
-  }
-
-  .tv-mode button,
-  .tv-mode .button {
-    padding: 24px 48px;
-    font-size: 1.25rem;
-  }
-
-  .tv-mode .carousel-button {
-    width: 96px;
-    height: 96px;
-    font-size: 2rem;
-  }
-
-  .tv-mode .carousel-dot {
-    width: 20px;
-    height: 20px;
-  }
-
-  .tv-mode .carousel-dot.active {
-    width: 50px;
-    height: 20px;
-  }
-}
-
-/* ──────────────────────────────────────────────────────────────
-   ACCESSIBILITY & HIGH CONTRAST
-   ────────────────────────────────────────────────────────────── */
-
-@media (prefers-contrast: high) {
-  .tv-mode :focus-visible {
-    outline: 8px solid #0ff;
-    box-shadow: 0 0 100px #0ff;
-  }
-
-  .tv-mode {
-    --accent-cyan: #00ffff;
-    --accent-pink: #ff00ff;
-  }
-}
-
-/* ──────────────────────────────────────────────────────────────
-   PRINT & DEBUG MODES (TV)
-   ────────────────────────────────────────────────────────────── */
-
+/* Debug modes */
 .tv-mode.debug-mode {
-  outline: 2px dashed rgba(0, 255, 255, 0.5);
+    outline: 2px dashed rgba(0, 255, 255, 0.5);
 }
 
 .tv-mode .debug-outline {
-  outline: 2px dashed rgba(0, 255, 255, 0.3);
+    outline: 2px dashed rgba(0, 255, 255, 0.3);
 }
