@@ -285,15 +285,16 @@ const styles = {
     fontSize: '0.92rem',
   },
   title: {
-    fontSize: 'clamp(3rem, 5vw, 4.5rem)',
+    fontSize: 'clamp(2.4rem, 5vw, 4.2rem)',
     marginBottom: 'var(--spacing-md)',
-    maxWidth: '12ch',
+    maxWidth: '16ch',
     textWrap: 'balance',
     color: 'var(--text-primary)',
     textShadow: '0 4px 18px rgba(0, 0, 0, 0.4)',
+    lineHeight: '1.05',
   },
   titleMobile: {
-    fontSize: 'clamp(2rem, 8vw, 2.8rem)',
+    fontSize: 'clamp(2rem, 8vw, 3rem)',
     marginBottom: 'var(--spacing-sm)',
   },
   description: {
