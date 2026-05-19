@@ -170,7 +170,7 @@ jobs:
             fi
 
             echo "Restarting service..."
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' systemctl restart isp-portal-backend.service
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' systemctl restart isp-portal.service
 
             echo "Health check..."
             for i in $(seq 1 30); do
