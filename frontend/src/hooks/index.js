@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from "react";
 
 export function useDebouncedSearch(value, delay = 300) {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -14,62 +14,84 @@ export function useDebouncedSearch(value, delay = 300) {
 // Breakpoint thresholds — keep in sync with global.css
 const BREAKPOINTS = {
   SMALL_MOBILE: 420,
-  MOBILE: 640,
+  MOBILE: 768,
   TABLET: 1024,
   LARGE_DESKTOP: 1440,
+  TV: 1600,
+  FOUR_K: 2500,
 };
 
 function getBreakpoint(w) {
-  if (w < BREAKPOINTS.MOBILE) return 'mobile';
-  if (w < BREAKPOINTS.TABLET) return 'tablet';
-  return 'desktop';
+  if (w < BREAKPOINTS.MOBILE) return "mobile";
+  if (w < BREAKPOINTS.TABLET) return "tablet";
+  return "desktop";
 }
 
 export function useBreakpoint() {
-  const initialWidth = typeof window === 'undefined' ? 1280 : window.innerWidth;
-  const [width, setWidth] = useState(initialWidth);
+  const initialWidth = typeof window === "undefined" ? 1280 : window.innerWidth;
+  const initialHeight =
+    typeof window === "undefined" ? 720 : window.innerHeight;
+  const [viewport, setViewport] = useState({
+    width: initialWidth,
+    height: initialHeight,
+  });
   const rafRef = useRef(null);
 
   useEffect(() => {
     const handleResize = () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(() => {
-        setWidth(window.innerWidth);
+        setViewport({ width: window.innerWidth, height: window.innerHeight });
       });
     };
 
     let observer;
-    if (typeof ResizeObserver !== 'undefined') {
+    if (typeof ResizeObserver !== "undefined") {
       observer = new ResizeObserver(handleResize);
       observer.observe(document.documentElement);
     } else {
-      window.addEventListener('resize', handleResize, { passive: true });
+      window.addEventListener("resize", handleResize, { passive: true });
     }
 
-    window.addEventListener('orientationchange', handleResize, { passive: true });
+    window.addEventListener("orientationchange", handleResize, {
+      passive: true,
+    });
 
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       if (observer) {
         observer.disconnect();
       } else {
-        window.removeEventListener('resize', handleResize);
+        window.removeEventListener("resize", handleResize);
       }
-      window.removeEventListener('orientationchange', handleResize);
+      window.removeEventListener("orientationchange", handleResize);
     };
   }, []);
 
+  const { width, height } = viewport;
   const breakpoint = getBreakpoint(width);
+  const isMobile = breakpoint === "mobile";
+  const isTablet = breakpoint === "tablet";
+  const isTV = width >= BREAKPOINTS.TV && width < BREAKPOINTS.FOUR_K;
+  const is4K = width >= BREAKPOINTS.FOUR_K;
 
   return {
     breakpoint,
     width,
-    isMobile: breakpoint === 'mobile',
-    isTablet: breakpoint === 'tablet',
-    isDesktop: breakpoint === 'desktop',
+    height,
+    isMobile,
+    isTablet,
+    isDesktop: breakpoint === "desktop",
     isSmallMobile: width < BREAKPOINTS.SMALL_MOBILE,
     isLargeDesktop: width >= BREAKPOINTS.LARGE_DESKTOP,
-    isTouchDevice: breakpoint === 'mobile' || breakpoint === 'tablet',
+    isTV,
+    is4K,
+    isTouchDevice:
+      isMobile ||
+      isTablet ||
+      (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0),
+    isPortrait: height > width,
+    isLandscape: width >= height,
   };
 }
 
@@ -80,8 +102,8 @@ export function useHorizontalScroll() {
     if (ref.current) {
       const scrollAmount = 300;
       ref.current.scrollBy({
-        left: direction === 'left' ? -scrollAmount : scrollAmount,
-        behavior: 'smooth',
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth",
       });
     }
   };
@@ -99,38 +121,50 @@ export function useLocalStorage(key, initialValue) {
     }
   });
 
-  const setValue = useCallback((value) => {
-    setStoredValue((previousValue) => {
-      try {
-        const valueToStore = value instanceof Function ? value(previousValue) : value;
-        window.localStorage.setItem(key, JSON.stringify(valueToStore));
-        return valueToStore;
-      } catch {
-        return value instanceof Function ? value(previousValue) : value;
-      }
-    });
-  }, [key]);
+  const setValue = useCallback(
+    (value) => {
+      setStoredValue((previousValue) => {
+        try {
+          const valueToStore =
+            value instanceof Function ? value(previousValue) : value;
+          window.localStorage.setItem(key, JSON.stringify(valueToStore));
+          return valueToStore;
+        } catch {
+          return value instanceof Function ? value(previousValue) : value;
+        }
+      });
+    },
+    [key],
+  );
 
   return [storedValue, setValue];
 }
 
 export function useRecentlyViewed() {
-  const [items, setItems] = useLocalStorage('isp-recently-viewed', []);
+  const [items, setItems] = useLocalStorage("isp-recently-viewed", []);
 
-  const addItem = useCallback((item) => {
-    if (!item?.id) return;
-    setItems((prev) => {
-      const filtered = (prev || []).filter((i) => String(i.id) !== String(item.id));
-      return [{ ...item, viewedAt: new Date().toISOString() }, ...filtered].slice(0, 12);
-    });
-  }, [setItems]);
+  const addItem = useCallback(
+    (item) => {
+      if (!item?.id) return;
+      setItems((prev) => {
+        const filtered = (prev || []).filter(
+          (i) => String(i.id) !== String(item.id),
+        );
+        return [
+          { ...item, viewedAt: new Date().toISOString() },
+          ...filtered,
+        ].slice(0, 12);
+      });
+    },
+    [setItems],
+  );
 
   const clearAll = useCallback(() => setItems([]), [setItems]);
 
   return { items: items || [], addItem, clearAll };
 }
 
-export { useTVMode } from './useTVMode';
+export { useTVMode } from "./useTVMode";
 export {
   useResponsive,
   useMediaQuery,
@@ -139,4 +173,4 @@ export {
   useIsDesktop,
   useIsTV,
   useScreenSize,
-} from './useResponsive';
+} from "./useResponsive";
