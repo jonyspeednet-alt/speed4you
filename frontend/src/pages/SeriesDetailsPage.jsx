@@ -6,8 +6,9 @@ import { useRecentlyViewed } from '../hooks';
 import WatchlistButton from '../components/ui/WatchlistButton';
 import ShareButton from '../components/ui/ShareButton';
 import StarRating from '../components/ui/StarRating';
+import { DETAIL_STYLES, DETAIL_SKELETON, posterFallbackUrl } from '../styles/detailPage';
 
-const posterFallback = '/portal/assets/poster-placeholder.svg';
+const posterFallback = posterFallbackUrl;
 const SERIES_CACHE_PREFIX = 'portal-series-details-v1:';
 
 function toPositiveInt(value, fallback) {
@@ -31,22 +32,23 @@ function writeCache(slug, data) {
 
 // ── Skeleton ─────────────────────────────────────────────────────────────────
 function SeriesDetailsSkeleton() {
+  const sk = DETAIL_SKELETON;
   return (
-    <div style={s.page}>
-      <div style={s.hero}>
-        <div style={{ ...s.skeletonBlock, position: 'absolute', inset: 0 }} />
-        <div style={s.heroGradient} />
-        <div style={s.heroInner}>
-          <div style={{ ...s.skeletonBlock, width: 220, height: 330, borderRadius: 20, flexShrink: 0 }} />
+    <div style={sk.page}>
+      <div style={sk.hero}>
+        <div style={{ ...sk.skeletonBlock, position: 'absolute', inset: 0 }} />
+        <div style={sk.heroGradient} />
+        <div style={sk.heroInner}>
+          <div style={{ ...sk.skeletonBlock, width: 220, height: 330, borderRadius: 20, flexShrink: 0 }} />
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ ...s.skeletonLine, width: 100, height: 12 }} />
-            <div style={{ ...s.skeletonLine, width: '55%', height: 52 }} />
-            <div style={{ ...s.skeletonLine, width: '80%', height: 16 }} />
-            <div style={{ ...s.skeletonLine, width: '70%', height: 16 }} />
-            <div style={{ ...s.skeletonLine, width: '60%', height: 16 }} />
+            <div style={{ ...sk.skeletonLine, width: 100, height: 12 }} />
+            <div style={{ ...sk.skeletonLine, width: '55%', height: 52 }} />
+            <div style={{ ...sk.skeletonLine, width: '80%', height: 16 }} />
+            <div style={{ ...sk.skeletonLine, width: '70%', height: 16 }} />
+            <div style={{ ...sk.skeletonLine, width: '60%', height: 16 }} />
             <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
               {[150, 52].map((w, i) => (
-                <div key={i} style={{ ...s.skeletonLine, width: w, height: 50, borderRadius: 999 }} />
+                <div key={i} style={{ ...sk.skeletonLine, width: w, height: 50, borderRadius: 999 }} />
               ))}
             </div>
           </div>
@@ -394,341 +396,91 @@ export default function SeriesDetailsPage() {
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
-const s = {
-  page: { minHeight: '100vh', paddingTop: 88, position: 'relative', overflow: 'hidden', background: '#050c16' },
-
-  auroraOrb: {
-    position: 'absolute',
-    width: '60vw',
-    height: '60vw',
-    borderRadius: '50%',
-    filter: 'blur(120px)',
-    opacity: 0.1,
-    zIndex: 0,
-    pointerEvents: 'none',
-  },
-
-  // Hero
-  hero: {
-    position: 'relative',
-    minHeight: '75vh',
-    display: 'flex',
-    alignItems: 'center',
-    padding: '40px 0',
-  },
-  backdropWrap: { position: 'absolute', inset: 0, zIndex: 0 },
-  backdropImg: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
-    objectPosition: 'center 10%',
-  },
-  backdropOverlay: {
-    position: 'absolute',
-    inset: 0,
-    background: 'linear-gradient(105deg, rgba(5,12,22,0.95) 10%, rgba(5,12,22,0.4) 40%, rgba(5,12,22,0.2) 60%, rgba(5,12,22,0.9) 100%)',
-  },
-  heroGradient: {
-    position: 'absolute',
-    inset: 0,
-    background: 'linear-gradient(to top, #050c16 0%, transparent 40%)',
-  },
-  heroInner: {
-    position: 'relative',
-    zIndex: 2,
-    width: 'min(1440px, calc(100vw - 48px))',
-    margin: '0 auto',
-    display: 'grid',
-    gridTemplateColumns: 'minmax(260px, 360px) minmax(0, 1fr)',
-    gap: '60px',
-    alignItems: 'center',
-  },
-  heroInnerTablet: {
-    gridTemplateColumns: '1fr',
-    gap: '32px',
-  },
-  heroInnerMobile: {
-    gridTemplateColumns: '1fr',
-    gap: '24px',
-    padding: '20px 16px',
-    alignItems: 'start',
-  },
-
-  posterWrap: {
-    position: 'relative',
-    borderRadius: '24px',
-    overflow: 'hidden',
-    boxShadow: '0 40px 80px rgba(0,0,0,0.8)',
-    border: '1px solid rgba(255,255,255,0.12)',
-    aspectRatio: '2/3',
-    minWidth: '260px',
-  },
-  posterWrapMobile: {
-    width: '100%',
-    maxWidth: '340px',
-    margin: '0 auto',
-    aspectRatio: '2/3',
-  },
-  posterGlow: {
-    position: 'absolute',
-    inset: 0,
-    background: 'linear-gradient(135deg, rgba(255,255,255,0.1), transparent 40%)',
-    pointerEvents: 'none',
-  },
-  poster: { width: '100%', height: '100%', objectFit: 'cover' },
-
-  infoPanel: { display: 'flex', flexDirection: 'column', gap: '20px' },
-  infoPanelMobile: { gap: '16px' },
-  eyebrowRow: { display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' },
-  eyebrow: {
-    color: 'var(--accent-pink)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.2em',
-    fontSize: '0.75rem',
-    fontWeight: '900',
-  },
-  seasonsBadge: {
-    padding: '6px 12px',
-    borderRadius: '8px',
-    background: 'rgba(0, 255, 255, 0.1)',
-    border: '1px solid rgba(0, 255, 255, 0.3)',
-    color: 'var(--accent-cyan)',
-    fontSize: '0.78rem',
-    fontWeight: '900',
-    letterSpacing: '0.05em',
-  },
-
-  title: {
-    fontSize: 'clamp(2.4rem, 5vw, 4.2rem)',
-    fontWeight: '900',
-    color: '#ffffff',
-    lineHeight: '1.05',
-    letterSpacing: '-0.03em',
-    textShadow: '0 10px 30px rgba(0,0,0,0.5)',
-  },
-  titleMobile: { fontSize: 'clamp(2rem, 8vw, 3rem)' },
-
-  metaRow: { display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' },
-  ratingBox: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    background: 'rgba(0, 255, 255, 0.1)',
-    padding: '6px 12px',
-    borderRadius: '8px',
-    border: '1px solid rgba(0, 255, 255, 0.3)',
-  },
-  ratingVal: {
-    color: 'var(--accent-cyan)',
-    fontWeight: '900',
-    fontSize: '1rem',
-  },
-  metaChip: {
-    color: 'rgba(255, 255, 255, 0.75)',
-    fontWeight: '700',
-    fontSize: '0.92rem',
-    letterSpacing: '0.04em',
-  },
-
-  genreRow: { display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' },
-  genreTag: {
-    padding: '8px 16px',
-    borderRadius: '12px',
-    background: 'rgba(255, 255, 255, 0.05)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    color: '#ffffff',
-    fontSize: '0.8rem',
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    whiteSpace: 'nowrap',
-  },
-
-  descWrap: { display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '760px' },
-  description: { margin: 0, color: 'rgba(255,255,255,0.85)', fontSize: '1rem', lineHeight: 1.75 },
-  descClamped: { display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
-  readMore: { appearance: 'none', border: 'none', background: 'none', color: 'var(--accent-cyan)', cursor: 'pointer', fontWeight: '900', letterSpacing: '0.08em', textTransform: 'uppercase', padding: 0 },
-
-  actions: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '18px', flexWrap: 'wrap' },
-  actionsMobile: { flexDirection: 'column', alignItems: 'stretch' },
-  primaryActions: { display: 'flex', flexWrap: 'wrap', gap: '14px', alignItems: 'center' },
-  playBtn: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '12px',
-    padding: '18px 40px',
-    borderRadius: '14px',
-    background: 'linear-gradient(135deg, var(--accent-cyan), var(--accent-secondary))',
-    color: '#050c16',
-    fontWeight: '900',
-    fontSize: '1.05rem',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    boxShadow: '0 0 30px rgba(0, 255, 255, 0.3)',
-    textDecoration: 'none',
-    whiteSpace: 'nowrap',
-  },
-  secondaryBtn: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '16px 30px',
-    borderRadius: '14px',
-    background: 'rgba(255,255,255,0.08)',
-    border: '1px solid rgba(255,255,255,0.12)',
-    color: '#ffffff',
-    fontWeight: '800',
-    fontSize: '0.95rem',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    textDecoration: 'none',
-    cursor: 'pointer',
-    transition: 'background 180ms ease, transform 180ms ease',
-  },
-  btnFull: { width: '100%' },
-
-  body: { position: 'relative', zIndex: 2, width: 'min(1440px, calc(100vw - 48px))', margin: '0 auto', padding: '36px 24px 64px', display: 'flex', flexDirection: 'column', gap: '28px' },
-  seasonTabsWrap: {
-    position: 'sticky',
-    top: 96,
-    zIndex: 3,
-    background: 'rgba(5,12,22,0.92)',
-    backdropFilter: 'blur(18px)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: '22px',
-    padding: '10px 12px',
-    marginBottom: '24px',
-    overflowX: 'auto',
-  },
-  seasonTabsWrapMobile: {
-    position: 'static',
-    background: 'transparent',
-    border: 'none',
-    padding: '0',
-    marginBottom: '16px',
-  },
-  seasonTabs: { display: 'flex', gap: '12px', alignItems: 'center' },
-  seasonTab: {
-    display: 'inline-flex',
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    minWidth: '130px',
-    padding: '14px 18px',
-    borderRadius: '16px',
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    color: 'rgba(255,255,255,0.82)',
-    cursor: 'pointer',
-    transition: 'transform 180ms ease, border-color 180ms ease, background 180ms ease',
-    textAlign: 'left',
-  },
-  seasonTabActive: {
-    background: 'rgba(0, 255, 255, 0.16)',
-    borderColor: 'var(--accent-cyan)',
-    color: '#ffffff',
-    transform: 'translateY(-1px)',
-    boxShadow: '0 18px 40px rgba(0, 255, 255, 0.12)',
-  },
-  seasonTabLabel: { fontSize: '0.95rem', fontWeight: '800', letterSpacing: '0.02em' },
-  seasonTabCount: { marginTop: '6px', fontSize: '0.8rem', color: 'rgba(255,255,255,0.65)' },
-  seasonTabCountActive: { color: 'var(--accent-cyan)' },
-
-  episodeSection: { display: 'flex', flexDirection: 'column', gap: '18px' },
-  episodeSectionHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '18px', flexWrap: 'wrap' },
-  episodeSectionTitle: { margin: 0, fontSize: 'clamp(1.8rem, 3vw, 2.5rem)', fontWeight: '900', letterSpacing: '-0.04em' },
-  episodeSectionMeta: { margin: 0, color: 'var(--text-muted)', fontSize: '0.95rem' },
-  episodeList: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '18px' },
-  episodeListMobile: { gridTemplateColumns: '1fr' },
-  emptyEpisodes: { padding: '32px', borderRadius: '18px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-muted)', textAlign: 'center' },
-
-  episodeCard: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-    padding: '18px',
-    borderRadius: '22px',
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    color: '#ffffff',
-    textDecoration: 'none',
-    transition: 'transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease',
-  },
-  episodeCardMobile: { flexDirection: 'row' },
-  epNumBadge: {
-    width: '54px',
-    minWidth: '54px',
-    height: '54px',
-    borderRadius: '18px',
-    background: 'rgba(255,255,255,0.08)',
-    border: '1px solid rgba(255,255,255,0.12)',
-    color: '#ffffff',
-    display: 'grid',
-    placeItems: 'center',
-    fontWeight: '900',
-    fontSize: '0.95rem',
-  },
-  epNumBadgeMobile: { width: '44px', height: '44px', borderRadius: '14px' },
-  epNum: { fontSize: '0.95rem', fontWeight: '900' },
-  epInfo: { flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' },
-  epTitleRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' },
-  epTitle: { margin: 0, fontSize: '1rem', fontWeight: '900' },
-  epDuration: { color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: '700' },
-  epDesc: { margin: 0, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 },
-
-  epPlay: {
-    width: '48px',
-    height: '48px',
-    borderRadius: '16px',
-    border: '1px solid rgba(255,255,255,0.1)',
-    display: 'grid',
-    placeItems: 'center',
-    color: 'rgba(255,255,255,0.9)',
-    background: 'rgba(255,255,255,0.04)',
-    transition: 'all 180ms ease',
-  },
-  epPlayHover: {
-    background: 'var(--accent-cyan)',
-    borderColor: 'var(--accent-cyan)',
-    color: '#050c16',
-    boxShadow: '0 0 15px rgba(0, 255, 255, 0.4)',
-  },
-
-  browseMore: { display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' },
-  detailTopGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'minmax(280px, 1fr) minmax(320px, 1.1fr)',
-    gap: '24px',
-  },
-  detailTopGridMobile: {
-    gridTemplateColumns: '1fr',
-  },
-  browseBtn: {
-    padding: '12px 24px',
-    borderRadius: '12px',
-    background: 'rgba(255, 255, 255, 0.05)',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
-    color: '#ffffff',
-    fontSize: '0.85rem',
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    textDecoration: 'none',
-  },
-
-  errorState: {
-    minHeight: '60vh',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '16px',
-    color: '#ffffff',
-    textAlign: 'center',
-    padding: '40px 16px',
-  },
-  backLink: { marginTop: '12px', color: 'var(--accent-cyan)', textDecoration: 'none', fontWeight: '900' },
-
-  skeletonBlock: { background: 'rgba(255,255,255,0.08)', borderRadius: '24px' },
-  skeletonLine: { background: 'rgba(255,255,255,0.08)', borderRadius: '999px' },
+const s = DETAIL_STYLES;
+s.seasonsBadge = {
+  padding: '6px 12px', borderRadius: '8px',
+  background: 'rgba(0, 255, 255, 0.1)',
+  border: '1px solid rgba(0, 255, 255, 0.3)',
+  color: 'var(--accent-cyan)', fontSize: '0.78rem',
+  fontWeight: '900', letterSpacing: '0.05em',
 };
+s.primaryActions = { display: 'flex', flexWrap: 'wrap', gap: '14px', alignItems: 'center' };
+s.secondaryBtn = {
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+  padding: '16px 30px', borderRadius: '14px',
+  background: 'rgba(255,255,255,0.08)',
+  border: '1px solid rgba(255,255,255,0.12)', color: '#ffffff',
+  fontWeight: '800', fontSize: '0.95rem', textTransform: 'uppercase',
+  letterSpacing: '0.05em', textDecoration: 'none', cursor: 'pointer',
+  transition: 'background 180ms ease, transform 180ms ease',
+};
+s.seasonTabsWrap = {
+  position: 'sticky', top: 96, zIndex: 3,
+  background: 'rgba(5,12,22,0.92)', backdropFilter: 'blur(18px)',
+  border: '1px solid rgba(255,255,255,0.08)', borderRadius: '22px',
+  padding: '10px 12px', marginBottom: '24px', overflowX: 'auto',
+};
+s.seasonTabsWrapMobile = {
+  position: 'static', background: 'transparent', border: 'none',
+  padding: '0', marginBottom: '16px',
+};
+s.seasonTabs = { display: 'flex', gap: '12px', alignItems: 'center' };
+s.seasonTab = {
+  display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start',
+  minWidth: '130px', padding: '14px 18px', borderRadius: '16px',
+  background: 'rgba(255,255,255,0.04)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  color: 'rgba(255,255,255,0.82)', cursor: 'pointer',
+  transition: 'transform 180ms ease, border-color 180ms ease, background 180ms ease',
+  textAlign: 'left',
+};
+s.seasonTabActive = {
+  background: 'rgba(0, 255, 255, 0.16)', borderColor: 'var(--accent-cyan)',
+  color: '#ffffff', transform: 'translateY(-1px)',
+  boxShadow: '0 18px 40px rgba(0, 255, 255, 0.12)',
+};
+s.seasonTabLabel = { fontSize: '0.95rem', fontWeight: '800', letterSpacing: '0.02em' };
+s.seasonTabCount = { marginTop: '6px', fontSize: '0.8rem', color: 'rgba(255,255,255,0.65)' };
+s.seasonTabCountActive = { color: 'var(--accent-cyan)' };
+s.episodeSection = { display: 'flex', flexDirection: 'column', gap: '18px' };
+s.episodeSectionHeader = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '18px', flexWrap: 'wrap' };
+s.episodeSectionTitle = { margin: 0, fontSize: 'clamp(1.8rem, 3vw, 2.5rem)', fontWeight: '900', letterSpacing: '-0.04em' };
+s.episodeSectionMeta = { margin: 0, color: 'var(--text-muted)', fontSize: '0.95rem' };
+s.episodeList = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '18px' };
+s.episodeListMobile = { gridTemplateColumns: '1fr' };
+s.emptyEpisodes = { padding: '32px', borderRadius: '18px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-muted)', textAlign: 'center' };
+s.episodeCard = {
+  display: 'flex', alignItems: 'center', gap: '16px', padding: '18px',
+  borderRadius: '22px', background: 'rgba(255,255,255,0.04)',
+  border: '1px solid rgba(255,255,255,0.08)', color: '#ffffff',
+  textDecoration: 'none',
+  transition: 'transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease',
+};
+s.episodeCardMobile = { flexDirection: 'row' };
+s.epNumBadge = {
+  width: '54px', minWidth: '54px', height: '54px', borderRadius: '18px',
+  background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)',
+  color: '#ffffff', display: 'grid', placeItems: 'center', fontWeight: '900',
+  fontSize: '0.95rem',
+};
+s.epNumBadgeMobile = { width: '44px', height: '44px', borderRadius: '14px' };
+s.epNum = { fontSize: '0.95rem', fontWeight: '900' };
+s.epInfo = { flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' };
+s.epTitleRow = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' };
+s.epTitle = { margin: 0, fontSize: '1rem', fontWeight: '900' };
+s.epDuration = { color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: '700' };
+s.epDesc = { margin: 0, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 };
+s.epPlay = {
+  width: '48px', height: '48px', borderRadius: '16px',
+  border: '1px solid rgba(255,255,255,0.1)', display: 'grid', placeItems: 'center',
+  color: 'rgba(255,255,255,0.9)', background: 'rgba(255,255,255,0.04)',
+  transition: 'all 180ms ease',
+};
+s.epPlayHover = {
+  background: 'var(--accent-cyan)', borderColor: 'var(--accent-cyan)',
+  color: '#050c16', boxShadow: '0 0 15px rgba(0, 255, 255, 0.4)',
+};
+s.detailTopGrid = {
+  display: 'grid', gridTemplateColumns: 'minmax(280px, 1fr) minmax(320px, 1.1fr)', gap: '24px',
+};
+s.detailTopGridMobile = { gridTemplateColumns: '1fr' };

@@ -5,7 +5,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { contentService, searchService } from '../services';
 import { useBreakpoint } from '../hooks';
 import { CardSkeleton } from '../components/feedback/Skeleton';
-import WatchlistButton from '../components/ui/WatchlistButton';
+import ContentCard from '../components/media/ContentCard';
 import QuickViewModal from '../components/ui/QuickViewModal';
 
 const QUICK_GENRES = ['All', 'Action', 'Drama', 'Comedy', 'Horror', 'Romance', 'Thriller', 'Crime'];
@@ -34,71 +34,14 @@ function normalizeQuery(value, fallback = 'All') {
 }
 
 function BrowseCard({ item, index, isMobile, onQuickView }) {
-  const [hovered, setHovered] = useState(false);
-  const genre = String(item.genre || 'Featured').split(',')[0].trim();
-  const isSeries = item.type === 'series';
-
   return (
-    <article style={styles.cardShell} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
-      <button type="button" className="browse-card" style={styles.cardButton} onClick={() => onQuickView(item)}>
-        <div style={{
-          ...styles.posterWrap,
-          transform: hovered && !isMobile ? 'translateY(-5px) scale(1.02)' : 'translateY(0) scale(1)',
-          boxShadow: hovered && !isMobile
-            ? '0 24px 56px rgba(0,0,0,0.5), 0 0 0 1px rgba(121,228,255,0.16), 0 0 40px rgba(255,143,83,0.08)'
-            : '0 8px 28px rgba(0,0,0,0.3)',
-          borderColor: hovered && !isMobile ? 'rgba(121,228,255,0.14)' : 'rgba(255,255,255,0.07)',
-        }}>
-          <img src={item.poster} alt={item.title} style={{
-            ...styles.poster,
-            transform: hovered && !isMobile ? 'scale(1.06)' : 'scale(1)',
-          }} loading="lazy" />
-          <div style={styles.posterOverlay} />
-
-          <div style={styles.posterTop}>
-            <span style={styles.typeBadge}>{isSeries ? 'Series' : 'Movie'}</span>
-            {item.rating ? (
-              <span style={styles.ratingBadge}>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="var(--accent-tertiary)" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
-                {item.rating}
-              </span>
-            ) : null}
-          </div>
-
-          <div style={styles.posterBottom}>
-            <h3 style={styles.posterTitle}>{item.title}</h3>
-            <div style={styles.posterMeta}>
-              <span style={styles.genrePill}>{genre}</span>
-              {item.year ? <span style={styles.yearText}>{item.year}</span> : null}
-            </div>
-          </div>
-
-          {!isMobile && hovered ? (
-            <div style={styles.hoverOverlay}>
-              <div style={styles.playCircle}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="#08111d" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
-              </div>
-              <span style={styles.hoverLabel}>Quick View</span>
-            </div>
-          ) : null}
-        </div>
-
-        <div style={styles.cardInfo}>
-          <div style={styles.cardMeta}>
-            <span>{genre}</span>
-            <span style={styles.metaDot}>·</span>
-            <span>{item.year}</span>
-            {item.language && item.language !== 'Unknown' ? <><span style={styles.metaDot}>·</span><span>{item.language}</span></> : null}
-            {item.runtime ? <><span style={styles.metaDot}>·</span><span>{item.runtime}m</span></> : null}
-            {item.metadataStatus === 'needs_review' ? <span style={styles.reviewBadge}>Review</span> : null}
-          </div>
-        </div>
-      </button>
-
-      <div style={styles.watchlistSlot}>
-        <WatchlistButton contentType={isSeries ? 'series' : 'movie'} contentId={item.id} title={item.title} compact />
-      </div>
-    </article>
+    <ContentCard
+      item={item}
+      index={index}
+      compact={isMobile}
+      onQuickView={onQuickView}
+      showReviewBadge
+    />
   );
 }
 
@@ -640,177 +583,6 @@ const styles = {
     width: '100%',
     gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
     gap: '12px',
-  },
-  cardShell: {
-    position: 'relative',
-  },
-  cardButton: {
-    width: '100%',
-    textAlign: 'left',
-    display: 'grid',
-    gap: '8px',
-  },
-  posterWrap: {
-    position: 'relative',
-    aspectRatio: '2 / 3',
-    borderRadius: '14px',
-    overflow: 'hidden',
-    background: '#0d1a2d',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
-    transition: 'all 450ms cubic-bezier(0.34, 1.56, 0.64, 1)',
-  },
-  poster: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
-    transition: 'transform 500ms cubic-bezier(0.4, 0, 0.2, 1)',
-  },
-  posterOverlay: {
-    position: 'absolute',
-    inset: 0,
-    background: 'linear-gradient(180deg, rgba(0,0,0,0) 25%, rgba(0,0,0,0.08) 45%, rgba(5,12,22,0.9) 100%)',
-    pointerEvents: 'none',
-  },
-  posterTop: {
-    position: 'absolute',
-    top: '10px',
-    left: '10px',
-    right: '10px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: '6px',
-    zIndex: 1,
-  },
-  typeBadge: {
-    padding: '5px 10px',
-    borderRadius: '6px',
-    background: 'rgba(5, 12, 22, 0.6)',
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)',
-    color: '#ffffff',
-    fontSize: '0.62rem',
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: '0.12em',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-  },
-  ratingBadge: {
-    padding: '5px 9px',
-    borderRadius: '6px',
-    background: 'rgba(5, 12, 22, 0.6)',
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)',
-    color: 'var(--accent-cyan)',
-    fontSize: '0.68rem',
-    fontWeight: '900',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-  },
-  posterBottom: {
-    position: 'absolute',
-    left: '10px',
-    right: '10px',
-    bottom: '10px',
-    zIndex: 1,
-  },
-  posterTitle: {
-    color: '#fff',
-    fontSize: '0.88rem',
-    fontWeight: '700',
-    lineHeight: '1.3',
-    display: '-webkit-box',
-    WebkitLineClamp: 2,
-    WebkitBoxOrient: 'vertical',
-    overflow: 'hidden',
-    marginBottom: '6px',
-    textShadow: '0 2px 10px rgba(0,0,0,0.6)',
-    letterSpacing: '-0.01em',
-  },
-  posterMeta: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    flexWrap: 'wrap',
-  },
-  genrePill: {
-    padding: '3px 8px',
-    borderRadius: '6px',
-    background: 'rgba(255,255,255,0.12)',
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: '0.62rem',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: '0.06em',
-  },
-  yearText: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: '0.68rem',
-    fontWeight: '600',
-  },
-  hoverOverlay: {
-    position: 'absolute',
-    inset: 0,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '10px',
-    background: 'rgba(0,0,0,0.35)',
-    backdropFilter: 'blur(2px)',
-    zIndex: 2,
-  },
-  playCircle: {
-    width: '50px',
-    height: '50px',
-    borderRadius: '50%',
-    background: 'rgba(255,255,255,0.95)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0 8px 28px rgba(0,0,0,0.35)',
-    paddingLeft: '3px',
-  },
-  hoverLabel: {
-    color: '#fff',
-    fontSize: '0.7rem',
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: '0.1em',
-    textShadow: '0 2px 8px rgba(0,0,0,0.5)',
-  },
-  cardInfo: {
-    padding: '0 2px',
-  },
-  reviewBadge: {
-    padding: '4px 8px',
-    borderRadius: '6px',
-    background: 'rgba(255, 209, 102, 0.14)',
-    color: 'var(--accent-tertiary)',
-    fontSize: '0.6rem',
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: '0.1em',
-  },
-  cardMeta: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '5px',
-    flexWrap: 'wrap',
-    color: 'var(--text-muted)',
-    fontSize: '0.72rem',
-  },
-  metaDot: {
-    opacity: 0.4,
-    fontSize: '0.6rem',
-  },
-  watchlistSlot: {
-    position: 'absolute',
-    top: '8px',
-    right: '8px',
-    zIndex: 3,
   },
   loadMoreWrap: {
     width: 'min(1440px, calc(100vw - 48px))',
