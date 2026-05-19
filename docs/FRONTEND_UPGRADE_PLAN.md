@@ -1,6 +1,11 @@
 # Frontend Design Upgrade Plan
 ## Based on Analysis of https://data.speed4you.net/portal
 
+> Last updated: May 2026
+>
+> **Note:** Many Phase 1 and Phase 2 items have already been implemented. Status markers
+> have been updated to reflect the current state. See individual feature docs for details.
+
 ---
 
 ## 🎨 **1. VISUAL DESIGN IMPROVEMENTS**
@@ -338,33 +343,33 @@
 
 ## 📋 **IMPLEMENTATION PRIORITY**
 
-### Phase 1 (High Impact, Low Effort) - 1-2 weeks
+### Phase 1 (High Impact, Low Effort) - COMPLETED
 1. ✅ Enhanced card design with badges
 2. ✅ Numbered rankings on rails
 3. ✅ Better hover effects
 4. ✅ Improved typography
-5. ✅ Search autocomplete
+5. ✅ Search autocomplete (via GlobalSearchModal)
 
-### Phase 2 (High Impact, Medium Effort) - 2-3 weeks
-1. ✅ Hero carousel with multiple slides
-2. ✅ Quick view modal enhancements
-3. ✅ Advanced filters on browse page
-4. ✅ Mobile swipe gestures
-5. ✅ Loading animations
+### Phase 2 (High Impact, Medium Effort) - COMPLETED
+1. ✅ Hero carousel with multiple slides (HeroCarousel.jsx)
+2. ✅ Quick view modal enhancements (QuickViewModal.jsx)
+3. ✅ Advanced filters on browse page (FilterBar.jsx)
+4. ✅ Mobile swipe gestures (HeroCarousel touch support)
+5. ✅ Loading animations (Skeleton components, PageTransition)
 
-### Phase 3 (Medium Impact, Medium Effort) - 3-4 weeks
-1. ✅ Player enhancements (skip intro, quality selector)
-2. ✅ Personalized recommendations
-3. ✅ Genre pages
-4. ✅ Voice search
-5. ✅ PWA improvements
+### Phase 3 (Medium Impact, Medium Effort) - PARTIALLY DONE
+1. ✅ Player enhancements (speed control, PiP, audio boost, progress tracking)
+2. ✅ Personalized recommendations (/api/content/recommendations)
+3. ❌ Dedicated genre pages (browse has genre filters but no /genre/* routes)
+4. ❌ Voice search
+5. ✅ PWA improvements (service worker, manifest, install banner)
 
-### Phase 4 (Nice to Have, High Effort) - 4+ weeks
-1. ✅ Social features
-2. ✅ Gamification
-3. ✅ Watch party
-4. ✅ Advanced analytics
-5. ✅ Admin dashboard enhancements
+### Phase 4 (Nice to Have, High Effort) - NOT STARTED
+1. ❌ Social features
+2. ❌ Gamification
+3. ❌ Watch party
+4. ❌ Advanced analytics
+5. ✅ Admin dashboard enhancements (basic stats + content management exist)
 
 ---
 
