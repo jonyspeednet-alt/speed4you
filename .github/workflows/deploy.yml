@@ -35,57 +35,83 @@ jobs:
         env:
           VITE_APP_BASE: /portal/
 
-      - name: Backend npm install (for lockfile refresh)
+      - name: Install backend dependencies (lockfile only)
         run: npm ci
         working-directory: backend
 
-      - name: Strip node_modules from backend upload
+      - name: Strip node_modules from backend transfer
         run: rm -rf node_modules
         working-directory: backend
 
-      - name: Backup data files on server
+      - name: Backup production data files
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          SUDO_PASSWORD: ${{ ***REMOVED***s.SUDO_PASSWORD }}
         with:
           host: ${{ ***REMOVED***s.DEPLOY_HOST }}
           username: ${{ ***REMOVED***s.DEPLOY_USER }}
           key: ${{ ***REMOVED***s.DEPLOY_SSH_KEY }}
           port: ${{ ***REMOVED***s.DEPLOY_PORT }}
+          envs: SUDO_PASSWORD
           script: |
             BACKEND=/home/speed4you/portal-app/backend
             BACKUP_DIR=/home/speed4you/portal-deploy-backups/current
             mkdir -p "$BACKUP_DIR"
-            for f in catalog.json scanner-log.json scanner-roots.json scanner-runtime.json scanner-state.json; do
-              if [ -f "$BACKEND/src/data/$f" ]; then
-                cp -a "$BACKEND/src/data/$f" "$BACKUP_DIR/$f"
-              fi
-            done
+            if [ -d "$BACKEND" ]; then
+              for f in catalog.json scanner-log.json scanner-roots.json scanner-runtime.json scanner-state.json; do
+                if [ -f "$BACKEND/src/data/$f" ]; then
+                  cp -a "$BACKEND/src/data/$f" "$BACKUP_DIR/$f"
+                fi
+              done
+            fi
             echo "Backup complete"
 
-      - name: Upload frontend bundle
-        uses: appleboy/scp-action@v0.1.7
+      - name: Copy frontend to web root
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          SUDO_PASSWORD: ${{ ***REMOVED***s.SUDO_PASSWORD }}
         with:
           host: ${{ ***REMOVED***s.DEPLOY_HOST }}
           username: ${{ ***REMOVED***s.DEPLOY_USER }}
           key: ${{ ***REMOVED***s.DEPLOY_SSH_KEY }}
           port: ${{ ***REMOVED***s.DEPLOY_PORT }}
-          source: "frontend/dist/*"
-          target: "/var/www/html/portal"
-          strip_components: 2
-          overwrite: true
+          envs: SUDO_PASSWORD
+          script: |
+            SRC=/home/speed4you/actions-runner/_work/speed4you/speed4you/frontend/dist
+            DEST=/var/www/html/portal
+            if [ -d "$SRC" ]; then
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p "$DEST"
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -r "$SRC/." "$DEST/"
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$DEST"
+              echo "Frontend copied to $DEST"
+            else
+              echo "ERROR: $SRC not found" >&2
+              exit 1
+            fi
 
-      - name: Upload backend package
-        uses: appleboy/scp-action@v0.1.7
+      - name: Copy backend to app directory
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          SUDO_PASSWORD: ${{ ***REMOVED***s.SUDO_PASSWORD }}
         with:
           host: ${{ ***REMOVED***s.DEPLOY_HOST }}
           username: ${{ ***REMOVED***s.DEPLOY_USER }}
           key: ${{ ***REMOVED***s.DEPLOY_SSH_KEY }}
           port: ${{ ***REMOVED***s.DEPLOY_PORT }}
-          source: "backend/*"
-          target: "/home/speed4you/portal-app/backend"
-          strip_components: 1
-          overwrite: true
+          envs: SUDO_PASSWORD
+          script: |
+            SRC=/home/speed4you/actions-runner/_work/speed4you/speed4you/backend
+            DEST=/home/speed4you/portal-app/backend
+            if [ -d "$SRC" ]; then
+              mkdir -p "$DEST"
+              cp -a "$SRC/." "$DEST/"
+              echo "Backend copied to $DEST"
+            else
+              echo "ERROR: $SRC not found" >&2
+              exit 1
+            fi
 
-      - name: Restore data, install deps, .env, restart, health check
+      - name: Install deps, write .env, restart, health check
         uses: appleboy/ssh-action@v1.2.0
         env:
           TMDB_API_KEY: ${{ ***REMOVED***s.TMDB_API_KEY }}
@@ -108,9 +134,8 @@ jobs:
             set -e
             BACKEND=/home/speed4you/portal-app/backend
             BACKUP_DIR=/home/speed4you/portal-deploy-backups/current
-            SUDO_PASSWORD="${SUDO_PASSWORD}"
 
-            # Restore production data files overwritten by the upload
+            # Restore production data files
             for f in catalog.json scanner-log.json scanner-roots.json scanner-runtime.json scanner-state.json; do
               if [ -f "$BACKUP_DIR/$f" ]; then
                 cp -a "$BACKUP_DIR/$f" "$BACKEND/src/data/$f" 2>/dev/null || true
@@ -145,7 +170,7 @@ jobs:
             fi
 
             echo "Restarting service..."
-            echo "$SUDO_PASSWORD" | sudo -S -p '' systemctl restart isp-portal-backend.service
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' systemctl restart isp-portal-backend.service
 
             echo "Health check..."
             for i in $(seq 1 30); do
