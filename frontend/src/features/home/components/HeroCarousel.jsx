@@ -6,11 +6,48 @@ import WatchlistButton from '../../../components/ui/WatchlistButton';
 import styles from './HeroCarousel.module.css'; // Import CSS module
 
 const AUTO_PLAY_DURATION = 3200;
+const MAX_VISIBLE_DOTS = 9;
+
+// Returns the slice of dot indices to show in the sliding window
+function getDotWindow(total, active, maxVisible) {
+    if (total <= maxVisible) return { start: 0, end: total, showStartEllipsis: false, showEndEllipsis: false };
+    const half = Math.floor(maxVisible / 2);
+    let start = Math.max(0, active - half);
+    let end = start + maxVisible;
+    if (end > total) {
+        end = total;
+        start = Math.max(0, end - maxVisible);
+    }
+    return {
+        start,
+        end,
+        showStartEllipsis: start > 0,
+        showEndEllipsis: end < total,
+    };
+}
 const AUTO_PLAY_RESUME_DELAY = 1200;
 const PROGRESS_INTERVAL = 50;
 
+function normalizeCarouselItem(item) {
+    if (!item) return null;
+    return {
+        ...item,
+        title: item.title || 'Featured Spotlight',
+        description: item.description || 'Freshly highlighted content.',
+        backdrop: item.backdrop || item.poster || null,
+        poster: item.poster || null,
+        genre: item.genre || '',
+        language: item.language || item.originalLanguage || 'Mixed',
+        year: item.year || '',
+        rating: item.rating || null,
+        type: item.type || 'movie',
+        isPlaceholder: item.isPlaceholder || false,
+    };
+}
+
 function HeroCarousel({ content, items }) {
-    const contentItems = Array.isArray(content) ? content : Array.isArray(items) ? items : [];
+    const rawItems = Array.isArray(content) ? content : Array.isArray(items) ? items : [];
+    const contentItems = rawItems.map(normalizeCarouselItem).filter(Boolean);
     const { isMobile, isTablet } = useBreakpoint();
     const isTVMode = useTVMode();
     const sectionRef = useRef(null);
@@ -122,7 +159,13 @@ function HeroCarousel({ content, items }) {
 
     const isSeries = type === 'series';
     const eyebrow = isPlaceholder ? 'CURATED DROP' : (isSeries ? 'SERIES SPOTLIGHT' : 'MOVIE PREMIERE');
-    const heroChips = [...(typeof genre === 'string' ? genre.split(',') : []), language, year].filter(Boolean).slice(0, 4);
+    // Handle genre as string or array, deduplicate, limit count
+    const genreChips = Array.isArray(genre)
+        ? genre.filter(Boolean)
+        : typeof genre === 'string'
+            ? genre.split(',').map(g => g.trim()).filter(Boolean)
+            : [];
+    const heroChips = [...genreChips, language, year].filter(Boolean).slice(0, 4);
 
     const insightItems = [
         { label: 'Format', value: isPlaceholder ? 'Spotlight' : (isSeries ? 'Series' : 'Movie') },
@@ -176,8 +219,7 @@ function HeroCarousel({ content, items }) {
                 <div className={`${styles.copyPanel} ${isTVMode ? styles.copyPanelTv : ''}`}>
                     <div className={styles.kickerRow}>
                         <span className={styles.liveBadge}>{eyebrow}</span>
-                        {genre ? <span className={styles.genre}>{genre}</span> : null}
-                        {year ? <span className={styles.year}>{year}</span> : null}
+                        {type && <span className={styles.genre}>{isSeries ? 'Series' : 'Movie'}</span>}
                     </div>
 
                     <h1 className={styles.title}>{title}</h1>
@@ -273,15 +315,30 @@ function HeroCarousel({ content, items }) {
                     </div>
 
                     <div className={styles.carouselDots}>
-                        {contentItems.map((_, index) => (
-                            <button
-                                key={index}
-                                onClick={() => moveToSlide(index)}
-                                className={index === activeIndex ? styles.dotActive : styles.dot}
-                                aria-label={`Go to slide ${index + 1}`}
-                                aria-current={index === activeIndex}
-                            />
-                        ))}
+                        {(() => {
+                            const { start, end, showStartEllipsis, showEndEllipsis } = getDotWindow(contentItems.length, activeIndex, MAX_VISIBLE_DOTS);
+                            return (
+                                <>
+                                    {showStartEllipsis && <span className={styles.dotEllipsis}>…</span>}
+                                    {contentItems.slice(start, end).map((_, i) => {
+                                        const index = start + i;
+                                        return (
+                                            <button
+                                                key={index}
+                                                onClick={() => moveToSlide(index)}
+                                                className={index === activeIndex ? styles.dotActive : styles.dot}
+                                                aria-label={`Go to slide ${index + 1}`}
+                                                aria-current={index === activeIndex}
+                                            />
+                                        );
+                                    })}
+                                    {showEndEllipsis && <span className={styles.dotEllipsis}>…</span>}
+                                    {contentItems.length > MAX_VISIBLE_DOTS && (
+                                        <span className={styles.slideCounter}>{activeIndex + 1}&thinsp;/&thinsp;{contentItems.length}</span>
+                                    )}
+                                </>
+                            );
+                        })()}
                     </div>
                 </>
             )}
