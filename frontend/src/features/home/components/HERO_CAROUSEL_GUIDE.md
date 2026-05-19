@@ -1,165 +1,184 @@
-# Hero Carousel Component Guide
+# Hero Carousel — Usage Guide
 
-## Overview
-একটি আধুনিক, ফিচার-সমৃদ্ধ ক্যারোসেল কম্পোনেন্ট যা মাল্টিপল কন্টেন্ট আইটেম প্রদর্শন করে।
+> Quick reference for integrating and customizing the HeroCarousel component.
 
-## Features
+---
 
-### 🎬 Core Features
-- **Auto-play**: 7 সেকেন্ডের ব্যবধানে স্বয়ংক্রিয় স্লাইড পরিবর্তন
-- **Progress Bar**: বর্তমান স্লাইডের অগ্রগতি দেখায় (ডেস্কটপ)
-- **Keyboard Navigation**: ← → তীর কী দিয়ে নেভিগেট করুন
-- **Touch/Swipe Support**: মোবাইলে সোয়াইপ করে নেভিগেট করুন
-- **Parallax Effect**: ডেস্কটপে স্ক্রল করার সময় ব্যাকগ্রাউন্ড মুভ করে
+## Quick Start
 
-### 🎨 UI Controls
-- **Navigation Arrows**: পূর্ববর্তী/পরবর্তী বাটন (ডেস্কটপ)
-- **Carousel Dots**: ইন্টারঅ্যাক্টিভ ডট নেভিগেশন
-- **Slide Counter**: বর্তমান স্লাইড নম্বর (01 / 05)
-- **Thumbnail Preview**: প্রথম 5 স্লাইডের থাম্বনেইল (ডেস্কটপ)
-
-### 📱 Responsive Design
-- **Desktop**: সম্পূর্ণ ফিচার সহ
-- **Tablet**: সরলীকৃত লেআউট
-- **Mobile**: টাচ-অপ্টিমাইজড, কম্প্যাক্ট কন্ট্রোল
-
-## Usage
-
-### Basic Implementation
 ```jsx
-import HeroCarousel from './HeroCarousel';
+import HeroCarousel from './features/home/components/HeroCarousel';
 
-function HomePage() {
-  const heroContent = [
+function MyPage() {
+  const featuredContent = [
     {
       id: '1',
-      title: 'Movie Title',
-      description: 'Movie description...',
-      genre: 'Action',
-      language: 'English',
-      year: 2024,
-      rating: 8.5,
+      title: 'Inception',
+      description: 'A thief who steals corporate ***REMOVED***s through dream-sharing technology.',
+      backdrop: '/images/inception-backdrop.jpg',
+      poster: '/images/inception-poster.jpg',
       type: 'movie',
-      backdrop: 'https://...',
-      poster: 'https://...',
+      genre: 'Sci-Fi',
+      language: 'English',
+      year: 2010,
+      rating: 8.8,
     },
-    // More items...
+    // ... more items
   ];
 
-  return <HeroCarousel content={heroContent} />;
+  return <HeroCarousel content={featuredContent} />;
 }
 ```
 
-### Props
-```typescript
-interface HeroCarouselProps {
-  content: ContentItem[];
-}
+---
 
-interface ContentItem {
-  id: string;
-  title: string;
-  description: string;
-  genre?: string;
-  language?: string;
-  year?: number;
-  rating?: number;
-  type: 'movie' | 'series';
-  backdrop?: string;  // Background image
-  poster?: string;    // Poster image
-  isPlaceholder?: boolean;
-}
-```
+## Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `content` | `Array<ContentItem>` | `[]` | Array of content items to display. Alias: `items` |
+| `items` | `Array<ContentItem>` | `[]` | Alternative to `content` — same array |
+
+### ContentItem Shape
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | `string` | Yes | Unique content identifier |
+| `title` | `string` | No | Display title (fallback: "Featured spotlight") |
+| `description` | `string` | No | Short description (fallback: "Freshly highlighted content from your portal.") |
+| `backdrop` | `string` | No | Backdrop image URL — used as hero background |
+| `poster` | `string` | No | Poster image URL — used in showcase panel and thumbnails |
+| `type` | `'movie' \| 'series'` | No | Content type — affects eyebrow text and button labels |
+| `genre` | `string` | No | Genre label displayed in kicker row and chip row |
+| `language` | `string` | No | Language displayed in chip row and metrics |
+| `year` | `string \| number` | No | Year displayed in kicker row |
+| `rating` | `number` | No | Star rating (1-10) — shown with StarRating component |
+| `isPlaceholder` | `boolean` | No | If true, shows "Browse Latest" instead of "Play Now" |
+
+---
 
 ## Keyboard Shortcuts
-| Key | Action |
-|-----|--------|
-| ← | Previous slide |
-| → | Next slide |
 
-## Touch Gestures
-| Gesture | Action |
-|---------|--------|
-| Swipe Left | Next slide |
-| Swipe Right | Previous slide |
+| Key | Action | Condition |
+|-----|--------|-----------|
+| `ArrowLeft` | Previous slide | Carousel section has focus or body is focused |
+| `ArrowRight` | Next slide | Carousel section has focus or body is focused |
 
-## Styling Customization
+---
 
-### CSS Variables Used
-```css
---nav-height-desktop: Navigation height
---nav-height-mobile: Mobile nav height
---spacing-*: Spacing values
---radius-*: Border radius values
---bg-primary: Primary background
---text-primary: Primary text color
---text-secondary: Secondary text color
---text-muted: Muted text color
---accent-red: Red accent color
---accent-cyan: Cyan accent color
---accent-amber: Amber accent color
+## Auto-Play Behavior
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `AUTO_PLAY_DURATION` | `3200ms` | Time each slide is displayed before auto-advancing |
+| `AUTO_PLAY_RESUME_DELAY` | `1200ms` | Pause duration after any manual interaction |
+| `PROGRESS_INTERVAL` | `50ms` | How often the progress bar updates |
+
+- Auto-play starts immediately when the carousel loads with 2+ items
+- Any manual interaction (click, swipe, keyboard) pauses auto-play temporarily
+- Auto-play resumes after `AUTO_PLAY_RESUME_DELAY`
+- Hovering does NOT pause auto-play (only manual navigation does)
+
+---
+
+## Responsive Behavior
+
+| Breakpoint | Layout | Showcase | Navigation |
+|------------|--------|----------|------------|
+| Desktop (>= 1024px) | 2-column: copy panel + showcase panel | Poster + "Up next" thumbnails | Arrows + dots |
+| Tablet (768-1023px) | 2-column: narrower | Poster + thumbnails (280px) | Arrows + dots |
+| Mobile (< 768px) | Single column: copy only | Hidden | Dots only |
+| TV Mode | Single column: centered copy | Hidden | Arrows + dots |
+
+---
+
+## Visual Elements
+
+### Copy Panel (Left Side)
+- **Eyebrow badge** — Shows "MOVIE PREMIERE", "SERIES SPOTLIGHT", or "CURATED DROP"
+- **Title** — Large, bold text with text-shadow
+- **Description** — Truncated to 3 lines (2 on mobile)
+- **Chip row** — Genre, language, year as pill badges
+- **Metric row** — Format, Rating (with star component), Language in stat cards
+- **Action buttons** — Primary (Play/Browse) + Secondary (Details/Search) + Watchlist
+
+### Showcase Panel (Right Side, Desktop/Tablet Only)
+- **Poster frame** — Large poster image with shine overlay
+- **Queue card** — "Up next" label with 4 thumbnail previews of upcoming slides
+
+### Navigation
+- **Arrow buttons** — Top-right, semi-transparent with backdrop blur
+- **Progress bar** — Bottom, gradient fill (cyan to secondary accent)
+- **Dot indicators** — Bottom center, active dot is elongated with glow
+
+---
+
+## Customization
+
+### Changing Auto-Play Duration
+
+Edit the constant in `HeroCarousel.jsx`:
+
+```javascript
+const AUTO_PLAY_DURATION = 5000; // Change from 3200ms to 5000ms
 ```
 
-### Customizing Colors
-সব রঙ CSS variables এর মাধ্যমে কাস্টমাইজ করা যায়। আপনার root CSS এ এগুলো ওভাররাইড করুন:
+### Using the Config Hook
 
-```css
-:root {
-  --accent-red: #ff5a5f;
-  --accent-cyan: #00f5d4;
-  --accent-amber: #ffc857;
+The `useCarouselConfig` hook provides a customizable configuration system. While `HeroCarousel` currently uses hardcoded constants, the hook is available for future enhancements:
+
+```jsx
+import { useCarouselConfig, useCarouselState, useKeyboardNavigation } from '../hooks/useCarouselConfig';
+
+function CustomCarousel({ items }) {
+  const config = useCarouselConfig({
+    autoPlayDuration: 5000,
+    enableParallax: false,
+    maxThumbnails: 3,
+  });
+
+  const { activeIndex, handleNext, handlePrevious } = useCarouselState(items, config);
+  useKeyboardNavigation(config.enableKeyboardNavigation, handleNext, handlePrevious);
+
+  // ... custom rendering
 }
 ```
 
-## Animation Timings
-- **Auto-play Duration**: 7000ms
-- **Progress Update**: 50ms
-- **Transition**: 0.3s ease
-- **Parallax**: 20s infinite
+### CSS Custom Properties
 
-## Accessibility
-- ✅ ARIA labels সব বাটনে
-- ✅ Keyboard navigation সাপোর্ট
-- ✅ Semantic HTML
-- ✅ Focus management
-- ✅ Screen reader friendly
+The carousel uses these CSS variables that you can override:
 
-## Performance Considerations
-- Lazy loading images
-- Passive event listeners
-- Efficient re-renders
-- Cleanup on unmount
+| Variable | Usage |
+|----------|-------|
+| `--accent-cyan` | Primary accent (progress bar, thumbnails, badges) |
+| `--accent-pink` | Secondary accent (eyebrow badge border, aurora orb) |
+| `--accent-secondary` | Gradient endpoint (progress bar, play button) |
+| `--bg-primary` | Background color (#050c16) |
+| `--text-primary` | Primary text color |
+| `--text-muted` | Muted label text |
+| `--nav-occupied-desktop` | Top offset for navigation bar |
 
-## Browser Support
-- Chrome/Edge: ✅ Full support
-- Firefox: ✅ Full support
-- Safari: ✅ Full support
-- Mobile browsers: ✅ Full support
+---
 
-## Common Issues & Solutions
+## Troubleshooting
 
-### Issue: Carousel not auto-playing
-**Solution**: নিশ্চিত করুন `content` array এ কমপক্ষে 2 আইটেম আছে।
+| Issue | Cause | Fix |
+|-------|-------|-----|
+| Images not loading | Missing `backdrop` or `poster` URLs | Ensure content items have valid image URLs |
+| Carousel not rotating | Only 1 item or `isAutoPlay` is false | Carousel requires 2+ items for auto-play |
+| Parallax janky on mobile | Parallax is computationally expensive | Parallax is auto-disabled on mobile/tablet |
+| Keyboard not responding | Focus is inside an input or modal | Keyboard only works when carousel section or body has focus |
+| Thumbnails not showing | On mobile or TV mode | Showcase panel is hidden on mobile and TV mode by design |
+| Progress bar stuck | Auto-play was paused by interaction | Resumes after 1200ms delay |
 
-### Issue: Images not loading
-**Solution**: `backdrop` এবং `poster` URLs সঠিক কিনা চেক করুন।
+---
 
-### Issue: Keyboard navigation not working
-**Solution**: নিশ্চিত করুন section focused আছে বা body active element।
+## File Locations
 
-## Future Enhancements
-- [ ] Keyboard shortcuts customization
-- [ ] Custom animation speeds
-- [ ] Video support
-- [ ] Analytics tracking
-- [ ] Accessibility improvements
-- [ ] Performance optimizations
-
-## Dependencies
-- React 16.8+
-- react-router-dom
-- Custom hooks: `useBreakpoint`
-- Custom components: `StarRating`, `WatchlistButton`
-
-## License
-Part of the main application
+| File | Path |
+|------|------|
+| HeroCarousel component | `frontend/src/features/home/components/HeroCarousel.jsx` |
+| HeroBanner component | `frontend/src/features/home/components/HeroBanner.jsx` |
+| Carousel config hooks | `frontend/src/features/home/hooks/useCarouselConfig.js` |
+| Carousel tests | `frontend/src/features/home/components/HeroCarousel.test.jsx` |
+| Architecture doc | `frontend/src/features/home/ARCHITECTURE.md` |
