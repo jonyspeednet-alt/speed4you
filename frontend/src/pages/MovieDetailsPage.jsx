@@ -260,7 +260,7 @@ export default function MovieDetailsPage() {
 
 // ── Styles ───────────────────────────────────────────────────────────────────
 const s = {
-  page: { minHeight: '100vh', paddingTop: 88, position: 'relative', overflow: 'hidden' },
+  page: { minHeight: '100vh', paddingTop: 88, position: 'relative', overflow: 'hidden', background: '#050c16' },
 
   auroraOrb: {
     position: 'absolute',
@@ -400,7 +400,7 @@ const s = {
   },
   qualityBadge: {
     padding: '6px 12px',
-    borderRadius: '999px',
+    borderRadius: '8px',
     background: 'rgba(255,255,255,0.08)',
     border: '1px solid rgba(255,255,255,0.12)',
     color: '#ffffff',
@@ -410,10 +410,10 @@ const s = {
     textTransform: 'uppercase',
   },
   title: {
-    fontSize: 'clamp(2.8rem, 6vw, 5.2rem)',
+    fontSize: 'clamp(2.4rem, 5vw, 4.2rem)',
     fontWeight: '900',
     color: '#ffffff',
-    lineHeight: '0.95',
+    lineHeight: '1.05',
     letterSpacing: '-0.03em',
     textShadow: '0 10px 30px rgba(0,0,0,0.5)',
   },
@@ -465,7 +465,7 @@ const s = {
     textDecoration: 'none',
   },
   titleMobile: {
-    fontSize: 'clamp(2rem, 8vw, 3.2rem)',
+    fontSize: 'clamp(2rem, 8vw, 3rem)',
   },
   actions: {
     display: 'flex',
