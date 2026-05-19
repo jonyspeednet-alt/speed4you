@@ -244,7 +244,7 @@ function HeroCarousel({ content, items }) {
 
                     <div className={styles.actions}>
                         <Link className={`${styles.button} ${styles.buttonPrimary}`} to={isPlaceholder ? '/browse?sort=latest' : `/watch/${id}`}>
-                            <svg className={styles.buttonIcon} width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <svg className={styles.buttonIcon} width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                                 {isPlaceholder ? <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z" /> : <path d="M8 5v14l11-7z" />}
                             </svg>
                             <span>{isPlaceholder ? 'Browse Latest' : (isSeries ? 'Start Watching' : 'Play Now')}</span>
@@ -256,9 +256,7 @@ function HeroCarousel({ content, items }) {
                             <span>{isPlaceholder ? 'Search Portal' : 'Details'}</span>
                         </Link>
                         {!isPlaceholder && (
-                            <div className={styles.watchlistWrap}>
-                                <WatchlistButton contentType={isSeries ? 'series' : 'movie'} contentId={id} title={title} />
-                            </div>
+                            <WatchlistButton contentType={isSeries ? 'series' : 'movie'} contentId={id} title={title} />
                         )}
                     </div>
                 </div>
