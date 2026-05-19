@@ -74,7 +74,7 @@ const styles = {
   },
   header: {
     width: 'min(1440px, calc(100vw - 48px))',
-    margin: '0 auto 14px',
+    margin: '0 0 14px 24px',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'end',
@@ -87,6 +87,7 @@ const styles = {
   headerTV: {
     width: 'min(1720px, calc(100vw - 96px))',
     marginBottom: '24px',
+    marginLeft: '48px',
   },
   eyebrow: {
     display: 'inline-block',
@@ -140,7 +141,7 @@ const styles = {
   rail: {
     display: 'flex',
     gap: '16px',
-    padding: '6px max(24px, calc((100vw - 1440px) / 2)) 16px',
+    padding: '6px 0 16px 24px',
     overflowX: 'auto',
     scrollSnapType: 'x mandatory',
     scrollbarWidth: 'none',
@@ -151,7 +152,7 @@ const styles = {
   },
   railTV: {
     gap: '20px',
-    padding: '6px max(48px, calc((100vw - 1720px) / 2)) 16px',
+    padding: '6px 0 16px 48px',
   },
 };
 
