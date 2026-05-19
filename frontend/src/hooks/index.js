@@ -131,3 +131,12 @@ export function useRecentlyViewed() {
 }
 
 export { useTVMode } from './useTVMode';
+export {
+  useResponsive,
+  useMediaQuery,
+  useIsMobile,
+  useIsTablet,
+  useIsDesktop,
+  useIsTV,
+  useScreenSize,
+} from './useResponsive';
