@@ -54,7 +54,7 @@ function MovieDetailsSkeleton() {
 
 // ── Main component ───────────────────────────────────────────────────────────
 export default function MovieDetailsPage() {
-  const { isMobile, isTablet } = useBreakpoint();
+  const { isMobile, isTablet, isDesktop } = useBreakpoint();
   const { slug } = useParams();
   const { addItem: trackView } = useRecentlyViewed();
   const [movie, setMovie] = useState(() => readMovieCache(slug));
@@ -308,12 +308,12 @@ const s = {
     width: 'min(1440px, calc(100vw - 48px))',
     margin: '0 auto',
     display: 'grid',
-    gridTemplateColumns: '320px 1fr',
+    gridTemplateColumns: 'minmax(260px, 360px) minmax(0, 1fr)',
     gap: '60px',
     alignItems: 'center',
   },
   heroInnerTablet: {
-    gridTemplateColumns: '260px 1fr',
+    gridTemplateColumns: '1fr',
     gap: '32px',
   },
   heroInnerMobile: {
@@ -331,6 +331,7 @@ const s = {
     boxShadow: '0 40px 80px rgba(0,0,0,0.8)',
     border: '1px solid rgba(255,255,255,0.12)',
     aspectRatio: '2/3',
+    minWidth: '260px',
   },
   posterGlow: {
     position: 'absolute',
@@ -345,7 +346,7 @@ const s = {
   },
   posterWrapMobile: {
     width: '100%',
-    maxWidth: '360px',
+    maxWidth: '340px',
     margin: '0 auto',
     aspectRatio: '2/3',
   },
@@ -486,14 +487,14 @@ const s = {
     zIndex: 2,
     width: 'min(1440px, calc(100vw - 48px))',
     margin: '0 auto',
-    padding: '0 24px 64px',
+    padding: '36px 24px 64px',
     display: 'flex',
     flexDirection: 'column',
     gap: '28px',
   },
   detailGrid: {
     display: 'grid',
-    gridTemplateColumns: '1.2fr 0.8fr',
+    gridTemplateColumns: 'minmax(280px, 1fr) minmax(320px, 1.2fr)',
     gap: '24px',
   },
   detailGridMobile: {
@@ -575,7 +576,7 @@ const s = {
   },
   browseMore: {
     display: 'flex',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     flexWrap: 'wrap',
     gap: '12px',
   },
