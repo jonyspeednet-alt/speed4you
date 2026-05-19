@@ -12,6 +12,7 @@
     border-bottom-left-radius: 48px;
     border-bottom-right-radius: 48px;
     margin-bottom: 40px;
+    padding-top: var(--nav-occupied-desktop);
 }
 
 .heroTv {
@@ -117,8 +118,8 @@
     width: min(1440px, calc(100vw - 48px));
     max-width: 100%;
     margin: 0 auto;
-    min-height: clamp(540px, 74vh, 760px);
-    padding: calc(var(--nav-occupied-desktop) + 24px) 0 76px;
+    min-height: calc(clamp(540px, 74vh, 760px) - var(--nav-occupied-desktop));
+    padding: clamp(24px, 4vw, 52px) 0 76px;
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
     gap: 24px;
@@ -520,7 +521,7 @@
 .navigationArrows {
     position: absolute;
     right: max(24px, calc((100vw - min(1440px, calc(100vw - 48px))) / 2));
-    top: calc(var(--nav-occupied-desktop) + 10px);
+    top: 10px;
     z-index: 3;
     display: flex;
     gap: 10px;
@@ -632,10 +633,10 @@
     }
     .layout {
         width: min(100vw - 32px, 1200px);
-        min-height: clamp(500px, 66vh, 640px);
+        min-height: calc(clamp(500px, 66vh, 640px) - var(--nav-occupied-desktop));
         grid-template-columns: minmax(0, 1fr) 280px;
         gap: 18px;
-        padding: calc(var(--nav-occupied-desktop) + 16px) 0 72px;
+        padding: 24px 0 72px;
     }
     .showcasePanel {
         max-width: 280px;
@@ -650,13 +651,14 @@
         border-bottom-left-radius: 32px;
         border-bottom-right-radius: 32px;
         margin-bottom: 24px;
+        padding-top: var(--nav-occupied-mobile);
     }
 
     .layout {
         width: 100%;
-        min-height: clamp(480px, 65svh, 600px);
+        min-height: calc(clamp(480px, 65svh, 600px) - var(--nav-occupied-mobile));
         grid-template-columns: 1fr;
-        padding: calc(var(--nav-occupied-mobile) + 12px) 16px 60px;
+        padding: 24px 16px 60px;
     }
 
     .copyPanel {
@@ -728,7 +730,7 @@
 /* TV Mode Styles */
 .layoutTv {
     width: min(1720px, calc(100vw - 120px));
-    min-height: 80vh;
+    min-height: calc(80vh - var(--nav-occupied-desktop));
     grid-template-columns: 1fr; /* Single column to focus on centered content */
     text-align: center;
     justify-items: center;
