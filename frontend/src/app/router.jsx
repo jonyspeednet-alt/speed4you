@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { RouteErrorBoundary } from '../components/feedback/ErrorBoundary.jsx';
+import GlobalErrorBoundary from '../components/feedback/GlobalErrorBoundary.jsx';
 import MainSiteLayout from '../layouts/MainSiteLayout';
 import AdminLayout from '../layouts/AdminLayout';
 import { RailSkeleton, HeroBannerSkeleton } from '../components/feedback/Skeleton';
@@ -169,7 +170,11 @@ const router = createBrowserRouter([
 });
 
 function AppRouter() {
-  return <RouterProvider router={router} />;
+  return (
+    <GlobalErrorBoundary>
+      <RouterProvider router={router} />
+    </GlobalErrorBoundary>
+  );
 }
 
 export default AppRouter;
