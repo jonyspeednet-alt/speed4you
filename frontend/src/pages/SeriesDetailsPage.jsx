@@ -98,7 +98,7 @@ function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMo
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function SeriesDetailsPage() {
-  const { isMobile, isTablet } = useBreakpoint();
+  const { isMobile, isTablet, isDesktop } = useBreakpoint();
   const { slug } = useParams();
   const { addItem: trackView } = useRecentlyViewed();
   const [series, setSeries] = useState(() => readCache(slug));
@@ -282,9 +282,38 @@ export default function SeriesDetailsPage() {
       {/* ── Season & Episodes ── */}
       <div style={s.body}>
 
+        {/* Overview */}
+        <div style={{ ...s.detailTopGrid, ...(isMobile ? s.detailTopGridMobile : {}) }}>
+          <section style={s.card}>
+            <h2 style={s.cardTitle}>Series details</h2>
+            <div style={s.statGrid}>
+              {[
+                { label: 'Year', value: series.year },
+                { label: 'Seasons', value: seasons.length || '—' },
+                { label: 'Episodes', value: totalEpisodes || '—' },
+                { label: 'Language', value: series.language || series.originalLanguage || '—' },
+                { label: 'Rating', value: series.rating ? `${series.rating} / 10` : '—' },
+                { label: 'Genre', value: genres.slice(0, 2).join(', ') || '—' },
+              ].map(({ label, value }) => (
+                <div key={label} style={s.statItem}>
+                  <span style={s.statLabel}>{label}</span>
+                  <strong style={s.statValue}>{value}</strong>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {series.description && (
+            <section style={s.card}>
+              <h2 style={s.cardTitle}>Synopsis</h2>
+              <p style={s.synopsisText}>{series.description}</p>
+            </section>
+          )}
+        </div>
+
         {/* Season tabs */}
         {seasons.length > 1 && (
-          <div style={s.seasonTabsWrap} ref={seasonTabsRef}>
+          <div style={{ ...s.seasonTabsWrap, ...(isMobile ? s.seasonTabsWrapMobile : {}) }} ref={seasonTabsRef}>
             <div style={s.seasonTabs}>
               {seasons.map((season, idx) => {
                 const active = activeSeason === idx;
@@ -410,12 +439,12 @@ const s = {
     width: 'min(1440px, calc(100vw - 48px))',
     margin: '0 auto',
     display: 'grid',
-    gridTemplateColumns: '320px 1fr',
+    gridTemplateColumns: 'minmax(260px, 360px) minmax(0, 1fr)',
     gap: '60px',
     alignItems: 'center',
   },
   heroInnerTablet: {
-    gridTemplateColumns: '260px 1fr',
+    gridTemplateColumns: '1fr',
     gap: '32px',
   },
   heroInnerMobile: {
@@ -432,10 +461,11 @@ const s = {
     boxShadow: '0 40px 80px rgba(0,0,0,0.8)',
     border: '1px solid rgba(255,255,255,0.12)',
     aspectRatio: '2/3',
+    minWidth: '260px',
   },
   posterWrapMobile: {
     width: '100%',
-    maxWidth: '360px',
+    maxWidth: '340px',
     margin: '0 auto',
     aspectRatio: '2/3',
   },
@@ -558,7 +588,7 @@ const s = {
   },
   btnFull: { width: '100%' },
 
-  body: { position: 'relative', zIndex: 2, width: 'min(1440px, calc(100vw - 48px))', margin: '0 auto', padding: '0 24px 64px', display: 'flex', flexDirection: 'column', gap: '28px' },
+  body: { position: 'relative', zIndex: 2, width: 'min(1440px, calc(100vw - 48px))', margin: '0 auto', padding: '36px 24px 64px', display: 'flex', flexDirection: 'column', gap: '28px' },
   seasonTabsWrap: {
     position: 'sticky',
     top: 96,
@@ -570,6 +600,13 @@ const s = {
     padding: '10px 12px',
     marginBottom: '24px',
     overflowX: 'auto',
+  },
+  seasonTabsWrapMobile: {
+    position: 'static',
+    background: 'transparent',
+    border: 'none',
+    padding: '0',
+    marginBottom: '16px',
   },
   seasonTabs: { display: 'flex', gap: '12px', alignItems: 'center' },
   seasonTab: {
@@ -657,7 +694,15 @@ const s = {
     boxShadow: '0 0 15px rgba(0, 255, 255, 0.4)',
   },
 
-  browseMore: { display: 'flex', justifyContent: 'flex-end', flexWrap: 'wrap', gap: '12px' },
+  browseMore: { display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' },
+  detailTopGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(280px, 1fr) minmax(320px, 1.1fr)',
+    gap: '24px',
+  },
+  detailTopGridMobile: {
+    gridTemplateColumns: '1fr',
+  },
   browseBtn: {
     padding: '12px 24px',
     borderRadius: '12px',
