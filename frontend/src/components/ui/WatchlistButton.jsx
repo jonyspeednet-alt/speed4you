@@ -80,12 +80,7 @@ function WatchlistButton({ contentType, contentId, title, compact = false }) {
         ...styles.btn,
         ...(saved ? styles.btnSaved : {}),
         ...(hovered && !saved ? styles.btnHover : {}),
-        transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
-        boxShadow: hovered && saved
-          ? '0 6px 20px var(--glow-cyan)'
-          : hovered
-            ? '0 6px 20px rgba(0,0,0,0.25)'
-            : 'none',
+        ...(hovered && saved ? styles.btnHoverSaved : {}),
       }}
       aria-label={saved ? `Remove ${title} from My List` : `Add ${title} to My List`}
       aria-pressed={saved}
@@ -112,26 +107,34 @@ const styles = {
   btn: {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: '8px',
-    padding: '11px 20px',
+    justifyContent: 'center',
+    gap: '10px',
+    padding: '14px 32px',
     borderRadius: '999px',
-    background: 'rgba(255,255,255,0.08)',
-    border: '1px solid rgba(255,255,255,0.14)',
-    color: 'var(--text-primary)',
+    background: 'rgba(255,255,255,0.12)',
+    border: '1px solid rgba(255,255,255,0.25)',
+    color: '#ffffff',
     fontWeight: '700',
-    fontSize: '0.88rem',
-    transition: 'background 180ms ease, border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease',
-    minHeight: '44px',
+    fontSize: '0.95rem',
+    transition: 'all 280ms cubic-bezier(0.34, 1.56, 0.64, 1)',
     cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    textDecoration: 'none',
+    backdropFilter: 'blur(16px)',
   },
   btnHover: {
-    background: 'rgba(255,255,255,0.13)',
-    borderColor: 'rgba(255,255,255,0.22)',
+    background: 'rgba(255,255,255,0.22)',
+    borderColor: 'rgba(255,255,255,0.4)',
+    transform: 'translateY(-3px) scale(1.02)',
   },
   btnSaved: {
-    background: 'rgba(125,249,255,0.12)',
-    borderColor: 'rgba(125,249,255,0.38)',
+    background: 'rgba(0,255,255,0.15)',
+    borderColor: 'rgba(0,255,255,0.4)',
     color: 'var(--accent-cyan)',
+  },
+  btnHoverSaved: {
+    transform: 'translateY(-3px) scale(1.02)',
+    boxShadow: '0 6px 20px var(--glow-cyan)',
   },
   compact: {
     width: '34px',

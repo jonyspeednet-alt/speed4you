@@ -250,65 +250,98 @@
 .actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 14px;
+    gap: 16px;
     align-items: center;
+    margin-top: 6px;
 }
 
 .button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 12px;
-    font-size: 0.95rem;
-    border-radius: 12px;
-    padding: 16px 28px;
-    transition: transform 250ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 250ms ease, background 250ms ease, border-color 250ms ease;
+    gap: 10px;
+    font-size: 1rem;
+    border-radius: 999px;
+    padding: 14px 32px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    white-space: nowrap;
 }
 
 .button:hover {
-    transform: translateY(-4px) scale(1.02);
+    transform: translateY(-3px) scale(1.02);
 }
 
 .buttonPrimary {
-    min-width: 180px;
+    min-width: 170px;
     color: #050c16;
-    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-secondary));
+    background: #ffffff;
     font-weight: 900;
-    font-size: 1rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
+    font-size: 1.05rem;
+    letter-spacing: 0.04em;
+    box-shadow: 0 4px 20px rgba(255, 255, 255, 0.2);
 }
 
 .buttonPrimary:hover {
-    box-shadow: 0 12px 40px rgba(0, 255, 255, 0.45);
+    box-shadow: 0 12px 40px rgba(255, 255, 255, 0.35);
+    background: #f0f0f0;
+}
+
+.buttonPrimary .buttonIcon {
+    color: #050c16;
 }
 
 .buttonSecondary {
-    min-width: 160px;
+    min-width: 140px;
     color: #ffffff;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    backdrop-filter: blur(12px);
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(16px);
     font-weight: 700;
+    font-size: 0.95rem;
 }
 
 .buttonSecondary:hover {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.22);
+    border-color: rgba(255, 255, 255, 0.4);
 }
 
 .buttonIcon {
     flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
 }
 
-.watchlistWrap {
+.watchlistBtn {
     display: inline-flex;
-    border-radius: 12px;
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(10px);
+    align-items: center;
+    gap: 10px;
+    min-width: 140px;
+    padding: 14px 32px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(16px);
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    white-space: nowrap;
+}
+
+.watchlistBtn:hover {
+    background: rgba(255, 255, 255, 0.22);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: translateY(-3px) scale(1.02);
+}
+
+.watchlistBtnActive {
+    background: rgba(0, 255, 255, 0.15);
+    border-color: rgba(0, 255, 255, 0.4);
+    color: var(--accent-cyan);
 }
 
 .showcasePanel {
@@ -609,13 +642,19 @@
     .actions {
         gap: 10px;
         justify-content: center;
+        width: 100%;
     }
 
     .button {
-        flex: 1 1 auto;
+        flex: 1;
         min-width: 0;
-        padding: 14px 20px;
-        font-size: 0.9rem;
+        padding: 12px 20px;
+        font-size: 0.95rem;
+        justify-content: center;
+    }
+
+    .buttonPrimary {
+        min-width: 0;
     }
     
     .showcasePanel {
