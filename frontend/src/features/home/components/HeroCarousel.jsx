@@ -297,7 +297,31 @@ function HeroCarousel({ content, items }) {
 
             {contentItems.length > 1 && (
                 <>
-                    {!isMobile && (
+                    {!isMobile && !isTVMode && (
+                        <>
+                            <button
+                                onClick={() => moveToSlide(activeIndex - 1)}
+                                className={styles.navArrowLeft}
+                                style={{ opacity: isHovering ? 1 : 0 }}
+                                aria-label="Previous slide"
+                            >
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="15 18 9 12 15 6" />
+                                </svg>
+                            </button>
+                            <button
+                                onClick={() => moveToSlide(activeIndex + 1)}
+                                className={styles.navArrowRight}
+                                style={{ opacity: isHovering ? 1 : 0 }}
+                                aria-label="Next slide"
+                            >
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="9 18 15 12 9 6" />
+                                </svg>
+                            </button>
+                        </>
+                    )}
+                    {isTVMode && !isMobile && (
                        <div className={styles.navigationArrows} style={{ opacity: isHovering || isTVMode ? 1 : 0 }}>
                             <button onClick={() => moveToSlide(activeIndex - 1)} className={styles.arrowBtn} aria-label="Previous slide">
                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
