@@ -111,8 +111,19 @@ function PlayerPage() {
   const invisibleVideoCheckRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [isMuted, setIsMuted] = useState(false);
-  const [volume, setVolume] = useState(80);
+  const [isMuted, setIsMuted] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('playerMuted') === 'true';
+    }
+    return false;
+  });
+  const [volume, setVolume] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const savedVolume = localStorage.getItem('playerVolume');
+      if (savedVolume !== null) return Number(savedVolume);
+    }
+    return 80;
+  });
   const [audioBoostLevel, setAudioBoostLevel] = useState(1.6);
   const [isAudioBoostEnabled, setIsAudioBoostEnabled] = useState(true);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
@@ -247,6 +258,80 @@ function PlayerPage() {
       }
     }, 2200);
   }, [clearInvisibleVideoCheck, getRenderedVideoFrameCount, hasOptimizedFallbacked, isMobile, streamMode, upgradeToOptimizedStream]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('playerVolume', volume);
+      localStorage.setItem('playerMuted', isMuted);
+    }
+  }, [volume, isMuted]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (document.activeElement.tagName.toLowerCase() === 'input' || 
+          document.activeElement.tagName.toLowerCase() === 'textarea') return;
+
+      const video = videoRef.current;
+      if (!video) return;
+
+      switch (e.key.toLowerCase()) {
+        case ' ':
+        case 'k':
+          e.preventDefault();
+          if (video.paused) video.play();
+          else video.pause();
+          break;
+        case 'f':
+          e.preventDefault();
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(() => {});
+          } else {
+            document.exitFullscreen().catch(() => {});
+          }
+          break;
+        case 'j':
+        case 'arrowleft':
+          e.preventDefault();
+          video.currentTime = Math.max(0, video.currentTime - 10);
+          setToastData({ icon: 'rewind', value: '-10s' });
+          break;
+        case 'l':
+        case 'arrowright':
+          e.preventDefault();
+          video.currentTime = Math.min(video.duration || 0, video.currentTime + 10);
+          setToastData({ icon: 'forward', value: '+10s' });
+          break;
+        case 'arrowup':
+          e.preventDefault();
+          setVolume((v) => {
+            const next = Math.min(100, v + 10);
+            if (next > 0) setIsMuted(false);
+            setToastData({ icon: 'volume', value: next });
+            return next;
+          });
+          break;
+        case 'arrowdown':
+          e.preventDefault();
+          setVolume((v) => {
+            const next = Math.max(0, v - 10);
+            if (next === 0) setIsMuted(true);
+            setToastData({ icon: next === 0 ? 'mute' : 'volume', value: next });
+            return next;
+          });
+          break;
+        case 'm':
+          e.preventDefault();
+          setIsMuted((m) => {
+            setToastData({ icon: !m ? 'mute' : 'volume', value: !m ? 0 : volume });
+            return !m;
+          });
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [volume]);
 
   useEffect(() => {
     let cancelled = false;
@@ -942,7 +1027,7 @@ function PlayerPage() {
           clearInvisibleVideoCheck();
           progressService.markComplete(content.type, contentId || 1);
           if (content?.type === 'series') {
-            setAutoPlayCountdown(10);
+            setAutoPlayCountdown(5);
           }
         }}
         onError={() => {
@@ -1450,6 +1535,15 @@ function PlayerPage() {
                       <div className="yt-settings-list">
                         <div
                           className="yt-settings-item"
+                          onClick={() => setSettingsActiveSubMenu('quality')}
+                        >
+                          <span className="yt-settings-item-label">Quality</span>
+                          <span className="yt-settings-item-value">
+                            {qualityLabel}
+                          </span>
+                        </div>
+                        <div
+                          className="yt-settings-item"
                           onClick={() => setSettingsActiveSubMenu('speed')}
                         >
                           <span className="yt-settings-item-label">Playback speed</span>
@@ -1482,6 +1576,39 @@ function PlayerPage() {
                             </span>
                           </div>
                         )}
+                      </div>
+                    )}
+
+                    {settingsActiveSubMenu === 'quality' && (
+                      <div className="yt-settings-submenu">
+                        <div
+                          className="yt-settings-submenu-header"
+                          onClick={() => setSettingsActiveSubMenu('main')}
+                        >
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                            <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
+                          </svg>
+                          <span>Quality</span>
+                        </div>
+                        <div className="yt-settings-list">
+                          {['Auto', '1080p', '720p', '480p'].map((q) => (
+                            <div
+                              key={q}
+                              className={`yt-settings-item ${qualityLabel === q ? 'selected' : ''}`}
+                              onClick={() => {
+                                setQualityLabel(q);
+                                setSettingsActiveSubMenu('main');
+                              }}
+                            >
+                              <span>{q}</span>
+                              {qualityLabel === q && (
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                                </svg>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
 
