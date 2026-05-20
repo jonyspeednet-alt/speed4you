@@ -235,8 +235,9 @@ const styles = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    gap: "6px",
+    gap: "8px",
     zIndex: 1,
+    pointerEvents: "none",
   },
   typeBadge: {
     padding: "5px 10px",
@@ -252,6 +253,7 @@ const styles = {
     border: "1px solid rgba(255, 255, 255, 0.1)",
   },
   ratingBadge: {
+    flexShrink: 0,
     padding: "5px 9px",
     borderRadius: "6px",
     background: "rgba(5, 12, 22, 0.6)",
@@ -369,8 +371,8 @@ const styles = {
   },
   watchlistSlot: {
     position: "absolute",
-    top: "8px",
-    right: "8px",
+    top: "46px",
+    right: "10px",
     zIndex: 3,
   },
 };
