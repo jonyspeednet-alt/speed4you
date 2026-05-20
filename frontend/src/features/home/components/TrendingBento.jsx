@@ -13,6 +13,7 @@ export default function TrendingBento({ items, onQuickView }) {
   return (
     <section style={{
       ...styles.section,
+      width: isMobile ? 'calc(100vw - 24px)' : isTablet ? 'calc(100vw - 48px)' : 'min(1720px, calc(100vw - 96px))',
       ...(isTVMode ? styles.sectionTV : {})
     }}>
       <div style={styles.header}>
@@ -111,6 +112,9 @@ function BentoItem({ item, index, onQuickView, isLarge, tv }) {
 }
 
 const styles = {
+  section: {
+    margin: '40px auto',
+  },
   sectionTV: {
     width: 'min(1720px, calc(100vw - 120px))',
     margin: '60px auto',
