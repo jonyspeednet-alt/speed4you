@@ -1,0 +1,2 @@
+PGPASSWORD=REDACTED_DB_PASSWORD psql -h localhost -U postgres -d isp_entertainment -c "UPDATE content_catalog SET featured = false, featured_order = 0, payload = jsonb_set(jsonb_set(payload, '{featured}', 'false'), '{featuredOrder}', '0') WHERE id = 1001;"
+PGPASSWORD=REDACTED_DB_PASSWORD psql -h localhost -U postgres -d isp_entertainment -c "SELECT id, title, featured, featured_order FROM content_catalog WHERE id = 1001;"
