@@ -1017,8 +1017,8 @@ p {
   z-index: 1050;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 10px calc(var(--safe-bottom) + 8px);
+  gap: 8px;
+  padding: 10px 12px calc(var(--safe-bottom) + 10px);
   border-radius: 24px 24px 0 0;
   background: rgba(7, 17, 31, 0.95);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -1032,10 +1032,10 @@ p {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  min-height: 48px;
-  padding: 6px 4px;
-  border-radius: 16px;
+  gap: 4px;
+  min-height: 54px;
+  padding: 8px 6px;
+  border-radius: 18px;
   color: var(--text-muted);
   transition: transform var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
 }
@@ -1049,9 +1049,9 @@ p {
 .bottom-nav-icon {
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 30px;
-  border-radius: 12px;
+  width: 42px;
+  height: 32px;
+  border-radius: 14px;
   transition: background var(--transition-fast), color var(--transition-fast);
 }
 
@@ -1062,7 +1062,7 @@ p {
 }
 
 .bottom-nav-label {
-  font-size: 0.64rem;
+  font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1162,7 +1162,10 @@ p {
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 10px;
-  scroll-snap-type: x mandatory;
+  scroll-snap-type: x proximity;
+  scroll-snap-stop: normal;
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: none;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x;
 }
