@@ -306,14 +306,14 @@ const styles = {
     padding: '112px 24px var(--spacing-3xl)',
   },
   hero: {
-    width: 'min(1440px, calc(100vw - 48px))',
+    width: 'min(1720px, calc(100vw - 96px))',
     margin: '0 auto 18px',
     display: 'grid',
     gridTemplateColumns: 'minmax(0, 1fr) 340px',
     gap: '18px',
   },
   heroNarrow: {
-    width: 'min(1440px, calc(100vw - 24px))',
+    width: 'min(1720px, calc(100vw - 48px))',
     gridTemplateColumns: '1fr',
   },
   heroCopy: {
@@ -421,14 +421,14 @@ const styles = {
     lineHeight: '1.68',
   },
   layout: {
-    width: 'min(1440px, calc(100vw - 48px))',
+    width: 'min(1720px, calc(100vw - 96px))',
     margin: '0 auto',
     display: 'grid',
     gridTemplateColumns: 'minmax(0, 1fr) 360px',
     gap: '18px',
   },
   layoutNarrow: {
-    width: 'min(1440px, calc(100vw - 24px))',
+    width: 'min(1720px, calc(100vw - 48px))',
     gridTemplateColumns: '1fr',
   },
   playerColumn: {
