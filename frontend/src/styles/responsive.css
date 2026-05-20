@@ -1008,14 +1008,15 @@
         width: 100%;
         box-sizing: border-box;
         padding: 0 12px;
-        align-items: center;
+        align-items: flex-start;
         justify-content: space-between;
         gap: 8px;
-        flex-wrap: nowrap;
+        flex-wrap: wrap;
     }
 
     .content-rail-header > div:first-child {
         min-width: 0;
+        max-width: min(72vw, 220px);
     }
 
     .content-rail-eyebrow {
@@ -1031,6 +1032,8 @@
     }
 
     .content-rail-actions {
+        width: 100%;
+        justify-content: flex-end;
         flex-shrink: 0;
         gap: 4px;
         padding: 2px;
@@ -1047,9 +1050,15 @@
         scroll-padding-inline: 12px;
         padding: 4px 12px 10px !important;
         gap: 10px !important;
+        scroll-snap-type: x proximity;
+        scroll-snap-stop: normal;
+        overscroll-behavior-x: contain;
+        overscroll-behavior-y: none;
         touch-action: pan-x;
         -webkit-overflow-scrolling: touch;
         overflow-y: hidden;
+        padding-left: 12px;
+        padding-right: 12px;
     }
 
     .content-rail-card {

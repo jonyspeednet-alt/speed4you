@@ -25,7 +25,11 @@
   padding: 0 var(--page-padding);
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  scroll-snap-type: x mandatory;
+  scroll-snap-type: x proximity;
+  scroll-snap-stop: normal;
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: none;
+  touch-action: pan-x;
   scrollbar-width: none; /* Firefox */
 }
 
@@ -35,7 +39,7 @@
 
 .card {
   flex: 0 0 auto;
-  width: 280px;
+  width: 260px;
   scroll-snap-align: start;
   text-decoration: none;
   background: var(--bg-secondary);
@@ -48,6 +52,13 @@
 .card:hover {
   transform: translateY(-5px);
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .card:hover {
+    transform: none;
+    box-shadow: none;
+  }
 }
 
 .posterWrapper {
@@ -123,25 +134,31 @@
   margin-bottom: var(--spacing-xs);
 }
 
+@media (max-width: 640px) {
+  .card {
+    width: 220px;
+  }
+}
+
 .progressText {
   font-size: 0.8rem;
   color: var(--text-muted);
 }
 
 .emptyState {
-    padding: var(--spacing-xl) var(--page-padding);
-    text-align: center;
-    background: var(--bg-secondary);
-    border-radius: var(--radius-lg);
+  padding: var(--spacing-xl) var(--page-padding);
+  text-align: center;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
 }
 
 .emptyState p {
-    font-size: 1rem;
-    color: var(--text-muted);
+  font-size: 1rem;
+  color: var(--text-muted);
 }
 
 .emptyState a {
-    color: var(--accent-blue);
-    text-decoration: none;
-    font-weight: 600;
+  color: var(--accent-blue);
+  text-decoration: none;
+  font-weight: 600;
 }
