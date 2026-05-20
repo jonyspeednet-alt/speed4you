@@ -115,6 +115,8 @@ function PlayerPage() {
   const [volume, setVolume] = useState(80);
   const [audioBoostLevel, setAudioBoostLevel] = useState(1.6);
   const [isAudioBoostEnabled, setIsAudioBoostEnabled] = useState(true);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [settingsActiveSubMenu, setSettingsActiveSubMenu] = useState('main');
   const [showControls, setShowControls] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -452,9 +454,9 @@ function PlayerPage() {
   useEffect(() => {
     function scheduleHide() {
       clearTimeout(hideTimerRef.current);
-      if (isHoveringControls) return;
+      if (isHoveringControls || showSettingsMenu) return;
       hideTimerRef.current = setTimeout(() => {
-        if (!isScrubbing && isPlaying && !isHoveringControls) {
+        if (!isScrubbing && isPlaying && !isHoveringControls && !showSettingsMenu) {
           setShowControls(false);
         }
       }, CONTROLS_HIDE_DELAY);
@@ -465,7 +467,7 @@ function PlayerPage() {
     }
 
     return () => clearTimeout(hideTimerRef.current);
-  }, [isPlaying, isScrubbing, showControls, isHoveringControls]);
+  }, [isPlaying, isScrubbing, showControls, isHoveringControls, showSettingsMenu]);
 
   const playNextEpisode = useCallback(() => {
     setAutoPlayCountdown(null);
@@ -636,6 +638,8 @@ function PlayerPage() {
     if (!videoRef.current) {
       return;
     }
+
+    setShowSettingsMenu(false);
 
     if (videoRef.current.paused) {
       videoRef.current.play();
@@ -1019,22 +1023,316 @@ function PlayerPage() {
       <div style={{ ...styles.chrome, ...(isMobile ? styles.chromeMobile : {}) }} />
       <div style={{ ...styles.vignette, ...(isMobile ? styles.vignetteMobile : {}) }} />
 
-      {!isMobile && (
-        <Link to="/" style={{ ...styles.back, opacity: showControls ? 1 : 0 }}>
-          Back
-        </Link>
-      )}
+      {/* Custom Styles Injection */}
+      <style>{`
+        /* YouTube Buttons */
+        .yt-btn {
+          background: none;
+          border: none;
+          color: #fff;
+          padding: 8px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          outline: none;
+          transition: background 0.15s ease, transform 0.1s ease;
+          width: 40px;
+          height: 40px;
+        }
+        .yt-btn:hover {
+          background: rgba(255, 255, 255, 0.18);
+        }
+        .yt-btn:active {
+          transform: scale(0.95);
+        }
+        .yt-btn.active {
+          color: #ff0000;
+        }
+
+        /* Scrubber Styles */
+        .yt-scrubber-wrap {
+          position: relative;
+          margin-bottom: 16px;
+          height: 16px;
+          display: flex;
+          align-items: center;
+          cursor: pointer;
+          width: 100%;
+        }
+        .yt-scrubber-track {
+          position: absolute;
+          left: 0;
+          right: 0;
+          height: 3px;
+          background: rgba(255, 255, 255, 0.2);
+          transition: height 0.1s ease;
+          overflow: hidden;
+        }
+        .yt-scrubber-wrap:hover .yt-scrubber-track {
+          height: 5px;
+        }
+
+        /* Seek Input Range - completely invisible except for active scrubber area */
+        .yt-scrubber {
+          position: relative;
+          width: 100%;
+          margin: 0;
+          appearance: none;
+          background: transparent;
+          cursor: pointer;
+          height: 16px;
+          z-index: 5;
+          outline: none;
+        }
+        .yt-scrubber::-webkit-slider-runnable-track {
+          background: transparent;
+          border: none;
+        }
+        .yt-scrubber::-webkit-slider-thumb {
+          appearance: none;
+          width: 0px;
+          height: 0px;
+          border-radius: 50%;
+          background: #ff0000;
+          transition: width 0.1s ease, height 0.1s ease;
+          border: none;
+        }
+        .yt-scrubber-wrap:hover .yt-scrubber::-webkit-slider-thumb {
+          width: 13px;
+          height: 13px;
+        }
+
+        /* Volume Control Cluster with hover expansion */
+        .yt-volume-cluster {
+          display: flex;
+          align-items: center;
+          gap: 0px;
+        }
+        .yt-volume-slider {
+          width: 0px;
+          opacity: 0;
+          appearance: none;
+          height: 4px;
+          background: rgba(255, 255, 255, 0.3);
+          outline: none;
+          cursor: pointer;
+          transition: width 0.2s ease, opacity 0.2s ease, margin 0.2s ease;
+          margin-left: 0px;
+          accent-color: #ff0000;
+        }
+        .yt-volume-cluster:hover .yt-volume-slider,
+        .yt-volume-slider:focus,
+        .yt-volume-slider:active {
+          width: 60px;
+          opacity: 1;
+          margin-left: 8px;
+          margin-right: 8px;
+        }
+        .yt-volume-slider::-webkit-slider-runnable-track {
+          background: transparent;
+        }
+        .yt-volume-slider::-webkit-slider-thumb {
+          appearance: none;
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+          background: #fff;
+          cursor: pointer;
+          border: none;
+          margin-top: -4px;
+        }
+
+        /* Monospace / Sans-Serif clean YouTube time label */
+        .yt-time-display {
+          color: #ddd;
+          font-size: 13px;
+          font-family: Roboto, Arial, sans-serif;
+          font-weight: 400;
+          margin-left: 14px;
+          display: flex;
+          align-items: center;
+          user-select: none;
+        }
+
+        /* Top Overlay styling */
+        .yt-top-overlay {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 90px;
+          background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8) 0%, transparent 100%);
+          display: flex;
+          align-items: center;
+          padding: 0 24px;
+          z-index: 10;
+          transition: opacity 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        .yt-back-btn {
+          background: none;
+          border: none;
+          color: #fff;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-right: 18px;
+          border-radius: 50%;
+          width: 44px;
+          height: 44px;
+          transition: background 0.15s ease;
+        }
+        .yt-back-btn:hover {
+          background: rgba(255, 255, 255, 0.15);
+        }
+        .yt-top-metadata {
+          display: flex;
+          flex-direction: column;
+        }
+        .yt-top-title {
+          color: #fff;
+          font-size: 18px;
+          font-weight: 500;
+          margin: 0 0 2px 0;
+          font-family: Roboto, Arial, sans-serif;
+        }
+        .yt-top-subtitle {
+          color: #aaa;
+          font-size: 13px;
+          margin: 0;
+          font-family: Roboto, Arial, sans-serif;
+        }
+
+        /* Custom Floating Settings Popover */
+        .yt-settings-menu {
+          position: absolute;
+          bottom: 56px;
+          right: 0;
+          width: 250px;
+          background: rgba(28, 28, 28, 0.9);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border-radius: 12px;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          color: #eee;
+          padding: 8px 0;
+          z-index: 100;
+          font-family: Roboto, Arial, sans-serif;
+          animation: ytFadeIn 0.15s ease-out;
+        }
+        @keyframes ytFadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .yt-settings-list {
+          display: flex;
+          flex-direction: column;
+        }
+        .yt-settings-item {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 10px 16px;
+          cursor: pointer;
+          font-size: 13px;
+          transition: background 0.15s ease;
+        }
+        .yt-settings-item:hover {
+          background: rgba(255, 255, 255, 0.1);
+        }
+        .yt-settings-item.disabled {
+          cursor: default;
+        }
+        .yt-settings-item.disabled:hover {
+          background: none;
+        }
+        .yt-settings-item.selected {
+          font-weight: bold;
+          color: #ff0000;
+        }
+        .yt-settings-item-label {
+          color: #eee;
+        }
+        .yt-settings-item-value {
+          color: #aaa;
+          font-size: 12px;
+        }
+        
+        /* Submenu Header */
+        .yt-settings-submenu-header {
+          display: flex;
+          align-items: center;
+          padding: 8px 12px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          font-weight: bold;
+          font-size: 13px;
+          cursor: pointer;
+          gap: 6px;
+          color: #fff;
+        }
+        .yt-settings-submenu-header:hover {
+          background: rgba(255, 255, 255, 0.05);
+        }
+
+        /* SVG animations */
+        .yt-btn:hover .yt-cog-svg {
+          transform: rotate(30deg);
+        }
+
+        /* Mobile Adjustments for YouTube Red Theme */
+        .yt-mobile-scrubber-track {
+          position: absolute;
+          left: 0;
+          right: 0;
+          height: 3px;
+          background: rgba(255, 255, 255, 0.28);
+          overflow: hidden;
+        }
+        .yt-mobile-progress-track {
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          left: 0;
+          background: #ff0000;
+        }
+        .yt-mobile-buffered-track {
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          left: 0;
+          background: rgba(255, 255, 255, 0.4);
+        }
+        .yt-mobile-action-btn-active {
+          background: rgba(255, 0, 0, 0.2) !important;
+          border-color: rgba(255, 0, 0, 0.45) !important;
+          color: #ff4d4d !important;
+        }
+      `}</style>
 
       {!isMobile && (
-        <div style={{ ...styles.topInfo, opacity: showControls ? 1 : 0 }}>
-          <h1 style={styles.title}>{content.title}</h1>
-          <p style={styles.episode}>
-            {content.type === 'series'
-              ? `S${content.season} E${content.episode}${content.episodeTitle ? ` - ${content.episodeTitle}` : ''}`
-              : (content.episodeTitle || 'Movie')}
-          </p>
-          {streamStatus ? <p style={styles.streamStatus}>{streamStatus}</p> : null}
-          {streamMode === 'optimized' ? <p style={styles.streamHint}>Optimized</p> : null}
+        <div
+          className="yt-top-overlay"
+          style={{
+            opacity: showControls ? 1 : 0,
+            pointerEvents: showControls ? 'auto' : 'none',
+          }}
+        >
+          <button className="yt-back-btn" onClick={() => navigate(-1)} aria-label="Back">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+              <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+            </svg>
+          </button>
+          <div className="yt-top-metadata">
+            <h1 className="yt-top-title">{content.title}</h1>
+            <span className="yt-top-subtitle">
+              {content.type === 'series'
+                ? `S${content.season} E${content.episode}${content.episodeTitle ? ` - ${content.episodeTitle}` : ''}`
+                : (content.episodeTitle || 'Movie')}
+            </span>
+          </div>
         </div>
       )}
 
@@ -1043,7 +1341,10 @@ function PlayerPage() {
         <div
           className="player-desktop-controls"
           onMouseEnter={() => setIsHoveringControls(true)}
-          onMouseLeave={() => setIsHoveringControls(false)}
+          onMouseLeave={() => {
+            setIsHoveringControls(false);
+            setShowSettingsMenu(false);
+          }}
           style={{
             ...styles.controls,
             opacity: showControls ? 1 : 0,
@@ -1051,8 +1352,8 @@ function PlayerPage() {
           }}
         >
           {/* Scrubber */}
-          <div style={styles.scrubberWrap}>
-            <div style={styles.scrubberTrack}>
+          <div style={styles.scrubberWrap} className="yt-scrubber-wrap">
+            <div style={styles.scrubberTrack} className="yt-scrubber-track">
               <div style={{ ...styles.bufferedTrack, width: `${bufferedPercent}%` }} />
               <div style={{ ...styles.progressTrack, width: `${progressPercent}%` }} />
             </div>
@@ -1062,6 +1363,7 @@ function PlayerPage() {
               onMouseDown={handleScrubStart} onTouchStart={handleScrubStart}
               onInput={handleScrubChange} onChange={handleScrubEnd}
               style={styles.scrubber}
+              className="yt-scrubber"
             />
           </div>
 
@@ -1069,58 +1371,224 @@ function PlayerPage() {
           <div style={styles.controlsRow}>
             <div style={styles.primaryCluster}>
               <div style={styles.playbackActions}>
-                <button style={styles.pillControl} onClick={() => skipBy(-10)} aria-label="Back 10 seconds">
-                  <Icon size={16}><path d="M11 19L2 12l9-7v14z" /><path d="M22 19l-9-7 9-7v14z" /></Icon>
+                {/* Play / Pause */}
+                <button className="yt-btn" onClick={togglePlayback} aria-label={isPlaying ? 'Pause' : 'Play'}>
+                  {isPlaying ? (
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                      <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  )}
                 </button>
-                <button style={styles.heroControl} onClick={togglePlayback}
-                  onMouseDown={startHoldSpeedBoost} onMouseUp={endHoldSpeedBoost}
-                  onMouseLeave={endHoldSpeedBoost} onTouchStart={startHoldSpeedBoost} onTouchEnd={endHoldSpeedBoost}
-                >
-                  {isPlaying
-                    ? <Icon size={18}><line x1="10" y1="6" x2="10" y2="18" /><line x1="14" y1="6" x2="14" y2="18" /></Icon>
-                    : <Icon size={18}><polygon points="8 5 19 12 8 19 8 5" /></Icon>}
-                </button>
-                <button style={styles.pillControl} onClick={() => skipBy(10)} aria-label="Skip 10 seconds">
-                  <Icon size={16}><path d="M13 19l9-7-9-7v14z" /><path d="M2 19l9-7-9-7v14z" /></Icon>
-                </button>
+
+                {/* Next Episode (if series) */}
                 {content.type === 'series' && (
-                  <button style={styles.pillControl} onClick={playNextEpisode} aria-label="Next Episode">
-                    <Icon size={16}><path d="M5 4l10 8-10 8V4z" /><path d="M19 4h-2v16h2V4z" /></Icon>
+                  <button className="yt-btn" onClick={playNextEpisode} aria-label="Next Episode">
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                      <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+                    </svg>
                   </button>
                 )}
+
+                {/* Volume cluster */}
+                <div className="yt-volume-cluster">
+                  <button className="yt-btn" onClick={() => setIsMuted((c) => !c)} aria-label={isMuted ? 'Unmute' : 'Mute'}>
+                    {isMuted || volume === 0 ? (
+                      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                        <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06A8.99 8.99 0 0017.73 18L19 19.27 20.27 18 5.27 3 4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
+                      </svg>
+                    ) : volume < 50 ? (
+                      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+                      </svg>
+                    )}
+                  </button>
+                  <input
+                    type="range" min="0" max="100"
+                    value={isMuted ? 0 : volume}
+                    onChange={handleVolumeChange}
+                    className="yt-volume-slider"
+                  />
+                </div>
               </div>
-              <div style={styles.timeGroup}>
-                <span style={styles.timeStrong}>{formatTime(activeTime)}</span>
-                <span style={styles.time}>/ {formatTime(activeDuration)}</span>
+
+              {/* Time display */}
+              <div className="yt-time-display">
+                <span>{formatTime(activeTime)}</span>
+                <span style={{ margin: '0 4px', color: '#ddd' }}>/</span>
+                <span>{formatTime(activeDuration)}</span>
               </div>
-              <div style={styles.metaBadge}>{content.type === 'series' ? `S${content.season} E${content.episode}` : 'MOVIE'}</div>
-              <div style={styles.metaBadge}>{playbackRate}x</div>
-              <div style={styles.metaBadge}>{qualityLabel}</div>
-              <div style={styles.metaBadge}>{bufferHealth}</div>
             </div>
+
             <div style={styles.controlGroup}>
-              <div style={styles.volumeControl}>
-                <button style={styles.secondaryControl} onClick={() => setIsMuted((c) => !c)}>
-                  {isMuted ? 'Unmute' : 'Mute'}
+              {/* Settings cog & Floating Menu */}
+              <div style={{ position: 'relative' }}>
+                <button
+                  className={`yt-btn ${showSettingsMenu ? 'active' : ''}`}
+                  onClick={() => {
+                    setShowSettingsMenu(!showSettingsMenu);
+                    setSettingsActiveSubMenu('main');
+                  }}
+                  aria-label="Settings"
+                >
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" style={{ transition: 'transform 0.3s ease' }} className="yt-cog-svg">
+                    <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" />
+                  </svg>
                 </button>
-                <input type="range" min="0" max="100" value={isMuted ? 0 : volume} onChange={handleVolumeChange} style={styles.volumeSlider} />
+
+                {/* Popover overlay */}
+                {showSettingsMenu && (
+                  <div className="yt-settings-menu">
+                    {settingsActiveSubMenu === 'main' && (
+                      <div className="yt-settings-list">
+                        <div
+                          className="yt-settings-item"
+                          onClick={() => setSettingsActiveSubMenu('speed')}
+                        >
+                          <span className="yt-settings-item-label">Playback speed</span>
+                          <span className="yt-settings-item-value">
+                            {playbackRate === 1 ? 'Normal' : `${playbackRate}x`}
+                          </span>
+                        </div>
+                        <div
+                          className="yt-settings-item"
+                          onClick={() => setSettingsActiveSubMenu('audio')}
+                        >
+                          <span className="yt-settings-item-label">Audio Boost</span>
+                          <span className="yt-settings-item-value">
+                            {isAudioBoostEnabled ? `${audioBoostLevel}x` : 'Off'}
+                          </span>
+                        </div>
+                        {streamMode === 'optimized' && (
+                          <div className="yt-settings-item disabled">
+                            <span className="yt-settings-item-label">Stream Mode</span>
+                            <span className="yt-settings-item-value" style={{ color: '#ff0000', fontWeight: 'bold' }}>
+                              Optimized
+                            </span>
+                          </div>
+                        )}
+                        {bufferHealth && (
+                          <div className="yt-settings-item disabled">
+                            <span className="yt-settings-item-label">Buffer Health</span>
+                            <span className="yt-settings-item-value" style={{ color: '#888' }}>
+                              {bufferHealth}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {settingsActiveSubMenu === 'speed' && (
+                      <div className="yt-settings-submenu">
+                        <div
+                          className="yt-settings-submenu-header"
+                          onClick={() => setSettingsActiveSubMenu('main')}
+                        >
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                            <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
+                          </svg>
+                          <span>Playback speed</span>
+                        </div>
+                        <div className="yt-settings-list">
+                          {PLAYBACK_RATES.map((rate) => (
+                            <div
+                              key={rate}
+                              className={`yt-settings-item ${playbackRate === rate ? 'selected' : ''}`}
+                              onClick={() => {
+                                setPlaybackRate(rate);
+                                setSettingsActiveSubMenu('main');
+                              }}
+                            >
+                              <span>{rate === 1 ? 'Normal' : `${rate}x`}</span>
+                              {playbackRate === rate && (
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                                </svg>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {settingsActiveSubMenu === 'audio' && (
+                      <div className="yt-settings-submenu">
+                        <div
+                          className="yt-settings-submenu-header"
+                          onClick={() => setSettingsActiveSubMenu('main')}
+                        >
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                            <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
+                          </svg>
+                          <span>Audio Boost</span>
+                        </div>
+                        <div className="yt-settings-list">
+                          <div
+                            className={`yt-settings-item ${!isAudioBoostEnabled ? 'selected' : ''}`}
+                            onClick={() => {
+                              setIsAudioBoostEnabled(false);
+                              setSettingsActiveSubMenu('main');
+                            }}
+                          >
+                            <span>Off (Normal)</span>
+                            {!isAudioBoostEnabled && (
+                              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                              </svg>
+                            )}
+                          </div>
+                          {AUDIO_BOOST_LEVELS.map((level) => (
+                            <div
+                              key={level}
+                              className={`yt-settings-item ${isAudioBoostEnabled && audioBoostLevel === level ? 'selected' : ''}`}
+                              onClick={() => {
+                                setIsAudioBoostEnabled(true);
+                                setAudioBoostLevel(level);
+                                setSettingsActiveSubMenu('main');
+                              }}
+                            >
+                              <span>{level.toFixed(1)}x Boost</span>
+                              {isAudioBoostEnabled && audioBoostLevel === level && (
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                                </svg>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <button style={styles.secondaryControl} onClick={() => setIsAudioBoostEnabled((c) => !c)}>
-                {isAudioBoostEnabled ? 'Audio Boost' : 'Boost Off'}
-              </button>
-              <select value={String(audioBoostLevel)} onChange={(e) => setAudioBoostLevel(Number(e.target.value))} style={styles.select}>
-                {AUDIO_BOOST_LEVELS.map((l) => <option key={l} value={l}>Audio {l.toFixed(1)}x</option>)}
-              </select>
-              <select value={String(playbackRate)} onChange={(e) => setPlaybackRate(Number(e.target.value))} style={styles.select}>
-                {PLAYBACK_RATES.map((r) => <option key={r} value={r}>Speed {r}x</option>)}
-              </select>
+
+              {/* Picture-in-Picture */}
               {canUsePictureInPicture && (
-                <button style={styles.secondaryControl} onClick={togglePictureInPicture}>
-                  {isPictureInPicture ? 'PiP Off' : 'PiP'}
+                <button className="yt-btn" onClick={togglePictureInPicture} aria-label={isPictureInPicture ? 'Exit Picture-in-Picture' : 'Picture-in-Picture'}>
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                    <path d="M19 7h-8v6h8V7zm2-4H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14z" />
+                  </svg>
                 </button>
               )}
-              <button style={styles.secondaryControl} onClick={toggleFullscreen}>
-                {isFullscreen ? 'Exit Full' : 'Full'}
+
+              {/* Fullscreen */}
+              <button className="yt-btn" onClick={toggleFullscreen} aria-label={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}>
+                {isFullscreen ? (
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                    <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                    <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
+                  </svg>
+                )}
               </button>
             </div>
           </div>
@@ -1204,9 +1672,9 @@ function PlayerPage() {
             {/* 3. Scrubber + time */}
             <div style={styles.mobileScrubRow}>
               <div style={styles.mobileScrubberWrap}>
-                <div style={styles.mobileScrubberTrack}>
-                  <div style={{ ...styles.mobileBufferedTrack, width: `${bufferedPercent}%` }} />
-                  <div style={{ ...styles.mobileProgressTrack, width: `${progressPercent}%` }} />
+                <div className="yt-mobile-scrubber-track">
+                  <div className="yt-mobile-buffered-track" style={{ width: `${bufferedPercent}%` }} />
+                  <div className="yt-mobile-progress-track" style={{ width: `${progressPercent}%` }} />
                 </div>
                 <input
                   type="range" min="0" max={Math.max(0, activeDuration)} step="0.1"
@@ -1275,13 +1743,6 @@ function PlayerPage() {
                   <span style={styles.mobileActionLabel}>PiP</span>
                 </button>
               )}
-            </div>
-
-            {/* 5. Meta badges */}
-            <div style={styles.mobileMetaRow}>
-              <div style={styles.metaBadge}>{content.type === 'series' ? `S${content.season}E${content.episode}` : 'MOVIE'}</div>
-              <div style={styles.metaBadge}>{qualityLabel}</div>
-              <div style={styles.metaBadge}>{bufferHealth}</div>
             </div>
           </div>
         </div>
@@ -1398,26 +1859,20 @@ const styles = {
   streamStatus: { marginTop: '8px', color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem' },
   streamHint: { marginTop: '6px', color: 'var(--accent-pink)', fontWeight: '900', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.12em' },
 
-  /* desktop controls container */
+  /* desktop controls container — full-width bottom-pinned YouTube-style */
   controls: {
-    position: 'absolute', left: '32px', right: '32px', bottom: '32px', zIndex: 10,
-    padding: '24px', borderRadius: '24px',
-    background: 'rgba(5, 12, 22, 0.5)', border: '1px solid rgba(255,255,255,0.1)',
-    backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)',
-    boxShadow: '0 20px 50px rgba(0,0,0,0.6)', transition: 'all 300ms ease',
+    position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 10,
+    padding: '0 24px 20px',
+    background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.55) 55%, transparent 100%)',
+    transition: 'opacity 300ms ease',
   },
-  /* mobile: transparent, full-width, pinned bottom — overlay on video */
-  controlsMobile: {
-    left: 0, right: 0, bottom: 0, borderRadius: 0,
-    padding: 0, background: 'transparent', border: 'none',
-    backdropFilter: 'none', WebkitBackdropFilter: 'none', boxShadow: 'none',
-  },
+  controlsMobile: {},
 
   /* desktop scrubber */
   scrubberWrap: { position: 'relative', marginBottom: '12px', height: '20px', display: 'flex', alignItems: 'center' },
   scrubberTrack: { position: 'absolute', left: 0, right: 0, height: '4px', borderRadius: '999px', background: 'rgba(255,255,255,0.2)', overflow: 'hidden' },
   bufferedTrack: { position: 'absolute', top: 0, bottom: 0, left: 0, borderRadius: '999px', background: 'rgba(255,255,255,0.28)' },
-  progressTrack: { position: 'absolute', top: 0, bottom: 0, left: 0, borderRadius: '999px', background: 'linear-gradient(90deg, var(--accent-cyan), var(--accent-secondary))', boxShadow: '0 0 10px rgba(0, 255, 255, 0.5)' },
+  progressTrack: { position: 'absolute', top: 0, bottom: 0, left: 0, background: '#ff0000' },
   scrubber: { position: 'relative', width: '100%', margin: 0, appearance: 'none', background: 'transparent', cursor: 'pointer', height: '20px', zIndex: 2 },
 
   /* desktop control rows */
