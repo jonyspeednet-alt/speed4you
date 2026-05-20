@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import WatchlistButton from "../ui/WatchlistButton";
 
 function ContentCard({
@@ -13,6 +14,7 @@ function ContentCard({
   showReviewBadge,
   cardWidth,
 }) {
+  const navigate = useNavigate();
   const isSeries = type === "series" || item.type === "series";
   const isLandscape = type === "continue";
   const [hovered, setHovered] = useState(false);
@@ -48,7 +50,10 @@ function ContentCard({
         type="button"
         className="content-card-trigger"
         style={styles.cardButton}
-        onClick={() => onQuickView && onQuickView(item)}
+        onClick={() => {
+          const targetPath = isSeries ? `/series/${item.id}` : `/movies/${item.id}`;
+          navigate(targetPath);
+        }}
         onFocus={() => tv && setHovered(true)}
         onBlur={() => tv && setHovered(false)}
       >
@@ -133,7 +138,7 @@ function ContentCard({
                   <path d="M8 5v14l11-7z" />
                 </svg>
               </div>
-              <span style={styles.hoverLabel}>Quick View</span>
+              <span style={styles.hoverLabel}>View Details</span>
             </div>
           ) : null}
         </div>
