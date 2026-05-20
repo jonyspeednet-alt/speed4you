@@ -188,8 +188,8 @@ const styles = {
   cardWrapLandscape: { width: "360px" },
   cardWrapLandscapeTV: { width: "420px" },
   cardWrapTV: { width: "280px" },
-  cardWrapTablet: { width: "196px" },
-  cardWrapMobile: { width: "156px" },
+  cardWrapTablet: { width: "180px" },
+  cardWrapMobile: { width: "148px" },
   cardButton: {
     width: "100%",
     textAlign: "left",

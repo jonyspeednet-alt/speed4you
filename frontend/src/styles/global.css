@@ -1160,9 +1160,11 @@ p {
   display: flex;
   gap: 18px;
   overflow-x: auto;
+  overflow-y: hidden;
   padding-bottom: 10px;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
 }
 
 .content-rail-list::-webkit-scrollbar {
@@ -1404,9 +1406,11 @@ p {
   display: flex;
   gap: 18px;
   overflow-x: auto;
+  overflow-y: hidden;
   padding: 0 max(48px, calc((100vw - 1720px) / 2)) 10px;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
   width: 100%;
   max-width: none;
   margin: 0;
@@ -1419,7 +1423,7 @@ p {
 .content-rail-card {
   position: relative;
   display: block;
-  min-width: 240px;
+  min-width: 200px;
   max-width: 260px;
   width: 100%;
 }
