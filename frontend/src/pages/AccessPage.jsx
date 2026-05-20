@@ -1,35 +1,48 @@
-import { useState, useEffect } from 'react';
-import { accessService } from '../services';
-import { useNavigate } from 'react-router-dom';
-import { useBreakpoint } from '../hooks';
+import { useState, useEffect } from "react";
+import { accessService } from "../services";
+import { useNavigate } from "react-router-dom";
+import { useBreakpoint, useTVMode } from "../hooks";
 
 function AccessPage() {
-  const [status, setStatus] = useState('checking');
+  const [status, setStatus] = useState("checking");
   const navigate = useNavigate();
   const { isMobile } = useBreakpoint();
+  const isTVMode = useTVMode();
 
   useEffect(() => {
     async function checkAccess() {
       try {
         const result = await accessService.checkAccess();
         if (result.allowed) {
-          navigate('/');
+          navigate("/");
         } else {
-          setStatus('restricted');
+          setStatus("restricted");
         }
       } catch {
-        setStatus('error');
+        setStatus("error");
       }
     }
     checkAccess();
   }, [navigate]);
 
-  if (status === 'checking') {
+  if (status === "checking") {
     return (
       <div style={styles.page}>
-        <div style={{ ...styles.content, ...(isMobile ? styles.contentMobile : {}) }}>
+        <div
+          style={{
+            ...styles.content,
+            ...(isTVMode ? styles.contentTV : {}),
+            ...(isMobile ? styles.contentMobile : {}),
+          }}
+        >
           <div style={styles.icon}>
-            <svg width="80" height="80" viewBox="0 0 24 24" fill="currentColor" style={{ animation: 'spin 2s linear infinite' }}>
+            <svg
+              width="80"
+              height="80"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              style={{ animation: "spin 2s linear infinite" }}
+            >
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z" />
             </svg>
           </div>
@@ -41,13 +54,19 @@ function AccessPage() {
 
   return (
     <div style={styles.page}>
-      <div style={{ ...styles.content, ...(isMobile ? styles.contentMobile : {}) }}>
+      <div
+        style={{
+          ...styles.content,
+          ...(isTVMode ? styles.contentTV : {}),
+          ...(isMobile ? styles.contentMobile : {}),
+        }}
+      >
         <div style={styles.icon}>
           <svg width="80" height="80" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
           </svg>
         </div>
-        
+
         <h1 style={styles.title}>Network Restricted</h1>
         <p style={styles.text}>
           This platform is available only to ISP network users.
@@ -75,57 +94,61 @@ function AccessPage() {
 
 const styles = {
   page: {
-    minHeight: '100vh',
-    background: 'var(--bg-primary)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 'var(--spacing-xl)',
+    minHeight: "100vh",
+    background: "var(--bg-primary)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "var(--spacing-xl)",
   },
   content: {
-    maxWidth: '500px',
-    textAlign: 'center',
+    maxWidth: "500px",
+    textAlign: "center",
+  },
+  contentTV: {
+    maxWidth: "760px",
+    fontSize: "1.25rem",
   },
   contentMobile: {
-    maxWidth: '100%',
+    maxWidth: "100%",
   },
   icon: {
-    color: 'var(--accent-red)',
-    marginBottom: 'var(--spacing-xl)',
+    color: "var(--accent-red)",
+    marginBottom: "var(--spacing-xl)",
   },
   title: {
-    fontSize: '2rem',
-    marginBottom: 'var(--spacing-md)',
-    color: 'var(--text-primary)',
+    fontSize: "clamp(2rem, 4vw, 4rem)",
+    marginBottom: "var(--spacing-md)",
+    color: "var(--text-primary)",
   },
   text: {
-    fontSize: '1.1rem',
-    color: 'var(--text-secondary)',
-    marginBottom: 'var(--spacing-sm)',
+    fontSize: "clamp(1.1rem, 1.4vw, 1.45rem)",
+    color: "var(--text-secondary)",
+    marginBottom: "var(--spacing-sm)",
   },
   subtext: {
-    fontSize: '1rem',
-    color: 'var(--text-muted)',
-    marginBottom: 'var(--spacing-xl)',
+    fontSize: "1rem",
+    color: "var(--text-muted)",
+    marginBottom: "var(--spacing-xl)",
   },
   info: {
-    textAlign: 'left',
-    background: 'var(--bg-secondary)',
-    padding: 'var(--spacing-lg)',
-    borderRadius: 'var(--radius-lg)',
-    marginBottom: 'var(--spacing-xl)',
+    textAlign: "left",
+    background: "var(--bg-secondary)",
+    padding: "var(--spacing-lg)",
+    borderRadius: "var(--radius-lg)",
+    marginBottom: "var(--spacing-xl)",
   },
   accessList: {
-    listStyle: 'disc',
-    paddingLeft: '20px',
-    marginTop: '12px',
-    display: 'grid',
-    gap: '8px',
-    color: 'var(--text-secondary)',
+    listStyle: "disc",
+    paddingLeft: "20px",
+    marginTop: "12px",
+    display: "grid",
+    gap: "8px",
+    color: "var(--text-secondary)",
   },
   help: {
-    color: 'var(--text-muted)',
-    fontSize: '0.9rem',
+    color: "var(--text-muted)",
+    fontSize: "0.9rem",
   },
 };
 
