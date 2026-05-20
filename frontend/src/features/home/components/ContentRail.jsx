@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import ContentCard from "../../../components/media/ContentCard";
 import { useBreakpoint, useTVMode } from "../../../hooks";
@@ -12,12 +12,13 @@ function ContentRail({
   priorityCount = 0,
 }) {
   const scrollRef = useRef(null);
+  const touchStartRef = useRef(0);
   const { isMobile, isTablet } = useBreakpoint();
   const isTVMode = useTVMode();
   const [leftHovered, setLeftHovered] = useState(false);
   const [rightHovered, setRightHovered] = useState(false);
-  const [touchStart, setTouchStart] = useState(0);
-  const [touchEnd, setTouchEnd] = useState(0);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
 
   const accent = title.includes("Bengali")
     ? "var(--accent-violet)"
@@ -25,16 +26,24 @@ function ContentRail({
       ? "var(--accent-pink)"
       : "var(--accent-cyan)";
 
+  const updateScrollIndicators = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 5);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 5);
+  }, []);
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollLeft = 0;
     }
-  }, [items, title]);
+    updateScrollIndicators();
+  }, [items, title, updateScrollIndicators]);
 
   const scroll = (direction) => {
     const element = scrollRef.current;
     if (!element) return;
-    
+
     const scrollDistance = direction === "left" ? -380 : 380;
     const currentScroll = element.scrollLeft;
     const targetScroll = currentScroll + scrollDistance;
@@ -46,37 +55,48 @@ function ContentRail({
     }
   };
 
-  const handleWheel = (e) => {
-    const element = scrollRef.current;
-    if (!element) return;
+  // Attach wheel handler as non-passive so preventDefault works
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
 
-    // Prefer translating vertical wheel to horizontal scroll for rails
-    const deltaX = e.deltaX;
-    const deltaY = e.deltaY;
+    const handleWheel = (e) => {
+      const deltaX = e.deltaX;
+      const deltaY = e.deltaY;
 
-    if (Math.abs(deltaY) > Math.abs(deltaX)) {
-      element.scrollLeft += deltaY;
-      e.preventDefault();
-    } else if (deltaX) {
-      element.scrollLeft += deltaX;
-    }
-  };
+      // Only intercept if there's meaningful vertical delta to convert to horizontal
+      if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 0) {
+        e.preventDefault();
+        el.scrollLeft += deltaY;
+      } else if (deltaX) {
+        // Horizontal trackpad / mouse wheel tilt – let it scroll naturally
+        e.preventDefault();
+        el.scrollLeft += deltaX;
+      }
+    };
 
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, []);
+
+  // Track scroll position for button visibility
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', updateScrollIndicators, { passive: true });
+    return () => el.removeEventListener('scroll', updateScrollIndicators);
+  }, [updateScrollIndicators]);
+
+  // Touch swipe handling using refs (avoids stale state issue)
   const handleTouchStart = (e) => {
-    setTouchStart(e.targetTouches[0].clientX);
+    touchStartRef.current = e.targetTouches[0].clientX;
   };
 
   const handleTouchEnd = (e) => {
-    setTouchEnd(e.changedTouches[0].clientX);
-    handleSwipe();
-  };
-
-  const handleSwipe = () => {
-    if (touchStart - touchEnd > 50) {
-      scroll("right");
-    }
-    if (touchStart - touchEnd < -50) {
-      scroll("left");
+    const touchEndVal = e.changedTouches[0].clientX;
+    const diff = touchStartRef.current - touchEndVal;
+    if (Math.abs(diff) > 50) {
+      scroll(diff > 0 ? "right" : "left");
     }
   };
 
@@ -109,7 +129,7 @@ function ContentRail({
             <Link
               className="content-rail-view-all"
               to={viewAllLink}
-              style={{ ...styles.viewAll, ...(isTVMode ? styles.viewAllTV : {}) }}
+              style={{ ...styles.viewAll, ...(isTVMode ? styles.viewAllTV : {}), ...(isMobile ? styles.viewAllMobile : {}) }}
             >
               Open shelf
             </Link>
@@ -121,10 +141,12 @@ function ContentRail({
                 onClick={() => scroll("left")}
                 onMouseEnter={() => setLeftHovered(true)}
                 onMouseLeave={() => setLeftHovered(false)}
+                disabled={!canScrollLeft}
                 style={{
                   ...styles.arrow,
                   ...(isTVMode ? styles.arrowTV : isMobile ? styles.arrowMobile : {}),
-                  ...(leftHovered ? styles.arrowHover : {}),
+                  ...(leftHovered && canScrollLeft ? styles.arrowHover : {}),
+                  ...(!canScrollLeft ? styles.arrowDisabled : {}),
                 }}
               >
                 <svg
@@ -143,10 +165,12 @@ function ContentRail({
                 onClick={() => scroll("right")}
                 onMouseEnter={() => setRightHovered(true)}
                 onMouseLeave={() => setRightHovered(false)}
+                disabled={!canScrollRight}
                 style={{
                   ...styles.arrow,
                   ...(isTVMode ? styles.arrowTV : isMobile ? styles.arrowMobile : {}),
-                  ...(rightHovered ? styles.arrowHover : {}),
+                  ...(rightHovered && canScrollRight ? styles.arrowHover : {}),
+                  ...(!canScrollRight ? styles.arrowDisabled : {}),
                 }}
               >
                 <svg
@@ -175,7 +199,6 @@ function ContentRail({
         aria-label={`${title} content rail`}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
-        onWheel={handleWheel}
       >
         {items.map((item, index) => (
           <ContentCard
@@ -289,11 +312,11 @@ const styles = {
     placeItems: "center",
   },
   arrowMobile: {
-    width: "32px",
-    height: "32px",
-    minWidth: "32px",
-    minHeight: "32px",
-    borderRadius: "8px",
+    width: "44px",
+    height: "44px",
+    minWidth: "44px",
+    minHeight: "44px",
+    borderRadius: "12px",
   },
   arrowTV: {
     width: "56px",
@@ -311,6 +334,16 @@ const styles = {
     background: "rgba(255, 255, 255, 0.1)",
     color: "var(--text-primary)",
     borderColor: "rgba(255,255,255,0.14)",
+  },
+  arrowDisabled: {
+    opacity: 0.25,
+    cursor: "default",
+    pointerEvents: "none",
+  },
+  viewAllMobile: {
+    minHeight: "44px",
+    padding: "0 14px",
+    fontSize: "0.78rem",
   },
   rail: {
     width: "100%",
@@ -330,7 +363,7 @@ const styles = {
     scrollPaddingLeft: "max(48px, calc((100vw - 1720px) / 2))",
     scrollbarWidth: "none",
     WebkitOverflowScrolling: "touch",
-    touchAction: "pan-x",
+    touchAction: "pan-x pan-y",
   },
   railCompactSet: {
     justifyContent: "space-between",
@@ -346,7 +379,7 @@ const styles = {
     scrollSnapStop: "normal",
     overscrollBehaviorX: "contain",
     overscrollBehaviorY: "none",
-    touchAction: "pan-x",
+    touchAction: "pan-x pan-y",
     WebkitOverflowScrolling: "touch",
   },
   railTV: {
