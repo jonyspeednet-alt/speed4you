@@ -16,6 +16,8 @@ function ContentRail({
   const isTVMode = useTVMode();
   const [leftHovered, setLeftHovered] = useState(false);
   const [rightHovered, setRightHovered] = useState(false);
+  const [touchStart, setTouchStart] = useState(0);
+  const [touchEnd, setTouchEnd] = useState(0);
 
   const accent = title.includes("Bengali")
     ? "var(--accent-violet)"
@@ -38,6 +40,24 @@ function ContentRail({
     const targetScroll = currentScroll + scrollDistance;
     
     element.scrollLeft = targetScroll;
+  };
+
+  const handleTouchStart = (e) => {
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = (e) => {
+    setTouchEnd(e.changedTouches[0].clientX);
+    handleSwipe();
+  };
+
+  const handleSwipe = () => {
+    if (touchStart - touchEnd > 50) {
+      scroll("right");
+    }
+    if (touchStart - touchEnd < -50) {
+      scroll("left");
+    }
   };
 
   return (
@@ -74,8 +94,8 @@ function ContentRail({
               Open shelf
             </Link>
           ) : null}
-          {!isMobile && (
-            <div className="content-rail-controls" style={{ ...styles.controls, ...(isTVMode ? styles.controlsTV : {}) }}>
+          {(isTVMode || !isMobile) && (
+            <div className="content-rail-controls" style={{ ...styles.controls, ...(isTVMode ? styles.controlsTV : isMobile ? styles.controlsMobile : {}) }}>
               <button
                 type="button"
                 aria-label={`Scroll ${title} left`}
@@ -84,7 +104,7 @@ function ContentRail({
                 onMouseLeave={() => setLeftHovered(false)}
                 style={{
                   ...styles.arrow,
-                  ...(isTVMode ? styles.arrowTV : {}),
+                  ...(isTVMode ? styles.arrowTV : isMobile ? styles.arrowMobile : {}),
                   ...(leftHovered ? styles.arrowHover : {}),
                 }}
               >
@@ -106,7 +126,7 @@ function ContentRail({
                 onMouseLeave={() => setRightHovered(false)}
                 style={{
                   ...styles.arrow,
-                  ...(isTVMode ? styles.arrowTV : {}),
+                  ...(isTVMode ? styles.arrowTV : isMobile ? styles.arrowMobile : {}),
                   ...(rightHovered ? styles.arrowHover : {}),
                 }}
               >
@@ -135,6 +155,8 @@ function ContentRail({
         ref={scrollRef}
         role="region"
         aria-label={`${title} content rail`}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
       >
         {items.map((item, index) => (
           <ContentCard
@@ -231,6 +253,9 @@ const styles = {
   controlsTV: {
     gap: "12px",
   },
+  controlsMobile: {
+    gap: "6px",
+  },
   arrow: {
     width: "38px",
     height: "38px",
@@ -243,6 +268,13 @@ const styles = {
     color: "var(--text-muted)",
     display: "grid",
     placeItems: "center",
+  },
+  arrowMobile: {
+    width: "32px",
+    height: "32px",
+    minWidth: "32px",
+    minHeight: "32px",
+    borderRadius: "8px",
   },
   arrowTV: {
     width: "56px",
