@@ -45,7 +45,7 @@ const YEAR_OPTIONS = [
   "2010s",
   "2000s",
   "1990s",
-  "Pre-1990s"
+  "Pre-1990s",
 ];
 const PAGE_SIZE = 24;
 const posterFallback = "/portal/assets/poster-placeholder.svg";
@@ -69,13 +69,7 @@ function normalizeQuery(value, fallback = "All") {
   return value;
 }
 
-function BrowseCard({
-  item,
-  index,
-  isMobile,
-  isTablet,
-  isTVMode,
-}) {
+function BrowseCard({ item, index, isMobile, isTablet, isTVMode }) {
   return (
     <ContentCard
       item={item}
@@ -280,7 +274,11 @@ function BrowsePage({ type }) {
 
   const currentType = type || selectedType;
   const pageTitle =
-    currentType === "movie" ? "Movies" : currentType === "series" ? "Series" : "Browse";
+    currentType === "movie"
+      ? "Movies"
+      : currentType === "series"
+        ? "Series"
+        : "Browse";
   const pageDescription =
     currentType === "movie"
       ? "A sharper movie shelf with stronger filtering, calmer spacing, and better scan rhythm."
@@ -309,7 +307,13 @@ function BrowsePage({ type }) {
   }
 
   return (
-    <div style={{ ...styles.page, ...(isMobile ? styles.pageMobile : {}) }}>
+    <div
+      style={{
+        ...styles.page,
+        ...(isTVMode ? styles.pageTV : {}),
+        ...(isMobile ? styles.pageMobile : {}),
+      }}
+    >
       <section
         style={{
           ...styles.hero,
@@ -319,7 +323,12 @@ function BrowsePage({ type }) {
         <div style={styles.heroContent}>
           <div style={styles.heroHeader}>
             <h1 style={styles.heroTitle}>{pageTitle}</h1>
-            <div style={styles.searchBar}>
+            <div
+              style={{
+                ...styles.searchBar,
+                ...(isMobile ? styles.searchBarMobile : {}),
+              }}
+            >
               <svg
                 width="18"
                 height="18"
@@ -343,7 +352,14 @@ function BrowsePage({ type }) {
             </div>
           </div>
 
-          <p style={styles.heroDescription}>{pageDescription}</p>
+          <p
+            style={{
+              ...styles.heroDescription,
+              ...(isMobile ? styles.heroDescriptionMobile : {}),
+            }}
+          >
+            {pageDescription}
+          </p>
 
           <div
             style={{
@@ -398,8 +414,21 @@ function BrowsePage({ type }) {
               ...(isMobile ? styles.actionsRowMobile : {}),
             }}
           >
-            <div style={styles.yearRowLabel}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ opacity: 0.8 }}>
+            <div
+              style={{
+                ...styles.yearRowLabel,
+                ...(isMobile ? styles.yearRowLabelMobile : {}),
+              }}
+            >
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                style={{ opacity: 0.8 }}
+              >
                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
                 <line x1="16" y1="2" x2="16" y2="6" />
                 <line x1="8" y1="2" x2="8" y2="6" />
@@ -420,7 +449,9 @@ function BrowsePage({ type }) {
                   onClick={() => setSelectedYear(yearOption)}
                   style={{
                     ...styles.genreChip,
-                    ...(selectedYear === yearOption ? styles.genreChipActive : {}),
+                    ...(selectedYear === yearOption
+                      ? styles.genreChipActive
+                      : {}),
                   }}
                 >
                   {yearOption}
@@ -483,7 +514,12 @@ function BrowsePage({ type }) {
         </div>
       </FilterDrawer>
 
-      <section style={styles.summaryPanel}>
+      <section
+        style={{
+          ...styles.summaryPanel,
+          ...(isMobile ? styles.summaryPanelMobile : {}),
+        }}
+      >
         <div style={styles.summaryText}>
           <span style={styles.summaryLabel}>Results</span>
           <strong style={styles.summaryValue}>
@@ -645,10 +681,14 @@ function FilterField({ label, value, onChange, options }) {
 const styles = {
   page: {
     minHeight: "100vh",
-    padding: "calc(var(--nav-occupied-desktop) + 8px) 24px var(--spacing-3xl)",
+    padding: "104px 24px var(--spacing-3xl)",
+  },
+  pageTV: {
+    paddingTop: "128px",
+    paddingBottom: "120px",
   },
   pageMobile: {
-    padding: "calc(var(--nav-occupied-mobile) + 8px) 12px var(--spacing-2xl)",
+    padding: "84px 12px var(--spacing-2xl)",
   },
   hero: {
     width: "min(1720px, calc(100vw - 96px))",
@@ -672,6 +712,7 @@ const styles = {
   heroContent: {
     display: "grid",
     gap: "16px",
+    minWidth: 0,
   },
   heroHeader: {
     display: "flex",
@@ -692,6 +733,15 @@ const styles = {
     lineHeight: "1.65",
     color: "rgba(255, 255, 255, 0.7)",
     marginLeft: "2px",
+    minWidth: 0,
+    overflowWrap: "anywhere",
+  },
+  heroDescriptionMobile: {
+    width: "min(100%, 32ch)",
+    maxWidth: "32ch",
+    fontSize: "0.9rem",
+    lineHeight: "1.55",
+    whiteSpace: "normal",
   },
   searchBar: {
     position: "relative",
@@ -704,6 +754,13 @@ const styles = {
     borderRadius: "14px",
     background: "rgba(0, 0, 0, 0.2)",
     border: "1px solid rgba(255, 255, 255, 0.08)",
+  },
+  searchBarMobile: {
+    width: "100%",
+    maxWidth: "100%",
+    minHeight: "48px",
+    padding: "0 14px 0 42px",
+    order: 2,
   },
   searchIcon: {
     position: "absolute",
@@ -726,7 +783,8 @@ const styles = {
     marginTop: "8px",
   },
   actionsRowMobile: {
-    flexWrap: "nowrap",
+    alignItems: "stretch",
+    flexWrap: "wrap",
   },
   filterTrigger: {
     display: "inline-flex",
@@ -740,6 +798,7 @@ const styles = {
     color: "var(--text-primary)",
     fontSize: "0.9rem",
     fontWeight: "800",
+    flexShrink: 0,
   },
   filterCountBadge: {
     display: "grid",
@@ -759,11 +818,17 @@ const styles = {
     gap: "10px",
     overflowX: "auto",
     flexGrow: 1,
+    minWidth: 0,
     paddingBottom: "4px",
     scrollbarWidth: "none",
   },
   chipRowMobile: {
+    width: "100%",
     flexWrap: "nowrap",
+    WebkitOverflowScrolling: "touch",
+    touchAction: "pan-x",
+    paddingBottom: "8px",
+    scrollSnapType: "x proximity",
   },
   genreChip: {
     padding: "10px 14px",
@@ -773,6 +838,8 @@ const styles = {
     color: "var(--text-secondary)",
     fontSize: "0.8rem",
     fontWeight: "800",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   },
   genreChipActive: {
     background:
@@ -793,13 +860,17 @@ const styles = {
     userSelect: "none",
     gap: "6px",
   },
+  yearRowLabelMobile: {
+    width: "100%",
+    minWidth: 0,
+  },
   drawerBackdrop: {
     position: "fixed",
     inset: 0,
     background: "rgba(0,0,0,0.6)",
     backdropFilter: "blur(8px)",
     WebkitBackdropFilter: "blur(8px)",
-    zIndex: 90,
+    zIndex: 1300,
     opacity: 0,
     pointerEvents: "none",
     transition: "opacity 300ms ease",
@@ -818,12 +889,14 @@ const styles = {
     background: "#0d1a2d",
     borderLeft: "1px solid rgba(255, 255, 255, 0.1)",
     boxShadow: "-20px 0 50px rgba(0,0,0,0.5)",
-    zIndex: 100,
+    zIndex: 1310,
     transform: "translateX(100%)",
     transition: "transform 350ms cubic-bezier(0.4, 0, 0.2, 1)",
     display: "grid",
     gap: "16px",
     alignContent: "flex-start",
+    overflowY: "auto",
+    maxWidth: "100vw",
   },
   drawerOpen: {
     transform: "translateX(0)",
@@ -859,6 +932,7 @@ const styles = {
     justifyContent: "space-between",
     alignItems: "center",
     gap: "12px",
+    flexWrap: "wrap",
   },
   filterStatus: {
     color: "var(--text-muted)",
@@ -890,9 +964,15 @@ const styles = {
     gap: "14px",
     flexWrap: "wrap",
   },
+  summaryPanelMobile: {
+    width: "100%",
+    padding: "14px",
+    alignItems: "stretch",
+  },
   summaryText: {
     display: "grid",
     gap: "4px",
+    minWidth: 0,
   },
   summaryLabel: {
     color: "var(--text-muted)",
@@ -909,6 +989,7 @@ const styles = {
     display: "flex",
     gap: "8px",
     flexWrap: "wrap",
+    minWidth: 0,
   },
   statPill: {
     padding: "9px 12px",
@@ -919,6 +1000,7 @@ const styles = {
     fontWeight: "800",
     textTransform: "uppercase",
     letterSpacing: "0.08em",
+    overflowWrap: "anywhere",
   },
   grid: {
     width: "min(1720px, calc(100vw - 96px))",

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import ContentCard from "../../../components/media/ContentCard";
 import { useBreakpoint, useTVMode } from "../../../hooks";
@@ -16,8 +16,13 @@ function ContentRail({
   const isTVMode = useTVMode();
   const [leftHovered, setLeftHovered] = useState(false);
   const [rightHovered, setRightHovered] = useState(false);
-  const [touchStart, setTouchStart] = useState(0);
-  const [touchEnd, setTouchEnd] = useState(0);
+  const touchStartRef = useRef({
+    x: 0,
+    y: 0,
+    scrollLeft: 0,
+    active: false,
+    dragging: false,
+  });
 
   const accent = title.includes("Bengali")
     ? "var(--accent-violet)"
@@ -31,54 +36,175 @@ function ContentRail({
     }
   }, [items, title]);
 
-  const scroll = (direction) => {
+  const clampScrollLeft = useCallback((element, nextLeft) => {
+    const maxScrollLeft = Math.max(
+      0,
+      element.scrollWidth - element.clientWidth,
+    );
+    return Math.min(maxScrollLeft, Math.max(0, nextLeft));
+  }, []);
+
+  const getScrollDistance = useCallback(
+    (element) => {
+      const firstCard = element.querySelector(".content-rail-card");
+      const cardWidth = firstCard?.getBoundingClientRect?.().width || 0;
+      const stylesForElement = window.getComputedStyle(element);
+      const gap =
+        Number.parseFloat(
+          stylesForElement.columnGap || stylesForElement.gap || "0",
+        ) || 0;
+      const byCard = cardWidth ? (cardWidth + gap) * (isTVMode ? 2 : 1) : 0;
+      const byViewport =
+        element.clientWidth * (isTVMode ? 0.72 : isMobile ? 0.78 : 0.82);
+
+      return Math.max(
+        120,
+        Math.min(Math.max(byCard, byViewport), element.clientWidth || 380),
+      );
+    },
+    [isMobile, isTVMode],
+  );
+
+  const applyScrollLeft = useCallback(
+    (element, targetScroll, behavior = "smooth") => {
+      const startScroll = element.scrollLeft;
+      const nextScroll = clampScrollLeft(element, targetScroll);
+
+      try {
+        element.scrollTo({ left: nextScroll, behavior });
+      } catch {
+        element.scrollLeft = nextScroll;
+      }
+
+      // Some TV/mobile WebViews ignore smooth scroll objects. Verify that the
+      // rail actually moved, and force the final position if it did not.
+      window.setTimeout(() => {
+        if (
+          Math.abs(element.scrollLeft - startScroll) < 1 &&
+          Math.abs(nextScroll - startScroll) > 1
+        ) {
+          element.scrollLeft = nextScroll;
+        }
+      }, 180);
+    },
+    [clampScrollLeft],
+  );
+
+  const scroll = useCallback(
+    (direction) => {
+      const element = scrollRef.current;
+      if (!element) return;
+
+      const scrollDistance = getScrollDistance(element);
+      const signedDistance =
+        direction === "left" ? -scrollDistance : scrollDistance;
+      applyScrollLeft(element, element.scrollLeft + signedDistance);
+    },
+    [applyScrollLeft, getScrollDistance],
+  );
+
+  const handleWheel = useCallback(
+    (e) => {
+      const element = scrollRef.current;
+      if (!element) return;
+
+      const deltaX = e.deltaX || 0;
+      const deltaY = e.deltaY || 0;
+      const horizontalIntent = Math.abs(deltaX) >= Math.abs(deltaY);
+      const delta = horizontalIntent ? deltaX : deltaY;
+      if (!delta) return;
+
+      const maxScrollLeft = Math.max(
+        0,
+        element.scrollWidth - element.clientWidth,
+      );
+      const nextScroll = clampScrollLeft(element, element.scrollLeft + delta);
+      const canMove = maxScrollLeft > 0 && nextScroll !== element.scrollLeft;
+
+      if (canMove) {
+        element.scrollLeft = nextScroll;
+        if (!horizontalIntent && e.cancelable) {
+          e.preventDefault();
+        }
+      }
+    },
+    [clampScrollLeft],
+  );
+
+  const handleTouchStart = useCallback((e) => {
+    const touch = e.touches?.[0];
     const element = scrollRef.current;
-    if (!element) return;
-    
-    const scrollDistance = direction === "left" ? -380 : 380;
-    const currentScroll = element.scrollLeft;
-    const targetScroll = currentScroll + scrollDistance;
+    if (!touch || !element) return;
 
-    if (element.scrollTo) {
-      element.scrollTo({ left: targetScroll, behavior: "smooth" });
-    } else {
-      element.scrollLeft = targetScroll;
-    }
-  };
+    touchStartRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      scrollLeft: element.scrollLeft,
+      active: true,
+      dragging: false,
+    };
+  }, []);
 
-  const handleWheel = (e) => {
-    const element = scrollRef.current;
-    if (!element) return;
+  const handleTouchMove = useCallback(
+    (e) => {
+      const touch = e.touches?.[0];
+      const element = scrollRef.current;
+      const touchState = touchStartRef.current;
+      if (!touch || !element || !touchState.active) return;
 
-    // Prefer translating vertical wheel to horizontal scroll for rails
-    const deltaX = e.deltaX;
-    const deltaY = e.deltaY;
+      const deltaX = touchState.x - touch.clientX;
+      const deltaY = touchState.y - touch.clientY;
+      const horizontalIntent =
+        Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 8;
 
-    if (Math.abs(deltaY) > Math.abs(deltaX)) {
-      element.scrollLeft += deltaY;
-      e.preventDefault();
-    } else if (deltaX) {
-      element.scrollLeft += deltaX;
-    }
-  };
+      if (!touchState.dragging && horizontalIntent) {
+        touchState.dragging = true;
+      }
 
-  const handleTouchStart = (e) => {
-    setTouchStart(e.targetTouches[0].clientX);
-  };
+      if (touchState.dragging) {
+        element.scrollLeft = clampScrollLeft(
+          element,
+          touchState.scrollLeft + deltaX,
+        );
+        if (e.cancelable) {
+          e.preventDefault();
+        }
+      }
+    },
+    [clampScrollLeft],
+  );
 
-  const handleTouchEnd = (e) => {
-    setTouchEnd(e.changedTouches[0].clientX);
-    handleSwipe();
-  };
+  const handleTouchEnd = useCallback(
+    (e) => {
+      const touch = e.changedTouches?.[0];
+      const element = scrollRef.current;
+      const touchState = touchStartRef.current;
+      touchStartRef.current = {
+        x: 0,
+        y: 0,
+        scrollLeft: 0,
+        active: false,
+        dragging: false,
+      };
 
-  const handleSwipe = () => {
-    if (touchStart - touchEnd > 50) {
-      scroll("right");
-    }
-    if (touchStart - touchEnd < -50) {
-      scroll("left");
-    }
-  };
+      if (!touch || !element || !touchState.active) return;
+
+      const deltaX = touchState.x - touch.clientX;
+      const deltaY = touchState.y - touch.clientY;
+      const horizontalSwipe =
+        Math.abs(deltaX) > 50 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2;
+      const nativeOrManualMoved =
+        Math.abs(element.scrollLeft - touchState.scrollLeft) > 8;
+
+      // Fallback for mobile browsers/WebViews that do not drag horizontal rails.
+      // If the rail already moved during touchmove/native panning, do not add an
+      // extra jump on touchend.
+      if (horizontalSwipe && !nativeOrManualMoved) {
+        scroll(deltaX > 0 ? "right" : "left");
+      }
+    },
+    [scroll],
+  );
 
   return (
     <section className="content-rail-section" style={styles.section}>
@@ -109,57 +235,78 @@ function ContentRail({
             <Link
               className="content-rail-view-all"
               to={viewAllLink}
-              style={{ ...styles.viewAll, ...(isTVMode ? styles.viewAllTV : {}) }}
+              style={{
+                ...styles.viewAll,
+                ...(isTVMode ? styles.viewAllTV : {}),
+              }}
             >
               Open shelf
             </Link>
           ) : null}
-          <div className="content-rail-controls" style={{ ...styles.controls, ...(isTVMode ? styles.controlsTV : isMobile ? styles.controlsMobile : {}) }}>
-              <button
-                type="button"
-                aria-label={`Scroll ${title} left`}
-                onClick={() => scroll("left")}
-                onMouseEnter={() => setLeftHovered(true)}
-                onMouseLeave={() => setLeftHovered(false)}
-                style={{
-                  ...styles.arrow,
-                  ...(isTVMode ? styles.arrowTV : isMobile ? styles.arrowMobile : {}),
-                  ...(leftHovered ? styles.arrowHover : {}),
-                }}
+          <div
+            className="content-rail-controls"
+            style={{
+              ...styles.controls,
+              ...(isTVMode
+                ? styles.controlsTV
+                : isMobile
+                  ? styles.controlsMobile
+                  : {}),
+            }}
+          >
+            <button
+              type="button"
+              aria-label={`Scroll ${title} left`}
+              onClick={() => scroll("left")}
+              onMouseEnter={() => setLeftHovered(true)}
+              onMouseLeave={() => setLeftHovered(false)}
+              style={{
+                ...styles.arrow,
+                ...(isTVMode
+                  ? styles.arrowTV
+                  : isMobile
+                    ? styles.arrowMobile
+                    : {}),
+                ...(leftHovered ? styles.arrowHover : {}),
+              }}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
               >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  aria-hidden="true"
-                >
-                  <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                aria-label={`Scroll ${title} right`}
-                onClick={() => scroll("right")}
-                onMouseEnter={() => setRightHovered(true)}
-                onMouseLeave={() => setRightHovered(false)}
-                style={{
-                  ...styles.arrow,
-                  ...(isTVMode ? styles.arrowTV : isMobile ? styles.arrowMobile : {}),
-                  ...(rightHovered ? styles.arrowHover : {}),
-                }}
+                <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              aria-label={`Scroll ${title} right`}
+              onClick={() => scroll("right")}
+              onMouseEnter={() => setRightHovered(true)}
+              onMouseLeave={() => setRightHovered(false)}
+              style={{
+                ...styles.arrow,
+                ...(isTVMode
+                  ? styles.arrowTV
+                  : isMobile
+                    ? styles.arrowMobile
+                    : {}),
+                ...(rightHovered ? styles.arrowHover : {}),
+              }}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
               >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  aria-hidden="true"
-                >
-                  <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
-                </svg>
-              </button>
-            </div>
+                <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -174,7 +321,17 @@ function ContentRail({
         role="region"
         aria-label={`${title} content rail`}
         onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onTouchCancel={() => {
+          touchStartRef.current = {
+            x: 0,
+            y: 0,
+            scrollLeft: 0,
+            active: false,
+            dragging: false,
+          };
+        }}
         onWheel={handleWheel}
       >
         {items.map((item, index) => (
@@ -289,11 +446,11 @@ const styles = {
     placeItems: "center",
   },
   arrowMobile: {
-    width: "32px",
-    height: "32px",
-    minWidth: "32px",
-    minHeight: "32px",
-    borderRadius: "8px",
+    width: "44px",
+    height: "44px",
+    minWidth: "44px",
+    minHeight: "44px",
+    borderRadius: "12px",
   },
   arrowTV: {
     width: "56px",
@@ -330,7 +487,8 @@ const styles = {
     scrollPaddingLeft: "max(48px, calc((100vw - 1720px) / 2))",
     scrollbarWidth: "none",
     WebkitOverflowScrolling: "touch",
-    touchAction: "pan-x",
+    touchAction: "pan-y",
+    cursor: "grab",
   },
   railCompactSet: {
     justifyContent: "space-between",
@@ -345,8 +503,8 @@ const styles = {
     scrollSnapType: "x proximity",
     scrollSnapStop: "normal",
     overscrollBehaviorX: "contain",
-    overscrollBehaviorY: "none",
-    touchAction: "pan-x",
+    overscrollBehaviorY: "auto",
+    touchAction: "pan-y",
     WebkitOverflowScrolling: "touch",
   },
   railTV: {
