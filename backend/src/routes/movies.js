@@ -6,7 +6,11 @@ const { AppError } = require('../utils/error');
 
 const moviesQuerySchema = Joi.object({
   genre: Joi.string().trim().min(1).max(80),
-  year: Joi.alternatives().try(Joi.number().integer().min(1900).max(2100), Joi.string().trim().pattern(/^\d{4}$/)),
+  year: Joi.alternatives().try(
+    Joi.number().integer().min(1900).max(2100),
+    Joi.string().trim().pattern(/^\d{4}s?$/),
+    Joi.string().trim().valid('Pre-1990s', 'Pre-1990', 'pre-1990s', 'pre-1990')
+  ),
   sort: Joi.string().valid('latest', 'popular', 'trending', 'rating', 'featured').default('latest'),
   page: Joi.number().integer().min(1).max(100000).default(1),
   limit: Joi.number().integer().min(1).max(100).default(24),
