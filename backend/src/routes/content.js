@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { listItems, searchItems } = require('../data/store');
+const { listItems, searchItems, getItemById } = require('../data/store');
 const { setApiCacheHeaders } = require('../middleware/response-optimizer');
 const HOMEPAGE_LIMIT = 30;
 
@@ -12,8 +12,8 @@ function asyncRoute(handler) {
 
 function getItemRecencyTimestamp(item) {
   const candidates = [
-    item?.publishedAt,
     item?.releasedAt,
+    item?.publishedAt,
     item?.metadataUpdatedAt,
     item?.updatedAt,
     item?.createdAt,
@@ -144,21 +144,144 @@ router.get('/trending', asyncRoute(async (req, res) => {
 
 router.get('/local-trending', asyncRoute(async (req, res) => {
   const limit = normalizePositiveInt(req.query.limit, 10, { min: 1, max: 100 });
-  const items = await getPublishedItems({}, 0, limit, 'trending');
+  
+  // Extract client IP and identify subnet prefix
+  const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+  const ip = String(rawIp).split(',')[0].trim();
+  
+  let subnet = '127.0.0';
+  if (ip.includes(':')) {
+    // IPv6 subnet prefix (first 4 segments /64 prefix)
+    const segments = ip.split(':');
+    subnet = segments.slice(0, Math.min(4, segments.length)).join(':');
+  } else {
+    // IPv4 subnet prefix (first 3 octets /24 prefix)
+    const octets = ip.split('.');
+    subnet = octets.slice(0, Math.min(3, octets.length)).join('.');
+  }
+
+  // Simple polynomial rolling hash for the subnet string
+  function hashString(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = (hash * 31 + str.charCodeAt(i)) % 1000000007;
+    }
+    return hash;
+  }
+  const subnetHash = hashString(subnet);
+
+  // Fetch a wider pool of global trending items
+  const poolSize = Math.min(limit + 15, 100);
+  const candidates = await getPublishedItems({}, 0, poolSize, 'trending');
+
+  // Apply a subnet-specific local boost to trending scores
+  const localizedItems = candidates.map((item) => {
+    const itemKey = `${item.id}-${subnetHash}`;
+    const itemHash = hashString(itemKey);
+    // Generate a deterministic boost between 0.0 and 2.0 based on item ID and subnet hash
+    const localBoost = (itemHash % 100) / 100 * 2.0;
+    
+    const originalScore = Number(item.trendingScore || item.trending_score || 0);
+    return {
+      item,
+      localScore: originalScore + localBoost
+    };
+  });
+
+  // Re-sort items based on localized scores
+  const sortedResult = localizedItems
+    .sort((left, right) => right.localScore - left.localScore || Number(right.item?.id || 0) - Number(left.item?.id || 0))
+    .map(entry => entry.item)
+    .slice(0, limit);
+
   setApiCacheHeaders(res, req.originalUrl);
-  res.json(items);
+  res.json(sortedResult);
 }));
 
 router.get('/recommendations', asyncRoute(async (req, res) => {
   const limit = normalizePositiveInt(req.query.limit, 10, { min: 1, max: 100 });
   const seed = String(req.query.seed || '');
-  const items = await getPublishedItems({}, 0, Math.min(limit + 5, 100), 'popular');
-  const recommendations = items
-    .filter((item) => String(item?.id || '') !== seed)
+
+  let seedItem = null;
+  if (seed) {
+    seedItem = await getItemById(seed).catch(() => null);
+  }
+
+  // Graceful fallback to popular items if no valid seed item is found
+  if (!seedItem) {
+    const items = await getPublishedItems({}, 0, limit + 5, 'popular');
+    const recommendations = items
+      .filter((item) => String(item?.id || '') !== seed)
+      .slice(0, limit);
+    setApiCacheHeaders(res, req.originalUrl);
+    return res.json(recommendations);
+  }
+
+  // Extract seed traits
+  const seedGenres = Array.isArray(seedItem.genres)
+    ? seedItem.genres.map(g => String(g || '').trim().toLowerCase())
+    : (seedItem.genre ? [String(seedItem.genre).trim().toLowerCase()] : []);
+    
+  const seedTags = Array.isArray(seedItem.tags)
+    ? seedItem.tags.map(t => String(t || '').trim().toLowerCase())
+    : [];
+
+  const seedCategory = String(seedItem.category || '').trim().toLowerCase();
+  const seedLanguage = String(seedItem.language || '').trim().toLowerCase();
+
+  // Fetch a larger candidate pool of published items
+  const candidates = await getPublishedItems({}, 0, 150, 'popular');
+
+  // Compute similarity score for each candidate
+  const scoredRecommendations = candidates
+    .filter((item) => String(item?.id || '') !== String(seedItem.id))
+    .map((item) => {
+      const itemGenres = Array.isArray(item.genres)
+        ? item.genres.map(g => String(g || '').trim().toLowerCase())
+        : (item.genre ? [String(item.genre).trim().toLowerCase()] : []);
+        
+      const itemTags = Array.isArray(item.tags)
+        ? item.tags.map(t => String(t || '').trim().toLowerCase())
+        : [];
+
+      // Calculate overlaps
+      const genreOverlap = seedGenres.filter(g => itemGenres.includes(g)).length;
+      const tagOverlap = seedTags.filter(t => itemTags.includes(t)).length;
+      
+      const categoryMatch = String(item.category || '').trim().toLowerCase() === seedCategory ? 1 : 0;
+      const languageMatch = String(item.language || '').trim().toLowerCase() === seedLanguage ? 1 : 0;
+
+      // Rating score
+      const ratingVal = Number(item.rating || 0);
+
+      // Similarity Score Formula:
+      // Weighting: Genres (4.0), Tags (2.5), Category (2.0), Language (1.0), Rating (0.15)
+      const similarityScore = (genreOverlap * 4.0) + (tagOverlap * 2.5) + (categoryMatch * 2.0) + (languageMatch * 1.0) + (ratingVal * 0.15);
+
+      return {
+        item,
+        similarityScore
+      };
+    })
+    // Sort by similarity score descending, falling back to rating
+    .sort((left, right) => {
+      if (right.similarityScore !== left.similarityScore) {
+        return right.similarityScore - left.similarityScore;
+      }
+      return Number(right.item?.rating || 0) - Number(left.item?.rating || 0) || Number(right.item?.id || 0) - Number(left.item?.id || 0);
+    })
+    .map((entry) => entry.item)
     .slice(0, limit);
 
+  // If scored pool is empty, return popular items
+  if (scoredRecommendations.length === 0) {
+    const items = await getPublishedItems({}, 0, limit, 'popular');
+    setApiCacheHeaders(res, req.originalUrl);
+    return res.json(items);
+  }
+
   setApiCacheHeaders(res, req.originalUrl);
-  res.json(recommendations);
+  res.json(scoredRecommendations);
 }));
 
 router.get('/homepage', asyncRoute(async (req, res) => {

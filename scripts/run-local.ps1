@@ -24,7 +24,7 @@ Write-Host "Checking SSH Tunnel to Production Database..." -ForegroundColor Cyan
 $tunnel = Get-NetTCPConnection -LocalPort $DBPort -ErrorAction SilentlyContinue | Where-Object { $_.State -eq 'Listen' }
 if (-not $tunnel) {
   Write-Host "Starting SSH Tunnel via plink..." -ForegroundColor Yellow
-  Start-Process plink -ArgumentList "-P $RemoteSSHPort -pw ***REMOVED*** -L $DBPort:localhost:$DBPort -N speed4you@$RemoteHost" -WindowStyle Hidden
+  Start-Process plink -ArgumentList "-hostkey 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIL+eak04klnhd45aow1QDKLZO990Z7fdUmtAvPnO8mAf' -P $RemoteSSHPort -pw ***REMOVED*** -L $DBPort:localhost:$DBPort -N speed4you@$RemoteHost" -WindowStyle Hidden
   Start-Sleep -Seconds 3
 } else {
   Write-Host "SSH Tunnel is already running." -ForegroundColor Green

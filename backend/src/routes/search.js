@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getRecentSearches, getSuggestions, recordRecentSearch, searchItems } = require('../data/store');
+const { getRecentSearches, getSuggestions, recordRecentSearch, searchItems, recordSearchAnalytics, getTrendingSearches } = require('../data/store');
 const { Joi, validateQuery } = require('../middleware/validate');
 const { resolveUserId } = require('../middleware/resolve-user-id');
 
@@ -9,7 +9,12 @@ const searchQuerySchema = Joi.object({
   type: Joi.string().valid('movie', 'series').allow('').default(''),
   genre: Joi.string().trim().allow('').max(80).default(''),
   language: Joi.string().trim().allow('').max(40).default(''),
-  year: Joi.alternatives().try(Joi.number().integer().min(1900).max(2100), Joi.string().trim().pattern(/^\d{4}$/), Joi.string().allow('')).default(''),
+  year: Joi.alternatives().try(
+    Joi.number().integer().min(1900).max(2100),
+    Joi.string().trim().pattern(/^\d{4}s?$/),
+    Joi.string().trim().valid('Pre-1990s', 'Pre-1990', 'pre-1990s', 'pre-1990'),
+    Joi.string().allow('')
+  ).default(''),
   page: Joi.number().integer().min(1).max(100000).default(1),
   limit: Joi.number().integer().min(1).max(100).default(24),
 });
@@ -49,6 +54,9 @@ router.get('/', validateQuery(searchQuerySchema), async (req, res, next) => {
     if (results.length > 0) {
       await recordRecentSearch(userId, q, { type, genre, language, year });
     }
+    
+    // Log for admin analytics
+    recordSearchAnalytics(q, results.length, userId).catch(() => {});
 
     res.json({
       results: pagedResults,
@@ -79,6 +87,15 @@ router.get('/recent', async (req, res, next) => {
   try {
     const userId = resolveUserId(req);
     const items = await getRecentSearches(userId, 10);
+    res.json({ items });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/trending', async (req, res, next) => {
+  try {
+    const items = await getTrendingSearches(10);
     res.json({ items });
   } catch (error) {
     next(error);

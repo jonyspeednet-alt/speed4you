@@ -26,6 +26,7 @@ const { contentSchema, bulkUpdateSchema } = require('../utils/validation-schemas
 // Dashboard & Stats
 router.get('/dashboard', asyncRoute(adminController.getDashboard));
 router.get('/stats', asyncRoute(adminController.getStats));
+router.get('/search-analytics', asyncRoute(adminController.getSearchAnalytics));
 
 // Content Management
 router.get('/content', asyncRoute(adminController.getContentList));
