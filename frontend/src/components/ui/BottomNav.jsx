@@ -116,10 +116,10 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '5px',
-    minHeight: '48px',
-    padding: '6px 4px',
-    borderRadius: '16px',
+    gap: '6px',
+    minHeight: '54px',
+    padding: '8px 6px',
+    borderRadius: '18px',
     color: 'var(--text-muted)',
   },
   itemActive: {
@@ -129,9 +129,9 @@ const styles = {
   iconWrap: {
     display: 'grid',
     placeItems: 'center',
-    width: '38px',
-    height: '30px',
-    borderRadius: '12px',
+    width: '42px',
+    height: '32px',
+    borderRadius: '14px',
   },
   iconWrapActive: {
     background: 'linear-gradient(135deg, #fff1df 0%, var(--accent-primary) 50%, var(--accent-secondary) 100%)',
@@ -139,7 +139,7 @@ const styles = {
     boxShadow: '0 10px 24px rgba(121, 228, 255, 0.2)',
   },
   label: {
-    fontSize: '0.64rem',
+    fontSize: '0.72rem',
     fontWeight: '700',
     letterSpacing: '0.04em',
     textTransform: 'uppercase',
