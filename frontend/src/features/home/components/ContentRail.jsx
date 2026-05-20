@@ -12,7 +12,6 @@ function ContentRail({
   priorityCount = 0,
 }) {
   const scrollRef = useRef(null);
-  const touchStartRef = useRef(0);
   const { isMobile, isTablet } = useBreakpoint();
   const isTVMode = useTVMode();
   const [leftHovered, setLeftHovered] = useState(false);
@@ -55,7 +54,7 @@ function ContentRail({
     }
   };
 
-  // Attach wheel handler as non-passive so preventDefault works
+  // Attach wheel handler as non-passive so preventDefault works on desktop
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -64,12 +63,11 @@ function ContentRail({
       const deltaX = e.deltaX;
       const deltaY = e.deltaY;
 
-      // Only intercept if there's meaningful vertical delta to convert to horizontal
+      // Convert vertical wheel to horizontal scroll on the rail
       if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 0) {
         e.preventDefault();
         el.scrollLeft += deltaY;
       } else if (deltaX) {
-        // Horizontal trackpad / mouse wheel tilt – let it scroll naturally
         e.preventDefault();
         el.scrollLeft += deltaX;
       }
@@ -79,26 +77,13 @@ function ContentRail({
     return () => el.removeEventListener('wheel', handleWheel);
   }, []);
 
-  // Track scroll position for button visibility
+  // Track scroll position for button enable/disable
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     el.addEventListener('scroll', updateScrollIndicators, { passive: true });
     return () => el.removeEventListener('scroll', updateScrollIndicators);
   }, [updateScrollIndicators]);
-
-  // Touch swipe handling using refs (avoids stale state issue)
-  const handleTouchStart = (e) => {
-    touchStartRef.current = e.targetTouches[0].clientX;
-  };
-
-  const handleTouchEnd = (e) => {
-    const touchEndVal = e.changedTouches[0].clientX;
-    const diff = touchStartRef.current - touchEndVal;
-    if (Math.abs(diff) > 50) {
-      scroll(diff > 0 ? "right" : "left");
-    }
-  };
 
   return (
     <section className="content-rail-section" style={styles.section}>
@@ -187,6 +172,8 @@ function ContentRail({
         </div>
       </div>
 
+      {/* Native touch scrolling works via CSS touch-action: pan-x pan-y.
+          No custom touch handlers needed — browser handles horizontal swipe natively. */}
       <div
         className="content-rail-list"
         style={{
@@ -197,8 +184,6 @@ function ContentRail({
         ref={scrollRef}
         role="region"
         aria-label={`${title} content rail`}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
       >
         {items.map((item, index) => (
           <ContentCard
@@ -310,6 +295,7 @@ const styles = {
     color: "var(--text-muted)",
     display: "grid",
     placeItems: "center",
+    touchAction: "manipulation",
   },
   arrowMobile: {
     width: "44px",
@@ -345,6 +331,8 @@ const styles = {
     padding: "0 14px",
     fontSize: "0.78rem",
   },
+  // touch-action: pan-x pan-y allows native horizontal AND vertical touch scroll
+  // browser auto-detects direction: horizontal = rail scroll, vertical = page scroll
   rail: {
     width: "100%",
     maxWidth: "none",
