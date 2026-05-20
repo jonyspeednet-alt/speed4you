@@ -55,6 +55,7 @@ function ContentCard({
         }}
         onFocus={() => tv && setHovered(true)}
         onBlur={() => tv && setHovered(false)}
+        onTouchStart={(e) => e.stopPropagation()}
       >
         <div
           style={{
