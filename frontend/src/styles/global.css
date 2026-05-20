@@ -1192,7 +1192,7 @@ p {
 
 /* Ensure content card buttons don't block rail touch scrolling */
 .content-card-trigger {
-  touch-action: manipulation;
+  touch-action: manipulation !important;
   -webkit-tap-highlight-color: transparent;
 }
 
