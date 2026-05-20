@@ -55,6 +55,11 @@ export default function AdminDashboard() {
     refetchInterval: 2000,
   });
 
+  const { data: searchAnalytics = { topSearches: [], zeroResults: [] }, isLoading: isAnalyticsLoading } = useQuery({
+    queryKey: ['admin', 'searchAnalytics'],
+    queryFn: () => adminService.getSearchAnalytics(),
+  });
+
   const normalizerMutation = useMutation({
     mutationFn: (action) => action === 'start'
       ? adminService.startMediaNormalizer()
@@ -94,68 +99,161 @@ export default function AdminDashboard() {
       {/* Main grid */}
       <div style={{ ...s.grid, ...(isMobile ? s.gridMobile : {}) }}>
 
-        {/* Recent content table */}
-        <div style={s.card}>
-          <SectionHeader
-            title="Recent Content"
-            action={
-              <Link to="/admin/content" style={s.linkBtn}>View all →</Link>
-            }
-          />
-          <div style={s.tableWrap}>
-            <table style={s.table}>
-              <thead>
-                <tr>
-                  <th style={s.th}>Title</th>
-                  <th style={{ ...s.th, ...s.thNarrow }}>Type</th>
-                  <th style={{ ...s.th, ...s.thNarrow }}>Status</th>
-                  <th style={{ ...s.th, ...s.thNarrow }}>Source</th>
-                  <th style={{ ...s.th, ...s.thAction }} />
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <tr key={i}>
-                      {Array.from({ length: 5 }).map((__, j) => (
-                        <td key={j} style={s.td}>
-                          <div style={{ ...s.skeleton, width: j === 0 ? '140px' : '60px' }} />
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                ) : (dashboard.recentContent || []).length === 0 ? (
+        {/* Left Column container */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {/* Recent content table */}
+          <div style={s.card}>
+            <SectionHeader
+              title="Recent Content"
+              action={
+                <Link to="/admin/content" style={s.linkBtn}>View all →</Link>
+              }
+            />
+            <div style={s.tableWrap}>
+              <table style={s.table}>
+                <thead>
                   <tr>
-                    <td colSpan={5} style={{ ...s.td, textAlign: 'center', color: TEXT3, padding: '32px' }}>
-                      No content yet
-                    </td>
+                    <th style={s.th}>Title</th>
+                    <th style={{ ...s.th, ...s.thNarrow }}>Type</th>
+                    <th style={{ ...s.th, ...s.thNarrow }}>Status</th>
+                    <th style={{ ...s.th, ...s.thNarrow }}>Source</th>
+                    <th style={{ ...s.th, ...s.thAction }} />
                   </tr>
-                ) : (
-                  (dashboard.recentContent || []).map((item) => (
-                    <tr key={item.id} style={s.tr}>
-                      <td style={s.td}>
-                        <span style={s.itemTitle}>{item.title}</span>
-                        <span style={s.itemMeta}>{item.category || 'Uncategorized'}</span>
-                      </td>
-                      <td style={s.td}>
-                        <span style={s.typeChip}>{item.type}</span>
-                      </td>
-                      <td style={s.td}>
-                        <StatusBadge status={item.status} />
-                      </td>
-                      <td style={{ ...s.td, color: TEXT3, fontSize: '0.8rem' }}>
-                        {item.sourceType === 'scanner' ? 'Scanner' : 'Manual'}
-                      </td>
-                      <td style={{ ...s.td, textAlign: 'right' }}>
-                        <Link to={`/admin/content/${item.id}/edit`} style={s.rowAction}>
-                          Review
-                        </Link>
+                </thead>
+                <tbody>
+                  {isLoading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <tr key={i}>
+                        {Array.from({ length: 5 }).map((__, j) => (
+                          <td key={j} style={s.td}>
+                            <div style={{ ...s.skeleton, width: j === 0 ? '140px' : '60px' }} />
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : (dashboard.recentContent || []).length === 0 ? (
+                    <tr>
+                      <td colSpan={5} style={{ ...s.td, textAlign: 'center', color: TEXT3, padding: '32px' }}>
+                        No content yet
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    (dashboard.recentContent || []).map((item) => (
+                      <tr key={item.id} style={s.tr}>
+                        <td style={s.td}>
+                          <span style={s.itemTitle}>{item.title}</span>
+                          <span style={s.itemMeta}>{item.category || 'Uncategorized'}</span>
+                        </td>
+                        <td style={s.td}>
+                          <span style={s.typeChip}>{item.type}</span>
+                        </td>
+                        <td style={s.td}>
+                          <StatusBadge status={item.status} />
+                        </td>
+                        <td style={{ ...s.td, color: TEXT3, fontSize: '0.8rem' }}>
+                          {item.sourceType === 'scanner' ? 'Scanner' : 'Manual'}
+                        </td>
+                        <td style={{ ...s.td, textAlign: 'right' }}>
+                          <Link to={`/admin/content/${item.id}/edit`} style={s.rowAction}>
+                            Review
+                          </Link>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Search Insights Widget */}
+          <div style={s.card}>
+            <SectionHeader title="Search Insights" />
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '24px' }}>
+              {/* Top Searches */}
+              <div style={s.tableWrap}>
+                <div style={{ padding: '16px', fontWeight: 'bold', color: TEXT, borderBottom: `1px solid ${BORDER}` }}>Top Searches</div>
+                <table style={s.table}>
+                  <thead>
+                    <tr>
+                      <th style={s.th}>Query</th>
+                      <th style={{ ...s.th, ...s.thNarrow }}>Search Count</th>
+                      <th style={{ ...s.th, ...s.thNarrow }}>Results Count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {isAnalyticsLoading ? (
+                      Array.from({ length: 5 }).map((_, i) => (
+                        <tr key={i}>
+                          <td style={s.td}><div style={s.skeleton} /></td>
+                          <td style={s.td}><div style={s.skeleton} /></td>
+                          <td style={s.td}><div style={s.skeleton} /></td>
+                        </tr>
+                      ))
+                    ) : searchAnalytics.topSearches?.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} style={{ ...s.td, textAlign: 'center', color: TEXT3, padding: '16px' }}>No search analytics yet</td>
+                      </tr>
+                    ) : (
+                      searchAnalytics.topSearches?.map((item, idx) => (
+                        <tr key={idx} style={s.tr}>
+                          <td style={{ ...s.td, color: TEXT, fontWeight: '600' }}>"{item.query}"</td>
+                          <td style={{ ...s.td, color: TEXT2 }}>{item.count} times</td>
+                          <td style={s.td}>
+                            <span style={{
+                              display: 'inline-block',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              fontSize: '0.78rem',
+                              fontWeight: 'bold',
+                              background: item.resultsCount > 0 ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                              color: item.resultsCount > 0 ? '#4ade80' : '#f87171',
+                              border: item.resultsCount > 0 ? '1px solid rgba(34,197,94,0.2)' : '1px solid rgba(239,68,68,0.2)',
+                            }}>
+                              {item.resultsCount}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Zero-Result Searches */}
+              <div style={s.tableWrap}>
+                <div style={{ padding: '16px', fontWeight: 'bold', color: '#f87171', borderBottom: `1px solid ${BORDER}` }}>Zero-Result Searches (Add Next!)</div>
+                <table style={s.table}>
+                  <thead>
+                    <tr>
+                      <th style={s.th}>Missing Query</th>
+                      <th style={{ ...s.th, ...s.thNarrow }}>Search Count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {isAnalyticsLoading ? (
+                      Array.from({ length: 5 }).map((_, i) => (
+                        <tr key={i}>
+                          <td style={s.td}><div style={s.skeleton} /></td>
+                          <td style={s.td}><div style={s.skeleton} /></td>
+                        </tr>
+                      ))
+                    ) : searchAnalytics.zeroResults?.length === 0 ? (
+                      <tr>
+                        <td colSpan={2} style={{ ...s.td, textAlign: 'center', color: TEXT3, padding: '16px' }}>No zero-result searches yet</td>
+                      </tr>
+                    ) : (
+                      searchAnalytics.zeroResults?.map((item, idx) => (
+                        <tr key={idx} style={s.tr}>
+                          <td style={{ ...s.td, color: '#f87171', fontWeight: '600' }}>"{item.query}"</td>
+                          <td style={{ ...s.td, color: TEXT2 }}>{item.count} times</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
 

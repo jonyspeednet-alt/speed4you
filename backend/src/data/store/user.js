@@ -69,6 +69,26 @@ async function getRecentSearches(externalUserId, limit = 10) {
   return (Array.isArray(state?.items) ? state.items : []).slice(0, Math.max(1, Number(limit) || 10));
 }
 
+async function recordSearchAnalytics(query, resultsCount, userId) {
+  const normalizedQuery = String(query || '').trim();
+  if (!normalizedQuery || normalizedQuery.length < 2) return;
+  try {
+    await db.query(`INSERT INTO search_analytics (query, results_count, user_id) VALUES ($1, $2, $3)`, [normalizedQuery.toLowerCase(), Number(resultsCount) || 0, userId ? String(userId) : null]);
+  } catch (error) {
+    console.error('Error logging search analytics:', error.message);
+  }
+}
+
+async function getTrendingSearches(limit = 10) {
+  try {
+    const result = await db.query(`SELECT query, COUNT(*) as count FROM search_analytics WHERE created_at > NOW() - INTERVAL '7 days' GROUP BY query ORDER BY count DESC LIMIT $1`, [Number(limit) || 10]);
+    return result.rows.map(row => row.query);
+  } catch (error) {
+    console.error('Error fetching trending searches:', error.message);
+    return [];
+  }
+}
+
 module.exports = {
   ensureUser,
   getWatchlistEntries,
@@ -79,4 +99,6 @@ module.exports = {
   markWatchProgressComplete,
   recordRecentSearch,
   getRecentSearches,
+  recordSearchAnalytics,
+  getTrendingSearches,
 };

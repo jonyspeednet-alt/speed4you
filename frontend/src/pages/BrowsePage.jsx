@@ -33,6 +33,21 @@ const TRENDING_SEARCHES = [
   "2025",
   "Crime",
 ];
+const YEAR_OPTIONS = [
+  "All",
+  "2026",
+  "2025",
+  "2024",
+  "2023",
+  "2022",
+  "2021",
+  "2020",
+  "2020s",
+  "2010s",
+  "2000s",
+  "1990s",
+  "Pre-1990s"
+];
 const PAGE_SIZE = 24;
 const posterFallback = "/portal/assets/poster-placeholder.svg";
 
@@ -93,6 +108,12 @@ function BrowsePage({ type }) {
   const [selectedCollection, setSelectedCollection] = useState(() =>
     normalizeQuery(searchParams.get("collection")),
   );
+  const [selectedType, setSelectedType] = useState(() =>
+    normalizeQuery(searchParams.get("type"), type || "All"),
+  );
+  const [selectedYear, setSelectedYear] = useState(() =>
+    normalizeQuery(searchParams.get("year")),
+  );
   const [searchText, setSearchText] = useState(
     () => searchParams.get("q") || "",
   );
@@ -111,6 +132,8 @@ function BrowsePage({ type }) {
     setSortBy("latest");
     setSelectedCollection("All");
     setSearchText("");
+    setSelectedType(type || "All");
+    setSelectedYear("All");
   }, [type]);
 
   useEffect(() => {
@@ -120,6 +143,8 @@ function BrowsePage({ type }) {
     if (sortBy !== "latest") nextParams.sort = sortBy;
     if (selectedCollection !== "All")
       nextParams.collection = selectedCollection;
+    if (selectedType !== "All") nextParams.type = selectedType;
+    if (selectedYear !== "All") nextParams.year = selectedYear;
     if (deferredSearchText.trim()) nextParams.q = deferredSearchText.trim();
     setSearchParams(nextParams, { replace: true });
   }, [
@@ -129,23 +154,27 @@ function BrowsePage({ type }) {
     selectedLanguage,
     setSearchParams,
     sortBy,
+    selectedType,
+    selectedYear,
   ]);
 
   const params = useMemo(
     () => ({
-      type,
+      type: selectedType !== "All" ? selectedType : undefined,
       genre: selectedGenre !== "All" ? selectedGenre : undefined,
       language: selectedLanguage !== "All" ? selectedLanguage : undefined,
       collection: selectedCollection !== "All" ? selectedCollection : undefined,
+      year: selectedYear !== "All" ? selectedYear : undefined,
       q: deferredSearchText.trim() || undefined,
       sort: sortBy,
       limit: PAGE_SIZE,
     }),
     [
-      type,
+      selectedType,
       selectedGenre,
       selectedLanguage,
       selectedCollection,
+      selectedYear,
       deferredSearchText,
       sortBy,
     ],
@@ -253,12 +282,13 @@ function BrowsePage({ type }) {
     return () => observer.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
+  const currentType = type || selectedType;
   const pageTitle =
-    type === "movie" ? "Movies" : type === "series" ? "Series" : "Browse";
+    currentType === "movie" ? "Movies" : currentType === "series" ? "Series" : "Browse";
   const pageDescription =
-    type === "movie"
+    currentType === "movie"
       ? "A sharper movie shelf with stronger filtering, calmer spacing, and better scan rhythm."
-      : type === "series"
+      : currentType === "series"
         ? "Track longer stories with tighter discovery, clearer metadata, and cleaner results."
         : "Explore the full catalog with a redesigned discovery workspace built for speed.";
 
@@ -267,6 +297,8 @@ function BrowsePage({ type }) {
     selectedLanguage !== "All",
     selectedCollection !== "All",
     sortBy !== "latest",
+    selectedType !== "All" && !type,
+    selectedYear !== "All",
   ].filter(Boolean).length;
 
   function resetFilters() {
@@ -275,6 +307,8 @@ function BrowsePage({ type }) {
     setSelectedCollection("All");
     setSortBy("latest");
     setSearchText("");
+    setSelectedType(type || "All");
+    setSelectedYear("All");
     setFiltersOpen(false);
   }
 
@@ -360,6 +394,44 @@ function BrowsePage({ type }) {
               ))}
             </div>
           </div>
+
+          <div
+            style={{
+              ...styles.actionsRow,
+              marginTop: "4px",
+              ...(isMobile ? styles.actionsRowMobile : {}),
+            }}
+          >
+            <div style={styles.yearRowLabel}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ opacity: 0.8 }}>
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+              <span>Release Year</span>
+            </div>
+            <div
+              style={{
+                ...styles.chipRow,
+                ...(isMobile ? styles.chipRowMobile : {}),
+              }}
+            >
+              {YEAR_OPTIONS.map((yearOption) => (
+                <button
+                  key={yearOption}
+                  type="button"
+                  onClick={() => setSelectedYear(yearOption)}
+                  style={{
+                    ...styles.genreChip,
+                    ...(selectedYear === yearOption ? styles.genreChipActive : {}),
+                  }}
+                >
+                  {yearOption}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -389,6 +461,20 @@ function BrowsePage({ type }) {
           onChange={setSelectedCollection}
           options={collectionOptions}
         />
+        {!type && (
+          <FilterField
+            label="Content Type"
+            value={selectedType}
+            onChange={setSelectedType}
+            options={["All", "movie", "series"]}
+          />
+        )}
+        <FilterField
+          label="Release Year"
+          value={selectedYear}
+          onChange={setSelectedYear}
+          options={YEAR_OPTIONS}
+        />
         <div style={styles.filterFooter}>
           <button
             type="button"
@@ -413,6 +499,12 @@ function BrowsePage({ type }) {
           </strong>
         </div>
         <div style={styles.summaryStats}>
+          {selectedType !== "All" && (
+            <span style={styles.statPill}>{selectedType}</span>
+          )}
+          {selectedYear !== "All" && (
+            <span style={styles.statPill}>{selectedYear}</span>
+          )}
           <span style={styles.statPill}>
             {selectedLanguage === "All" ? "All languages" : selectedLanguage}
           </span>
@@ -698,6 +790,19 @@ const styles = {
       "linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-secondary) 100%)",
     color: "#050c16",
     boxShadow: "0 0 15px rgba(0, 255, 255, 0.3)",
+  },
+  yearRowLabel: {
+    fontSize: "0.72rem",
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    color: "var(--accent-cyan)",
+    opacity: 0.8,
+    minWidth: "120px",
+    display: "inline-flex",
+    alignItems: "center",
+    userSelect: "none",
+    gap: "6px",
   },
   drawerBackdrop: {
     position: "fixed",

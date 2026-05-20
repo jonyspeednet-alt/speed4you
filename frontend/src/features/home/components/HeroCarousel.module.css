@@ -118,7 +118,7 @@
     max-width: 100%;
     margin: 0 auto;
     min-height: calc(clamp(540px, 74vh, 760px) - var(--nav-occupied-desktop));
-    padding: clamp(24px, 4vw, 52px) 0 76px;
+    padding: calc(clamp(24px, 4vw, 52px) + var(--nav-occupied-desktop)) 0 76px;
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
     gap: 24px;
@@ -635,7 +635,7 @@
         min-height: calc(clamp(500px, 66vh, 640px) - var(--nav-occupied-desktop));
         grid-template-columns: minmax(0, 1fr) 280px;
         gap: 18px;
-        padding: 24px 0 72px;
+        padding: calc(24px + var(--nav-occupied-desktop)) 0 72px;
     }
     .showcasePanel {
         max-width: 280px;
@@ -656,7 +656,7 @@
         width: 100%;
         min-height: calc(clamp(480px, 65svh, 600px) - var(--nav-occupied-mobile));
         grid-template-columns: 1fr;
-        padding: 24px 16px 60px;
+        padding: calc(24px + var(--nav-occupied-mobile)) 16px 60px;
     }
 
     .copyPanel {

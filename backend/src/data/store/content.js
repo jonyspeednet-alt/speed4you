@@ -68,10 +68,29 @@ function buildCatalogFilterClauses(filters = {}, params = []) {
   if (filters.source)       clauses.push(`source_type = ${push(String(filters.source))}`);
   if (filters.sourceRootId) clauses.push(`source_root_id = ${push(String(filters.sourceRootId))}`);
   if (filters.scanRunId)    clauses.push(`last_scan_run_id = ${push(String(filters.scanRunId))}`);
-  if (filters.language)     clauses.push(`language = ${push(String(filters.language))}`);
+  if (filters.language) {
+    const langPlaceholder = push('%' + String(filters.language).trim().toLowerCase() + '%');
+    clauses.push(`LOWER(COALESCE(language, '')) LIKE ${langPlaceholder}`);
+  }
   if (filters.category)     clauses.push(`category = ${push(String(filters.category))}`);
   if (filters.collection)   clauses.push(`collection = ${push(String(filters.collection))}`);
-  if (filters.year)         clauses.push(`year = ${push(Number(filters.year))}`);
+  if (filters.year) {
+    const yearStr = String(filters.year).trim();
+    if (/^\d{4}$/.test(yearStr)) {
+      clauses.push(`year = ${push(Number(yearStr))}`);
+    } else if (/^\d{4}s$/.test(yearStr)) {
+      const decadeStart = Number(yearStr.slice(0, 4));
+      const decadeEnd = decadeStart + 9;
+      clauses.push(`year BETWEEN ${push(decadeStart)} AND ${push(decadeEnd)}`);
+    } else if (yearStr.toLowerCase() === 'pre-1990s' || yearStr.toLowerCase() === 'pre-1990') {
+      clauses.push(`year < 1990`);
+    } else {
+      const numYear = Number(yearStr);
+      if (!isNaN(numYear)) {
+        clauses.push(`year = ${push(numYear)}`);
+      }
+    }
+  }
   if (filters.featured)     clauses.push(`featured = true`);
   if (filters.duplicatesOnly) clauses.push(`duplicate_count > 0`);
 
@@ -79,39 +98,36 @@ function buildCatalogFilterClauses(filters = {}, params = []) {
     clauses.push(`COALESCE(payload->'tags', '[]'::jsonb) ? ${push(String(filters.tag))}`);
   }
   if (filters.genre) {
-    const genrePlaceholder = push(String(filters.genre).trim().toLowerCase());
+    const genreParam = String(filters.genre).trim().toLowerCase();
+    const genrePlaceholderExact = push(genreParam);
+    const genrePlaceholderLike = push('%' + genreParam + '%');
     clauses.push(
       `(`
-      + `LOWER(COALESCE(payload->>'genre', '')) = ${genrePlaceholder}`
-      + ` OR LOWER(COALESCE(category, '')) = ${genrePlaceholder}`
+      + `LOWER(COALESCE(payload->>'genre', '')) LIKE ${genrePlaceholderLike}`
+      + ` OR LOWER(COALESCE(category, '')) LIKE ${genrePlaceholderLike}`
       + ` OR EXISTS (`
       + `SELECT 1 FROM jsonb_array_elements_text(COALESCE(payload->'genres', '[]'::jsonb)) AS genre_value`
-      + ` WHERE LOWER(genre_value) = ${genrePlaceholder}`
+      + ` WHERE LOWER(genre_value) = ${genrePlaceholderExact}`
       + `)`
       + ` OR EXISTS (`
       + `SELECT 1 FROM jsonb_array_elements_text(COALESCE(payload->'tags', '[]'::jsonb)) AS tag_value`
-      + ` WHERE LOWER(tag_value) = ${genrePlaceholder}`
+      + ` WHERE LOWER(tag_value) = ${genrePlaceholderExact}`
       + `)`
       + `)`,
     );
   }
 
   if (filters.search) {
-    const term = `%${String(filters.search).trim().toLowerCase()}%`;
-    const placeholder = push(term);
+    const rawSearch = String(filters.search).trim();
+    const tsQueryPlaceholder = push(rawSearch);
+    const trgmPlaceholder = push(rawSearch);
+
     clauses.push(
       `(`
-      + `LOWER(`
-      + `COALESCE(title, '') || ' ' || COALESCE(payload->>'genre', '') || ' '`
-      + ` || COALESCE(language, '') || ' ' || COALESCE(category, '') || ' '`
-      + ` || COALESCE(collection, '') || ' ' || COALESCE(payload->>'description', '') || ' '`
-      + ` || COALESCE(payload->>'originalTitle', '') || ' ' || COALESCE(payload->>'year', '')`
-      + `) LIKE ${placeholder}`
-      + ` OR EXISTS (`
-      + `SELECT 1 FROM jsonb_array_elements_text(COALESCE(payload->'tags', '[]'::jsonb)) AS tag_value`
-      + ` WHERE LOWER(tag_value) LIKE ${placeholder}`
+      + `(search_vector @@ plainto_tsquery('english', ${tsQueryPlaceholder}))`
+      + ` OR (title % ${trgmPlaceholder})`
+      + ` OR ((payload->>'originalTitle') % ${trgmPlaceholder})`
       + `)`
-      + `)`,
     );
   }
 
@@ -158,14 +174,16 @@ async function listItems(filters = {}, offset = 0, limit = null, sort = 'latest'
   const total = Number(countResult.rows[0]?.count || 0);
 
   let orderClause = '';
-  if (sort === 'popular' || sort === 'rating') {
+  if (sort === 'popular') {
+    orderClause = 'ORDER BY (COALESCE(rating, 0.0) * 0.7 + LN(1.0 + COALESCE(trending_score, 0.0)) * 0.5) DESC NULLS LAST, id DESC';
+  } else if (sort === 'rating') {
     orderClause = 'ORDER BY rating DESC NULLS LAST, id DESC';
   } else if (sort === 'trending') {
     orderClause = 'ORDER BY trending_score DESC, id DESC';
   } else if (sort === 'featured') {
     orderClause = 'ORDER BY featured_order DESC NULLS LAST, CASE WHEN featured THEN 1 ELSE 0 END DESC, id DESC';
   } else {
-    orderClause = 'ORDER BY COALESCE(published_at, released_at, updated_at) DESC NULLS LAST, id DESC';
+    orderClause = 'ORDER BY COALESCE(released_at, published_at, updated_at) DESC NULLS LAST, id DESC';
   }
 
   const listParams = [...params];
@@ -266,15 +284,30 @@ async function searchItems(query, filters = {}) {
   const params = [];
   const clauses = buildCatalogFilterClauses(searchFilters, params);
   const whereClause = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-  const result = await db.query(`SELECT payload FROM content_catalog ${whereClause} LIMIT 500`, params);
-  const items = result.rows.map((row) => normalizeItem(row.payload));
+  const qParamIndex = params.length + 1;
+  const listParams = [...params, normalizedQuery];
+  
+  const queryStr = `
+    SELECT payload,
+           (ts_rank(search_vector, plainto_tsquery('english', $${qParamIndex})) * 10 + 
+            similarity(title, $${qParamIndex}) * 5) as db_score
+    FROM content_catalog 
+    ${whereClause} 
+    ORDER BY db_score DESC 
+    LIMIT 500
+  `;
+  
+  const result = await db.query(queryStr, listParams);
+  const items = result.rows.map((row) => ({
+    ...normalizeItem(row.payload),
+    searchScore: row.db_score || 0
+  }));
+  
   const duplicateGroups = await getDuplicateGroupsForItems(items);
-  // scoreSearchResult and search logic here...
-  // (Moving scoreSearchResult to helpers or keeping here)
   const scoredItems = items
-    .map((item) => ({ ...attachDuplicateMetadata(item, duplicateGroups), searchScore: scoreSearchResult(item, normalizedQuery) }))
-    .filter((item) => item.searchScore > 0)
+    .map((item) => attachDuplicateMetadata(item, duplicateGroups))
     .sort((left, right) => right.searchScore - left.searchScore || (right.trendingScore || 0) - (left.trendingScore || 0));
+  
   return { items: scoredItems, total: scoredItems.length };
 }
 

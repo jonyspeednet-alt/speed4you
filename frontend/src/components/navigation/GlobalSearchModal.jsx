@@ -7,6 +7,7 @@ function GlobalSearchModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
+  const [trending, setTrending] = useState([]);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef(null);
   const navigate = useNavigate();
@@ -30,6 +31,18 @@ function GlobalSearchModal() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('open-global-search', handleOpenEvent);
     };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      searchService.getTrendingSearches()
+        .then((res) => {
+          setTrending(res?.items || []);
+        })
+        .catch(() => {
+          // ignore
+        });
+    }
   }, [isOpen]);
 
   useEffect(() => {
@@ -132,6 +145,17 @@ function GlobalSearchModal() {
         {loading && <div style={styles.message}>Searching...</div>}
         {!loading && query && results.length === 0 && <div style={styles.message}>No results found</div>}
         
+        {!loading && !query && trending.length > 0 && (
+          <div style={styles.trendingContainer}>
+            <div style={styles.trendingTitle}>Trending Searches</div>
+            <div style={styles.trendingTags}>
+              {trending.map((t, idx) => (
+                <button key={idx} style={styles.trendingTag} onClick={() => setQuery(t)}>{t}</button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {!loading && results.length > 0 && (
           <ul style={styles.list}>
             {results.map((item) => (
@@ -209,7 +233,11 @@ const styles = {
   title: { color: '#fff', fontSize: '1rem', fontWeight: '600' },
   meta: { color: 'var(--text-muted)', fontSize: '0.8rem' },
   viewAll: { marginTop: '8px', borderTop: '1px solid rgba(255,255,255,0.05)' },
-  viewAllBtn: { width: '100%', padding: '16px', background: 'transparent', border: 'none', color: 'var(--accent-cyan)', cursor: 'pointer', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.05em' }
+  viewAllBtn: { width: '100%', padding: '16px', background: 'transparent', border: 'none', color: 'var(--accent-cyan)', cursor: 'pointer', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.05em' },
+  trendingContainer: { padding: '20px' },
+  trendingTitle: { color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' },
+  trendingTags: { display: 'flex', flexWrap: 'wrap', gap: '8px' },
+  trendingTag: { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '6px 12px', borderRadius: '16px', cursor: 'pointer', fontSize: '0.85rem', transition: 'background 0.2s' }
 };
 
 export default GlobalSearchModal;
