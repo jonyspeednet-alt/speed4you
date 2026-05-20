@@ -431,13 +431,13 @@
         transform: scale(1.08);
     }
 
-    /* TV buttons larger */
-    button,
-    a[role="button"],
-    [role="button"] {
+    /* TV-sized controls only when TV mode is active. Avoid resizing compact card buttons on desktop. */
+    .tv-mode .button,
+    .tv-mode .top-nav-link,
+    .tv-mode .top-nav-search,
+    .tv-mode .carousel-button {
         min-height: var(--touch-target);
         min-width: var(--touch-target);
-        padding: 18px 36px;
         font-size: 1.1rem;
     }
 
@@ -526,12 +526,12 @@
         transform: scale(1.12);
     }
 
-    button,
-    a[role="button"],
-    [role="button"] {
+    .tv-mode .button,
+    .tv-mode .top-nav-link,
+    .tv-mode .top-nav-search,
+    .tv-mode .carousel-button {
         min-height: var(--touch-target);
         min-width: var(--touch-target);
-        padding: 24px 48px;
         font-size: 1.25rem;
     }
 }
