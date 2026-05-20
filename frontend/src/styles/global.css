@@ -1167,7 +1167,8 @@ p {
   overscroll-behavior-x: contain;
   overscroll-behavior-y: none;
   -webkit-overflow-scrolling: touch;
-  touch-action: pan-x;
+  touch-action: pan-x pan-y;
+  scrollbar-width: none;
 }
 
 .content-rail-list::-webkit-scrollbar {
@@ -1186,6 +1187,13 @@ p {
 .content-rail-view-all {
   color: var(--text-muted);
   text-decoration: none;
+  touch-action: manipulation;
+}
+
+/* Ensure content card buttons don't block rail touch scrolling */
+.content-card-trigger {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .hero-carousel {
@@ -1411,9 +1419,12 @@ p {
   overflow-x: auto;
   overflow-y: hidden;
   padding: 0 max(48px, calc((100vw - 1720px) / 2)) 10px;
-  scroll-snap-type: x mandatory;
+  scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
-  touch-action: pan-x;
+  touch-action: pan-x pan-y;
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: none;
+  scrollbar-width: none;
   width: 100%;
   max-width: none;
   margin: 0;
@@ -1442,12 +1453,40 @@ p {
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-muted);
+  touch-action: manipulation;
 }
 
 .content-rail-controls button:hover,
 .content-rail-controls button:focus-visible {
   background: rgba(255, 255, 255, 0.12);
   border-color: rgba(255, 255, 255, 0.16);
+}
+
+.content-rail-controls button:disabled {
+  opacity: 0.25;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Mobile: larger touch targets for rail nav buttons */
+@media (max-width: 768px) {
+  .content-rail-controls button {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* TV: larger touch targets for rail nav buttons */
+@media (min-width: 1600px) {
+  .content-rail-controls button {
+    width: 56px;
+    height: 56px;
+    min-width: 56px;
+    min-height: 56px;
+    border-radius: 16px;
+  }
 }
 
 .hero-carousel--mobile .content-rail-header,
