@@ -1,33 +1,35 @@
-import { useState } from 'react';
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { authService } from '../services';
-import { useBreakpoint } from '../hooks';
+import { useState } from "react";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
+import { authService } from "../services";
+import { useBreakpoint, useTVMode } from "../hooks";
 
 function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { isMobile } = useBreakpoint();
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const isTVMode = useTVMode();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
       const response = await authService.login(username, password);
-      localStorage.setItem('token', response.token);
-      localStorage.setItem('user', JSON.stringify(response.user));
+      localStorage.setItem("token", response.token);
+      localStorage.setItem("user", JSON.stringify(response.user));
       // Only allow relative paths to prevent open redirect attacks
-      const next = searchParams.get('next') || '';
-      const safePath = next.startsWith('/') && !next.startsWith('//') ? next : '/admin';
+      const next = searchParams.get("next") || "";
+      const safePath =
+        next.startsWith("/") && !next.startsWith("//") ? next : "/admin";
       navigate(safePath);
     } catch (loginError) {
-      setError(loginError.message || 'Invalid credentials.');
+      setError(loginError.message || "Invalid credentials.");
     }
 
     setLoading(false);
@@ -35,7 +37,13 @@ function LoginPage() {
 
   return (
     <div style={styles.page}>
-      <div style={{ ...styles.container, ...(isMobile ? styles.containerMobile : {}) }}>
+      <div
+        style={{
+          ...styles.container,
+          ...(isTVMode ? styles.containerTV : {}),
+          ...(isMobile ? styles.containerMobile : {}),
+        }}
+      >
         <div style={styles.logo}>
           <span style={styles.logoIcon}>ISP</span>
           <span style={styles.logoText}>ISP Portal</span>
@@ -48,7 +56,9 @@ function LoginPage() {
           {error && <div style={styles.error}>{error}</div>}
 
           <div style={styles.field}>
-            <label style={styles.label} htmlFor="login-username">Username</label>
+            <label style={styles.label} htmlFor="login-username">
+              Username
+            </label>
             <input
               id="login-username"
               type="text"
@@ -56,17 +66,19 @@ function LoginPage() {
               onChange={(event) => setUsername(event.target.value)}
               style={{
                 ...styles.input,
-                ...(focusedField === 'username' ? styles.inputFocused : {}),
+                ...(focusedField === "username" ? styles.inputFocused : {}),
               }}
               placeholder="Enter username"
-              onFocus={() => setFocusedField('username')}
+              onFocus={() => setFocusedField("username")}
               onBlur={() => setFocusedField(null)}
               autoComplete="username"
             />
           </div>
 
           <div style={styles.field}>
-            <label style={styles.label} htmlFor="login-password">Password</label>
+            <label style={styles.label} htmlFor="login-password">
+              Password
+            </label>
             <input
               id="login-password"
               type="password"
@@ -74,17 +86,17 @@ function LoginPage() {
               onChange={(event) => setPassword(event.target.value)}
               style={{
                 ...styles.input,
-                ...(focusedField === 'password' ? styles.inputFocused : {}),
+                ...(focusedField === "password" ? styles.inputFocused : {}),
               }}
               placeholder="Enter password"
-              onFocus={() => setFocusedField('password')}
+              onFocus={() => setFocusedField("password")}
               onBlur={() => setFocusedField(null)}
               autoComplete="current-password"
             />
           </div>
 
           <button type="submit" style={styles.submitBtn} disabled={loading}>
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? "Signing in..." : "Sign In"}
           </button>
         </form>
 
@@ -98,112 +110,121 @@ function LoginPage() {
 
 const styles = {
   page: {
-    minHeight: '100vh',
-    background: 'linear-gradient(180deg, #08111d 0%, #0f1c2e 56%, #08111d 100%)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 'var(--spacing-xl)',
+    minHeight: "100vh",
+    background:
+      "linear-gradient(180deg, #08111d 0%, #0f1c2e 56%, #08111d 100%)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "var(--spacing-xl)",
   },
   container: {
-    width: '100%',
-    maxWidth: '400px',
-    padding: 'var(--spacing-xl)',
-    background: 'rgba(13,26,43,0.84)',
-    borderRadius: '28px',
-    border: '1px solid rgba(255,255,255,0.08)',
-    boxShadow: 'var(--shadow-card)',
-    backdropFilter: 'blur(18px)',
+    width: "100%",
+    maxWidth: "400px",
+    padding: "var(--spacing-xl)",
+    background: "rgba(13,26,43,0.84)",
+    borderRadius: "28px",
+    border: "1px solid rgba(255,255,255,0.08)",
+    boxShadow: "var(--shadow-card)",
+    backdropFilter: "blur(18px)",
+  },
+  containerTV: {
+    maxWidth: "560px",
+    padding: "48px",
+    borderRadius: "36px",
   },
   containerMobile: {
-    maxWidth: '100%',
-    padding: '18px',
-    borderRadius: '24px',
+    maxWidth: "100%",
+    padding: "18px",
+    borderRadius: "24px",
   },
   logo: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 'var(--spacing-sm)',
-    fontSize: '1.5rem',
-    fontWeight: '700',
-    marginBottom: 'var(--spacing-xl)',
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "var(--spacing-sm)",
+    fontSize: "1.5rem",
+    fontWeight: "700",
+    marginBottom: "var(--spacing-xl)",
   },
   logoIcon: {
-    color: 'var(--accent-red)',
-    fontSize: '0.8rem',
-    letterSpacing: '0.12em',
-    border: '1px solid var(--accent-red)',
-    borderRadius: 'var(--radius-sm)',
-    padding: '0.3rem 0.45rem',
+    color: "var(--accent-red)",
+    fontSize: "0.8rem",
+    letterSpacing: "0.12em",
+    border: "1px solid var(--accent-red)",
+    borderRadius: "var(--radius-sm)",
+    padding: "0.3rem 0.45rem",
   },
   logoText: {
-    color: 'var(--text-primary)',
+    color: "var(--text-primary)",
   },
   title: {
-    fontSize: '1.5rem',
-    textAlign: 'center',
-    marginBottom: 'var(--spacing-xs)',
+    fontSize: "clamp(1.5rem, 2.4vw, 2.8rem)",
+    textAlign: "center",
+    marginBottom: "var(--spacing-xs)",
   },
   subtitle: {
-    textAlign: 'center',
-    color: 'var(--text-muted)',
-    marginBottom: 'var(--spacing-xl)',
+    textAlign: "center",
+    color: "var(--text-muted)",
+    marginBottom: "var(--spacing-xl)",
   },
   form: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 'var(--spacing-md)',
+    display: "flex",
+    flexDirection: "column",
+    gap: "var(--spacing-md)",
   },
   error: {
-    padding: 'var(--spacing-md)',
-    background: 'rgba(229, 9, 20, 0.1)',
-    border: '1px solid var(--accent-red)',
-    borderRadius: 'var(--radius-md)',
-    color: 'var(--accent-red)',
-    fontSize: '0.9rem',
+    padding: "var(--spacing-md)",
+    background: "rgba(229, 9, 20, 0.1)",
+    border: "1px solid var(--accent-red)",
+    borderRadius: "var(--radius-md)",
+    color: "var(--accent-red)",
+    fontSize: "0.9rem",
   },
   field: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 'var(--spacing-xs)',
+    display: "flex",
+    flexDirection: "column",
+    gap: "var(--spacing-xs)",
   },
   label: {
-    fontSize: '0.9rem',
-    color: 'var(--text-secondary)',
+    fontSize: "0.9rem",
+    color: "var(--text-secondary)",
   },
   input: {
-    padding: '12px 16px',
-    background: 'var(--bg-tertiary)',
-    border: '1px solid var(--border-color)',
-    borderRadius: 'var(--radius-md)',
-    color: 'var(--text-primary)',
-    fontSize: '1rem',
-    outline: 'none',
-    transition: 'border-color 180ms ease, box-shadow 180ms ease',
+    minHeight: "48px",
+    padding: "12px 16px",
+    background: "var(--bg-tertiary)",
+    border: "1px solid var(--border-color)",
+    borderRadius: "var(--radius-md)",
+    color: "var(--text-primary)",
+    fontSize: "1rem",
+    outline: "none",
+    transition: "border-color 180ms ease, box-shadow 180ms ease",
   },
   inputFocused: {
-    borderColor: 'rgba(125,249,255,0.5)',
-    boxShadow: '0 0 0 3px rgba(125,249,255,0.1)',
+    borderColor: "rgba(125,249,255,0.5)",
+    boxShadow: "0 0 0 3px rgba(125,249,255,0.1)",
   },
   submitBtn: {
-    padding: '14px 24px',
-    background: 'linear-gradient(135deg, var(--accent-red), #ff8a54)',
-    color: '#fff',
-    borderRadius: '16px',
-    fontWeight: '700',
-    fontSize: '1rem',
-    marginTop: 'var(--spacing-sm)',
-    transition: 'opacity 150ms ease, transform 150ms ease, box-shadow 150ms ease',
-    boxShadow: '0 8px 24px rgba(255,90,95,0.28)',
+    minHeight: "52px",
+    padding: "14px 24px",
+    background: "linear-gradient(135deg, var(--accent-red), #ff8a54)",
+    color: "#fff",
+    borderRadius: "16px",
+    fontWeight: "700",
+    fontSize: "1rem",
+    marginTop: "var(--spacing-sm)",
+    transition:
+      "opacity 150ms ease, transform 150ms ease, box-shadow 150ms ease",
+    boxShadow: "0 8px 24px rgba(255,90,95,0.28)",
   },
   backLink: {
-    display: 'block',
-    textAlign: 'center',
-    marginTop: 'var(--spacing-lg)',
-    color: 'var(--text-muted)',
-    fontSize: '0.9rem',
-    transition: 'color 150ms ease',
+    display: "block",
+    textAlign: "center",
+    marginTop: "var(--spacing-lg)",
+    color: "var(--text-muted)",
+    fontSize: "0.9rem",
+    transition: "color 150ms ease",
   },
 };
 

@@ -116,7 +116,7 @@ function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMo
       </div>
 
       {/* Action buttons */}
-      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }} onClick={(e) => e.stopPropagation()}>
+      <div style={{ ...s.epActions, ...(isMobile ? s.epActionsMobile : {}) }} onClick={(e) => e.stopPropagation()}>
         {/* Download button */}
         <a
           href={downloadUrl}
@@ -337,7 +337,7 @@ export default function SeriesDetailsPage() {
         <div style={{ ...s.detailTopGrid, ...(isMobile ? s.detailTopGridMobile : {}) }}>
           <section style={s.card}>
             <h2 style={s.cardTitle}>Series details</h2>
-            <div style={s.statGrid}>
+            <div style={{ ...s.statGrid, ...(isMobile ? s.statGridMobile : {}) }}>
               {[
                 { label: 'Year', value: series.year },
                 { label: 'Seasons', value: seasons.length || '—' },
@@ -506,6 +506,8 @@ s.episodeCard = {
   transition: 'transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease',
 };
 s.episodeCardMobile = { flexDirection: 'row' };
+s.epActions = { display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 };
+s.epActionsMobile = { gap: '8px' };
 s.epNumBadge = {
   width: '54px', minWidth: '54px', height: '54px', borderRadius: '18px',
   background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)',
