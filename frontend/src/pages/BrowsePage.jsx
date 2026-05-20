@@ -5,7 +5,6 @@ import { contentService, searchService } from "../services";
 import { useBreakpoint, useTVMode } from "../hooks";
 import { CardSkeleton } from "../components/feedback/Skeleton";
 import ContentCard from "../components/media/ContentCard";
-import QuickViewModal from "../components/ui/QuickViewModal";
 
 const QUICK_GENRES = [
   "All",
@@ -76,7 +75,6 @@ function BrowseCard({
   isMobile,
   isTablet,
   isTVMode,
-  onQuickView,
 }) {
   return (
     <ContentCard
@@ -86,7 +84,6 @@ function BrowseCard({
       tablet={isTablet}
       tv={isTVMode}
       cardWidth="100%"
-      onQuickView={onQuickView}
       showReviewBadge
     />
   );
@@ -118,7 +115,6 @@ function BrowsePage({ type }) {
     () => searchParams.get("q") || "",
   );
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [quickViewItem, setQuickViewItem] = useState(null);
   const loadMoreRef = useRef(null);
   const [suggestions, setSuggestions] = useState([]);
   const deferredSearchText = useDeferredValue(searchText);
@@ -565,7 +561,6 @@ function BrowsePage({ type }) {
                 isMobile={isMobile}
                 isTablet={isTablet}
                 isTVMode={isTVMode}
-                onQuickView={setQuickViewItem}
               />
             ))}
           </div>
@@ -595,12 +590,6 @@ function BrowsePage({ type }) {
           </button>
         </div>
       ) : null}
-
-      <QuickViewModal
-        isOpen={!!quickViewItem}
-        item={quickViewItem}
-        onClose={() => setQuickViewItem(null)}
-      />
     </div>
   );
 }
