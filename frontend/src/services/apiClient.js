@@ -80,6 +80,19 @@ function redirectToLogin() {
 async function apiClient(endpoint, options = {}) {
   const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : '';
+
+  let guestUserId = '';
+  if (!token && typeof localStorage !== 'undefined') {
+    guestUserId = localStorage.getItem('guest_user_id');
+    if (!guestUserId) {
+      const randomUuid = typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      guestUserId = 'guest:' + randomUuid;
+      localStorage.setItem('guest_user_id', guestUserId);
+    }
+  }
+
   const method = (options.method || 'GET').toUpperCase();
   const endpointUrl = new URL(`${API_BASE}/api${endpoint}`, window.location.origin);
 
@@ -94,6 +107,7 @@ async function apiClient(endpoint, options = {}) {
     headers: {
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(token && !(options.headers || {}).Authorization ? { Authorization: `Bearer ${token}` } : {}),
+      ...(!token && guestUserId ? { 'X-User-ID': guestUserId } : {}),
       ...(options.headers || {}),
     },
   };

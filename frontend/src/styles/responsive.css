@@ -970,7 +970,9 @@
     }
 
     .content-rail-header {
-        width: calc(100vw - 24px);
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0 12px;
         align-items: flex-start;
     }
 
@@ -1036,7 +1038,9 @@
     }
 
     .content-rail-header {
-        width: min(1200px, calc(100vw - 32px));
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0 max(48px, calc((100vw - 1720px) / 2));
     }
 }
 

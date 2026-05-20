@@ -21,6 +21,7 @@ export const searchService = {
   },
   getSuggestions: (query) => apiClient(`/search/suggestions?${toQueryString({ q: query })}`),
   getRecentSearches: () => apiClient('/search/recent'),
+  getTrendingSearches: () => apiClient('/search/trending'),
 };
 
 export default searchService;

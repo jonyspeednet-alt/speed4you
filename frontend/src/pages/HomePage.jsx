@@ -77,20 +77,36 @@ function mergePools(...collections) {
   return uniqueById(collections.flat().filter(Boolean));
 }
 
+function shuffleArray(array) {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const temp = shuffled[i];
+    shuffled[i] = shuffled[j];
+    shuffled[j] = temp;
+  }
+  return shuffled;
+}
+
 function pickFeatured(explicitFeatured, latestItems, popularItems, trendingItems) {
   const featuredSource = mergePools(latestItems, trendingItems, popularItems);
   const featuredCandidate = explicitFeatured && explicitFeatured.id ? normalizeItem(explicitFeatured) : null;
-  const rotatedPool = rotateItems(
-    featuredSource.filter(item => item.poster || item.backdrop || item.description),
-    createRotationSeed('featured'),
-    featuredCandidate?.id ? 1 : 0
+
+  const filtered = featuredSource.filter(
+    item => item.poster || item.backdrop || item.description
   );
 
-  if (featuredCandidate?.id) {
-    return [featuredCandidate, ...rotatedPool.filter(item => String(item.id) !== String(featuredCandidate.id))];
+  const shuffled = shuffleArray(filtered);
+
+  let finalItems = shuffled;
+  if (featuredCandidate?.id && featuredCandidate?.featured === true) {
+    finalItems = [
+      featuredCandidate,
+      ...shuffled.filter(item => String(item.id) !== String(featuredCandidate.id))
+    ];
   }
 
-  return rotatedPool.length > 0 ? rotatedPool : (popularItems[0] ? [popularItems[0]] : []);
+  return finalItems.slice(0, 30);
 }
 
 
@@ -262,6 +278,10 @@ function HomePage() {
           <div style={styles.loadingNote}>Building your portal...</div>
         ) : null}
 
+        {content.continueWatching?.length > 0 ? (
+          <ContinueWatchingRail items={content.continueWatching} isLoading={loading && !content.continueWatching} />
+        ) : null}
+
         {content.movies?.length >= 3 ? (
           <ContentRail onQuickView={setQuickViewItem} title="Movies" subtitle="Lean-back movie night" items={content.movies} viewAllLink="/movies" />
         ) : null}
@@ -304,10 +324,6 @@ function HomePage() {
           <TrendingBento items={content.trending} onQuickView={setQuickViewItem} />
         ) : content.trending?.length >= 3 ? (
           <ContentRail onQuickView={setQuickViewItem} title="Trending Right Now" subtitle="Most watched this week" items={content.trending} viewAllLink="/browse?sort=trending" priorityCount={4} />
-        ) : null}
-
-        {content.continueWatching?.length > 0 ? (
-          <ContinueWatchingRail items={content.continueWatching} isLoading={loading && !content.continueWatching} />
         ) : null}
 
       </div>

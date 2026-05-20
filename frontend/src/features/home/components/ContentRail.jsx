@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import ContentCard from "../../../components/media/ContentCard";
 import { useBreakpoint, useTVMode } from "../../../hooks";
 
@@ -63,13 +64,13 @@ function ContentRail({
 
         <div className="content-rail-actions" style={styles.headerActions}>
           {viewAllLink ? (
-            <a
+            <Link
               className="content-rail-view-all"
-              href={viewAllLink}
+              to={viewAllLink}
               style={styles.viewAll}
             >
               Open shelf
-            </a>
+            </Link>
           ) : null}
           {!isMobile && (
             <div className="content-rail-controls" style={styles.controls}>
@@ -152,20 +153,26 @@ const styles = {
     padding: "var(--spacing-md) 0 var(--spacing-lg)",
   },
   header: {
-    width: "min(1720px, calc(100vw - 96px))",
-    margin: "0 auto 14px",
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "0 max(48px, calc((100vw - 1720px) / 2))",
+    margin: "0 0 14px",
     display: "flex",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
     alignItems: "end",
-    gap: "14px",
+    gap: "24px",
   },
   headerMobile: {
-    width: "min(1720px, calc(100vw - 24px))",
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "0 12px",
     alignItems: "start",
   },
   headerTV: {
-    width: "min(1720px, calc(100vw - 96px))",
-    margin: "0 auto 24px",
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "0 max(48px, calc((100vw - 1720px) / 2))",
+    margin: "0 0 24px",
   },
   eyebrow: {
     display: "inline-block",

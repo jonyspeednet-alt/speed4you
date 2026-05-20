@@ -351,3 +351,29 @@ exports.fetchTmdbMetadata = async (req, res) => {
   }
   return res.json({ metadata });
 };
+
+exports.getSearchAnalytics = async (req, res) => {
+  try {
+    const topSearches = await db.query(`
+      SELECT query, COUNT(*) as count, MAX(results_count) as results_count 
+      FROM search_analytics 
+      GROUP BY query 
+      ORDER BY count DESC 
+      LIMIT 10
+    `);
+    const zeroResults = await db.query(`
+      SELECT query, COUNT(*) as count 
+      FROM search_analytics 
+      WHERE results_count = 0 
+      GROUP BY query 
+      ORDER BY count DESC 
+      LIMIT 10
+    `);
+    res.json({
+      topSearches: topSearches.rows.map(r => ({ query: r.query, count: Number(r.count), resultsCount: Number(r.results_count) })),
+      zeroResults: zeroResults.rows.map(r => ({ query: r.query, count: Number(r.count) }))
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

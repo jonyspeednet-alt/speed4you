@@ -1135,12 +1135,14 @@ p {
 }
 
 .content-rail-header {
-  width: min(1720px, calc(100vw - 96px));
-  margin: 0 auto 16px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 max(48px, calc((100vw - 1720px) / 2));
+  margin: 0 0 16px;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: flex-end;
-  gap: 12px;
+  gap: 24px;
 }
 
 .content-rail-actions {
@@ -1362,15 +1364,20 @@ p {
 }
 
 .content-rail-header {
-  width: min(1720px, calc(100vw - 96px));
-  margin: 0 auto 16px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 max(48px, calc((100vw - 1720px) / 2));
+  margin: 0 0 16px;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: flex-end;
-  gap: 12px;
+  gap: 24px;
 }
 
 .content-rail-header--mobile {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 12px;
   flex-direction: column;
   align-items: flex-start;
 }
