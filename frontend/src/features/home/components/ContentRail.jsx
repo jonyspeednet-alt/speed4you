@@ -29,18 +29,36 @@ function ContentRail({
     const element = scrollRef.current;
     if (!element) return;
 
+    const maxScrollLeft = Math.max(
+      0,
+      element.scrollWidth - element.clientWidth,
+    );
+
     setCanScrollLeft(element.scrollLeft > 5);
     setCanScrollRight(
-      element.scrollLeft + element.clientWidth < element.scrollWidth - 5,
+      maxScrollLeft > 5 && element.scrollLeft < maxScrollLeft - 5,
     );
   }, []);
+
+  const scheduleScrollIndicatorUpdate = useCallback(() => {
+    updateScrollIndicators();
+
+    if (typeof window === "undefined") return;
+
+    window.requestAnimationFrame(() => {
+      updateScrollIndicators();
+      window.requestAnimationFrame(updateScrollIndicators);
+    });
+
+    window.setTimeout(updateScrollIndicators, 250);
+  }, [updateScrollIndicators]);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollLeft = 0;
     }
-    updateScrollIndicators();
-  }, [items, title, updateScrollIndicators]);
+    scheduleScrollIndicatorUpdate();
+  }, [items, title, scheduleScrollIndicatorUpdate]);
 
   const clampScrollLeft = useCallback((element, nextLeft) => {
     const maxScrollLeft = Math.max(
@@ -115,8 +133,14 @@ function ContentRail({
     const handleWheel = (event) => {
       const deltaX = event.deltaX || 0;
       const deltaY = event.deltaY || 0;
-      const horizontalIntent = Math.abs(deltaX) >= Math.abs(deltaY);
-      const delta = horizontalIntent ? deltaX : deltaY;
+      const horizontalIntent =
+        Math.abs(deltaX) > Math.abs(deltaY) || event.shiftKey;
+
+      if (!horizontalIntent) return;
+
+      const delta = event.shiftKey && Math.abs(deltaX) < Math.abs(deltaY)
+        ? deltaY
+        : deltaX;
       if (!delta) return;
 
       const maxScrollLeft = Math.max(
@@ -128,25 +152,46 @@ function ContentRail({
 
       if (canMove) {
         element.scrollLeft = nextScroll;
-        updateScrollIndicators();
+        scheduleScrollIndicatorUpdate();
         if (event.cancelable) {
           event.preventDefault();
         }
       }
     };
 
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(scheduleScrollIndicatorUpdate)
+        : null;
+    resizeObserver?.observe(element);
+    Array.from(element.children).forEach((child) =>
+      resizeObserver?.observe(child),
+    );
+
+    const mutationObserver =
+      typeof MutationObserver !== "undefined"
+        ? new MutationObserver(scheduleScrollIndicatorUpdate)
+        : null;
+    mutationObserver?.observe(element, { childList: true, subtree: true });
+
     element.addEventListener("wheel", handleWheel, { passive: false });
     element.addEventListener("scroll", updateScrollIndicators, {
       passive: true,
     });
 
-    updateScrollIndicators();
+    scheduleScrollIndicatorUpdate();
 
     return () => {
+      resizeObserver?.disconnect();
+      mutationObserver?.disconnect();
       element.removeEventListener("wheel", handleWheel);
       element.removeEventListener("scroll", updateScrollIndicators);
     };
-  }, [clampScrollLeft, updateScrollIndicators]);
+  }, [
+    clampScrollLeft,
+    scheduleScrollIndicatorUpdate,
+    updateScrollIndicators,
+  ]);
 
   return (
     <section className="content-rail-section" style={styles.section}>
@@ -267,6 +312,8 @@ function ContentRail({
         ref={scrollRef}
         role="region"
         aria-label={`${title} content rail`}
+        onMouseEnter={scheduleScrollIndicatorUpdate}
+        onFocus={scheduleScrollIndicatorUpdate}
       >
         {items.map((item, index) => (
           <ContentCard
