@@ -570,7 +570,7 @@ const styles = {
     padding: "calc(var(--nav-occupied-mobile) + 8px) 12px var(--spacing-2xl)",
   },
   hero: {
-    width: "min(1440px, calc(100vw - 48px))",
+    width: "min(1720px, calc(100vw - 96px))",
     margin: "0 auto 16px",
     padding: "24px",
     borderRadius: "34px",
@@ -581,7 +581,7 @@ const styles = {
     boxShadow: "0 32px 64px rgba(0,0,0,0.5)",
   },
   heroTablet: {
-    width: "min(1440px, calc(100vw - 28px))",
+    width: "min(1720px, calc(100vw - 48px))",
   },
   heroMobile: {
     width: "100%",
@@ -784,7 +784,7 @@ const styles = {
     boxShadow: "0 0 20px rgba(0, 255, 255, 0.25)",
   },
   summaryPanel: {
-    width: "min(1440px, calc(100vw - 48px))",
+    width: "min(1720px, calc(100vw - 96px))",
     margin: "0 auto 16px",
     padding: "16px 18px",
     borderRadius: "24px",
@@ -827,14 +827,14 @@ const styles = {
     letterSpacing: "0.08em",
   },
   grid: {
-    width: "min(1440px, calc(100vw - 48px))",
+    width: "min(1720px, calc(100vw - 96px))",
     margin: "0 auto",
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
     gap: "18px",
   },
   gridTablet: {
-    width: "min(1440px, calc(100vw - 28px))",
+    width: "min(1720px, calc(100vw - 48px))",
     gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
     gap: "14px",
   },
@@ -854,7 +854,7 @@ const styles = {
     gap: "10px",
   },
   loadMoreWrap: {
-    width: "min(1440px, calc(100vw - 48px))",
+    width: "min(1720px, calc(100vw - 96px))",
     minHeight: "56px",
     margin: "22px auto 0",
     display: "grid",

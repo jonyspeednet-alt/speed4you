@@ -9,7 +9,7 @@ export const DETAIL_SKELETON = {
   skeletonLine: { background: 'rgba(255,255,255,0.08)', borderRadius: '999px' },
   heroGradient: { position: 'absolute', inset: 0, background: 'linear-gradient(to top, #050c16 0%, transparent 40%)' },
   heroInner: {
-    position: 'relative', zIndex: 2, width: 'min(1440px, calc(100vw - 48px))',
+    position: 'relative', zIndex: 2, width: 'min(1720px, calc(100vw - 96px))',
     margin: '0 auto', display: 'grid',
     gridTemplateColumns: 'minmax(260px, 360px) minmax(0, 1fr)',
     gap: '60px', alignItems: 'center',
@@ -62,7 +62,7 @@ export const DETAIL_STYLES = {
   heroGradient: { position: 'absolute', inset: 0, background: 'linear-gradient(to top, #050c16 0%, transparent 40%)' },
 
   heroInner: {
-    position: 'relative', zIndex: 2, width: 'min(1440px, calc(100vw - 48px))',
+    position: 'relative', zIndex: 2, width: 'min(1720px, calc(100vw - 96px))',
     margin: '0 auto', display: 'grid',
     gridTemplateColumns: 'minmax(260px, 360px) minmax(0, 1fr)',
     gap: '60px', alignItems: 'center',
@@ -146,7 +146,7 @@ export const DETAIL_STYLES = {
   },
 
   body: {
-    position: 'relative', zIndex: 2, width: 'min(1440px, calc(100vw - 48px))',
+    position: 'relative', zIndex: 2, width: 'min(1720px, calc(100vw - 96px))',
     margin: '0 auto', padding: '36px 24px 64px',
     display: 'flex', flexDirection: 'column', gap: '28px',
   },

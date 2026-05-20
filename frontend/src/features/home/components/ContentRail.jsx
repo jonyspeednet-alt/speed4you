@@ -152,7 +152,7 @@ const styles = {
     padding: "var(--spacing-md) 0 var(--spacing-lg)",
   },
   header: {
-    width: "min(1440px, calc(100vw - 48px))",
+    width: "min(1720px, calc(100vw - 96px))",
     margin: "0 auto 14px",
     display: "flex",
     justifyContent: "space-between",
@@ -160,7 +160,7 @@ const styles = {
     gap: "14px",
   },
   headerMobile: {
-    width: "min(1440px, calc(100vw - 24px))",
+    width: "min(1720px, calc(100vw - 24px))",
     alignItems: "start",
   },
   headerTV: {
@@ -230,16 +230,17 @@ const styles = {
     borderColor: "rgba(255,255,255,0.14)",
   },
   rail: {
-    width: "min(1440px, calc(100vw - 48px))",
+    width: "100%",
+    maxWidth: "none",
     display: "flex",
     justifyContent: "flex-start",
     alignItems: "flex-start",
     gap: "16px",
-    margin: "0 auto",
-    padding: "6px 0 16px",
+    margin: "0",
+    padding: "6px max(48px, calc((100vw - 1720px) / 2)) 16px",
     overflowX: "auto",
     scrollSnapType: "x mandatory",
-    scrollPaddingLeft: "0px",
+    scrollPaddingLeft: "max(48px, calc((100vw - 1720px) / 2))",
     scrollbarWidth: "none",
   },
   railCompactSet: {
@@ -247,15 +248,19 @@ const styles = {
   },
   railMobile: {
     width: "100%",
+    maxWidth: "none",
     gap: "12px",
-    margin: 0,
+    margin: "0",
     padding: "4px 12px 8px",
+    scrollPaddingLeft: "12px",
   },
   railTV: {
-    width: "min(1720px, calc(100vw - 96px))",
+    width: "100%",
+    maxWidth: "none",
     gap: "20px",
-    padding: "6px 0 16px",
-    scrollPaddingLeft: "0px",
+    margin: "0",
+    padding: "6px max(48px, calc((100vw - 1720px) / 2)) 16px",
+    scrollPaddingLeft: "max(48px, calc((100vw - 1720px) / 2))",
   },
 };
 

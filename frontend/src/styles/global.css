@@ -243,7 +243,7 @@ p {
 }
 
 .container {
-  width: min(1440px, calc(100vw - 48px));
+  width: min(1720px, calc(100vw - 48px));
   margin: 0 auto;
 }
 
@@ -1135,7 +1135,7 @@ p {
 }
 
 .content-rail-header {
-  width: min(1440px, calc(100vw - 48px));
+  width: min(1720px, calc(100vw - 96px));
   margin: 0 auto 16px;
   display: flex;
   justify-content: space-between;
@@ -1227,7 +1227,7 @@ p {
 .hero-carousel__layout {
   position: relative;
   z-index: 2;
-  width: min(1440px, calc(100vw - 48px));
+  width: min(1720px, calc(100vw - 96px));
   max-width: 100%;
   margin: 0 auto;
   height: calc(clamp(540px, 74vh, 760px) - var(--nav-occupied-desktop));
@@ -1362,7 +1362,7 @@ p {
 }
 
 .content-rail-header {
-  width: min(1440px, calc(100vw - 48px));
+  width: min(1720px, calc(100vw - 96px));
   margin: 0 auto 16px;
   display: flex;
   justify-content: space-between;
@@ -1397,12 +1397,12 @@ p {
   display: flex;
   gap: 18px;
   overflow-x: auto;
-  padding: 0 max(24px, calc((100vw - min(1440px, calc(100vw - 48px))) / 2)) 10px;
+  padding: 0 max(48px, calc((100vw - 1720px) / 2)) 10px;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   width: 100%;
-  max-width: min(1440px, calc(100vw - 48px));
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
 }
 
 .content-rail-list::-webkit-scrollbar {
