@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useBreakpoint, useTVMode } from '../../../hooks';
 import WatchlistButton from '../../../components/ui/WatchlistButton';
 
-export default function TrendingBento({ items, onQuickView }) {
+export default function TrendingBento({ items }) {
   const { isMobile, isTablet } = useBreakpoint();
   const isTVMode = useTVMode();
   const displayItems = items.slice(0, 5);
@@ -31,7 +31,6 @@ export default function TrendingBento({ items, onQuickView }) {
             key={item.id} 
             item={item} 
             index={index} 
-            onQuickView={onQuickView}
             isLarge={index === 0 && !isMobile && !isTVMode}
             tv={isTVMode}
           />
@@ -41,7 +40,7 @@ export default function TrendingBento({ items, onQuickView }) {
   );
 }
 
-function BentoItem({ item, index, onQuickView, isLarge, tv }) {
+function BentoItem({ item, index, isLarge, tv }) {
   const [hovered, setHovered] = useState(false);
   const navigate = useNavigate();
   const isSeries = item.type === 'series';

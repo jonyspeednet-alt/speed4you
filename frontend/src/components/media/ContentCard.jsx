@@ -10,7 +10,6 @@ function ContentCard({
   compact,
   tablet,
   tv,
-  onQuickView,
   showReviewBadge,
   cardWidth,
 }) {
