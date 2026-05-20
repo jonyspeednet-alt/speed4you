@@ -918,74 +918,145 @@
 @media (max-width: 767px) {
     :root {
         --nav-height-mobile: 62px;
-        --nav-occupied-mobile: 82px;
-        --bottom-nav-height: 72px;
+        --nav-occupied-mobile: 78px;
+        --bottom-nav-height: 68px;
     }
 
     #main-content {
-        scroll-margin-top: 92px;
+        scroll-margin-top: 88px;
+    }
+
+    html {
+        font-size: 16px;
+    }
+
+    body {
+        line-height: 1.55;
+        letter-spacing: -0.01em;
     }
 
     .top-nav-container {
         top: max(8px, var(--safe-top));
         left: max(8px, var(--safe-left));
         right: max(8px, var(--safe-right));
-        border-radius: 20px;
+        border-radius: 18px;
+        padding: 0;
+        height: auto;
     }
 
     .top-nav-main {
-        min-height: 58px;
-        padding: 7px 8px 7px 10px;
+        min-height: 56px;
+        padding: 8px 10px 8px 12px;
         gap: 8px;
+        flex-wrap: nowrap;
     }
 
     .top-nav-logo-mark {
-        width: 42px;
-        height: 42px;
-        border-radius: 14px;
-        font-size: 0.82rem;
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        flex-shrink: 0;
+    }
+
+    .top-nav-logo-copy {
+        min-width: 0;
     }
 
     .top-nav-logo-title {
-        max-width: min(54vw, 220px);
-        font-size: clamp(0.78rem, 3vw, 0.94rem);
+        max-width: min(50vw, 180px);
+        font-size: clamp(0.75rem, 2.8vw, 0.9rem);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .top-nav-logo-subtitle {
+        display: none;
     }
 
     .bottom-nav {
-        padding-left: max(8px, var(--safe-left));
+        padding: 6px max(8px, var(--safe-left)) calc(6px + var(--safe-bottom));
         padding-right: max(8px, var(--safe-right));
+        gap: 4px;
+        height: auto;
     }
 
     .bottom-nav-item {
         min-width: 0;
+        min-height: 52px;
+        padding: 6px 8px;
+        gap: 4px;
+    }
+
+    .bottom-nav-icon {
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
     }
 
     .bottom-nav-label {
-        font-size: clamp(0.54rem, 2.25vw, 0.64rem);
+        font-size: clamp(0.5rem, 2vw, 0.62rem);
+        margin-top: 2px;
     }
 
     .content-rail-section {
-        padding-top: 10px;
-        padding-bottom: 20px;
+        padding: 12px 0 18px;
     }
 
     .content-rail-header {
         width: 100%;
         box-sizing: border-box;
         padding: 0 12px;
-        align-items: flex-start;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        flex-wrap: nowrap;
+    }
+
+    .content-rail-header > div:first-child {
+        min-width: 0;
+    }
+
+    .content-rail-eyebrow {
+        font-size: 0.65rem;
+    }
+
+    .content-rail-title {
+        font-size: 1.05rem;
+        font-weight: 800;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .content-rail-actions {
         flex-shrink: 0;
+        gap: 4px;
+        padding: 2px;
     }
 
     .content-rail-view-all {
         white-space: nowrap;
+        font-size: 0.68rem;
+        padding: 6px 10px;
+        min-height: 32px;
     }
 
     .content-rail-list {
         scroll-padding-inline: 12px;
+        padding: 4px 12px 10px !important;
+        gap: 10px !important;
+        touch-action: pan-x;
+        -webkit-overflow-scrolling: touch;
+        overflow-y: hidden;
+    }
+
+    .content-rail-card {
+        min-width: 140px !important;
+        max-width: 160px !important;
+        width: 140px;
+        flex-shrink: 0;
     }
 
     .content-rail-card:hover {
@@ -995,27 +1066,85 @@
     .browse-grid {
         align-items: start;
     }
+
+    /* Ensure proper spacing for main content */
+    main {
+        overflow-x: hidden;
+    }
+
+    /* Fix for touch events on modals */
+    [role="dialog"] {
+        -webkit-tap-highlight-color: transparent;
+    }
 }
 
 @media (max-width: 380px) {
+    :root {
+        --nav-occupied-mobile: 74px;
+    }
+
+    html {
+        font-size: 15px;
+    }
+
+    .top-nav-container {
+        left: max(6px, var(--safe-left));
+        right: max(6px, var(--safe-right));
+        border-radius: 16px;
+    }
+
+    .top-nav-main {
+        min-height: 52px;
+        padding: 6px 8px;
+        gap: 6px;
+    }
+
+    .top-nav-logo-mark {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        font-size: 0.75rem;
+    }
+
     .top-nav-logo-copy {
-        max-width: 48vw;
+        max-width: 42vw;
     }
 
     .top-nav-logo-title {
-        max-width: 46vw;
+        max-width: 40vw;
+        font-size: 0.7rem;
     }
 
     .bottom-nav {
+        padding: 4px max(6px, var(--safe-left)) calc(4px + var(--safe-bottom));
+        padding-right: max(6px, var(--safe-right));
         gap: 2px;
     }
 
+    .bottom-nav-item {
+        min-height: 48px;
+        padding: 4px 6px;
+        gap: 3px;
+    }
+
     .bottom-nav-icon {
-        width: 32px;
+        width: 24px;
+        height: 24px;
+        min-width: 24px;
+    }
+
+    .bottom-nav-label {
+        font-size: 0.48rem;
     }
 
     .content-rail-meta {
-        font-size: 0.64rem !important;
+        font-size: 0.62rem !important;
+    }
+
+    .content-rail-card {
+        min-width: 120px !important;
+        max-width: 140px !important;
+        width: 120px;
     }
 }
 
