@@ -119,8 +119,10 @@ function HeroCarousel({ content, items }) {
         return () => window.removeEventListener('scroll', handleScroll);
     }, [isMobile, isTablet]);
 
-    // Keyboard navigation
+    // Keyboard navigation (desktop arrows only; remote spatial nav should manage TV mode)
     useEffect(() => {
+        if (isTVMode) return undefined;
+
         const handleKeyDown = (event) => {
             if (contentItems.length <= 1) return;
             if (event.key === 'ArrowLeft') {
@@ -134,7 +136,7 @@ function HeroCarousel({ content, items }) {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [activeIndex, contentItems.length, moveToSlide]);
+    }, [activeIndex, contentItems.length, moveToSlide, isTVMode]);
 
     // Touch swipe navigation
     const handleTouchStart = (event) => {
@@ -241,27 +243,9 @@ function HeroCarousel({ content, items }) {
                             </div>
                         ))}
                     </div>
-
-                    <div className={styles.actions}>
-                        <Link className={`${styles.button} ${styles.buttonPrimary}`} to={isPlaceholder ? '/browse?sort=latest' : `/watch/${id}`}>
-                            <svg className={styles.buttonIcon} width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                {isPlaceholder ? <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z" /> : <path d="M8 5v14l11-7z" />}
-                            </svg>
-                            <span>{isPlaceholder ? 'Browse Latest' : (isSeries ? 'Start Watching' : 'Play Now')}</span>
-                        </Link>
-                        <Link className={`${styles.button} ${styles.buttonSecondary}`} to={isPlaceholder ? '/search' : (isSeries ? `/series/${id}` : `/movies/${id}`)}>
-                            <svg className={styles.buttonIcon} width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
-                            </svg>
-                            <span>{isPlaceholder ? 'Search Portal' : 'Details'}</span>
-                        </Link>
-                        {!isPlaceholder && (
-                            <WatchlistButton contentType={isSeries ? 'series' : 'movie'} contentId={id} title={title} />
-                        )}
-                    </div>
                 </div>
 
-                {!isMobile && !isTVMode && (
+                {!isTVMode && (
                     <div className={styles.showcasePanel}>
                         <div className={styles.posterFrame}>
                             {poster ? (

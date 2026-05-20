@@ -16,8 +16,6 @@ function ContentRail({
   const isTVMode = useTVMode();
   const [leftHovered, setLeftHovered] = useState(false);
   const [rightHovered, setRightHovered] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState(0);
 
   const accent = title.includes("Bengali")
     ? "var(--accent-violet)"
@@ -32,20 +30,14 @@ function ContentRail({
   }, [items, title]);
 
   const scroll = (direction) => {
-    if (!scrollRef.current) return;
-    scrollRef.current.scrollBy({
-      left: direction === "left" ? -380 : 380,
-      behavior: "smooth",
-    });
-  };
-
-  const handleTouchStart = (e) => {
-    setDragStart(e.touches[0].clientX);
-    setIsDragging(true);
-  };
-
-  const handleTouchEnd = () => {
-    setIsDragging(false);
+    const element = scrollRef.current;
+    if (!element) return;
+    
+    const scrollDistance = direction === "left" ? -380 : 380;
+    const currentScroll = element.scrollLeft;
+    const targetScroll = currentScroll + scrollDistance;
+    
+    element.scrollLeft = targetScroll;
   };
 
   return (
@@ -77,13 +69,13 @@ function ContentRail({
             <Link
               className="content-rail-view-all"
               to={viewAllLink}
-              style={styles.viewAll}
+              style={{ ...styles.viewAll, ...(isTVMode ? styles.viewAllTV : {}) }}
             >
               Open shelf
             </Link>
           ) : null}
           {!isMobile && (
-            <div className="content-rail-controls" style={styles.controls}>
+            <div className="content-rail-controls" style={{ ...styles.controls, ...(isTVMode ? styles.controlsTV : {}) }}>
               <button
                 type="button"
                 aria-label={`Scroll ${title} left`}
@@ -92,6 +84,7 @@ function ContentRail({
                 onMouseLeave={() => setLeftHovered(false)}
                 style={{
                   ...styles.arrow,
+                  ...(isTVMode ? styles.arrowTV : {}),
                   ...(leftHovered ? styles.arrowHover : {}),
                 }}
               >
@@ -113,6 +106,7 @@ function ContentRail({
                 onMouseLeave={() => setRightHovered(false)}
                 style={{
                   ...styles.arrow,
+                  ...(isTVMode ? styles.arrowTV : {}),
                   ...(rightHovered ? styles.arrowHover : {}),
                 }}
               >
@@ -139,8 +133,6 @@ function ContentRail({
           ...(isTVMode ? styles.railTV : isMobile ? styles.railMobile : {}),
         }}
         ref={scrollRef}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
         role="region"
         aria-label={`${title} content rail`}
       >
@@ -236,6 +228,9 @@ const styles = {
     display: "flex",
     gap: "4px",
   },
+  controlsTV: {
+    gap: "12px",
+  },
   arrow: {
     width: "38px",
     height: "38px",
@@ -248,6 +243,18 @@ const styles = {
     color: "var(--text-muted)",
     display: "grid",
     placeItems: "center",
+  },
+  arrowTV: {
+    width: "56px",
+    height: "56px",
+    minWidth: "56px",
+    minHeight: "56px",
+    borderRadius: "16px",
+  },
+  viewAllTV: {
+    minHeight: "48px",
+    padding: "0 18px",
+    fontSize: "0.9rem",
   },
   arrowHover: {
     background: "rgba(255, 255, 255, 0.1)",
@@ -265,7 +272,10 @@ const styles = {
     padding: "6px max(48px, calc((100vw - 1720px) / 2)) 16px",
     overflowX: "auto",
     overflowY: "hidden",
-    scrollSnapType: "x mandatory",
+    scrollSnapType: "x proximity",
+    scrollSnapStop: "normal",
+    overscrollBehaviorX: "contain",
+    overscrollBehaviorY: "none",
     scrollPaddingLeft: "max(48px, calc((100vw - 1720px) / 2))",
     scrollbarWidth: "none",
     WebkitOverflowScrolling: "touch",
@@ -281,6 +291,10 @@ const styles = {
     margin: "0",
     padding: "4px 14px 12px",
     scrollPaddingLeft: "14px",
+    scrollSnapType: "x proximity",
+    scrollSnapStop: "normal",
+    overscrollBehaviorX: "contain",
+    overscrollBehaviorY: "none",
     touchAction: "pan-x",
     WebkitOverflowScrolling: "touch",
   },
