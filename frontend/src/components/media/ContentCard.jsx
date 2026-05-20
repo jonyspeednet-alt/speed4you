@@ -48,14 +48,13 @@ function ContentCard({
       <button
         type="button"
         className="content-card-trigger"
-        style={styles.cardButton}
+        style={{ ...styles.cardButton, touchAction: 'manipulation' }}
         onClick={() => {
           const targetPath = isSeries ? `/series/${item.id}` : `/movies/${item.id}`;
           navigate(targetPath);
         }}
         onFocus={() => tv && setHovered(true)}
         onBlur={() => tv && setHovered(false)}
-        onTouchStart={(e) => e.stopPropagation()}
       >
         <div
           style={{
