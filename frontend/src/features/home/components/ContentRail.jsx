@@ -38,8 +38,28 @@ function ContentRail({
     const scrollDistance = direction === "left" ? -380 : 380;
     const currentScroll = element.scrollLeft;
     const targetScroll = currentScroll + scrollDistance;
-    
-    element.scrollLeft = targetScroll;
+
+    if (element.scrollTo) {
+      element.scrollTo({ left: targetScroll, behavior: "smooth" });
+    } else {
+      element.scrollLeft = targetScroll;
+    }
+  };
+
+  const handleWheel = (e) => {
+    const element = scrollRef.current;
+    if (!element) return;
+
+    // Prefer translating vertical wheel to horizontal scroll for rails
+    const deltaX = e.deltaX;
+    const deltaY = e.deltaY;
+
+    if (Math.abs(deltaY) > Math.abs(deltaX)) {
+      element.scrollLeft += deltaY;
+      e.preventDefault();
+    } else if (deltaX) {
+      element.scrollLeft += deltaX;
+    }
   };
 
   const handleTouchStart = (e) => {
@@ -94,8 +114,7 @@ function ContentRail({
               Open shelf
             </Link>
           ) : null}
-          {(isTVMode || !isMobile) && (
-            <div className="content-rail-controls" style={{ ...styles.controls, ...(isTVMode ? styles.controlsTV : isMobile ? styles.controlsMobile : {}) }}>
+          <div className="content-rail-controls" style={{ ...styles.controls, ...(isTVMode ? styles.controlsTV : isMobile ? styles.controlsMobile : {}) }}>
               <button
                 type="button"
                 aria-label={`Scroll ${title} left`}
@@ -141,7 +160,6 @@ function ContentRail({
                 </svg>
               </button>
             </div>
-          )}
         </div>
       </div>
 
@@ -157,6 +175,7 @@ function ContentRail({
         aria-label={`${title} content rail`}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
+        onWheel={handleWheel}
       >
         {items.map((item, index) => (
           <ContentCard
