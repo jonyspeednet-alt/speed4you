@@ -193,6 +193,7 @@ function MobileNav() {
         <div
           style={{ ...styles.overlay, opacity: menuOpacity }}
           onClick={() => setIsOpen(false)}
+          onTouchEnd={() => setIsOpen(false)}
           aria-hidden="true"
         />
       )}
