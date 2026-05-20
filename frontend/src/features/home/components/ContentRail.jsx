@@ -10,7 +10,6 @@ function ContentRail({
   subtitle = "Curated now",
   viewAllLink,
   priorityCount = 0,
-  onQuickView,
 }) {
   const scrollRef = useRef(null);
   const { isMobile, isTablet } = useBreakpoint();
@@ -140,7 +139,6 @@ function ContentRail({
             compact={isMobile}
             tablet={isTablet}
             tv={isTVMode}
-            onQuickView={() => onQuickView && onQuickView(item)}
           />
         ))}
       </div>
