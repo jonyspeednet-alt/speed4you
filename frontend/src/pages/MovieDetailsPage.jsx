@@ -65,6 +65,7 @@ export default function MovieDetailsPage() {
   const [descExpanded, setDescExpanded] = useState(false);
   const [posterError, setPosterError] = useState(false);
   const [backdropError, setBackdropError] = useState(false);
+  const [downloadHovered, setDownloadHovered] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -192,18 +193,66 @@ export default function MovieDetailsPage() {
             </div>
 
             {/* Actions */}
-            <div style={{ ...s.actions, ...(isMobile ? s.actionsMobile : {}) }}>
-              <Link to={`/watch/${movie.id}`} style={{ ...s.playBtn, ...(isMobile ? s.btnFull : {}) }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-                Watch Now
-              </Link>
-              <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
-                <WatchlistButton contentType="movie" contentId={movie.id} title={movie.title} />
-                <ShareButton title={movie.title} url={`${window.location.origin}/movies/${movie.id}`} />
-              </div>
-            </div>
+            {(() => {
+              const apiBase = (import.meta.env.VITE_API_URL || '/portal-api').replace(/\/$/, '');
+              const downloadUrl = `${apiBase}/api/player/download/movie/${movie.id}`;
+              const downloadBtnStyle = {
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '12px',
+                padding: '18px 40px',
+                borderRadius: '14px',
+                background: downloadHovered 
+                  ? 'rgba(0, 255, 255, 0.12)' 
+                  : 'rgba(255, 255, 255, 0.05)',
+                border: downloadHovered 
+                  ? '1px solid var(--accent-cyan)' 
+                  : '1px solid rgba(255, 255, 255, 0.12)',
+                color: downloadHovered ? 'var(--accent-cyan)' : '#ffffff',
+                fontWeight: '900',
+                fontSize: '1.05rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                textDecoration: 'none',
+                boxShadow: downloadHovered 
+                  ? '0 0 20px rgba(0, 255, 255, 0.15)' 
+                  : 'none',
+                cursor: 'pointer',
+                transition: 'all 180ms ease',
+              };
+
+              return (
+                <div style={{ ...s.actions, ...(isMobile ? s.actionsMobile : {}) }}>
+                  <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto', alignItems: 'center' }}>
+                    <Link to={`/watch/${movie.id}`} style={{ ...s.playBtn, ...(isMobile ? s.btnFull : {}) }}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                      Watch Now
+                    </Link>
+                    <a
+                      href={downloadUrl}
+                      download
+                      style={{ ...downloadBtnStyle, ...(isMobile ? s.btnFull : {}) }}
+                      onMouseEnter={() => setDownloadHovered(true)}
+                      onMouseLeave={() => setDownloadHovered(false)}
+                    >
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                      </svg>
+                      Download Movie
+                    </a>
+                  </div>
+                  <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center', ...(isMobile ? { width: '100%', justifyContent: 'flex-start' } : {}) }}>
+                    <WatchlistButton contentType="movie" contentId={movie.id} title={movie.title} />
+                    <ShareButton title={movie.title} url={`${window.location.origin}/movies/${movie.id}`} />
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </section>
