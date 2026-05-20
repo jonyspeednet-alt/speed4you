@@ -1054,7 +1054,7 @@
         scroll-snap-stop: normal;
         overscroll-behavior-x: contain;
         overscroll-behavior-y: none;
-        touch-action: pan-x;
+        touch-action: pan-x pan-y;
         -webkit-overflow-scrolling: touch;
         overflow-y: hidden;
         padding-left: 12px;
@@ -1070,6 +1070,11 @@
 
     .content-rail-card:hover {
         transform: none;
+    }
+
+    /* Allow touch scroll to pass through card buttons on mobile */
+    .content-card-trigger {
+        touch-action: manipulation !important;
     }
 
     .browse-grid {
