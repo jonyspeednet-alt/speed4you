@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useBreakpoint, useTVMode } from '../../../hooks';
 import WatchlistButton from '../../../components/ui/WatchlistButton';
 
@@ -43,7 +43,9 @@ export default function TrendingBento({ items, onQuickView }) {
 
 function BentoItem({ item, index, onQuickView, isLarge, tv }) {
   const [hovered, setHovered] = useState(false);
+  const navigate = useNavigate();
   const isSeries = item.type === 'series';
+  const path = isSeries ? `/series/${item.id}` : `/movies/${item.id}`;
 
   return (
     <div 
@@ -53,6 +55,7 @@ function BentoItem({ item, index, onQuickView, isLarge, tv }) {
         ...(hovered ? styles.itemHovered : {}),
         ...(tv ? styles.itemTV : {})
       }}
+      onClick={() => navigate(path)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       tabIndex={0}
@@ -89,11 +92,12 @@ function BentoItem({ item, index, onQuickView, isLarge, tv }) {
               <button 
                 onClick={(e) => {
                   e.preventDefault();
-                  onQuickView(item);
+                  e.stopPropagation();
+                  navigate(path);
                 }}
                 style={styles.quickViewBtn}
               >
-                Quick View
+                View Details
               </button>
               <WatchlistButton 
                 contentType={item.type} 

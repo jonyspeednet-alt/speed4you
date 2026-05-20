@@ -3,7 +3,6 @@ import HeroCarousel from '../features/home/components/HeroCarousel';
 import ContentRail from '../features/home/components/ContentRail';
 import ContinueWatchingRail from '../features/continueWatching/components/ContinueWatchingRail';
 import TrendingBento from '../features/home/components/TrendingBento';
-import QuickViewModal from '../components/ui/QuickViewModal';
 import { contentService, progressService } from '../services';
 import { useBreakpoint, useRecentlyViewed, useTVMode } from '../hooks';
 
@@ -221,7 +220,6 @@ function HomePage() {
   const { items: recentlyViewed } = useRecentlyViewed();
   const [content, setContent] = useState(() => readHomepageCache()?.content || {});
   const [loading, setLoading] = useState(() => !readHomepageCache());
-  const [quickViewItem, setQuickViewItem] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -271,7 +269,7 @@ function HomePage() {
 
   return (
     <div style={{ ...styles.page, ...(!hasFeaturedHero ? styles.pageWithoutHero : {}) }}>
-      {hasFeaturedHero ? <HeroCarousel items={content.featured} onQuickView={setQuickViewItem} /> : null}
+      {hasFeaturedHero ? <HeroCarousel items={content.featured} /> : null}
 
       <div style={{ ...styles.content, ...(isTVMode ? styles.contentTV : {}), ...(isMobile ? styles.contentMobile : {}) }}>
         {loading && Object.keys(content).length === 0 ? (
@@ -283,28 +281,27 @@ function HomePage() {
         ) : null}
 
         {content.movies?.length >= 3 ? (
-          <ContentRail onQuickView={setQuickViewItem} title="Movies" subtitle="Lean-back movie night" items={content.movies} viewAllLink="/movies" />
+          <ContentRail title="Movies" subtitle="Lean-back movie night" items={content.movies} viewAllLink="/movies" />
         ) : null}
 
         {content.series?.length >= 1 ? (
-          <ContentRail onQuickView={setQuickViewItem} title="Series" subtitle="Binge-ready stories" items={content.series} type="series" viewAllLink="/series" />
+          <ContentRail title="Series" subtitle="Binge-ready stories" items={content.series} type="series" viewAllLink="/series" />
         ) : null}
 
         {content.latest?.length >= 1 ? (
-          <ContentRail onQuickView={setQuickViewItem} title="Latest Releases" subtitle="Just added" items={content.latest} viewAllLink="/browse?sort=latest" priorityCount={4} />
+          <ContentRail title="Latest Releases" subtitle="Just added" items={content.latest} viewAllLink="/browse?sort=latest" priorityCount={4} />
         ) : null}
 
         {content.popular?.length >= 3 ? (
-          <ContentRail onQuickView={setQuickViewItem} title="Portal Favorites" subtitle="Strong local demand" items={content.popular} viewAllLink="/browse?sort=popular" priorityCount={3} />
+          <ContentRail title="Portal Favorites" subtitle="Strong local demand" items={content.popular} viewAllLink="/browse?sort=popular" priorityCount={3} />
         ) : null}
 
         {content.bengali?.length >= 2 ? (
-          <ContentRail onQuickView={setQuickViewItem} title="Bengali Picks" subtitle="Local language highlights" items={content.bengali} viewAllLink="/browse?language=Bengali" />
+          <ContentRail title="Bengali Picks" subtitle="Local language highlights" items={content.bengali} viewAllLink="/browse?language=Bengali" />
         ) : null}
 
         {content.recommendations?.length > 0 ? (
           <ContentRail
-            onQuickView={setQuickViewItem}
             title="Because you watched..."
             subtitle="More of what you like"
             items={content.recommendations}
@@ -313,7 +310,6 @@ function HomePage() {
 
         {content.localTrending?.length > 3 ? (
           <ContentRail
-            onQuickView={setQuickViewItem}
             title="Trending Near You"
             subtitle="Popular in your area"
             items={content.localTrending}
@@ -321,14 +317,12 @@ function HomePage() {
         ) : null}
 
         {content.trending?.length >= 5 ? (
-          <TrendingBento items={content.trending} onQuickView={setQuickViewItem} />
+          <TrendingBento items={content.trending} />
         ) : content.trending?.length >= 3 ? (
-          <ContentRail onQuickView={setQuickViewItem} title="Trending Right Now" subtitle="Most watched this week" items={content.trending} viewAllLink="/browse?sort=trending" priorityCount={4} />
+          <ContentRail title="Trending Right Now" subtitle="Most watched this week" items={content.trending} viewAllLink="/browse?sort=trending" priorityCount={4} />
         ) : null}
 
       </div>
-
-      <QuickViewModal isOpen={!!quickViewItem} item={quickViewItem} onClose={() => setQuickViewItem(null)} />
     </div>
   );
 }
