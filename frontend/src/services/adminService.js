@@ -11,6 +11,7 @@ function clearAdminCache() {
 export const adminService = {
   getDashboard: () => cachedGet('/admin/dashboard'),
   getStats: () => cachedGet('/admin/stats'),
+  getSearchAnalytics: () => cachedGet('/admin/search-analytics'),
   getScannerRoots: () => cachedGet('/admin/scanner/roots'),
   getScannerHealth: () => cachedGet('/admin/scanner/health'),
   getScannerLogs: (limit = 10) => cachedGet('/admin/scanner/logs', { limit }),
