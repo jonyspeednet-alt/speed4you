@@ -264,7 +264,7 @@ export default function MovieDetailsPage() {
           {/* Stats */}
           <section style={s.card}>
             <h2 style={s.cardTitle}>Details</h2>
-            <div style={s.statGrid}>
+            <div style={{ ...s.statGrid, ...(isMobile ? s.statGridMobile : {}) }}>
               {[
                 { label: 'Year', value: movie.year },
                 { label: 'Runtime', value: runtime || '—' },

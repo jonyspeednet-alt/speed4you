@@ -114,13 +114,28 @@ function ContentCard({
           </div>
 
           <div style={styles.posterBottom}>
-            <h3 style={styles.posterTitle}>{item.title}</h3>
-            <div style={styles.posterMeta}>
+            <h3
+              style={{
+                ...styles.posterTitle,
+                ...(compact ? styles.posterTitleCompact : {}),
+                ...(tv ? styles.posterTitleTV : {}),
+              }}
+            >
+              {item.title}
+            </h3>
+            <div
+              style={{
+                ...styles.posterMeta,
+                ...(compact ? styles.posterMetaCompact : {}),
+              }}
+            >
               <span style={styles.genrePill}>{genre}</span>
-              {item.year ? (
+              {!compact && item.year ? (
                 <span style={styles.yearText}>{item.year}</span>
               ) : null}
-              <span style={styles.langText}>{item.language || "Mixed"}</span>
+              {!compact ? (
+                <span style={styles.langText}>{item.language || "Mixed"}</span>
+              ) : null}
             </div>
           </div>
 
@@ -277,6 +292,7 @@ const styles = {
     right: "10px",
     bottom: "10px",
     zIndex: 1,
+    minWidth: 0,
   },
   posterTitle: {
     color: "#fff",
@@ -291,11 +307,23 @@ const styles = {
     textShadow: "0 2px 10px rgba(0,0,0,0.6)",
     letterSpacing: "-0.01em",
   },
+  posterTitleCompact: {
+    fontSize: "0.76rem",
+    lineHeight: "1.22",
+    marginBottom: "4px",
+  },
+  posterTitleTV: {
+    fontSize: "1rem",
+  },
   posterMeta: {
     display: "flex",
     alignItems: "center",
     gap: "6px",
     flexWrap: "wrap",
+    minWidth: 0,
+  },
+  posterMetaCompact: {
+    gap: "4px",
   },
   genrePill: {
     padding: "3px 8px",
@@ -306,6 +334,10 @@ const styles = {
     fontWeight: "700",
     textTransform: "uppercase",
     letterSpacing: "0.06em",
+    maxWidth: "100%",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
   },
   yearText: {
     color: "rgba(255,255,255,0.6)",
@@ -358,6 +390,9 @@ const styles = {
     color: "var(--text-muted)",
     fontSize: "0.72rem",
     textTransform: "capitalize",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
   },
   metaDot: {
     opacity: 0.4,
