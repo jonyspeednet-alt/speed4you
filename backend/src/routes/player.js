@@ -589,6 +589,52 @@ router.get('/:contentType/:id', async (req, res, next) => {
   }
 });
 
+router.get('/download/:contentType/:id', async (req, res, next) => {
+  try {
+    const selection = await findSelectedMedia(req);
+
+    if (selection.error) {
+      throw new AppError(selection.error.message, selection.error.status, 'MEDIA_SELECTION_ERROR');
+    }
+
+    const { sourcePath, videoUrl, item, seasonNumber, episodeNumber } = selection;
+    const resolvedPath = resolvePlayableFilePath(sourcePath, videoUrl);
+
+    if (!resolvedPath) {
+      if (process.env.REMOTE_MEDIA_BASE_URL && videoUrl) {
+        return res.redirect(`${process.env.REMOTE_MEDIA_BASE_URL}${videoUrl}`);
+      }
+      throw new AppError('Source file is not available on the server for download', 404, 'NOT_FOUND');
+    }
+
+    const stat = safeStat(resolvedPath);
+    if (!stat?.isFile()) {
+      throw new AppError('Source file is not available on the server for download', 404, 'NOT_FOUND');
+    }
+
+    const ext = path.extname(resolvedPath).toLowerCase() || '.mp4';
+    let filename = item.title;
+    if (item.type === 'series') {
+      const sPad = String(seasonNumber).padStart(2, '0');
+      const ePad = String(episodeNumber).padStart(2, '0');
+      filename = `${item.title} - S${sPad}E${ePad}`;
+    }
+    filename = filename.replace(/[\\/:*?"<>|]/g, '_');
+    const cleanFilename = `${filename}${ext}`;
+
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(cleanFilename)}"; filename*=UTF-8''${encodeURIComponent(cleanFilename)}`);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Length', stat.size);
+    res.setHeader('Cache-Control', 'no-cache');
+
+    fs.createReadStream(resolvedPath).pipe(res);
+  } catch (error) {
+    if (!res.headersSent) {
+      next(error);
+    }
+  }
+});
+
 router.get('/prepare/:contentType/:id', async (req, res, next) => {
   try {
     const selection = await findSelectedMedia(req);

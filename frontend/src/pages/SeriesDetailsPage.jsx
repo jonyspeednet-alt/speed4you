@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { seriesService } from '../services/seriesService';
 import { useBreakpoint } from '../hooks';
 import { useRecentlyViewed } from '../hooks';
@@ -61,13 +61,40 @@ function SeriesDetailsSkeleton() {
 // ── Episode card ──────────────────────────────────────────────────────────────
 function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMobile }) {
   const [hovered, setHovered] = useState(false);
+  const [downloadHovered, setDownloadHovered] = useState(false);
+  const navigate = useNavigate();
+
+  const handleCardClick = () => {
+    navigate(`/watch/${seriesId}?season=${seasonParam}&episode=${episodeParam}`);
+  };
+
+  const apiBase = (import.meta.env.VITE_API_URL || '/portal-api').replace(/\/$/, '');
+  const downloadUrl = `${apiBase}/api/player/download/series/${seriesId}?season=${seasonParam}&episode=${episodeParam}`;
+
+  const downloadBtnStyle = {
+    width: '44px',
+    height: '44px',
+    borderRadius: '14px',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    display: 'grid',
+    placeItems: 'center',
+    color: downloadHovered ? 'var(--accent-cyan)' : 'rgba(255, 255, 255, 0.7)',
+    background: downloadHovered ? 'rgba(0, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+    borderColor: downloadHovered ? 'var(--accent-cyan)' : 'rgba(255, 255, 255, 0.1)',
+    boxShadow: downloadHovered ? '0 0 12px rgba(0, 255, 255, 0.25)' : 'none',
+    transition: 'all 180ms ease',
+    cursor: 'pointer',
+    flexShrink: 0,
+  };
+
   return (
-    <Link
-      to={`/watch/${seriesId}?season=${seasonParam}&episode=${episodeParam}`}
+    <div
+      onClick={handleCardClick}
       style={{
         ...s.episodeCard,
         ...(isMobile ? s.episodeCardMobile : {}),
         ...(hovered ? s.episodeCardHover : {}),
+        cursor: 'pointer',
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -88,13 +115,35 @@ function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMo
         )}
       </div>
 
-      {/* Play icon */}
-      <div style={{ ...s.epPlay, ...(hovered ? s.epPlayHover : {}) }}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M8 5v14l11-7z" />
-        </svg>
+      {/* Action buttons */}
+      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }} onClick={(e) => e.stopPropagation()}>
+        {/* Download button */}
+        <a
+          href={downloadUrl}
+          download
+          style={downloadBtnStyle}
+          onMouseEnter={() => setDownloadHovered(true)}
+          onMouseLeave={() => setDownloadHovered(false)}
+          title="Download Episode"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+        </a>
+
+        {/* Play icon */}
+        <div 
+          onClick={handleCardClick}
+          style={{ ...s.epPlay, ...(hovered ? s.epPlayHover : {}), width: '44px', height: '44px', borderRadius: '14px' }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        </div>
       </div>
-    </Link>
+    </div>
   );
 }
 
