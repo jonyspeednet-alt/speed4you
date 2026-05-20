@@ -16,6 +16,8 @@ function ContentRail({
   const isTVMode = useTVMode();
   const [leftHovered, setLeftHovered] = useState(false);
   const [rightHovered, setRightHovered] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState(0);
 
   const accent = title.includes("Bengali")
     ? "var(--accent-violet)"
@@ -35,6 +37,15 @@ function ContentRail({
       left: direction === "left" ? -380 : 380,
       behavior: "smooth",
     });
+  };
+
+  const handleTouchStart = (e) => {
+    setDragStart(e.touches[0].clientX);
+    setIsDragging(true);
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
   };
 
   return (
@@ -128,6 +139,10 @@ function ContentRail({
           ...(isTVMode ? styles.railTV : isMobile ? styles.railMobile : {}),
         }}
         ref={scrollRef}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        role="region"
+        aria-label={`${title} content rail`}
       >
         {items.map((item, index) => (
           <ContentCard
@@ -163,8 +178,10 @@ const styles = {
   headerMobile: {
     width: "100%",
     boxSizing: "border-box",
-    padding: "0 12px",
-    alignItems: "start",
+    padding: "0 14px",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flexWrap: "nowrap",
   },
   headerTV: {
     width: "100%",
@@ -174,43 +191,46 @@ const styles = {
   },
   eyebrow: {
     display: "inline-block",
-    marginBottom: "6px",
-    fontSize: "0.7rem",
+    marginBottom: "4px",
+    fontSize: "0.68rem",
     fontWeight: "800",
     textTransform: "uppercase",
     letterSpacing: "0.16em",
   },
   title: {
     color: "var(--text-primary)",
-    fontSize: "clamp(1.3rem, 2.5vw, 1.8rem)",
+    fontSize: "clamp(1.1rem, 2.5vw, 1.8rem)",
   },
   titleMobile: {
-    fontSize: "1.35rem",
+    fontSize: "1.1rem",
+    fontWeight: "800",
   },
   headerActions: {
     display: "flex",
     alignItems: "center",
-    gap: "8px",
-    padding: "4px",
-    borderRadius: "16px",
+    gap: "6px",
+    padding: "3px",
+    borderRadius: "14px",
     background: "rgba(255, 255, 255, 0.035)",
     border: "1px solid rgba(255, 255, 255, 0.07)",
     backdropFilter: "blur(18px)",
     WebkitBackdropFilter: "blur(18px)",
+    flexShrink: 0,
   },
   viewAll: {
-    minHeight: "38px",
+    minHeight: "34px",
     display: "inline-flex",
     alignItems: "center",
-    padding: "0 14px",
-    borderRadius: "12px",
+    padding: "0 12px",
+    borderRadius: "10px",
     background: "rgba(255, 255, 255, 0.055)",
     border: "1px solid rgba(255, 255, 255, 0.08)",
     color: "var(--text-secondary)",
-    fontSize: "0.74rem",
+    fontSize: "0.72rem",
     fontWeight: "800",
     letterSpacing: "0.02em",
     whiteSpace: "nowrap",
+    textDecoration: "none",
   },
   controls: {
     display: "flex",
@@ -244,9 +264,12 @@ const styles = {
     margin: "0",
     padding: "6px max(48px, calc((100vw - 1720px) / 2)) 16px",
     overflowX: "auto",
+    overflowY: "hidden",
     scrollSnapType: "x mandatory",
     scrollPaddingLeft: "max(48px, calc((100vw - 1720px) / 2))",
     scrollbarWidth: "none",
+    WebkitOverflowScrolling: "touch",
+    touchAction: "pan-x",
   },
   railCompactSet: {
     justifyContent: "space-between",
@@ -254,10 +277,12 @@ const styles = {
   railMobile: {
     width: "100%",
     maxWidth: "none",
-    gap: "12px",
+    gap: "10px",
     margin: "0",
-    padding: "4px 12px 8px",
-    scrollPaddingLeft: "12px",
+    padding: "4px 14px 12px",
+    scrollPaddingLeft: "14px",
+    touchAction: "pan-x",
+    WebkitOverflowScrolling: "touch",
   },
   railTV: {
     width: "100%",
