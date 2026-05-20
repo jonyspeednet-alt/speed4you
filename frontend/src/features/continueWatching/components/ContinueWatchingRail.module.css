@@ -1,7 +1,14 @@
 
 .section {
+  --page-padding: max(48px, calc((100vw - 1720px) / 2));
   padding: var(--spacing-lg) 0;
   margin-bottom: var(--spacing-lg);
+}
+
+@media (max-width: 768px) {
+  .section {
+    --page-padding: 12px;
+  }
 }
 
 .title {
