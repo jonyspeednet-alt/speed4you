@@ -3,7 +3,7 @@ const posterFallback = '/portal/assets/poster-placeholder.svg';
 export const posterFallbackUrl = posterFallback;
 
 export const DETAIL_SKELETON = {
-  page: { minHeight: '100vh', paddingTop: 88, position: 'relative', overflow: 'hidden', background: '#050c16' },
+  page: { minHeight: '100vh', paddingTop: 'calc(var(--nav-occupied-desktop) + 8px)', position: 'relative', overflow: 'hidden', background: '#050c16' },
   hero: { position: 'relative', minHeight: '75vh', display: 'flex', alignItems: 'center', padding: '40px 0' },
   skeletonBlock: { background: 'rgba(255,255,255,0.08)', borderRadius: '24px' },
   skeletonLine: { background: 'rgba(255,255,255,0.08)', borderRadius: '999px' },
@@ -43,7 +43,7 @@ export const DETAIL_SKELETON = {
 };
 
 export const DETAIL_STYLES = {
-  page: { minHeight: '100vh', paddingTop: 88, position: 'relative', overflow: 'hidden', background: '#050c16' },
+  page: { minHeight: '100vh', paddingTop: 'calc(var(--nav-occupied-desktop) + 8px)', position: 'relative', overflow: 'hidden', background: '#050c16' },
 
   auroraOrb: {
     position: 'absolute', width: '60vw', height: '60vw', borderRadius: '50%',
