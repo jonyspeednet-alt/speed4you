@@ -493,11 +493,10 @@ const styles = {
     scrollSnapType: "x proximity",
     scrollSnapStop: "normal",
     overscrollBehaviorX: "contain",
-    overscrollBehaviorY: "none",
     scrollPaddingLeft: "max(48px, calc((100vw - 1720px) / 2))",
     scrollbarWidth: "none",
     WebkitOverflowScrolling: "touch",
-    touchAction: "pan-x pan-y",
+    touchAction: "auto",
   },
   railCompactSet: {
     justifyContent: "space-between",
@@ -513,8 +512,7 @@ const styles = {
     scrollSnapType: "x proximity",
     scrollSnapStop: "normal",
     overscrollBehaviorX: "contain",
-    overscrollBehaviorY: "none",
-    touchAction: "pan-x pan-y",
+    touchAction: "auto",
     WebkitOverflowScrolling: "touch",
   },
   railTV: {

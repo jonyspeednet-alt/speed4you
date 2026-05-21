@@ -1053,9 +1053,9 @@
         scroll-snap-type: x proximity;
         scroll-snap-stop: normal;
         overscroll-behavior-x: contain;
-        touch-action: auto !important;
+        touch-action: auto;
         -webkit-overflow-scrolling: touch;
-        overflow-y: visible !important;
+        overflow-y: hidden;
         padding-left: 12px;
         padding-right: 12px;
     }
@@ -1274,7 +1274,7 @@
 
 /* Cross-device polish pass */
 .content-rail-list {
-    touch-action: auto !important;
+    touch-action: auto;
 }
 
 @media (min-width: 1024px) and (max-width: 1379px) {
@@ -1303,7 +1303,7 @@
 
 @media (max-width: 767px) {
     .content-rail-list {
-        touch-action: auto !important;
+        touch-action: auto;
     }
 
     .browse-grid {
