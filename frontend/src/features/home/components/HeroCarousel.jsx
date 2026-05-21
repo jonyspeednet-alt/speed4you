@@ -7,7 +7,6 @@ import styles from './HeroCarousel.module.css'; // Import CSS module
 
 const AUTO_PLAY_DURATION = 3200;
 const AUTO_PLAY_RESUME_DELAY = 1200;
-const PROGRESS_INTERVAL = 50;
 
 function normalizeCarouselItem(item) {
     if (!item) return null;
@@ -34,18 +33,16 @@ function HeroCarousel({ content, items }) {
     const sectionRef = useRef(null);
     const bgRef = useRef(null);
     const resumeTimerRef = useRef(null);
-    const progressIntervalRef = useRef(null);
     const touchStartRef = useRef(0);
 
     const [activeIndex, setActiveIndex] = useState(0);
-    const [progress, setProgress] = useState(0);
     const [isAutoPlay, setIsAutoPlay] = useState(true);
     const [isHovering, setIsHovering] = useState(false);
+    const slideTimerRef = useRef(null);
 
-    // Stop autoplay timer when component unmounts
     useEffect(() => () => {
         if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
-        if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+        if (slideTimerRef.current) clearTimeout(slideTimerRef.current);
     }, []);
 
     // Reset index if content items change
@@ -53,37 +50,29 @@ function HeroCarousel({ content, items }) {
         setActiveIndex(prev => Math.min(prev, contentItems.length - 1 || 0));
     }, [contentItems.length]);
 
-    // Function to move to a specific slide
     const moveToSlide = useCallback((index) => {
         if (contentItems.length === 0) return;
         const normalizedIndex = (index + contentItems.length) % contentItems.length;
         setActiveIndex(normalizedIndex);
-        setProgress(0);
 
-        // Pause and resume autoplay
         setIsAutoPlay(false);
         if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
         resumeTimerRef.current = setTimeout(() => setIsAutoPlay(true), AUTO_PLAY_RESUME_DELAY);
     }, [contentItems.length]);
 
-    // Autoplay logic
     useEffect(() => {
         if (!isAutoPlay || contentItems.length <= 1) {
-            if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+            if (slideTimerRef.current) clearTimeout(slideTimerRef.current);
             return;
         }
 
-        let elapsed = 0;
-        progressIntervalRef.current = setInterval(() => {
-            elapsed += PROGRESS_INTERVAL;
-            setProgress(Math.min((elapsed / AUTO_PLAY_DURATION) * 100, 100));
+        slideTimerRef.current = setTimeout(() => {
+            moveToSlide(activeIndex + 1);
+        }, AUTO_PLAY_DURATION);
 
-            if (elapsed >= AUTO_PLAY_DURATION) {
-                moveToSlide(activeIndex + 1);
-            }
-        }, PROGRESS_INTERVAL);
-
-        return () => clearInterval(progressIntervalRef.current);
+        return () => {
+            if (slideTimerRef.current) clearTimeout(slideTimerRef.current);
+        };
     }, [isAutoPlay, contentItems.length, activeIndex, moveToSlide]);
 
     // Parallax scroll effect for the background
@@ -299,7 +288,7 @@ function HeroCarousel({ content, items }) {
                     )}
 
                     <div className={styles.progressBarContainer}>
-                        <div className={styles.progressBar} style={{ width: `${progress}%` }} />
+                        <div className={styles.progressBar} style={{ animationDuration: `${AUTO_PLAY_DURATION}ms`, animationPlayState: isAutoPlay ? 'running' : 'paused' }} />
                     </div>
                 </>
             )}
