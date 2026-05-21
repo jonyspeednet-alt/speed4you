@@ -168,7 +168,7 @@ function PlayerPage() {
   const [mediaDuration, setMediaDuration] = useState(0);
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [scrubTime, setScrubTime] = useState(0);
-  const [hasOptimizedFallbacked, setHasOptimizedFallbacked] = useState(false);
+  const hasOptimizedFallbackedRef = useRef(false);
   const streamUrlBaseRef = useRef("");
 
   const swipeStartRef = useRef(null);
@@ -243,7 +243,7 @@ function PlayerPage() {
 
   const upgradeToOptimizedStream = useCallback(
     (baseUrl) => {
-      if (!baseUrl || !videoRef.current || hasOptimizedFallbacked) {
+      if (!baseUrl || !videoRef.current || hasOptimizedFallbackedRef.current) {
         return;
       }
 
@@ -258,12 +258,12 @@ function PlayerPage() {
 
       pendingResumeTimeRef.current = resumeFrom > 0 ? resumeFrom : null;
       pendingAutoplayRef.current = wasPlaying;
-      setHasOptimizedFallbacked(true);
+      hasOptimizedFallbackedRef.current = true;
       setStreamMode("optimized");
       setStreamUrl(optimizedUrl);
       setStreamStatus("Trying optimized stream...");
     },
-    [hasOptimizedFallbacked],
+    [],
   );
 
   const clearInvisibleVideoCheck = useCallback(() => {
@@ -295,7 +295,7 @@ function PlayerPage() {
     if (
       typeof window === "undefined" ||
       !isMobile ||
-      hasOptimizedFallbacked ||
+      hasOptimizedFallbackedRef.current ||
       streamMode === "optimized" ||
       !streamUrlBaseRef.current
     ) {
@@ -325,7 +325,6 @@ function PlayerPage() {
   }, [
     clearInvisibleVideoCheck,
     getRenderedVideoFrameCount,
-    hasOptimizedFallbacked,
     isMobile,
     streamMode,
     upgradeToOptimizedStream,
@@ -552,7 +551,6 @@ function PlayerPage() {
     episodeNumber,
     hasEpisodeSelection,
     seasonNumber,
-    upgradeToOptimizedStream,
   ]);
 
   useEffect(() => {
@@ -972,15 +970,13 @@ function PlayerPage() {
   const handleScrubChange = (event) => {
     const nextPosition = Number(event.target.value);
     setScrubTime(nextPosition);
-
-    if (isScrubbing) {
-      commitScrub(nextPosition);
-    }
+    commitScrub(nextPosition);
   };
 
   const handleScrubEnd = (event) => {
     const nextPosition = Number(event.target.value);
     setIsScrubbing(false);
+    setShowControls(false);
     commitScrub(nextPosition);
   };
 
@@ -1767,7 +1763,8 @@ function PlayerPage() {
               onMouseDown={handleScrubStart}
               onTouchStart={handleScrubStart}
               onInput={handleScrubChange}
-              onChange={handleScrubEnd}
+              onPointerUp={handleScrubEnd}
+              onKeyUp={handleScrubEnd}
               style={styles.scrubber}
               className="yt-scrubber"
               aria-label="Seek video position"
@@ -2366,7 +2363,8 @@ function PlayerPage() {
                   onMouseDown={handleScrubStart}
                   onTouchStart={handleScrubStart}
                   onInput={handleScrubChange}
-                  onChange={handleScrubEnd}
+                  onPointerUp={handleScrubEnd}
+                  onKeyUp={handleScrubEnd}
                   style={styles.mobileScrubber}
                   aria-label="Seek video position"
                 />
