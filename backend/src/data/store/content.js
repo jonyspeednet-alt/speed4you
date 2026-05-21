@@ -294,7 +294,7 @@ async function searchItems(query, filters = {}) {
     FROM content_catalog 
     ${whereClause} 
     ORDER BY db_score DESC 
-    LIMIT 500
+    LIMIT 50
   `;
   
   const result = await db.query(queryStr, listParams);

@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { listItems, searchItems, getItemById } = require('../data/store');
+const { listItems, searchItems, getItemById, toCardItem } = require('../data/store');
 const { setApiCacheHeaders } = require('../middleware/response-optimizer');
-const HOMEPAGE_LIMIT = 30;
+const HOMEPAGE_LIMIT = 10;
 
 function asyncRoute(handler) {
   return (req, res, next) => {
@@ -86,11 +86,11 @@ async function buildHomepagePayload(limit = HOMEPAGE_LIMIT) {
   const featured = featuredItems[0] || latest[0] || null;
 
   return {
-    featured,
-    latest,
-    popular,
-    trending,
-    series,
+    featured: featured ? toCardItem(featured) : null,
+    latest: latest.map(toCardItem),
+    popular: popular.map(toCardItem),
+    trending: trending.map(toCardItem),
+    series: series.map(toCardItem),
     generatedAt: new Date().toISOString(),
   };
 }
@@ -112,8 +112,8 @@ router.get('/', asyncRoute(async (req, res) => {
 
   setApiCacheHeaders(res, req.originalUrl);
   res.json({
-    items,
-    featured,
+    items: items.map(toCardItem),
+    featured: featured ? toCardItem(featured) : null,
     total,
     page,
     limit,
@@ -125,21 +125,21 @@ router.get('/latest', asyncRoute(async (req, res) => {
   const limit = normalizePositiveInt(req.query.limit, 10, { min: 1, max: 100 });
   const items = await getPublishedItems({}, 0, limit, 'latest');
   setApiCacheHeaders(res, req.originalUrl);
-  res.json({ items });
+  res.json({ items: items.map(toCardItem) });
 }));
 
 router.get('/popular', asyncRoute(async (req, res) => {
   const limit = normalizePositiveInt(req.query.limit, 10, { min: 1, max: 100 });
   const items = await getPublishedItems({}, 0, limit, 'popular');
   setApiCacheHeaders(res, req.originalUrl);
-  res.json({ items });
+  res.json({ items: items.map(toCardItem) });
 }));
 
 router.get('/trending', asyncRoute(async (req, res) => {
   const limit = normalizePositiveInt(req.query.limit, 10, { min: 1, max: 100 });
   const items = await getPublishedItems({}, 0, limit, 'trending');
   setApiCacheHeaders(res, req.originalUrl);
-  res.json({ items });
+  res.json({ items: items.map(toCardItem) });
 }));
 
 router.get('/local-trending', asyncRoute(async (req, res) => {
@@ -195,7 +195,7 @@ router.get('/local-trending', asyncRoute(async (req, res) => {
     .slice(0, limit);
 
   setApiCacheHeaders(res, req.originalUrl);
-  res.json(sortedResult);
+  res.json(sortedResult.map(toCardItem));
 }));
 
 router.get('/recommendations', asyncRoute(async (req, res) => {
@@ -214,7 +214,7 @@ router.get('/recommendations', asyncRoute(async (req, res) => {
       .filter((item) => String(item?.id || '') !== seed)
       .slice(0, limit);
     setApiCacheHeaders(res, req.originalUrl);
-    return res.json(recommendations);
+    return res.json(recommendations.map(toCardItem));
   }
 
   // Extract seed traits
@@ -229,8 +229,8 @@ router.get('/recommendations', asyncRoute(async (req, res) => {
   const seedCategory = String(seedItem.category || '').trim().toLowerCase();
   const seedLanguage = String(seedItem.language || '').trim().toLowerCase();
 
-  // Fetch a larger candidate pool of published items
-  const candidates = await getPublishedItems({}, 0, 150, 'popular');
+  // Fetch a moderate candidate pool of published items
+  const candidates = await getPublishedItems({}, 0, 50, 'popular');
 
   // Compute similarity score for each candidate
   const scoredRecommendations = candidates
@@ -277,11 +277,11 @@ router.get('/recommendations', asyncRoute(async (req, res) => {
   if (scoredRecommendations.length === 0) {
     const items = await getPublishedItems({}, 0, limit, 'popular');
     setApiCacheHeaders(res, req.originalUrl);
-    return res.json(items);
+    return res.json(items.map(toCardItem));
   }
 
   setApiCacheHeaders(res, req.originalUrl);
-  res.json(scoredRecommendations);
+  res.json(scoredRecommendations.map(toCardItem));
 }));
 
 router.get('/homepage', asyncRoute(async (req, res) => {
@@ -321,7 +321,7 @@ router.get('/browse', asyncRoute(async (req, res) => {
   }
 
   res.json({
-    items,
+    items: items.map(toCardItem),
     total,
     page,
     limit,

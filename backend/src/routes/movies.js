@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getItemById, listItems } = require('../data/store');
+const { getItemById, listItems, toCardItem } = require('../data/store');
 const { Joi, validateQuery } = require('../middleware/validate');
 const { AppError } = require('../utils/error');
 
@@ -27,7 +27,7 @@ router.get('/', validateQuery(moviesQuerySchema), async (req, res, next) => {
     const offset = (page - 1) * limit;
     const { items, total } = await listItems(filters, offset, limit, sort);
     res.json({
-      movies: items,
+      movies: items.map(toCardItem),
       total,
       page,
       limit,
