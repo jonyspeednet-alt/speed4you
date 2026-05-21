@@ -221,11 +221,18 @@ jobs:
             echo "Found nginx config: $CONF"
             CHANGED=0
 
-            # Enable HTTP/2 if missing
-            if ! grep -q 'http2' "$CONF"; then
+            # Remove invalid standalone http2 directive from previous broken runs
+            if grep -q '^[[:space:]]*http2 on;' "$CONF"; then
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i '/^[[:space:]]*http2 on;/d' "$CONF"
+              echo "Removed invalid standalone http2 on; directive"
+              CHANGED=1
+            fi
+
+            # Enable HTTP/2 — must be part of listen directive (nginx 1.25+)
+            if ! grep -q 'listen 443 ssl http2' "$CONF"; then
               if grep -q 'listen 443 ssl;' "$CONF"; then
-                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i 's/listen 443 ssl;/listen 443 ssl;\n    http2 on;/' "$CONF"
-                echo "HTTP/2 enabled"
+                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i 's/listen 443 ssl;/listen 443 ssl http2;/' "$CONF"
+                echo "HTTP/2 enabled (via listen directive)"
                 CHANGED=1
               fi
             fi
