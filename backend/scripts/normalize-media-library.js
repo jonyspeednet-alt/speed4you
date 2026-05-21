@@ -660,7 +660,16 @@ async function loadState() {
     currentOperation: null,
   };
   const state = await getMediaNormalizerState();
-  return state || fallback;
+  if (!state || typeof state !== 'object') {
+    return { ...fallback };
+  }
+  return {
+    ...fallback,
+    ...state,
+    processed: state.processed || {},
+    failed: state.failed || {},
+    stats: { ...fallback.stats, ...(state.stats || {}) },
+  };
 }
 
 function trimMap(obj, maxEntries) {
