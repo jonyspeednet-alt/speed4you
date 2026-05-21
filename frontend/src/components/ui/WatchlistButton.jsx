@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import { watchlistService } from "../../services";
 import { useToast } from "./useToast";
 
-function WatchlistButton({ contentType, contentId, title, compact = false }) {
+function WatchlistButton({ contentType, contentId, title, compact = false, checkOnMount = true }) {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
   const [hovered, setHovered] = useState(false);
   const { show } = useToast();
 
   useEffect(() => {
+    if (!checkOnMount) return;
     let cancelled = false;
     watchlistService
       .check(contentType, contentId)
@@ -19,7 +20,7 @@ function WatchlistButton({ contentType, contentId, title, compact = false }) {
     return () => {
       cancelled = true;
     };
-  }, [contentType, contentId]);
+  }, [contentType, contentId, checkOnMount]);
 
   async function toggle(e) {
     e.preventDefault();

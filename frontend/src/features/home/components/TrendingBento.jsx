@@ -62,7 +62,7 @@ function BentoItem({ item, index, isLarge, tv }) {
       onBlur={() => tv && setHovered(false)}
     >
       <img 
-        src={isLarge ? (item.backdrop || item.poster) : item.poster} 
+        src={(isLarge ? (item.backdrop || item.poster) : item.poster)?.includes('image.tmdb.org/t/p/') ? (isLarge ? (item.backdrop || item.poster) : item.poster).replace(/\/t\/p\/[^/]+\//, '/t/p/w780/') : (isLarge ? (item.backdrop || item.poster) : item.poster)} 
         alt={item.title} 
         loading="lazy"
         style={{
@@ -104,6 +104,7 @@ function BentoItem({ item, index, isLarge, tv }) {
                 contentId={item.id} 
                 title={item.title}
                 compact
+                checkOnMount={false}
               />
             </div>
           )}
@@ -174,7 +175,7 @@ const styles = {
     background: '#0d1a2d',
     cursor: 'pointer',
     border: '1px solid rgba(255, 255, 255, 0.08)',
-    transition: 'all 400ms cubic-bezier(0.4, 0, 0.2, 1)',
+    transition: 'transform 400ms cubic-bezier(0.4, 0, 0.2, 1), border-color 400ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 400ms cubic-bezier(0.4, 0, 0.2, 1)',
   },
   itemLarge: {
     gridColumn: 'span 2',
