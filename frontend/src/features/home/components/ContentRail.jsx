@@ -230,7 +230,10 @@ function ContentRail({
           </h2>
         </div>
 
-        <div className="content-rail-actions" style={styles.headerActions}>
+        <div className="content-rail-actions" style={{
+            ...styles.headerActions,
+            ...(isMobile ? styles.headerActionsMobile : {}),
+        }}>
           {viewAllLink ? (
             <Link
               className="content-rail-view-all"
@@ -405,6 +408,14 @@ const styles = {
     WebkitBackdropFilter: "blur(18px)",
     flexShrink: 0,
   },
+  headerActionsMobile: {
+    background: "none",
+    border: "none",
+    backdropFilter: "none",
+    WebkitBackdropFilter: "none",
+    padding: "2px",
+    gap: "4px",
+  },
   viewAll: {
     minHeight: "34px",
     display: "inline-flex",
@@ -428,7 +439,7 @@ const styles = {
     gap: "12px",
   },
   controlsMobile: {
-    gap: "6px",
+    gap: "4px",
   },
   arrow: {
     width: "38px",
@@ -445,11 +456,11 @@ const styles = {
     touchAction: "manipulation",
   },
   arrowMobile: {
-    width: "44px",
-    height: "44px",
-    minWidth: "44px",
-    minHeight: "44px",
-    borderRadius: "12px",
+    width: "36px",
+    height: "36px",
+    minWidth: "36px",
+    minHeight: "36px",
+    borderRadius: "10px",
   },
   arrowTV: {
     width: "56px",
@@ -474,9 +485,9 @@ const styles = {
     pointerEvents: "none",
   },
   viewAllMobile: {
-    minHeight: "44px",
-    padding: "0 14px",
-    fontSize: "0.78rem",
+    minHeight: "36px",
+    padding: "0 12px",
+    fontSize: "0.72rem",
   },
   rail: {
     width: "100%",
