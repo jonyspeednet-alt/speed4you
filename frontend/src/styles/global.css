@@ -1212,7 +1212,6 @@ main,
   overflow-y: hidden;
   padding: 0 max(48px, calc((100vw - 1720px) / 2)) 10px;
   scroll-snap-type: x proximity;
-  -webkit-overflow-scrolling: touch;
   touch-action: auto;
   overscroll-behavior-x: contain;
   scrollbar-width: none;

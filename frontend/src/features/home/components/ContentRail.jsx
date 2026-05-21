@@ -41,16 +41,7 @@ function ContentRail({
   }, []);
 
   const scheduleScrollIndicatorUpdate = useCallback(() => {
-    updateScrollIndicators();
-
-    if (typeof window === "undefined") return;
-
-    window.requestAnimationFrame(() => {
-      updateScrollIndicators();
-      window.requestAnimationFrame(updateScrollIndicators);
-    });
-
-    window.setTimeout(updateScrollIndicators, 250);
+    window.requestAnimationFrame(updateScrollIndicators);
   }, [updateScrollIndicators]);
 
   useEffect(() => {
@@ -72,11 +63,7 @@ function ContentRail({
     (element) => {
       const firstCard = element.querySelector(".content-rail-card");
       const cardWidth = firstCard?.getBoundingClientRect?.().width || 0;
-      const stylesForElement = window.getComputedStyle(element);
-      const gap =
-        Number.parseFloat(
-          stylesForElement.columnGap || stylesForElement.gap || "0",
-        ) || 0;
+      const gap = isTVMode ? 20 : isMobile ? 10 : 16;
       const byCard = cardWidth ? (cardWidth + gap) * (isTVMode ? 2 : 1) : 0;
       const byViewport =
         element.clientWidth * (isTVMode ? 0.72 : isMobile ? 0.78 : 0.82);
@@ -135,20 +122,13 @@ function ContentRail({
       const deltaX = event.deltaX || 0;
       const deltaY = event.deltaY || 0;
 
-      // Determine the horizontal scroll delta:
-      // 1. Trackpad horizontal swipe → use deltaX naturally
-      // 2. Shift + mouse wheel → convert shift+deltaY to horizontal
-      // 3. Regular mouse wheel (deltaY only) → DO NOT intercept, let page scroll vertically
       let delta = 0;
 
       if (Math.abs(deltaX) > 0 && Math.abs(deltaX) >= Math.abs(deltaY)) {
-        // Trackpad horizontal gesture
         delta = deltaX;
       } else if (event.shiftKey && Math.abs(deltaY) > 0) {
-        // Shift + mouse wheel → horizontal scroll
         delta = deltaY;
       }
-      // else: regular vertical wheel — do NOT convert to horizontal, let page scroll
 
       if (!delta) return;
 
@@ -157,18 +137,12 @@ function ContentRail({
         element.scrollWidth - element.clientWidth,
       );
 
-      // Only intercept if there is actually overflow to scroll
       if (maxScrollLeft <= 0) return;
 
       const nextScroll = clampScrollLeft(element, element.scrollLeft + delta);
-      const canMove = nextScroll !== element.scrollLeft;
-
-      if (canMove) {
+      if (nextScroll !== element.scrollLeft) {
         element.scrollLeft = nextScroll;
         scheduleScrollIndicatorUpdate();
-        if (event.cancelable) {
-          event.preventDefault();
-        }
       }
     };
 
@@ -177,17 +151,8 @@ function ContentRail({
         ? new ResizeObserver(scheduleScrollIndicatorUpdate)
         : null;
     resizeObserver?.observe(element);
-    Array.from(element.children).forEach((child) =>
-      resizeObserver?.observe(child),
-    );
 
-    const mutationObserver =
-      typeof MutationObserver !== "undefined"
-        ? new MutationObserver(scheduleScrollIndicatorUpdate)
-        : null;
-    mutationObserver?.observe(element, { childList: true, subtree: true });
-
-    element.addEventListener("wheel", handleWheel, { passive: false });
+    element.addEventListener("wheel", handleWheel, { passive: true });
     element.addEventListener("scroll", updateScrollIndicators, {
       passive: true,
     });
@@ -196,7 +161,6 @@ function ContentRail({
 
     return () => {
       resizeObserver?.disconnect();
-      mutationObserver?.disconnect();
       element.removeEventListener("wheel", handleWheel);
       element.removeEventListener("scroll", updateScrollIndicators);
     };
@@ -506,7 +470,6 @@ const styles = {
     overscrollBehaviorX: "contain",
     scrollPaddingLeft: "max(48px, calc((100vw - 1720px) / 2))",
     scrollbarWidth: "none",
-    WebkitOverflowScrolling: "touch",
     touchAction: "auto",
   },
   railCompactSet: {
@@ -524,7 +487,6 @@ const styles = {
     scrollSnapStop: "normal",
     overscrollBehaviorX: "contain",
     touchAction: "auto",
-    WebkitOverflowScrolling: "touch",
   },
   railTV: {
     width: "100%",
