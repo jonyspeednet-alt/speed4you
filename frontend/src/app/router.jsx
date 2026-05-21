@@ -182,9 +182,13 @@ const router = createBrowserRouter([
 
 function AppRouter() {
   return (
-    <GlobalErrorBoundary>
-      <RouterProvider router={router} />
-    </GlobalErrorBoundary>
+    <Suspense fallback={
+      <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }} />
+    }>
+      <GlobalErrorBoundary>
+        <RouterProvider router={router} />
+      </GlobalErrorBoundary>
+    </Suspense>
   );
 }
 
