@@ -6,25 +6,6 @@ import WatchlistButton from '../../../components/ui/WatchlistButton';
 import styles from './HeroCarousel.module.css'; // Import CSS module
 
 const AUTO_PLAY_DURATION = 3200;
-const MAX_VISIBLE_DOTS = 9;
-
-// Returns the slice of dot indices to show in the sliding window
-function getDotWindow(total, active, maxVisible) {
-    if (total <= maxVisible) return { start: 0, end: total, showStartEllipsis: false, showEndEllipsis: false };
-    const half = Math.floor(maxVisible / 2);
-    let start = Math.max(0, active - half);
-    let end = start + maxVisible;
-    if (end > total) {
-        end = total;
-        start = Math.max(0, end - maxVisible);
-    }
-    return {
-        start,
-        end,
-        showStartEllipsis: start > 0,
-        showEndEllipsis: end < total,
-    };
-}
 const AUTO_PLAY_RESUME_DELAY = 1200;
 const PROGRESS_INTERVAL = 50;
 
@@ -319,33 +300,6 @@ function HeroCarousel({ content, items }) {
 
                     <div className={styles.progressBarContainer}>
                         <div className={styles.progressBar} style={{ width: `${progress}%` }} />
-                    </div>
-
-                    <div className={styles.carouselDots}>
-                        {(() => {
-                            const { start, end, showStartEllipsis, showEndEllipsis } = getDotWindow(contentItems.length, activeIndex, MAX_VISIBLE_DOTS);
-                            return (
-                                <>
-                                    {showStartEllipsis && <span className={styles.dotEllipsis}>…</span>}
-                                    {contentItems.slice(start, end).map((_, i) => {
-                                        const index = start + i;
-                                        return (
-                                            <button
-                                                key={index}
-                                                onClick={() => moveToSlide(index)}
-                                                className={index === activeIndex ? styles.dotActive : styles.dot}
-                                                aria-label={`Go to slide ${index + 1}`}
-                                                aria-current={index === activeIndex}
-                                            />
-                                        );
-                                    })}
-                                    {showEndEllipsis && <span className={styles.dotEllipsis}>…</span>}
-                                    {contentItems.length > MAX_VISIBLE_DOTS && (
-                                        <span className={styles.slideCounter}>{activeIndex + 1}&thinsp;/&thinsp;{contentItems.length}</span>
-                                    )}
-                                </>
-                            );
-                        })()}
                     </div>
                 </>
             )}
