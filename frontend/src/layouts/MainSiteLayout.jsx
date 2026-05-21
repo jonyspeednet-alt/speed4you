@@ -1,14 +1,14 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import TopNav from "../components/navigation/TopNav";
 import ScrollToTop from "../components/ui/ScrollToTop";
 import BottomNav from "../components/ui/BottomNav";
-import KeyboardShortcuts from "../components/ui/KeyboardShortcuts";
 import { ToastProvider } from "../components/ui/Toast";
 import { useBreakpoint, useTVMode } from "../hooks";
 
-import GlobalSearchModal from "../components/navigation/GlobalSearchModal";
-import PwaInstallBanner from "../components/ui/PwaInstallBanner";
+const KeyboardShortcuts = lazy(() => import("../components/ui/KeyboardShortcuts"));
+const GlobalSearchModal = lazy(() => import("../components/navigation/GlobalSearchModal"));
+const PwaInstallBanner = lazy(() => import("../components/ui/PwaInstallBanner"));
 
 function MainSiteLayout() {
   const location = useLocation();
@@ -77,9 +77,17 @@ function MainSiteLayout() {
         </main>
         <ScrollToTop />
         {isMobile && !isPlayerRoute && <BottomNav />}
-        {!isMobile && !isPlayerRoute && <KeyboardShortcuts />}
-        <GlobalSearchModal />
-        <PwaInstallBanner />
+        {!isMobile && !isPlayerRoute && (
+          <Suspense fallback={null}>
+            <KeyboardShortcuts />
+          </Suspense>
+        )}
+        <Suspense fallback={null}>
+          <GlobalSearchModal />
+        </Suspense>
+        <Suspense fallback={null}>
+          <PwaInstallBanner />
+        </Suspense>
       </div>
     </ToastProvider>
   );

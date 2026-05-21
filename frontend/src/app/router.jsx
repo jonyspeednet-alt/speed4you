@@ -1,10 +1,11 @@
 import { lazy, Suspense } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
-import { RouteErrorBoundary } from '../components/feedback/ErrorBoundary.jsx';
-import GlobalErrorBoundary from '../components/feedback/GlobalErrorBoundary.jsx';
-import MainSiteLayout from '../layouts/MainSiteLayout';
-import AdminLayout from '../layouts/AdminLayout';
 import { RailSkeleton, HeroBannerSkeleton } from '../components/feedback/Skeleton';
+
+const RouteErrorBoundary = lazy(() => import('../components/feedback/ErrorBoundary').then(m => ({ default: m.RouteErrorBoundary })));
+const GlobalErrorBoundary = lazy(() => import('../components/feedback/GlobalErrorBoundary'));
+const MainSiteLayout = lazy(() => import('../layouts/MainSiteLayout'));
+const AdminLayout = lazy(() => import('../layouts/AdminLayout'));
 
 const HomePage = lazy(() => import('../pages/HomePage'));
 const BrowsePage = lazy(() => import('../pages/BrowsePage'));
@@ -59,13 +60,23 @@ function withRouteFallback(element, routeType = 'default') {
   );
 }
 
+function LayoutSuspense({ children }) {
+  return (
+    <Suspense fallback={
+      <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }} />
+    }>
+      {children}
+    </Suspense>
+  );
+}
+
 const appBasePath = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '/';
 
 const router = createBrowserRouter([
   {
     path: '/',
-    element: <MainSiteLayout />,
-    errorElement: <RouteErrorBoundary />,
+    element: <LayoutSuspense><MainSiteLayout /></LayoutSuspense>,
+    errorElement: <LayoutSuspense><RouteErrorBoundary /></LayoutSuspense>,
     children: [
       {
         index: true,
@@ -124,8 +135,8 @@ const router = createBrowserRouter([
   },
   {
     path: '/admin',
-    element: <AdminLayout />,
-    errorElement: <RouteErrorBoundary />,
+    element: <LayoutSuspense><AdminLayout /></LayoutSuspense>,
+    errorElement: <LayoutSuspense><RouteErrorBoundary /></LayoutSuspense>,
     children: [
       {
         index: true,
