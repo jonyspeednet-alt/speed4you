@@ -663,8 +663,8 @@ function AddContentPage() {
                   </div>
 
                   <div style={styles.previewStage}>
-                    {formData.poster ? <img src={formData.poster} alt="Poster preview" style={{ ...styles.previewImage, ...(isMobile ? styles.previewImageMobile : {}) }} /> : <div style={{ ...styles.posterFallback, ...(isMobile ? styles.previewImageMobile : {}) }}>Poster Preview</div>}
-                    {formData.backdrop ? <img src={formData.backdrop} alt="Backdrop preview" style={styles.previewWideImage} /> : <div style={styles.backdropFallback}>Backdrop Preview</div>}
+                    {formData.poster ? <img src={formData.poster} alt="Poster preview" loading="lazy" style={{ ...styles.previewImage, ...(isMobile ? styles.previewImageMobile : {}) }} /> : <div style={{ ...styles.posterFallback, ...(isMobile ? styles.previewImageMobile : {}) }}>Poster Preview</div>}
+                    {formData.backdrop ? <img src={formData.backdrop} alt="Backdrop preview" loading="lazy" style={styles.previewWideImage} /> : <div style={styles.backdropFallback}>Backdrop Preview</div>}
                   </div>
                 </section>
 
