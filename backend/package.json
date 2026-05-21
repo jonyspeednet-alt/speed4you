@@ -16,7 +16,6 @@
     "media:cache-report": "node scripts/manage-player-cache.js --report",
     "media:cache-maintain": "node scripts/manage-player-cache.js --report --remove-stale-partials",
     "media:normalize-library": "node scripts/normalize-media-library.js"
-
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -30,7 +29,8 @@
     "morgan": "^1.10.0",
     "multer": "^2.1.1",
     "pg": "^8.11.3",
-    "pg-mem": "^3.0.14"
+    "pg-mem": "^3.0.14",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
