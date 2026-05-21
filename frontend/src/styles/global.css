@@ -70,6 +70,10 @@
   --nav-occupied-mobile: 82px;
   --nav-occupied-desktop: 104px;
   --bottom-nav-height: 68px;
+  --focus-ring-color: rgba(0, 255, 255, 0.7);
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 3px;
+  --focus-ring-glow: 0 0 12px rgba(0, 255, 255, 0.35), 0 0 4px rgba(0, 255, 255, 0.2);
 }
 
 *,
@@ -83,6 +87,7 @@
 }
 
 html {
+  height: auto;
   min-height: 100%;
   font-size: 16px;
   scroll-behavior: smooth;
@@ -90,9 +95,11 @@ html {
   color-scheme: dark;
   background: var(--bg-primary);
   overflow-x: hidden;
+  overflow-y: auto;
 }
 
 body {
+  height: auto;
   min-height: 100vh;
   font-family: var(--font-family-ui);
   color: var(--text-primary);
@@ -106,6 +113,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   overflow-x: hidden;
+  overflow-y: auto;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -161,6 +169,35 @@ button {
     border-color var(--transition-fast),
     box-shadow var(--transition-fast),
     color var(--transition-fast);
+}
+
+/* ── Premium Accessible Focus Ring ── */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible,
+[role="button"]:focus-visible,
+[role="tab"]:focus-visible,
+[role="link"]:focus-visible,
+[role="menuitem"]:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  box-shadow: var(--focus-ring-glow);
+  transition: outline-color 160ms ease, box-shadow 160ms ease;
+}
+
+/* Keep mouse clicks clean — only show focus ring on keyboard navigation */
+a:focus:not(:focus-visible),
+button:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible),
+[tabindex]:focus:not(:focus-visible),
+[role="button"]:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
 }
 
 ul,
@@ -280,6 +317,15 @@ p {
   opacity: 0.3;
   pointer-events: none;
   z-index: -1;
+}
+
+/* ── Overflow Containment ── */
+main,
+.page-wrapper,
+.hero-section,
+[data-page] {
+  position: relative;
+  overflow-x: hidden;
 }
 
 .scroll-x {
@@ -996,7 +1042,8 @@ p {
 }
 
 .focus-ring:focus-visible {
-  outline: none;
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .focus-ring:focus-visible::after {
@@ -1086,7 +1133,8 @@ p {
 .input-field:focus-visible {
   border-color: var(--accent-secondary);
   box-shadow: 0 0 0 4px rgba(0, 255, 255, 0.12);
-  outline: none;
+  outline: var(--focus-ring-width) solid transparent;
+  outline-offset: var(--focus-ring-offset);
 }
 
 .field-label {
@@ -1162,14 +1210,13 @@ p {
   display: flex;
   gap: 18px;
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: visible !important;
   padding-bottom: 10px;
   scroll-snap-type: x proximity;
   scroll-snap-stop: normal;
   overscroll-behavior-x: contain;
-  overscroll-behavior-y: none;
   -webkit-overflow-scrolling: touch;
-  touch-action: pan-x pan-y;
+  touch-action: auto !important;
   scrollbar-width: none;
   width: 100%;
   max-width: 100%;

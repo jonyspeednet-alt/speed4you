@@ -1053,10 +1053,9 @@
         scroll-snap-type: x proximity;
         scroll-snap-stop: normal;
         overscroll-behavior-x: contain;
-        overscroll-behavior-y: none;
-        touch-action: pan-x pan-y;
+        touch-action: auto !important;
         -webkit-overflow-scrolling: touch;
-        overflow-y: hidden;
+        overflow-y: visible !important;
         padding-left: 12px;
         padding-right: 12px;
     }
@@ -1275,7 +1274,7 @@
 
 /* Cross-device polish pass */
 .content-rail-list {
-    touch-action: pan-x !important;
+    touch-action: auto !important;
 }
 
 @media (min-width: 1024px) and (max-width: 1379px) {
@@ -1304,7 +1303,7 @@
 
 @media (max-width: 767px) {
     .content-rail-list {
-        touch-action: pan-x !important;
+        touch-action: auto !important;
     }
 
     .browse-grid {
@@ -1384,5 +1383,97 @@
     }
     .show-print {
         display: block;
+    }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ACCESSIBILITY — Touch Targets & TV/Large Screen Enhancements
+   ══════════════════════════════════════════════════════════════ */
+
+/* Ensure minimum 44px touch targets on all interactive elements (mobile) */
+@media (max-width: 767px) {
+    button,
+    a[role="button"],
+    [role="button"],
+    .top-nav-link,
+    .bottom-nav-item,
+    .content-rail-view-all,
+    input[type="checkbox"],
+    input[type="radio"] {
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    /* Search input touch target */
+    .top-nav-search {
+        min-height: 44px;
+    }
+}
+
+/* TV & Large Display — Enhanced readability from distance */
+@media screen and (min-width: 1920px) {
+    html {
+        font-size: 18px;
+    }
+
+    body {
+        line-height: 1.7;
+    }
+
+    .top-nav-main {
+        padding-left: max(48px, 5vw);
+        padding-right: max(48px, 5vw);
+    }
+
+    .content-rail-header {
+        padding: 0 max(64px, calc((100vw - 1800px) / 2));
+    }
+
+    .content-rail-list {
+        padding-left: max(64px, calc((100vw - 1800px) / 2)) !important;
+        padding-right: max(64px, calc((100vw - 1800px) / 2)) !important;
+    }
+
+    h1, .hero-title {
+        font-size: clamp(3rem, 4vw, 5rem);
+    }
+
+    h2, .section-title {
+        font-size: clamp(2rem, 2.5vw, 3.5rem);
+    }
+
+    h3 {
+        font-size: clamp(1.5rem, 2vw, 2.5rem);
+    }
+
+    .content-rail-card {
+        min-width: 280px;
+        max-width: 340px;
+    }
+}
+
+/* Ultra-wide 4K displays */
+@media screen and (min-width: 3000px) {
+    html {
+        font-size: 22px;
+    }
+
+    .top-nav-main {
+        padding-left: max(80px, 8vw);
+        padding-right: max(80px, 8vw);
+    }
+
+    .content-rail-header {
+        padding: 0 max(120px, calc((100vw - 2400px) / 2));
+    }
+
+    .content-rail-list {
+        padding-left: max(120px, calc((100vw - 2400px) / 2)) !important;
+        padding-right: max(120px, calc((100vw - 2400px) / 2)) !important;
+    }
+
+    .content-rail-card {
+        min-width: 360px;
+        max-width: 440px;
     }
 }
