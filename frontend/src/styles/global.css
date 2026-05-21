@@ -1210,17 +1210,16 @@ main,
   display: flex;
   gap: 18px;
   overflow-x: auto;
-  overflow-y: visible !important;
-  padding-bottom: 10px;
+  overflow-y: hidden;
+  padding: 0 max(48px, calc((100vw - 1720px) / 2)) 10px;
   scroll-snap-type: x proximity;
-  scroll-snap-stop: normal;
-  overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
-  touch-action: auto !important;
+  touch-action: auto;
+  overscroll-behavior-x: contain;
   scrollbar-width: none;
   width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
+  max-width: none;
+  margin: 0;
 }
 
 .content-rail-list::-webkit-scrollbar {
