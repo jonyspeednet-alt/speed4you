@@ -17,8 +17,11 @@ function getTmdbPosterSrc(url, targetSize = 'w342') {
 
 function getTmdbSrcSet(url) {
   if (!url || !url.includes('image.tmdb.org/t/p/')) return undefined;
-  const base = url.replace(/\/t\/p\/[^/]+\//, '/t/p/');
-  return `${base}w185 185w, ${base}w342 342w, ${base}w500 500w`;
+  const parts = url.match(/^(.*\/t\/p\/)[^/]+(\/.*)$/);
+  if (!parts) return undefined;
+  const base = parts[1];
+  const path = parts[2];
+  return `${base}w185${path} 185w, ${base}w342${path} 342w, ${base}w500${path} 500w`;
 }
 
 function ContentCard({
