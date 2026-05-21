@@ -651,13 +651,12 @@ router.get('/stream/:contentType/:id', async (req, res, next) => {
     }
 
 
-    ensureOptimizedCache(selection, resolvedPath, strategy).catch(() => {});
-
     const tempPath = `${cachePath}.part.mp4`;
     const inputStat = safeStat(resolvedPath);
     const inputSize = inputStat ? inputStat.size : 0;
 
     if (inputSize > 0 && (strategy.mode === 'remux-copy' || strategy.mode === 'copy-video-transcode-audio')) {
+      ensureOptimizedCache(selection, resolvedPath, strategy).catch(() => {});
       try {
         await waitForFileSize(tempPath, 4096, 15000);
         serveGrowingFile(tempPath, inputSize, req, res);
@@ -821,7 +820,7 @@ router.get('/prepare/:contentType/:id', async (req, res, next) => {
 
     const tempPath = `${cachePath}.part.mp4`;
     const tempStat = fs.existsSync(tempPath) ? safeStat(tempPath) : null;
-    if (tempStat?.size > 1024 * 1024) {
+    if (tempStat?.size > 1024 * 1024 && strategy.mode !== 'transcode') {
       return res.json({ ready: true, strategy: strategy.mode, cachePath: tempPath });
     }
 
