@@ -1423,6 +1423,11 @@ function PlayerPage() {
         .yt-btn.active {
           color: #ff0000;
         }
+        .yt-btn:focus-visible {
+          outline: 2px solid rgba(0, 255, 255, 0.7);
+          outline-offset: 3px;
+          box-shadow: 0 0 12px rgba(0, 255, 255, 0.35);
+        }
 
         /* Scrubber Styles */
         .yt-scrubber-wrap {
@@ -1457,7 +1462,12 @@ function PlayerPage() {
           cursor: pointer;
           height: 16px;
           z-index: 5;
-          outline: none;
+          outline: none;  /* mouse interaction */
+        }
+        .yt-scrubber:focus-visible {
+          outline: 2px solid rgba(0, 255, 255, 0.7);
+          outline-offset: 2px;
+          border-radius: 4px;
         }
         .yt-scrubber::-webkit-slider-runnable-track {
           background: transparent;
@@ -1494,6 +1504,10 @@ function PlayerPage() {
           transition: width 0.2s ease, opacity 0.2s ease, margin 0.2s ease;
           margin-left: 0px;
           accent-color: #ff0000;
+        }
+        .yt-volume-slider:focus-visible {
+          outline: 2px solid rgba(0, 255, 255, 0.7);
+          outline-offset: 2px;
         }
         .yt-volume-cluster:hover .yt-volume-slider,
         .yt-volume-slider:focus,
@@ -1756,6 +1770,7 @@ function PlayerPage() {
               onChange={handleScrubEnd}
               style={styles.scrubber}
               className="yt-scrubber"
+              aria-label="Seek video position"
             />
           </div>
 
@@ -1851,6 +1866,7 @@ function PlayerPage() {
                     value={isMuted ? 0 : volume}
                     onChange={handleVolumeChange}
                     className="yt-volume-slider"
+                    aria-label="Volume"
                   />
                 </div>
               </div>
@@ -2352,6 +2368,7 @@ function PlayerPage() {
                   onInput={handleScrubChange}
                   onChange={handleScrubEnd}
                   style={styles.mobileScrubber}
+                  aria-label="Seek video position"
                 />
               </div>
               <div style={styles.mobileTimeRow}>

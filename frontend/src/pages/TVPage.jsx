@@ -373,6 +373,7 @@ export default function TVPage() {
                 onChange={(event) => setSearchText(event.target.value)}
                 placeholder="Search channels..."
                 style={styles.searchInput}
+                aria-label="Search channels"
               />
             </div>
 
@@ -778,7 +779,6 @@ const styles = {
     minWidth: 0,
     background: "transparent",
     border: "none",
-    outline: "none",
     color: "var(--text-primary)",
   },
   categoryRow: {
