@@ -563,68 +563,6 @@
     box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
 }
 
-.carouselDots {
-    position: absolute;
-    left: 50%;
-    bottom: 18px;
-    transform: translateX(-50%);
-    z-index: 3;
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    justify-content: center;
-    padding: 10px 14px;
-    border-radius: 999px;
-    background: rgba(7,17,31,0.52);
-    border: 1px solid rgba(255,255,255,0.08);
-    backdrop-filter: blur(14px);
-}
-
-.dot {
-    width: 10px;
-    height: 10px;
-    padding: 0;
-    border-radius: 999px;
-    background: rgba(255,255,255,0.32);
-    border: none;
-    cursor: pointer;
-}
-
-.dotActive {
-    width: 30px;
-    height: 10px;
-    padding: 0;
-    border-radius: 999px;
-    background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
-    box-shadow: 0 0 18px rgba(121, 228, 255, 0.22);
-    border: none;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: width 200ms ease;
-}
-
-.dotEllipsis {
-    color: rgba(255, 255, 255, 0.4);
-    font-size: 0.75rem;
-    line-height: 1;
-    letter-spacing: 0.05em;
-    user-select: none;
-    align-self: center;
-}
-
-.slideCounter {
-    margin-left: 6px;
-    padding-left: 8px;
-    border-left: 1px solid rgba(255,255,255,0.15);
-    color: rgba(255, 255, 255, 0.5);
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    white-space: nowrap;
-    align-self: center;
-    line-height: 1;
-}
-
 /* Tablet Styles */
 @media (max-width: 1024px) {
     .hero {
@@ -767,23 +705,6 @@
     .navArrowRight,
     .navigationArrows {
         display: none;
-    }
-
-    .carouselDots {
-        bottom: 10px;
-        gap: 6px;
-        padding: 6px 10px;
-        background: rgba(7,17,31,0.6);
-    }
-
-    .dot {
-        width: 8px;
-        height: 8px;
-    }
-
-    .dotActive {
-        width: 24px;
-        height: 8px;
     }
 }
 
