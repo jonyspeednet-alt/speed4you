@@ -294,18 +294,9 @@ jobs:
               echo "gzip enabled"
             fi
 
-            # Write cache snippet file (always idempotent)
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' tee /etc/nginx/portal-cache.conf > /dev/null <<'NGINX_EOF'
-location ~ ^/portal/assets/ {
-    expires 1y;
-    add_header Cache-Control "public, immutable";
-    add_header Vary "Accept-Encoding";
-}
-location = /portal/index.html {
-    expires -1;
-    add_header Cache-Control "no-cache, no-store, must-revalidate";
-}
-NGINX_EOF
+            # Write cache snippet file (always idempotent) — printf avoids YAML heredoc-indent clash
+            printf 'location ~ ^/portal/assets/ {\n    expires 1y;\n    add_header Cache-Control "public, immutable";\n    add_header Vary "Accept-Encoding";\n}\nlocation = /portal/index.html {\n    expires -1;\n    add_header Cache-Control "no-cache, no-store, must-revalidate";\n}\n' > /tmp/portal-cache.conf
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp /tmp/portal-cache.conf /etc/nginx/portal-cache.conf
             echo "Cache snippet written"
 
             # Add include directive to the /portal location block
