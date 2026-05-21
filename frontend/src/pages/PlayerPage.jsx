@@ -170,6 +170,7 @@ function PlayerPage() {
   const [scrubTime, setScrubTime] = useState(0);
   const hasOptimizedFallbackedRef = useRef(false);
   const streamUrlBaseRef = useRef("");
+  const isSeekingRef = useRef(false);
 
   const swipeStartRef = useRef(null);
   const swipeCurrentRef = useRef(null);
@@ -243,7 +244,7 @@ function PlayerPage() {
 
   const upgradeToOptimizedStream = useCallback(
     (baseUrl) => {
-      if (!baseUrl || !videoRef.current || hasOptimizedFallbackedRef.current) {
+      if (!baseUrl || !videoRef.current || hasOptimizedFallbackedRef.current || isSeekingRef.current) {
         return;
       }
 
@@ -296,6 +297,7 @@ function PlayerPage() {
       typeof window === "undefined" ||
       !isMobile ||
       hasOptimizedFallbackedRef.current ||
+      isSeekingRef.current ||
       streamMode === "optimized" ||
       !streamUrlBaseRef.current
     ) {
@@ -965,6 +967,7 @@ function PlayerPage() {
   const handleScrubStart = () => {
     setIsScrubbing(true);
     setShowControls(true);
+    isSeekingRef.current = true;
   };
 
   const handleScrubChange = (event) => {
@@ -977,6 +980,7 @@ function PlayerPage() {
     const nextPosition = Number(event.target.value);
     setIsScrubbing(false);
     setShowControls(false);
+    isSeekingRef.current = false;
     commitScrub(nextPosition);
   };
 
@@ -1254,7 +1258,8 @@ function PlayerPage() {
           if (
             (event.target.videoWidth === 0 || event.target.videoHeight === 0) &&
             streamMode !== "optimized" &&
-            streamUrlBaseRef.current
+            streamUrlBaseRef.current &&
+            !isSeekingRef.current
           ) {
             upgradeToOptimizedStream(streamUrlBaseRef.current);
           }
