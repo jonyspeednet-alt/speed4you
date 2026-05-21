@@ -1,6 +1,25 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import WatchlistButton from "../ui/WatchlistButton";
+
+/**
+ * Convert TMDB poster URL to appropriate size
+ * TMDB sizes: w92, w154, w185, w342, w500, w780, original
+ */
+function getTmdbPosterSrc(url, targetSize = 'w342') {
+  if (!url) return url;
+  // Only transform TMDB image URLs
+  if (url.includes('image.tmdb.org/t/p/')) {
+    return url.replace(/\/t\/p\/[^/]+\//, `/t/p/${targetSize}/`);
+  }
+  return url;
+}
+
+function getTmdbSrcSet(url) {
+  if (!url || !url.includes('image.tmdb.org/t/p/')) return undefined;
+  const base = url.replace(/\/t\/p\/[^/]+\//, '/t/p/');
+  return `${base}w185 185w, ${base}w342 342w, ${base}w500 500w`;
+}
 
 function ContentCard({
   item,
@@ -80,9 +99,12 @@ function ContentCard({
             </div>
           ) : null}
           <img
-            src={item.poster}
+            src={getTmdbPosterSrc(item.poster, compact ? 'w185' : 'w342')}
+            srcSet={getTmdbSrcSet(item.poster)}
+            sizes={compact ? '(max-width: 480px) 148px, 156px' : '(max-width: 1024px) 196px, 220px'}
             alt={item.title}
             loading={eager ? "eager" : "lazy"}
+            decoding="async"
             fetchPriority={eager ? "high" : "low"}
             style={{
               ...styles.poster,
