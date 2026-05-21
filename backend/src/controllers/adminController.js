@@ -222,18 +222,18 @@ exports.vacuumDatabase = async (req, res) => {
   res.json(await vacuumDatabase());
 };
 
-exports.uploadPoster = (req, res, next) => {
+exports.uploadPoster = async (req, res, next) => {
   try {
-    const assetUrl = req.file ? saveBufferAsset(req.file, 'posters') : saveDataUrlAsset(req.body?.dataUrl, 'posters');
+    const assetUrl = req.file ? await saveBufferAsset(req.file, 'posters') : await saveDataUrlAsset(req.body?.dataUrl, 'posters');
     res.status(201).json({ url: assetUrl });
   } catch (error) {
     next(new AppError(error.message || 'Poster upload failed.', 400, 'BAD_REQUEST'));
   }
 };
 
-exports.uploadBanner = (req, res, next) => {
+exports.uploadBanner = async (req, res, next) => {
   try {
-    const assetUrl = req.file ? saveBufferAsset(req.file, 'banners') : saveDataUrlAsset(req.body?.dataUrl, 'banners');
+    const assetUrl = req.file ? await saveBufferAsset(req.file, 'banners') : await saveDataUrlAsset(req.body?.dataUrl, 'banners');
     res.status(201).json({ url: assetUrl });
   } catch (error) {
     next(new AppError(error.message || 'Banner upload failed.', 400, 'BAD_REQUEST'));

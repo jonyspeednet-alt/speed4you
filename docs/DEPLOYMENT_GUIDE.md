@@ -284,9 +284,17 @@ ffmpeg -version
 ffprobe -version
 ```
 
-### Step 5: Configure Nginx Reverse Proxy
+### Step 5: Configure Nginx Reverse Proxy (with HTTP/2 support)
 
-Create an nginx configuration file that proxies API requests to the backend and serves frontend static files. The example below assumes the backend runs on port 4100 (adjust to match your `PORT` environment variable) and the frontend is served from `/var/www/html/portal`:
+Create an nginx configuration file that proxies API requests to the backend, serves frontend static files, and enables **HTTP/2 multiplexing**. Multiplexing allows the browser to download all JS, CSS, and media assets concurrently over a single connection, drastically reducing page load latency.
+
+> [!IMPORTANT]
+> **HTTP/2 Syntax by Nginx Version:**
+> - **Nginx >= 1.25:** The `http2` parameter on the `listen` directive is deprecated. Use the `http2 on;` directive inside the `server` block instead.
+> - **Nginx < 1.25:** Specify `http2` directly on the `listen` line (e.g., `listen 443 ssl http2;`).
+
+#### Option A: Modern Nginx Configuration (Nginx >= 1.25)
+Recommended configuration for newer Nginx versions on your production server `203.0.113.2`:
 
 ```nginx
 server {
@@ -298,7 +306,8 @@ server {
 }
 
 server {
-    listen 443 ssl http2;
+    listen 443 ssl;
+    http2 on; # Modern directive to enable HTTP/2
     server_name <YOUR_DOMAIN>;
 
     ssl_certificate     /etc/ssl/certs/<YOUR_SSL_CERT>;
@@ -332,7 +341,26 @@ server {
 }
 ```
 
-After creating the configuration, test and reload nginx:
+#### Option B: Legacy Nginx Configuration (Nginx < 1.25)
+If your server is running an older Nginx version, use:
+
+```nginx
+server {
+    listen 443 ssl http2; # Older style inline parameter
+    server_name <YOUR_DOMAIN>;
+    # ... rest of the ssl and location configuration same as Option A ...
+}
+```
+
+#### Verifying HTTP/2 Activation
+After reloading Nginx, check if HTTP/2 is active on server `203.0.113.2` using curl:
+```bash
+curl -I --http2 -s https://<YOUR_DOMAIN>/portal/ | grep -i HTTP
+```
+Expected output showing the HTTP/2 protocol (`HTTP/2` or `h2`):
+`HTTP/2 200`
+
+After creating or updating the configuration, test and reload nginx:
 
 ```bash
 sudo nginx -t
