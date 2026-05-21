@@ -2,6 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const { Readable } = require('stream');
 const { getItemById } = require('../data/store');
 const { loadScannerRoots } = require('../data/store');
 const { AppError } = require('../utils/error');
@@ -298,6 +299,134 @@ function streamFileDirect(resolvedPath, req, res) {
   fs.createReadStream(resolvedPath, { start, end }).pipe(res);
 }
 
+function waitForFileSize(filePath, minSize, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const check = () => {
+      try {
+        const stat = fs.statSync(filePath);
+        if (stat.size >= minSize) {
+          resolve(stat.size);
+          return;
+        }
+      } catch {}
+      if (Date.now() - start >= timeoutMs) {
+        reject(new Error(`waitForFileSize timeout ${filePath}`));
+        return;
+      }
+      setTimeout(check, 200);
+    };
+    check();
+  });
+}
+
+function createTailStream(filePath, maxSize) {
+  let pos = 0;
+  let ended = false;
+  let pollTimer = null;
+
+  const stream = new Readable({
+    read(size) {
+      if (ended) {
+        this.push(null);
+        return;
+      }
+      try {
+        const stat = fs.statSync(filePath);
+        const available = Math.max(0, stat.size - pos);
+        if (available > 0) {
+          const toRead = Math.min(size, available, maxSize ? maxSize - pos : Infinity);
+          if (toRead <= 0) {
+            ended = true;
+            this.push(null);
+            return;
+          }
+          const buf = Buffer.alloc(toRead);
+          const fd = fs.openSync(filePath, 'r');
+          const bytesRead = fs.readSync(fd, buf, 0, toRead, pos);
+          fs.closeSync(fd);
+          pos += bytesRead;
+          this.push(bytesRead < toRead ? buf.subarray(0, bytesRead) : buf);
+          return;
+        }
+        if (maxSize && pos >= maxSize) {
+          ended = true;
+          this.push(null);
+          return;
+        }
+        pollTimer = setTimeout(() => stream._read(size), 200);
+      } catch (err) {
+        if (err.code === 'ENOENT') {
+          pollTimer = setTimeout(() => stream._read(size), 200);
+        } else {
+          stream.destroy(err);
+        }
+      }
+    },
+  });
+
+  stream._tailEnd = () => { ended = true; clearTimeout(pollTimer); };
+  return stream;
+}
+
+function serveGrowingFile(tempPath, totalSize, req, res) {
+  const range = req.headers.range;
+
+  res.setHeader('Accept-Ranges', 'bytes');
+  res.setHeader('Content-Type', 'video/mp4');
+  res.setHeader('Cache-Control', 'private, no-store');
+
+  if (range) {
+    const [startText, endText] = String(range).replace(/bytes=/, '').split('-');
+    const start = Number.parseInt(startText, 10);
+
+    if (!Number.isFinite(start) || start < 0 || start >= totalSize) {
+      res.status(416).setHeader('Content-Range', `bytes */${totalSize}`).end();
+      return;
+    }
+
+    const requestedEnd = endText ? Number.parseInt(endText, 10) : totalSize - 1;
+
+    const tryServe = () => {
+      try {
+        const stat = fs.statSync(tempPath);
+        if (stat.size > start) {
+          const end = Math.min(requestedEnd, stat.size - 1, totalSize - 1);
+          if (start <= end) {
+            res.status(206);
+            res.setHeader('Content-Range', `bytes ${start}-${end}/${totalSize}`);
+            res.setHeader('Content-Length', end - start + 1);
+            fs.createReadStream(tempPath, { start, end }).pipe(res);
+            return true;
+          }
+        }
+      } catch {}
+      return false;
+    };
+
+    if (tryServe()) return;
+
+    const timeout = setTimeout(() => {
+      clearInterval(poll);
+      res.status(416).setHeader('Content-Range', `bytes */${totalSize}`).end();
+    }, 30000);
+
+    const poll = setInterval(() => {
+      if (tryServe()) { clearInterval(poll); clearTimeout(timeout); }
+    }, 500);
+
+    res.on('close', () => { clearInterval(poll); clearTimeout(timeout); });
+    return;
+  }
+
+  res.status(200);
+  res.setHeader('Content-Length', totalSize);
+
+  const stream = createTailStream(tempPath, totalSize);
+  stream.pipe(res);
+  res.on('close', () => { stream._tailEnd(); stream.destroy?.(); });
+}
+
 function transcodeToMp4(resolvedPath, res) {
   res.status(200);
   res.setHeader('Content-Type', 'video/mp4');
@@ -399,7 +528,13 @@ function ensureOptimizedCache(selection, resolvedPath, strategy) {
         return;
       }
 
-      fs.renameSync(tempPath, cachePath);
+      try {
+        fs.renameSync(tempPath, cachePath);
+      } catch (renameError) {
+        logger.warn('Cache rename failed (file may be in use): ' + renameError.message);
+        resolve({ status: 'ready', cachePath: tempPath });
+        return;
+      }
       resolve({ status: 'ready', cachePath });
     });
   });
@@ -516,7 +651,28 @@ router.get('/stream/:contentType/:id', async (req, res, next) => {
     }
 
 
+    ensureOptimizedCache(selection, resolvedPath, strategy).catch(() => {});
+
+    const tempPath = `${cachePath}.part.mp4`;
+    const inputStat = safeStat(resolvedPath);
+    const inputSize = inputStat ? inputStat.size : 0;
+
+    if (inputSize > 0 && (strategy.mode === 'remux-copy' || strategy.mode === 'copy-video-transcode-audio')) {
+      try {
+        await waitForFileSize(tempPath, 4096, 15000);
+        serveGrowingFile(tempPath, inputSize, req, res);
+        return;
+      } catch {
+        logger.warn('Growing file not ready in time, falling back to pipe');
+      }
+    }
+
     if (req.query.requireOptimized === '1') {
+      const optTempStat = safeStat(tempPath);
+      if (optTempStat && optTempStat.size >= PLAYER_CACHE_READY_MIN_BYTES && inputSize > 0 && (strategy.mode === 'remux-copy' || strategy.mode === 'copy-video-transcode-audio')) {
+        serveGrowingFile(tempPath, inputSize, req, res);
+        return;
+      }
       throw new AppError('Optimized stream is still preparing', 425, 'TOO_EARLY');
     }
 
@@ -661,6 +817,12 @@ router.get('/prepare/:contentType/:id', async (req, res, next) => {
     const cacheStat = fs.existsSync(cachePath) ? safeStat(cachePath) : null;
     if (cacheStat?.size > 1024 * 1024) {
       return res.json({ ready: true, strategy: strategy.mode, cachePath });
+    }
+
+    const tempPath = `${cachePath}.part.mp4`;
+    const tempStat = fs.existsSync(tempPath) ? safeStat(tempPath) : null;
+    if (tempStat?.size > 1024 * 1024) {
+      return res.json({ ready: true, strategy: strategy.mode, cachePath: tempPath });
     }
 
     ensureOptimizedCache(selection, resolvedPath, strategy).catch((error) => {

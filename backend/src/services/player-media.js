@@ -254,7 +254,7 @@ function getFfmpegFileArgs(resolvedPath, outputPath, strategyMode) {
       ...common,
       '-c:v', 'copy',
       '-c:a', 'copy',
-      '-movflags', '+faststart',
+      '-movflags', 'frag_keyframe+empty_moov',
       outputPath,
     ];
   }
@@ -265,7 +265,7 @@ function getFfmpegFileArgs(resolvedPath, outputPath, strategyMode) {
       '-c:v', 'copy',
       '-c:a', 'aac',
       '-b:a', process.env.PLAYER_AUDIO_BITRATE || '160k',
-      '-movflags', '+faststart',
+      '-movflags', 'frag_keyframe+empty_moov',
       outputPath,
     ];
   }
@@ -273,7 +273,7 @@ function getFfmpegFileArgs(resolvedPath, outputPath, strategyMode) {
   return [
     ...common,
     ...getUniversalTranscodeArgs([
-      '-movflags', '+faststart',
+      '-movflags', 'frag_keyframe+empty_moov',
       outputPath,
     ]),
   ];
