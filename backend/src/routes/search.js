@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getRecentSearches, getSuggestions, recordRecentSearch, searchItems, recordSearchAnalytics, getTrendingSearches } = require('../data/store');
+const { getRecentSearches, getSuggestions, recordRecentSearch, searchItems, recordSearchAnalytics, getTrendingSearches, toCardItem } = require('../data/store');
 const { Joi, validateQuery } = require('../middleware/validate');
 const { resolveUserId } = require('../middleware/resolve-user-id');
 
@@ -59,7 +59,7 @@ router.get('/', validateQuery(searchQuerySchema), async (req, res, next) => {
     recordSearchAnalytics(q, results.length, userId).catch(() => {});
 
     res.json({
-      results: pagedResults,
+      results: pagedResults.map(toCardItem),
       total: results.length,
       suggestions: await getSuggestions(q, 8),
       page,

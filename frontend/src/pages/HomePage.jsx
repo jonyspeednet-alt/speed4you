@@ -197,7 +197,7 @@ function writeHomepageCache(value) {
 }
 
 async function fetchAllPublishedCatalog() {
-  const limit = 150;
+  const limit = 50;
   let page = 1;
   let hasMore = true;
   const allItems = [];
@@ -207,7 +207,7 @@ async function fetchAllPublishedCatalog() {
     allItems.push(...(response?.items || []));
     hasMore = Boolean(response?.hasMore) && (response?.items?.length || 0) > 0;
     page += 1;
-    if (page > 5) hasMore = false; // Safety break
+    if (page > 2) hasMore = false;
   }
 
   return uniqueById(allItems);

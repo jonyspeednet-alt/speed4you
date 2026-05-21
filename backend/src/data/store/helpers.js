@@ -228,6 +228,39 @@ function attachDuplicateMetadata(item, groups) {
   };
 }
 
+function toCardItem(item) {
+  const genres = resolveDisplayGenres(item);
+  return {
+    id: item.id,
+    title: item.title || '',
+    type: item.type || 'movie',
+    poster: item.poster || '',
+    backdrop: item.backdrop || '',
+    thumbnail: item.thumbnail || '',
+    genre: item.genre || genres.join(', '),
+    genres,
+    year: item.year ? Number(item.year) : null,
+    rating: item.rating ? Number(item.rating) : null,
+    language: item.language || '',
+    description: item.description || '',
+    runtime: item.runtime || item.runtimeMinutes || null,
+    seasonCount: item.seasonCount ? Number(item.seasonCount) : 0,
+    episodeCount: item.episodeCount ? Number(item.episodeCount) : 0,
+    featured: Boolean(item.featured),
+    trendingScore: Number(item.trendingScore || 0),
+    slug: item.slug || '',
+    status: item.status || 'published',
+    category: item.category || '',
+    collection: item.collection || '',
+    tags: normalizeStringList(item.tags),
+    videoUrl: item.videoUrl || '',
+    createdAt: item.createdAt || '',
+    updatedAt: item.updatedAt || '',
+    publishedAt: item.publishedAt || '',
+    releasedAt: item.releasedAt || '',
+  };
+}
+
 module.exports = {
   normalizeTitleKey,
   clampNumber,
@@ -243,5 +276,6 @@ module.exports = {
   resolveDisplayGenres,
   normalizeStringList,
   normalizeItem,
+  toCardItem,
   attachDuplicateMetadata,
 };
