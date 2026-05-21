@@ -560,8 +560,14 @@
 .progressBar {
     height: 100%;
     background: linear-gradient(90deg, var(--accent-cyan), var(--accent-secondary));
-    transition: width 50ms linear;
+    animation: progressGrow 3.2s linear;
+    animation-fill-mode: forwards;
     box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
+}
+
+@keyframes progressGrow {
+    from { width: 0%; }
+    to { width: 100%; }
 }
 
 /* Tablet Styles */
