@@ -1,8 +1,10 @@
-function SelectField({ value, onChange, options, label, placeholder, ...props }) {
+function SelectField({ value, onChange, options, label, placeholder, id, ...props }) {
+  const selectId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
   return (
     <div style={styles.container}>
-      {label && <label style={styles.label}>{label}</label>}
+      {label && <label htmlFor={selectId} style={styles.label}>{label}</label>}
       <select
+        id={selectId}
         value={value}
         onChange={onChange}
         style={styles.select}
@@ -34,7 +36,6 @@ const styles = {
     borderRadius: 'var(--radius-md)',
     color: 'var(--text-primary)',
     fontSize: '1rem',
-    outline: 'none',
     cursor: 'pointer',
   },
 };

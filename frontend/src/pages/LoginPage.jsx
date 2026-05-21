@@ -198,7 +198,6 @@ const styles = {
     borderRadius: "var(--radius-md)",
     color: "var(--text-primary)",
     fontSize: "1rem",
-    outline: "none",
     transition: "border-color 180ms ease, box-shadow 180ms ease",
   },
   inputFocused: {

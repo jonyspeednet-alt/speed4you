@@ -461,7 +461,6 @@ const styles = {
   searchInput: {
     flex: 1,
     border: 'none',
-    outline: 'none',
     background: 'transparent',
     color: 'var(--text-primary)',
     fontSize: '0.95rem',
