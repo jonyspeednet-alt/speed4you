@@ -304,7 +304,7 @@ export function ResponsiveAspectRatio({
       {...props}
     >
       {typeof children === 'string' ? (
-        <img src={children} style={childStyle} alt="" />
+        <img src={children} loading="lazy" style={childStyle} alt="" />
       ) : (
         <div style={childStyle}>{children}</div>
       )}

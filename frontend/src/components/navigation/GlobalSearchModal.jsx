@@ -170,7 +170,7 @@ function GlobalSearchModal() {
                   onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                 >
-                  <img src={item.poster || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=50'} alt="" style={styles.thumb} />
+                  <img src={item.poster || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=50'} alt="" loading="lazy" style={styles.thumb} />
                   <div style={styles.info}>
                     <span style={styles.title}>{item.title}</span>
                     <span style={styles.meta}>{item.type === 'series' ? 'Series' : 'Movie'} • {item.year || 'N/A'}</span>

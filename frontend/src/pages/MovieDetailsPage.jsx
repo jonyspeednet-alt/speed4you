@@ -124,6 +124,7 @@ export default function MovieDetailsPage() {
             src={backdropError ? posterFallback : (movie.backdrop || movie.poster || posterFallback)}
             alt=""
             style={s.backdropImg}
+            loading="lazy"
             onError={() => setBackdropError(true)}
           />
           <div style={s.backdropOverlay} />
@@ -139,6 +140,7 @@ export default function MovieDetailsPage() {
               src={posterError ? posterFallback : (movie.poster || posterFallback)}
               alt={movie.title}
               style={s.poster}
+              loading="lazy"
               onError={() => setPosterError(true)}
             />
             <div style={s.posterGlow} />

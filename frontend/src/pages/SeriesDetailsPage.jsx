@@ -235,6 +235,7 @@ export default function SeriesDetailsPage() {
             src={backdropError ? posterFallback : (series.backdrop || series.poster || posterFallback)}
             alt=""
             style={s.backdropImg}
+            loading="lazy"
             onError={() => setBackdropError(true)}
           />
           <div style={s.backdropOverlay} />
@@ -249,6 +250,7 @@ export default function SeriesDetailsPage() {
               src={posterError ? posterFallback : (series.poster || posterFallback)}
               alt={series.title}
               style={s.poster}
+              loading="lazy"
               onError={() => setPosterError(true)}
             />
             <div style={s.posterGlow} />
