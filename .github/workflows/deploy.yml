@@ -291,15 +291,25 @@ jobs:
               CHANGED=1
             fi
 
-            # Add cache headers to the /portal location block
-            if grep -q 'location /portal' "$CONF" && ! grep -q 'expires' "$CONF"; then
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i '/location \/portal {/a\        expires 1y;\n        add_header Cache-Control "public, immutable";\n\n        # Never cache index.html — so new deploys bust chunk URLs\n        location ~ index\.html$ {\n            expires -1;\n            add_header Cache-Control "no-cache, no-store, must-revalidate";\n        }' "$CONF"
-              echo "Cache headers added (index.html excluded)"
+            # Add cache & no-cache headers if not already present
+            if ! grep -q '/portal/assets/.*expires' "$CONF"; then
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i '/^server {/a\
+                # Cache portal static assets (hash-based URLs are immutable)\
+                location ~ ^/portal/assets/ {\
+                    expires 1y;\
+                    add_header Cache-Control "public, immutable";\
+                    add_header Vary "Accept-Encoding";\
+                }\
+            \
+                # Never cache portal index.html — so new deploys bust chunk URLs\
+                location = /portal/index.html {\
+                    expires -1;\
+                    add_header Cache-Control "no-cache, no-store, must-revalidate";\
+                }' "$CONF"
+              echo "Cache headers added (assets 1y, index.html no-cache)"
               CHANGED=1
-            elif grep -q 'location /portal' "$CONF" && ! grep -q 'index\.html' "$CONF"; then
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i '/location \/portal {/a\        # Never cache index.html — so new deploys bust chunk URLs\n        location ~ index\.html$ {\n            expires -1;\n            add_header Cache-Control "no-cache, no-store, must-revalidate";\n        }' "$CONF"
-              echo "index.html cache exclusion added"
-              CHANGED=1
+            else
+              echo "Cache headers already present"
             fi
 
             if [ "$CHANGED" = "1" ]; then
@@ -339,6 +349,12 @@ jobs:
             echo "Nginx is serving index.html for asset URLs — check try_files config." >&2
             exit 1
           fi
+
+          # Verify cache headers on JS assets
+          cache_headers=$(curl -fsSL -I "https://data.speed4you.net/portal/assets/react-vendor-c37b7f41.js?dv=${{ github.run_id }}" 2>&1 | grep -iE 'cache-control|expires')
+          echo "Asset cache headers:"
+          echo "$cache_headers"
+          echo "$cache_headers" | grep -qi 'immutable' || echo "WARNING: Asset cache headers missing"
 
       - name: Deployment summary
         run: |
