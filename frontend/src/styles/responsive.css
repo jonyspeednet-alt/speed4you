@@ -1056,7 +1056,6 @@
         scroll-snap-stop: normal;
         overscroll-behavior-x: contain;
         touch-action: auto;
-        overflow-y: hidden;
         padding-left: 12px;
         padding-right: 12px;
     }
