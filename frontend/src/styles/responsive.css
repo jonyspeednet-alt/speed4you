@@ -1032,11 +1032,13 @@
     }
 
     .content-rail-actions {
-        width: 100%;
         justify-content: flex-end;
         flex-shrink: 0;
-        gap: 4px;
-        padding: 2px;
+        gap: 4px !important;
+        padding: 2px !important;
+        background: none !important;
+        border: none !important;
+        backdrop-filter: none !important;
     }
 
     .content-rail-view-all {
