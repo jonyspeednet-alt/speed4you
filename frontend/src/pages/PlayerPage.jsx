@@ -172,6 +172,7 @@ function PlayerPage() {
   const streamUrlBaseRef = useRef("");
   const isSeekingRef = useRef(false);
   const pendingSeekTargetRef = useRef(null);
+  const preSeekTimeRef = useRef(0);
 
   const swipeStartRef = useRef(null);
   const swipeCurrentRef = useRef(null);
@@ -369,6 +370,7 @@ function PlayerPage() {
         case "j":
         case "arrowleft":
           e.preventDefault();
+          preSeekTimeRef.current = video.currentTime;
           pendingSeekTargetRef.current = Math.max(0, video.currentTime - 10);
           video.currentTime = Math.max(0, video.currentTime - 10);
           setToastData({ icon: "rewind", value: "-10s" });
@@ -376,6 +378,7 @@ function PlayerPage() {
         case "l":
         case "arrowright":
           e.preventDefault();
+          preSeekTimeRef.current = video.currentTime;
           pendingSeekTargetRef.current = Math.min(
             video.duration || 0,
             video.currentTime + 10,
@@ -796,6 +799,7 @@ function PlayerPage() {
           0,
           duration || videoRef.current.currentTime + 10,
         );
+        preSeekTimeRef.current = videoRef.current.currentTime;
         pendingSeekTargetRef.current = nextTime;
         videoRef.current.currentTime = nextTime;
         setCurrentTime(nextTime);
@@ -809,6 +813,7 @@ function PlayerPage() {
           0,
           duration || videoRef.current.currentTime,
         );
+        preSeekTimeRef.current = videoRef.current.currentTime;
         pendingSeekTargetRef.current = nextTime;
         videoRef.current.currentTime = nextTime;
         setCurrentTime(nextTime);
@@ -956,6 +961,7 @@ function PlayerPage() {
       0,
       duration || videoRef.current.currentTime + seconds,
     );
+    preSeekTimeRef.current = videoRef.current.currentTime;
     pendingSeekTargetRef.current = nextTime;
     videoRef.current.currentTime = nextTime;
     setCurrentTime(nextTime);
@@ -968,6 +974,7 @@ function PlayerPage() {
       return;
     }
 
+    preSeekTimeRef.current = videoRef.current.currentTime;
     pendingSeekTargetRef.current = nextPosition;
     videoRef.current.currentTime = nextPosition;
     setCurrentTime(nextPosition);
@@ -1281,11 +1288,8 @@ function PlayerPage() {
         onSeeking={clearInvisibleVideoCheck}
         onSeeked={(event) => {
           if (pendingSeekTargetRef.current === null || isSeekingRef.current) return;
-          const target = pendingSeekTargetRef.current;
-          const actual = event.target.currentTime;
-          if (actual < 0.5 && target > 5) {
-            event.target.currentTime = target;
-            return;
+          if (event.target.currentTime < 0.5 && pendingSeekTargetRef.current > 5) {
+            event.target.currentTime = preSeekTimeRef.current;
           }
           pendingSeekTargetRef.current = null;
         }}
