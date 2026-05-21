@@ -6,9 +6,6 @@ on:
       - main
   workflow_dispatch:
 
-concurrency:
-  group: production-deploy
-  cancel-in-progress: true
 
 jobs:
   deploy:
