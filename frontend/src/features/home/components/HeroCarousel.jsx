@@ -204,7 +204,8 @@ function HeroCarousel({ content, items }) {
                     <img
                         ref={bgRef}
                         key={activeIndex} // Force re-render for transition
-                        src={backdrop}
+                        src={backdrop.includes('image.tmdb.org') ? backdrop.replace(/\/t\/p\/[^/]+\//, '/t/p/w1280/') : backdrop}
+                        srcSet={backdrop.includes('image.tmdb.org') ? backdrop.replace(/\/t\/p\/[^/]+\//, '/t/p/w780/') + ' 780w, ' + backdrop.replace(/\/t\/p\/[^/]+\//, '/t/p/w1280/') + ' 1280w' : undefined}
                         alt={title}
                         className={styles.bgImage}
                         loading="eager" fetchPriority="high" decoding="async" sizes="100vw"
