@@ -41,7 +41,7 @@ function PwaInstallBanner() {
   return (
     <div style={styles.banner}>
       <div style={styles.content}>
-        <img src="/favicon.svg" alt="App Icon" style={styles.icon} />
+        <img src="/favicon.svg" alt="App Icon" loading="lazy" style={styles.icon} />
         <div style={styles.textWrap}>
           <strong style={styles.title}>Install ISP Portal</strong>
           <span style={styles.subtitle}>Add to home screen for quick access</span>

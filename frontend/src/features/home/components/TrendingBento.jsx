@@ -64,6 +64,7 @@ function BentoItem({ item, index, isLarge, tv }) {
       <img 
         src={isLarge ? (item.backdrop || item.poster) : item.poster} 
         alt={item.title} 
+        loading="lazy"
         style={{
           ...styles.image,
           ...(hovered ? styles.imageHovered : {})
