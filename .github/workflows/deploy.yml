@@ -246,8 +246,12 @@ jobs:
 
             # Add cache headers to the /portal location block
             if grep -q 'location /portal' "$CONF" && ! grep -q 'expires' "$CONF"; then
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i '/location \/portal {/a\        expires 1y;\n        add_header Cache-Control "public, immutable";' "$CONF"
-              echo "Cache headers added"
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i '/location \/portal {/a\        expires 1y;\n        add_header Cache-Control "public, immutable";\n\n        # Never cache index.html — so new deploys bust chunk URLs\n        location ~ index\.html$ {\n            expires -1;\n            add_header Cache-Control "no-cache, no-store, must-revalidate";\n        }' "$CONF"
+              echo "Cache headers added (index.html excluded)"
+              CHANGED=1
+            elif grep -q 'location /portal' "$CONF" && ! grep -q 'index\.html' "$CONF"; then
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i '/location \/portal {/a\        # Never cache index.html — so new deploys bust chunk URLs\n        location ~ index\.html$ {\n            expires -1;\n            add_header Cache-Control "no-cache, no-store, must-revalidate";\n        }' "$CONF"
+              echo "index.html cache exclusion added"
               CHANGED=1
             fi
 
