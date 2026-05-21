@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-visual" />
 
-  <!-- Prevent Caching -->
+  <!-- Prevent Caching for HTML only (assets use hash-based cache busting) -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
@@ -23,14 +23,21 @@
 
   <!-- SEO -->
   <meta name="description"
-    content="ISP Entertainment Portal — Premium local streaming for movies, series, and live TV." />
-  <meta name="robots" content="noindex, nofollow" />
+    content="Speed4You Entertainment Portal — Stream movies, series, and live TV on your local network. Premium Bengali, Hindi, and English content." />
+  <meta name="robots" content="index, follow" />
+  <meta name="keywords" content="streaming, movies, series, live TV, ISP portal, Bengali movies, local network, entertainment" />
+  <link rel="canonical" href="https://data.speed4you.net/portal/" />
 
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="ISP Entertainment Portal" />
-  <meta property="og:description" content="Premium local streaming for movies, series, and live TV." />
-  <meta property="og:image" content="icons.svg" />
+  <meta property="og:title" content="Speed4You Entertainment Portal" />
+  <meta property="og:description" content="Stream movies, series, and live TV. Premium Bengali, Hindi, and English content on your local network." />
+  <meta property="og:image" content="/portal/favicon.svg" />
+  <meta property="og:url" content="https://data.speed4you.net/portal/" />
+  <meta property="og:site_name" content="Speed4You" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Speed4You Entertainment Portal" />
+  <meta name="twitter:description" content="Stream movies, series, and live TV on your local network." />
 
   <!-- Favicon & Icons -->
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
@@ -39,7 +46,8 @@
 
   <!-- Preconnect for performance -->
   <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
-  <link rel="dns-prefetch" href="https://images.unsplash.com" />
+  <link rel="preconnect" href="https://image.tmdb.org" />
+  <link rel="dns-prefetch" href="https://image.tmdb.org" />
 
   <!-- Bengali font for better text rendering -->
   <link rel="preload" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap"
@@ -49,7 +57,7 @@
       href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap" />
   </noscript>
 
-  <title>ISP Entertainment Portal</title>
+  <title>Speed4You Entertainment Portal — Movies, Series & Live TV</title>
 </head>
 
 <body>
