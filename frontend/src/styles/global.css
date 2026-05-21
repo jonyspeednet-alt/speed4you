@@ -1168,7 +1168,6 @@ main,
   display: block;
   flex-shrink: 0;
   transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
-  will-change: transform;
 }
 
 .content-rail-card:hover {

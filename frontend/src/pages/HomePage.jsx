@@ -10,7 +10,6 @@ const posterFallback = '/portal/assets/poster-placeholder.svg';
 const RAIL_SIZE = 10;
 const HOMEPAGE_POOL_LIMIT = 40;
 const HOMEPAGE_CACHE_KEY = 'portal-homepage-cache-v2'; // Cache key updated
-const HOMEPAGE_COMPACT_THRESHOLD = 4;
 
 // ... (rest of the helper functions remain the same) ...
 
@@ -111,13 +110,12 @@ function pickFeatured(explicitFeatured, latestItems, popularItems, trendingItems
 
 function buildHomepageContent({
   featured, latest, popular, trending, series, continueWatching,
-  recommendations, localTrending, publishedCatalog
+  recommendations, localTrending
 }) {
   const latestItems = (latest || []).map(normalizeItem);
   const popularItems = (popular || []).map(normalizeItem);
   const trendingItems = (trending || []).map(normalizeItem);
   const homepageSeriesItems = (series || []).map(normalizeItem);
-  const publishedItems = (publishedCatalog || []).map(normalizeItem);
   const recommendationsItems = (recommendations || []).map(normalizeItem);
   const localTrendingItems = (localTrending || []).map(normalizeItem);
 
@@ -150,7 +148,7 @@ function buildHomepageContent({
 
   const continueIds = continueWatchingItems.map(item => item.id);
 
-  const featuredPool = publishedItems.length > 0 ? publishedItems : mergePools(latestItems, trendingItems, popularItems, homepageSeriesItems);
+  const featuredPool = mergePools(latestItems, trendingItems, popularItems, homepageSeriesItems);
   const featuredItems = pickFeatured(featured, featuredPool, [], []);
   const featuredIds = featuredItems.slice(0, 5).map(item => item.id);
 
@@ -196,24 +194,6 @@ function writeHomepageCache(value) {
   }
 }
 
-async function fetchAllPublishedCatalog() {
-  const limit = 50;
-  let page = 1;
-  let hasMore = true;
-  const allItems = [];
-
-  while (hasMore) {
-    const response = await contentService.browse({ page, limit, sort: 'latest' }).catch(() => ({ items: [], hasMore: false }));
-    allItems.push(...(response?.items || []));
-    hasMore = Boolean(response?.hasMore) && (response?.items?.length || 0) > 0;
-    page += 1;
-    if (page > 2) hasMore = false;
-  }
-
-  return uniqueById(allItems);
-}
-
-
 function HomePage() {
   const { isMobile } = useBreakpoint();
   const isTVMode = useTVMode();
@@ -229,14 +209,13 @@ function HomePage() {
       setLoading(true);
 
       try {
-        const continueWatchingResponse = await progressService.getContinueWatching().catch(() => ({ items: [] }));
-        const seedContentId = continueWatchingResponse?.items?.[0]?.id || recentlyViewed?.[0]?.id || '';
+        const seedContentId = recentlyViewed?.[0]?.id || '';
 
-        const [homepageResponse, recommendations, localTrending, publishedCatalog] = await Promise.all([
+        const [continueWatchingResponse, homepageResponse, recommendations, localTrending] = await Promise.all([
+          progressService.getContinueWatching().catch(() => ({ items: [] })),
           contentService.getHomepage(HOMEPAGE_POOL_LIMIT).catch(() => ({})),
           seedContentId ? contentService.getRecommendations(seedContentId).catch(() => ({ items: [] })) : Promise.resolve({ items: [] }),
           contentService.getLocalTrending().catch(() => ({ items: [] })),
-          fetchAllPublishedCatalog(),
         ]);
 
         const nextContent = buildHomepageContent({
@@ -244,7 +223,6 @@ function HomePage() {
           continueWatching: continueWatchingResponse?.items,
           recommendations: recommendations?.items,
           localTrending: localTrending?.items,
-          publishedCatalog
         });
 
         if (!cancelled) {

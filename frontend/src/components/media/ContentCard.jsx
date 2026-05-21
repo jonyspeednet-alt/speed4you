@@ -212,6 +212,7 @@ function ContentCard({
           contentId={item.id}
           title={item.title}
           compact
+          checkOnMount={false}
         />
       </div>
     </article>
@@ -243,7 +244,7 @@ const styles = {
     overflow: "hidden",
     background: "#0d1a2d",
     border: "1px solid rgba(255, 255, 255, 0.08)",
-    transition: "all 450ms cubic-bezier(0.34, 1.56, 0.64, 1)",
+    transition: "transform 450ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 450ms cubic-bezier(0.34, 1.56, 0.64, 1), border-color 450ms cubic-bezier(0.34, 1.56, 0.64, 1)",
   },
   poster: {
     width: "100%",

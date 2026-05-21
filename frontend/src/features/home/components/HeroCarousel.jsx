@@ -231,7 +231,7 @@ function HeroCarousel({ content, items }) {
                     <div className={styles.showcasePanel}>
                         <div className={styles.posterFrame}>
                             {poster ? (
-                                <img src={poster} alt={title} className={styles.posterImage} loading="eager" fetchPriority="high" decoding="async" />
+                                <img src={poster?.includes('image.tmdb.org/t/p/') ? poster.replace(/\/t\/p\/[^/]+\//, '/t/p/w342/') : poster} alt={title} className={styles.posterImage} loading="eager" fetchPriority="high" decoding="async" />
                             ) : (
                                 <div className={styles.posterPlaceholder} />
                             )}
@@ -250,7 +250,7 @@ function HeroCarousel({ content, items }) {
                                         aria-label={getAriaLabel(item, index)}
                                         aria-current={index === activeIndex}
                                     >
-                                        {item.poster ? <img src={item.poster} alt={item.title} className={styles.thumbnailImage} loading="lazy" decoding="async" /> : <div className={styles.thumbnailPlaceholder} />}
+                                        {item.poster ? <img src={item.poster?.includes('image.tmdb.org/t/p/') ? item.poster.replace(/\/t\/p\/[^/]+\//, '/t/p/w185/') : item.poster} alt={item.title} className={styles.thumbnailImage} loading="lazy" decoding="async" /> : <div className={styles.thumbnailPlaceholder} />}
                                         <div className={styles.thumbnailOverlay} />
                                         <span className={styles.thumbnailTitle}>{item.title || 'Featured item'}</span>
                                     </button>

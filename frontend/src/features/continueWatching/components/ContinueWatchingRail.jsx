@@ -26,7 +26,7 @@ function ContinueWatchingRail({ items, isLoading }) {
         {items.map((item) => (
           <Link key={item.id} to={`/watch/${item.id}`} className={styles.card}>
             <div className={styles.posterWrapper}>
-              <img src={item.poster} alt={item.title} className={styles.poster} loading="lazy" />
+              <img src={item.poster?.includes('image.tmdb.org/t/p/') ? item.poster.replace(/\/t\/p\/[^/]+\//, '/t/p/w342/') : item.poster} alt={item.title} className={styles.poster} loading="lazy" />
               <div className={styles.progressContainer}>
                 <div style={{ width: `${item.progress}%` }} className={styles.progressBar} />
               </div>
