@@ -134,6 +134,7 @@ function SearchPage() {
               onChange={(event) => setQuery(event.target.value)}
               style={styles.input}
               autoFocus
+              aria-label="Search titles, genres, languages, and years"
             />
             {hasVoiceSupport && (
               <button
@@ -338,7 +339,7 @@ const styles = {
     border: '1px solid rgba(255,255,255,0.08)',
   },
   searchIcon: { position: 'absolute', left: '24px', color: 'var(--text-muted)' },
-  input: { width: '100%', padding: '18px 160px 18px 54px', background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '1.05rem', outline: 'none' },
+  input: { width: '100%', padding: '18px 160px 18px 54px', background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '1.05rem' },
   clearBtn: { position: 'absolute', right: '12px', padding: '12px 18px', borderRadius: '999px', background: 'linear-gradient(135deg, var(--accent-red), #ff8a54)', color: '#fff', fontWeight: '700' },
   voiceBtn: { position: 'absolute', right: '100px', width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 150ms ease, color 150ms ease' },
   voiceBtnActive: { background: 'rgba(239,68,68,0.2)', borderColor: 'rgba(239,68,68,0.4)', color: '#f87171', animation: 'glowPulse 1s ease-in-out infinite' },

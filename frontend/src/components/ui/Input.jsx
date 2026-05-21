@@ -44,7 +44,6 @@ const styles = {
     borderRadius: 'var(--radius-md)',
     color: 'var(--text-primary)',
     fontSize: '1rem',
-    outline: 'none',
   },
   inputError: {
     borderColor: 'var(--accent-red)',

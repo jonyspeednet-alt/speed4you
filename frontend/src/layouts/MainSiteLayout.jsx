@@ -103,7 +103,6 @@ const styles = {
     fontWeight: "700",
     transform: "translateY(-140%)",
     transition: "transform 200ms ease",
-    outline: "none",
   },
   main: {
     flex: 1,

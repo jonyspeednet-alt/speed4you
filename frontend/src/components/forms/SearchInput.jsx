@@ -38,6 +38,7 @@ function SearchInput({
         onChange={handleChange}
         placeholder={placeholder}
         style={styles.input}
+        aria-label={placeholder}
       />
       {localValue && (
         <button onClick={handleClear} style={styles.clearBtn}>
@@ -69,7 +70,6 @@ const styles = {
     borderRadius: 'var(--radius-lg)',
     color: 'var(--text-primary)',
     fontSize: '1rem',
-    outline: 'none',
   },
   clearBtn: {
     position: 'absolute',

@@ -1365,8 +1365,9 @@ function ContentLibraryPage() {
 
             <div style={styles.filterGrid}>
               <div style={styles.field}>
-                <label style={styles.searchLabel}>Search</label>
+                <label htmlFor="lib-search" style={styles.searchLabel}>Search</label>
                 <input
+                  id="lib-search"
                   type="text"
                   value={searchInput}
                   onChange={(event) => setSearchInput(event.target.value)}
@@ -1375,24 +1376,24 @@ function ContentLibraryPage() {
                 />
               </div>
               <div style={styles.field}>
-                <label style={styles.searchLabel}>Status</label>
-                <select value={filters.status} onChange={(event) => updateFilter('status', event.target.value)} style={styles.select}>
+                <label htmlFor="lib-status" style={styles.searchLabel}>Status</label>
+                <select id="lib-status" value={filters.status} onChange={(event) => updateFilter('status', event.target.value)} style={styles.select}>
                   <option value="">All Status</option>
                   <option value="draft">Draft</option>
                   <option value="published">Published</option>
                 </select>
               </div>
               <div style={styles.field}>
-                <label style={styles.searchLabel}>Source</label>
-                <select value={filters.source} onChange={(event) => updateFilter('source', event.target.value)} style={styles.select}>
+                <label htmlFor="lib-source" style={styles.searchLabel}>Source</label>
+                <select id="lib-source" value={filters.source} onChange={(event) => updateFilter('source', event.target.value)} style={styles.select}>
                   <option value="">All Sources</option>
                   <option value="scanner">Scanner</option>
                   <option value="manual">Manual</option>
                 </select>
               </div>
               <div style={styles.field}>
-                <label style={styles.searchLabel}>Language</label>
-                <select value={filters.language} onChange={(event) => updateFilter('language', event.target.value)} style={styles.select}>
+                <label htmlFor="lib-lang" style={styles.searchLabel}>Language</label>
+                <select id="lib-lang" value={filters.language} onChange={(event) => updateFilter('language', event.target.value)} style={styles.select}>
                   <option value="">All Languages</option>
                   {filterOptions.languages.map((language) => (
                     <option key={language} value={language}>{language}</option>
@@ -1400,8 +1401,8 @@ function ContentLibraryPage() {
                 </select>
               </div>
               <div style={styles.field}>
-                <label style={styles.searchLabel}>Category</label>
-                <select value={filters.category} onChange={(event) => updateFilter('category', event.target.value)} style={styles.select}>
+                <label htmlFor="lib-category" style={styles.searchLabel}>Category</label>
+                <select id="lib-category" value={filters.category} onChange={(event) => updateFilter('category', event.target.value)} style={styles.select}>
                   <option value="">All Categories</option>
                   {filterOptions.categories.map((category) => (
                     <option key={category} value={category}>{category}</option>
@@ -1409,8 +1410,8 @@ function ContentLibraryPage() {
                 </select>
               </div>
               <div style={styles.field}>
-                <label style={styles.searchLabel}>Collection</label>
-                <select value={filters.collection} onChange={(event) => updateFilter('collection', event.target.value)} style={styles.select}>
+                <label htmlFor="lib-collection" style={styles.searchLabel}>Collection</label>
+                <select id="lib-collection" value={filters.collection} onChange={(event) => updateFilter('collection', event.target.value)} style={styles.select}>
                   <option value="">All Collections</option>
                   {filterOptions.collections.map((collection) => (
                     <option key={collection} value={collection}>{collection}</option>
@@ -1418,8 +1419,8 @@ function ContentLibraryPage() {
                 </select>
               </div>
               <div style={styles.field}>
-                <label style={styles.searchLabel}>Tag</label>
-                <select value={filters.tag} onChange={(event) => updateFilter('tag', event.target.value)} style={styles.select}>
+                <label htmlFor="lib-tag" style={styles.searchLabel}>Tag</label>
+                <select id="lib-tag" value={filters.tag} onChange={(event) => updateFilter('tag', event.target.value)} style={styles.select}>
                   <option value="">All Tags</option>
                   {filterOptions.tags.map((tag) => (
                     <option key={tag} value={tag}>{tag}</option>
@@ -1427,8 +1428,8 @@ function ContentLibraryPage() {
                 </select>
               </div>
               <div style={styles.field}>
-                <label style={styles.searchLabel}>Root</label>
-                <select value={filters.sourceRootId} onChange={(event) => updateFilter('sourceRootId', event.target.value)} style={styles.select}>
+                <label htmlFor="lib-root" style={styles.searchLabel}>Root</label>
+                <select id="lib-root" value={filters.sourceRootId} onChange={(event) => updateFilter('sourceRootId', event.target.value)} style={styles.select}>
                   <option value="">All Roots</option>
                   {roots.map((root) => (
                     <option key={root.id} value={root.id}>{root.label || root.id}</option>
@@ -1958,8 +1959,8 @@ const styles = {
   filterGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' },
   field: { display: 'grid', gap: '8px' },
   searchLabel: { color: TEXT3, textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: '0.7rem', fontWeight: '700' },
-  input: { padding: '10px 14px', background: SURFACE2, border: `1px solid ${BORDER}`, borderRadius: '10px', color: TEXT, fontSize: '0.92rem', width: '100%', outline: 'none' },
-  select: { padding: '10px 14px', background: SURFACE2, border: `1px solid ${BORDER}`, borderRadius: '10px', color: TEXT, fontSize: '0.92rem', width: '100%', outline: 'none' },
+  input: { padding: '10px 14px', background: SURFACE2, border: `1px solid ${BORDER}`, borderRadius: '10px', color: TEXT, fontSize: '0.92rem', width: '100%' },
+  select: { padding: '10px 14px', background: SURFACE2, border: `1px solid ${BORDER}`, borderRadius: '10px', color: TEXT, fontSize: '0.92rem', width: '100%' },
   quickFilterBar: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
   quickChip: { padding: '8px 14px', borderRadius: '999px', background: '#12171f', border: `1px solid ${BORDER}`, color: TEXT2, fontWeight: '600', fontSize: '0.8rem', cursor: 'pointer', transition: 'all 150ms ease' },
   quickChipActive: { background: ACCENT, color: '#fff', borderColor: ACCENT },
