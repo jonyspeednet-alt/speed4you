@@ -44,6 +44,10 @@ function ContentRail({
     window.requestAnimationFrame(updateScrollIndicators);
   }, [updateScrollIndicators]);
 
+  const handleScroll = useCallback(() => {
+    updateScrollIndicators();
+  }, [updateScrollIndicators]);
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollLeft = 0;
@@ -116,35 +120,7 @@ function ContentRail({
 
   useEffect(() => {
     const element = scrollRef.current;
-    if (!element) return undefined;
-
-    const handleWheel = (event) => {
-      const deltaX = event.deltaX || 0;
-      const deltaY = event.deltaY || 0;
-
-      let delta = 0;
-
-      if (Math.abs(deltaX) > 0 && Math.abs(deltaX) >= Math.abs(deltaY)) {
-        delta = deltaX;
-      } else if (event.shiftKey && Math.abs(deltaY) > 0) {
-        delta = deltaY;
-      }
-
-      if (!delta) return;
-
-      const maxScrollLeft = Math.max(
-        0,
-        element.scrollWidth - element.clientWidth,
-      );
-
-      if (maxScrollLeft <= 0) return;
-
-      const nextScroll = clampScrollLeft(element, element.scrollLeft + delta);
-      if (nextScroll !== element.scrollLeft) {
-        element.scrollLeft = nextScroll;
-        scheduleScrollIndicatorUpdate();
-      }
-    };
+    if (!element) return;
 
     const resizeObserver =
       typeof ResizeObserver !== "undefined"
@@ -152,23 +128,15 @@ function ContentRail({
         : null;
     resizeObserver?.observe(element);
 
-    element.addEventListener("wheel", handleWheel, { passive: true });
-    element.addEventListener("scroll", updateScrollIndicators, {
-      passive: true,
-    });
+    element.addEventListener("scroll", handleScroll, { passive: true });
 
     scheduleScrollIndicatorUpdate();
 
     return () => {
       resizeObserver?.disconnect();
-      element.removeEventListener("wheel", handleWheel);
-      element.removeEventListener("scroll", updateScrollIndicators);
+      element.removeEventListener("scroll", handleScroll);
     };
-  }, [
-    clampScrollLeft,
-    scheduleScrollIndicatorUpdate,
-    updateScrollIndicators,
-  ]);
+  }, [scheduleScrollIndicatorUpdate, handleScroll]);
 
   return (
     <section className="content-rail-section" style={styles.section}>
@@ -464,7 +432,6 @@ const styles = {
     margin: "0",
     padding: "6px max(48px, calc((100vw - 1720px) / 2)) 16px",
     overflowX: "auto",
-    overflowY: "hidden",
     scrollSnapType: "x proximity",
     scrollSnapStop: "normal",
     overscrollBehaviorX: "contain",
