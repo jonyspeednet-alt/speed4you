@@ -266,12 +266,6 @@ jobs:
               exit 0
             fi
             echo "Found nginx config: $CONF"
-            echo "=== Config structure around server blocks ==="
-            grep -n 'server {' "$CONF" 2>/dev/null || echo "No server blocks found"
-            echo "=== Lines containing /portal ==="
-            grep -n 'location.*portal' "$CONF" 2>/dev/null || true
-            echo "=== Current cache headers ==="
-            grep -n -i 'cache-control\|expires' "$CONF" 2>/dev/null || echo "(none)"
             CHANGED=0
 
             # Remove invalid standalone http2 directive from previous broken runs
@@ -297,25 +291,31 @@ jobs:
               CHANGED=1
             fi
 
-            # Add cache headers for portal assets + index.html exclusion
-            # Uses a unique PORTAL-CACHE-MARKER to prevent duplicate inserts
-            if ! grep -q 'PORTAL-CACHE-MARKER' "$CONF"; then
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i '/location.*\/portal.*{/a\
-                # PORTAL-CACHE-MARKER - do not remove\
-                location ~ ^/portal/assets/ {\
-                    expires 1y;\
-                    add_header Cache-Control "public, immutable";\
-                    add_header Vary "Accept-Encoding";\
-                }\
-                location = /portal/index.html {\
-                    expires -1;\
-                    add_header Cache-Control "no-cache, no-store, must-revalidate";\
-                }' "$CONF"
-              echo "Cache headers added (assets 1y, index.html no-cache)"
-              CHANGED=1
-            else
-              echo "Cache headers already present"
-            fi
+            # Clean up any corrupted lines from previous failed attempts
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i '/portal-cache/d' "$CONF"
+
+            # Write cache header snippet to a separate file (idempotent)
+            CACHE_SNIPPET=/etc/nginx/portal-cache.conf
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' tee "$CACHE_SNIPPET" > /dev/null <<'NGINX_EOF'
+# Served by nginx for /portal/assets/* — hash-based URLs are immutable
+location ~ ^/portal/assets/ {
+    expires 1y;
+    add_header Cache-Control "public, immutable";
+    add_header Vary "Accept-Encoding";
+}
+
+# Never cache index.html so new deploys bust stale chunk URLs
+location = /portal/index.html {
+    expires -1;
+    add_header Cache-Control "no-cache, no-store, must-revalidate";
+}
+NGINX_EOF
+            echo "Cache snippet written to $CACHE_SNIPPET"
+
+            # Include the snippet from the /portal location block
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i '/location.*\/portal\b.*{/a\    include /etc/nginx/portal-cache.conf;' "$CONF"
+            echo "Cache snippet included in /portal block"
+            CHANGED=1
 
             if [ "$CHANGED" = "1" ]; then
               printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' nginx -t
