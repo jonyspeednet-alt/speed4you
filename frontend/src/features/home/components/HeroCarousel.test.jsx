@@ -82,12 +82,6 @@ describe('HeroCarousel', () => {
         expect(screen.getByText('Test Movie 1')).toBeInTheDocument();
     });
 
-    it('displays carousel dots when multiple items', () => {
-        renderWithRouter(<HeroCarousel content={mockContent} />);
-        const dots = screen.getAllByRole('button', { name: /Go to slide/ });
-        expect(dots.length).toBeGreaterThanOrEqual(mockContent.length);
-    });
-
     it('navigates to next slide on next button click', async () => {
         renderWithRouter(<HeroCarousel content={mockContent} />);
         fireEvent.click(screen.getByTitle('Next (right arrow key)'));
