@@ -197,6 +197,7 @@ const styles = {
   cardWrap: {
     position: "relative",
     flex: "0 0 auto",
+    flexShrink: 0,
     scrollSnapAlign: "start",
   },
   cardWrapDefault: { width: "220px" },
