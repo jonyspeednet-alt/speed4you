@@ -55,6 +55,21 @@ jobs:
         run: rm -rf node_modules
         working-directory: backend
 
+      - name: Check server disk space
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ ***REMOVED***s.DEPLOY_HOST }}
+          username: ${{ ***REMOVED***s.DEPLOY_USER }}
+          key: ${{ ***REMOVED***s.DEPLOY_SSH_KEY }}
+          port: ${{ ***REMOVED***s.DEPLOY_PORT }}
+          script: |
+            echo "=== Disk space ==="
+            df -h /var/www/html/ /home/speed4you/ / 2>/dev/null || df -h
+            echo "=== Frontend destination ==="
+            ls -la /var/www/html/portal/ 2>/dev/null | head -5 || echo "(empty or missing)"
+            echo "=== Build output ==="
+            ls -la /home/speed4you/actions-runner/_work/speed4you/speed4you/frontend/dist/ 2>/dev/null | head -5 || echo "(empty or missing)"
+
       - name: Backup production data files
         uses: appleboy/ssh-action@v1.2.0
         env:
@@ -89,14 +104,46 @@ jobs:
           port: ${{ ***REMOVED***s.DEPLOY_PORT }}
           envs: SUDO_PASSWORD
           script: |
+            set -e
             SRC=/home/speed4you/actions-runner/_work/speed4you/speed4you/frontend/dist
             DEST=/var/www/html/portal
+
+            # Check disk space - need at least 50 MB free
+            available_kb=$(df --output=avail "$DEST" 2>/dev/null | tail -1)
+            if [ -n "$available_kb" ] && [ "$available_kb" -lt 51200 ]; then
+              echo "ERROR: Low disk space on $DEST ($available_kb KB available)" >&2
+              exit 1
+            fi
+
             if [ -d "$SRC" ]; then
+              src_count=$(find "$SRC" -type f | wc -l)
+              src_size=$(du -sh "$SRC" | cut -f1)
+              echo "Source has $src_count files ($src_size)"
+
               printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p "$DEST"
               printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' find "$DEST" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
               printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -r "$SRC/." "$DEST/"
+
+              # Verify all files were copied correctly
+              dest_count=$(find "$DEST" -type f | wc -l)
+              dest_size=$(du -sh "$DEST" | cut -f1)
+              echo "Destination has $dest_count files ($dest_size)"
+
+              if [ "$dest_count" -lt "$src_count" ]; then
+                echo "ERROR: File count mismatch — source $src_count, destination $dest_count" >&2
+                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' ls -la "$DEST/assets/" >&2 || true
+                exit 1
+              fi
+
+              # Check that index.html references a file that exists
+              entry_chunk=$(grep -oE 'assets/index-[a-z0-9]+\.js' "$SRC/index.html" | head -1)
+              if [ -n "$entry_chunk" ] && [ ! -f "$DEST/$entry_chunk" ]; then
+                echo "ERROR: $DEST/$entry_chunk missing after copy" >&2
+                exit 1
+              fi
+
               printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$DEST"
-              echo "Frontend copied to $DEST"
+              echo "Frontend copied to $DEST ($dest_count files)"
             else
               echo "ERROR: $SRC not found" >&2
               exit 1
@@ -269,13 +316,27 @@ jobs:
         run: |
           set -e
           echo "Expected public bundle: $EXPECTED_BUNDLE"
-          html=$(curl -fsSL -H 'Cache-Control: no-cache' -H 'Pragma: no-cache' 'https://data.speed4you.net/portal/?deploy_verify=${{ github.run_id }}')
+          url="https://data.speed4you.net/portal/?dv=${{ github.run_id }}"
+
+          # Fetch the public index.html and extract the entry chunk hash
+          html=$(curl -fsSL -H 'Cache-Control: no-cache' -H 'Pragma: no-cache' "$url")
           public_bundle=$(printf '%s' "$html" | grep -oE 'index-[a-z0-9]+\.js' | head -n 1 || true)
           echo "Public bundle: $public_bundle"
+
           if [ "$public_bundle" != "$EXPECTED_BUNDLE" ]; then
-            echo "Public portal is not serving the freshly built frontend bundle." >&2
-            echo "Expected $EXPECTED_BUNDLE but got ${public_bundle:-none}." >&2
-            echo "Check nginx /portal root/alias, CDN/proxy cache, and deploy destination /var/www/html/portal." >&2
+            echo "FAIL: Public HTML references $public_bundle, expected $EXPECTED_BUNDLE" >&2
+            echo "This means the server is serving stale index.html." >&2
+            echo "Check deploy copy (disk space?), nginx root/alias, and any CDN/proxy cache." >&2
+            exit 1
+          fi
+
+          # Verify the entry chunk actually loads as JavaScript, not HTML
+          chunk_url="https://data.speed4you.net/portal/assets/${public_bundle}?dv=${{ github.run_id }}"
+          content_type=$(curl -fsSL -o /dev/null -w '%{content_type}' -H 'Cache-Control: no-cache' "$chunk_url")
+          echo "Entry chunk Content-Type: $content_type"
+          if [ "$content_type" != "application/javascript" ]; then
+            echo "FAIL: Entry chunk is not JavaScript (Content-Type: $content_type)" >&2
+            echo "Nginx is serving index.html for asset URLs — check try_files config." >&2
             exit 1
           fi
 
