@@ -135,14 +135,20 @@ function ContentRail({
       const deltaX = event.deltaX || 0;
       const deltaY = event.deltaY || 0;
 
-      // Convert vertical scroll to horizontal on the rail
-      // On most desktop mice, scroll wheel only produces deltaY
-      const isHorizontalTrackpad = Math.abs(deltaX) > Math.abs(deltaY) && deltaX !== 0;
-      const delta = isHorizontalTrackpad
-        ? deltaX
-        : event.shiftKey && Math.abs(deltaX) < Math.abs(deltaY)
-          ? deltaY
-          : deltaY; // Convert vertical wheel to horizontal scroll
+      // Determine the horizontal scroll delta:
+      // 1. Trackpad horizontal swipe → use deltaX naturally
+      // 2. Shift + mouse wheel → convert shift+deltaY to horizontal
+      // 3. Regular mouse wheel (deltaY only) → DO NOT intercept, let page scroll vertically
+      let delta = 0;
+
+      if (Math.abs(deltaX) > 0 && Math.abs(deltaX) >= Math.abs(deltaY)) {
+        // Trackpad horizontal gesture
+        delta = deltaX;
+      } else if (event.shiftKey && Math.abs(deltaY) > 0) {
+        // Shift + mouse wheel → horizontal scroll
+        delta = deltaY;
+      }
+      // else: regular vertical wheel — do NOT convert to horizontal, let page scroll
 
       if (!delta) return;
 
