@@ -58,10 +58,123 @@
   </noscript>
 
   <title>Speed4You Entertainment Portal — Movies, Series & Live TV</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #07111f;
+      font-family: 'Hind Siliguri', system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+    }
+    .critical-loader {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100vw;
+      height: 100vh;
+      background: radial-gradient(circle at center, #0f223d 0%, #07111f 100%);
+      color: #ffffff;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 9999;
+    }
+    .loader-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+    }
+    .glowing-orb {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+      position: relative;
+      box-shadow: 0 0 40px rgba(0, 242, 254, 0.6);
+      animation: pulse 2s infinite ease-in-out;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .glowing-orb::before {
+      content: '';
+      position: absolute;
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      border: 2px solid rgba(0, 242, 254, 0.3);
+      animation: spin-outer 3s infinite linear;
+    }
+    .inner-core {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background-color: #07111f;
+      box-shadow: inset 0 0 15px rgba(0, 242, 254, 0.4);
+    }
+    .loader-text {
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      background: linear-gradient(120deg, #ffffff, #a5b4fc, #ffffff);
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: shine 3s linear infinite;
+    }
+    .loader-bar-container {
+      width: 140px;
+      height: 4px;
+      background-color: rgba(255, 255, 255, 0.08);
+      border-radius: 2px;
+      overflow: hidden;
+      position: relative;
+    }
+    .loader-bar {
+      width: 60px;
+      height: 100%;
+      background: linear-gradient(90deg, #00f2fe, #4facfe);
+      border-radius: 2px;
+      position: absolute;
+      animation: shift 1.5s infinite ease-in-out;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(0.92); box-shadow: 0 0 30px rgba(0, 242, 254, 0.4); }
+      50% { transform: scale(1.08); box-shadow: 0 0 60px rgba(0, 242, 254, 0.8); }
+    }
+    @keyframes spin-outer {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes shift {
+      0% { left: -60px; }
+      50% { left: 140px; }
+      100% { left: -60px; }
+    }
+    @keyframes shine {
+      to { background-position: 200% center; }
+    }
+  </style>
 </head>
 
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <div class="critical-loader">
+      <div class="loader-content">
+        <div class="glowing-orb">
+          <div class="inner-core"></div>
+        </div>
+        <div class="loader-text">Speed4You পোর্টাল লোড হচ্ছে</div>
+        <div class="loader-bar-container">
+          <div class="loader-bar"></div>
+        </div>
+      </div>
+    </div>
+  </div>
   <script type="module" src="src/main.jsx"></script>
 </body>
 

@@ -151,7 +151,7 @@ function compressionMiddleware(req, res, next) {
 function setStaticCacheHeaders(res, filePath) {
   const normalizedPath = String(filePath || '').replace(/\\/g, '/');
   const isHtml = normalizedPath.endsWith('/index.html') || path.basename(normalizedPath) === 'index.html';
-  const isHashedAsset = /\/assets\/.+-[A-Za-z0-9_-]{8,}\./.test(normalizedPath);
+  const isHashedAsset = normalizedPath.includes('/assets/');
   const basename = path.basename(normalizedPath);
 
   if (basename === 'sw.js' || basename === 'manifest.json') {
