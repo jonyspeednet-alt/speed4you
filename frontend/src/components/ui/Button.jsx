@@ -158,7 +158,6 @@ const styles = {
     fontWeight: '700',
     cursor: 'pointer',
     transition: 'background 200ms ease, box-shadow 200ms ease, transform 180ms ease, border-color 200ms ease',
-    outline: 'none',
     letterSpacing: '0.01em',
     whiteSpace: 'nowrap',
     userSelect: 'none',

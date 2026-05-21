@@ -348,6 +348,7 @@ function BrowsePage({ type }) {
                 onChange={(event) => setSearchText(event.target.value)}
                 placeholder="Search by title, genre, year..."
                 style={styles.searchInput}
+                aria-label="Search titles, genres, and years"
               />
             </div>
           </div>
@@ -771,7 +772,6 @@ const styles = {
     width: "100%",
     background: "transparent",
     border: "none",
-    outline: "none",
     color: "#ffffff",
     fontSize: "1rem",
   },

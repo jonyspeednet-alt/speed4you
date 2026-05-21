@@ -138,8 +138,9 @@ function GlobalSearchModal() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search movies, series..."
             style={styles.input}
+            aria-label="Search movies, series"
           />
-          <button style={styles.escBtn} onClick={() => setIsOpen(false)}>ESC</button>
+          <button style={styles.escBtn} onClick={() => setIsOpen(false)} aria-label="Close search">ESC</button>
         </div>
         
         {loading && <div style={styles.message}>Searching...</div>}
@@ -218,7 +219,7 @@ const styles = {
   },
   header: { display: 'flex', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)' },
   icon: { color: 'var(--text-muted)', marginRight: '16px' },
-  input: { flex: 1, background: 'transparent', border: 'none', color: '#fff', fontSize: '1.2rem', outline: 'none' },
+  input: { flex: 1, background: 'transparent', border: 'none', color: '#fff', fontSize: '1.2rem' },
   escBtn: { background: 'rgba(255,255,255,0.1)', border: 'none', color: '#aaa', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer' },
   message: { padding: '24px', textAlign: 'center', color: '#aaa' },
   list: { listStyle: 'none', margin: 0, padding: '8px' },
