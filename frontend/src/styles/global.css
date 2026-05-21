@@ -1117,10 +1117,8 @@ p {
 
 .content-rail-card {
   position: relative;
-  display: inline-block;
-  min-width: 220px;
-  max-width: 280px;
-  width: 100%;
+  display: block;
+  flex-shrink: 0;
   transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
   will-change: transform;
 }
@@ -1132,6 +1130,10 @@ p {
 .content-rail-section {
   padding-top: var(--spacing-lg);
   padding-bottom: var(--spacing-xl);
+  overflow: hidden;
+  width: 100%;
+  max-width: 100vw;
+  box-sizing: border-box;
 }
 
 .content-rail-header {
@@ -1169,10 +1171,43 @@ p {
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x pan-y;
   scrollbar-width: none;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .content-rail-list::-webkit-scrollbar {
   display: none;
+}
+
+.content-rail-card {
+  flex-shrink: 0;
+}
+
+.tv-mode-card {
+  min-width: 300px;
+}
+
+.content-rail-controls button {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  touch-action: manipulation;
+}
+
+.content-rail-controls button:hover,
+.content-rail-controls button:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.content-rail-controls button:disabled {
+  opacity: 0.25;
+  cursor: default;
+  pointer-events: none;
 }
 
 .content-rail-eyebrow,
@@ -1371,102 +1406,7 @@ p {
   min-width: 220px;
 }
 
-.content-rail-section {
-  padding-top: var(--spacing-lg);
-  padding-bottom: var(--spacing-xl);
-}
-
-.content-rail-header {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 0 max(48px, calc((100vw - 1720px) / 2));
-  margin: 0 0 16px;
-  display: flex;
-  justify-content: flex-start;
-  align-items: flex-end;
-  gap: 24px;
-}
-
-.content-rail-header--mobile {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 0 12px;
-  flex-direction: column;
-  align-items: flex-start;
-}
-
-.content-rail-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.content-rail-controls {
-  display: flex;
-  gap: 8px;
-}
-
-.content-rail-view-all {
-  padding: 10px 16px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.content-rail-list {
-  display: flex;
-  gap: 18px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 0 max(48px, calc((100vw - 1720px) / 2)) 10px;
-  scroll-snap-type: x proximity;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-x pan-y;
-  overscroll-behavior-x: contain;
-  overscroll-behavior-y: none;
-  scrollbar-width: none;
-  width: 100%;
-  max-width: none;
-  margin: 0;
-}
-
-.content-rail-list::-webkit-scrollbar {
-  display: none;
-}
-
-.content-rail-card {
-  position: relative;
-  display: block;
-  min-width: 200px;
-  max-width: 260px;
-  width: 100%;
-}
-
-.tv-mode-card {
-  min-width: 300px;
-}
-
-.content-rail-controls button {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-muted);
-  touch-action: manipulation;
-}
-
-.content-rail-controls button:hover,
-.content-rail-controls button:focus-visible {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.16);
-}
-
-.content-rail-controls button:disabled {
-  opacity: 0.25;
-  cursor: default;
-  pointer-events: none;
-}
+/* Duplicate rules removed — see unified definitions above */
 
 /* Mobile: larger touch targets for rail nav buttons */
 @media (max-width: 768px) {

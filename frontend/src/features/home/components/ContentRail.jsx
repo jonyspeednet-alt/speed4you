@@ -122,8 +122,9 @@ function ContentRail({
       const signedDistance =
         direction === "left" ? -scrollDistance : scrollDistance;
       applyScrollLeft(element, element.scrollLeft + signedDistance);
+      scheduleScrollIndicatorUpdate();
     },
-    [applyScrollLeft, getScrollDistance],
+    [applyScrollLeft, getScrollDistance, scheduleScrollIndicatorUpdate],
   );
 
   useEffect(() => {
@@ -133,22 +134,28 @@ function ContentRail({
     const handleWheel = (event) => {
       const deltaX = event.deltaX || 0;
       const deltaY = event.deltaY || 0;
-      const horizontalIntent =
-        Math.abs(deltaX) > Math.abs(deltaY) || event.shiftKey;
 
-      if (!horizontalIntent) return;
+      // Convert vertical scroll to horizontal on the rail
+      // On most desktop mice, scroll wheel only produces deltaY
+      const isHorizontalTrackpad = Math.abs(deltaX) > Math.abs(deltaY) && deltaX !== 0;
+      const delta = isHorizontalTrackpad
+        ? deltaX
+        : event.shiftKey && Math.abs(deltaX) < Math.abs(deltaY)
+          ? deltaY
+          : deltaY; // Convert vertical wheel to horizontal scroll
 
-      const delta = event.shiftKey && Math.abs(deltaX) < Math.abs(deltaY)
-        ? deltaY
-        : deltaX;
       if (!delta) return;
 
       const maxScrollLeft = Math.max(
         0,
         element.scrollWidth - element.clientWidth,
       );
+
+      // Only intercept if there is actually overflow to scroll
+      if (maxScrollLeft <= 0) return;
+
       const nextScroll = clampScrollLeft(element, element.scrollLeft + delta);
-      const canMove = maxScrollLeft > 0 && nextScroll !== element.scrollLeft;
+      const canMove = nextScroll !== element.scrollLeft;
 
       if (canMove) {
         element.scrollLeft = nextScroll;
@@ -335,6 +342,10 @@ function ContentRail({
 const styles = {
   section: {
     padding: "var(--spacing-md) 0 var(--spacing-lg)",
+    overflow: "hidden",
+    width: "100%",
+    maxWidth: "100vw",
+    boxSizing: "border-box",
   },
   header: {
     width: "100%",
@@ -463,7 +474,8 @@ const styles = {
   },
   rail: {
     width: "100%",
-    maxWidth: "none",
+    maxWidth: "100%",
+    boxSizing: "border-box",
     display: "flex",
     justifyContent: "flex-start",
     alignItems: "flex-start",
@@ -486,7 +498,8 @@ const styles = {
   },
   railMobile: {
     width: "100%",
-    maxWidth: "none",
+    maxWidth: "100%",
+    boxSizing: "border-box",
     gap: "10px",
     margin: "0",
     padding: "4px 14px 12px",
@@ -500,7 +513,8 @@ const styles = {
   },
   railTV: {
     width: "100%",
-    maxWidth: "none",
+    maxWidth: "100%",
+    boxSizing: "border-box",
     gap: "20px",
     margin: "0",
     padding: "6px max(48px, calc((100vw - 1720px) / 2)) 16px",
