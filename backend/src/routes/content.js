@@ -77,7 +77,7 @@ function normalizePositiveInt(value, defaultValue, { min = 1, max = Number.MAX_S
 async function buildHomepagePayload(limit = HOMEPAGE_LIMIT) {
   const [featuredItems, latest, popular, trending, series] = await Promise.all([
     getPublishedItems({ featured: true }, 0, 1),
-    getPublishedItems({}, 0, limit, 'latest'),
+    getPublishedItems({ type: 'movie' }, 0, limit, 'latest'),
     getPublishedItems({}, 0, limit, 'popular'),
     getPublishedItems({}, 0, limit, 'trending'),
     getPublishedItems({ type: 'series' }, 0, limit, 'latest')
