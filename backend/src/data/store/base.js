@@ -348,9 +348,9 @@ async function ensureContentStore() {
   return contentStoreReadyPromise;
 }
 
-async function getAppState(key, fallback = null) {
+async function getAppState(key, fallback = null, noCache = false) {
   await ensureContentStore();
-  if (appStateCache.has(key)) {
+  if (!noCache && appStateCache.has(key)) {
     return appStateCache.get(key);
   }
   const result = await db.query('SELECT value FROM app_state WHERE key = $1 LIMIT 1', [key]);
