@@ -200,8 +200,14 @@ jobs:
             cd "$BACKEND"
             npm ci --omit=dev
 
-            # Ensure IP-based access is always allowed in CORS
+            # Ensure all required origins are always in CORS
             CORS="${CORS_ALLOWED_ORIGINS}"
+            if [[ "$CORS" != *"speed4you.net"* ]]; then
+              CORS="${CORS},https://speed4you.net"
+            fi
+            if [[ "$CORS" != *"data.speed4you.net"* ]]; then
+              CORS="${CORS},https://data.speed4you.net"
+            fi
             if [[ "$CORS" != *"103.79.182.226"* ]]; then
               CORS="${CORS},https://103.79.182.226"
             fi
