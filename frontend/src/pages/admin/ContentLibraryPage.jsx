@@ -1,8 +1,9 @@
-import { startTransition, useCallback, useEffect, useMemo, useState } from 'react';
+import { startTransition, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { adminService } from '../../services';
 import ConfirmDialog from '../../components/overlays/ConfirmDialog';
 import ProgressBar from '../../components/ui/ProgressBar';
+import { ToastContext } from '../../components/ui/ToastContext';
 import { useBreakpoint } from '../../hooks';
 
 function formatWhen(value) {
@@ -157,6 +158,8 @@ function ContentLibraryPage() {
   const { isMobile, isTablet } = useBreakpoint();
   const location = useLocation();
   const navigate = useNavigate();
+  const toast = useContext(ToastContext);
+  const prevStatusRef = useRef(null);
   const sectionType = location.pathname === '/admin/movies'
     ? 'movie'
     : location.pathname === '/admin/series'
@@ -475,6 +478,22 @@ function ContentLibraryPage() {
 
     return () => clearInterval(interval);
   }, [currentJob?.status, loadAuxiliaryData, loadContentData]);
+
+  useEffect(() => {
+    const prev = prevStatusRef.current;
+    prevStatusRef.current = currentJob?.status;
+    if (prev === 'running' && currentJob?.status === 'completed' && toast) {
+      const summary = currentJob?.summary || {};
+      const created = Number(summary.created || 0);
+      toast.show({
+        message: created > 0
+          ? `Scan finished: ${created} new item${created !== 1 ? 's' : ''} added`
+          : 'Scan finished — no new items found',
+        type: 'success',
+        duration: 5000,
+      });
+    }
+  }, [currentJob?.status, toast]);
 
   const healthSummary = useMemo(() => getHealthSummary(health), [health]);
   const filterOptions = useMemo(() => ({
