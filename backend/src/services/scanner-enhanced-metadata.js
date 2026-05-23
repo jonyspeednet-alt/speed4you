@@ -39,6 +39,7 @@ const METADATA_PATCH_FIELDS = [
   'metadataUpdatedAt',
   'metadataError',
   'parsedTitle',
+  'releasedAt',
   'poster',
   'backdrop',
 ];
@@ -67,6 +68,7 @@ function applyMetadataPatch(item, patch, parsedTitle) {
     imdbId: patch.imdbId || item.imdbId || '',
     originalTitle: patch.originalTitle || item.originalTitle || '',
     originalLanguage: patch.originalLanguage || item.originalLanguage || '',
+    releasedAt: item.releasedAt || patch.releasedAt || '',
     metadataStatus: patch.metadataStatus || item.metadataStatus || 'skipped',
     metadataProvider: patch.metadataProvider || item.metadataProvider || '',
     metadataConfidence: patch.metadataConfidence ?? item.metadataConfidence ?? 0,
@@ -114,6 +116,7 @@ async function enrichItemWithMetadata(item) {
         imdbId: omdbData.imdbId,
         originalTitle: omdbData.originalTitle,
         originalLanguage: omdbData.originalLanguage,
+        releasedAt: omdbData.releasedAt || '',
         metadataStatus: 'matched',
         metadataProvider: 'omdb',
         metadataConfidence: 100,

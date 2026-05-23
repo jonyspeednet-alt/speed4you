@@ -111,6 +111,7 @@ async function fetchTmdbDetails(resultId, mediaType) {
     append_to_response: appendToResponse,
   });
 
+  const releaseDate = (payload.release_date || payload.first_air_date || '').trim();
   return {
     tmdbId: payload.id || null,
     title: payload.title || payload.name || '',
@@ -124,7 +125,8 @@ async function fetchTmdbDetails(resultId, mediaType) {
     rating: payload.vote_average ? Number(payload.vote_average.toFixed(1)) : null,
     runtime: payload.runtime || null,
     originalLanguage: payload.original_language || '',
-    year: Number((payload.release_date || payload.first_air_date || '').slice(0, 4)) || null,
+    year: Number(releaseDate.slice(0, 4)) || null,
+    releaseDate,
     numberOfSeasons: Number(payload.number_of_seasons || 0),
   };
 }
@@ -183,11 +185,14 @@ async function fetchMetadataFromOmdb(imdbId) {
   }
 
   const isSeries = data.Type === 'series';
+  const omdbReleased = data.Released !== 'N/A' ? data.Released : '';
   return {
     type: isSeries ? 'series' : 'movie',
     title: data.Title || '',
     description: data.Plot !== 'N/A' ? data.Plot : '',
     year: parseInt(data.Year, 10) || null,
+    releaseDate: omdbReleased,
+    releasedAt: omdbReleased,
     genre: data.Genre !== 'N/A' ? data.Genre : '',
     genres: data.Genre !== 'N/A' ? data.Genre.split(',').map((g) => g.trim()) : [],
     poster: data.Poster !== 'N/A' ? data.Poster : '',
@@ -224,6 +229,8 @@ async function fetchMetadataByTmdbId(tmdbId, mediaType = 'movie') {
     title: details.title,
     description: details.overview,
     year: details.year,
+    releaseDate: details.releaseDate,
+    releasedAt: details.releaseDate,
     genre: details.genre,
     genres: details.genres,
     poster: details.poster,
