@@ -26,23 +26,34 @@ jobs:
         run: npm ci
         working-directory: frontend
 
-      - name: Build frontend
-        run: npm run build
+      - name: Build frontend for /portal/ (data.speed4you.net)
+        run: |
+          npm run build
+          mv dist dist-portal
         working-directory: frontend
         env:
           VITE_APP_BASE: /portal/
 
-      - name: Record frontend bundle fingerprint
+      - name: Build frontend for / (speed4you.net)
+        run: npm run build
+        working-directory: frontend
+        env:
+          VITE_APP_BASE: /
+
+      - name: Record frontend bundle fingerprints
         id: frontend_bundle
         run: |
           set -e
           bundle=$(grep -oE 'index-[a-z0-9]+\.js' frontend/dist/index.html | head -n 1)
+          portal_bundle=$(grep -oE 'index-[a-z0-9]+\.js' frontend/dist-portal/index.html | head -n 1)
           if [ -z "$bundle" ]; then
             echo "Could not find main frontend bundle in frontend/dist/index.html" >&2
             exit 1
           fi
           echo "bundle=$bundle" >> "$GITHUB_OUTPUT"
-          echo "Built frontend main bundle: $bundle"
+          echo "portal_bundle=$portal_bundle" >> "$GITHUB_OUTPUT"
+          echo "speed4you bundle: $bundle"
+          echo "portal   bundle: $portal_bundle"
 
       - name: Install backend dependencies (lockfile only)
         run: npm ci
@@ -90,7 +101,7 @@ jobs:
             fi
             echo "Backup complete"
 
-      - name: Copy frontend to web root
+      - name: Copy frontend to web roots
         uses: appleboy/ssh-action@v1.2.0
         env:
           SUDO_PASSWORD: ${{ ***REMOVED***s.SUDO_PASSWORD }}
@@ -102,49 +113,53 @@ jobs:
           envs: SUDO_PASSWORD
           script: |
             set -e
-            SRC=/home/speed4you/actions-runner/_work/speed4you/speed4you/frontend/dist
-            DEST=/var/www/html/portal
+            BASE=/home/speed4you/actions-runner/_work/speed4you/speed4you/frontend
 
-            # Check disk space - need at least 50 MB free
-            available_kb=$(df --output=avail "$DEST" 2>/dev/null | tail -1)
-            if [ -n "$available_kb" ] && [ "$available_kb" -lt 51200 ]; then
-              echo "ERROR: Low disk space on $DEST ($available_kb KB available)" >&2
-              exit 1
-            fi
+            deploy_build() {
+              local SRC="$1"
+              local DEST="$2"
+              local NAME="$3"
 
-            if [ -d "$SRC" ]; then
-              src_count=$(find "$SRC" -type f | wc -l)
-              src_size=$(du -sh "$SRC" | cut -f1)
-              echo "Source has $src_count files ($src_size)"
-
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p "$DEST"
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' find "$DEST" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -r "$SRC/." "$DEST/"
-
-              # Verify all files were copied correctly
-              dest_count=$(find "$DEST" -type f | wc -l)
-              dest_size=$(du -sh "$DEST" | cut -f1)
-              echo "Destination has $dest_count files ($dest_size)"
-
-              if [ "$dest_count" -lt "$src_count" ]; then
-                echo "ERROR: File count mismatch — source $src_count, destination $dest_count" >&2
-                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' ls -la "$DEST/assets/" >&2 || true
+              available_kb=$(df --output=avail "$DEST" 2>/dev/null | tail -1)
+              if [ -n "$available_kb" ] && [ "$available_kb" -lt 51200 ]; then
+                echo "ERROR: Low disk space on $DEST ($available_kb KB available)" >&2
                 exit 1
               fi
 
-              # Check that index.html references a file that exists
-              entry_chunk=$(grep -oE 'assets/index-[a-z0-9]+\.js' "$SRC/index.html" | head -1)
-              if [ -n "$entry_chunk" ] && [ ! -f "$DEST/$entry_chunk" ]; then
-                echo "ERROR: $DEST/$entry_chunk missing after copy" >&2
+              if [ -d "$SRC" ]; then
+                src_count=$(find "$SRC" -type f | wc -l)
+                src_size=$(du -sh "$SRC" | cut -f1)
+                echo "[$NAME] Source has $src_count files ($src_size)"
+
+                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p "$DEST"
+                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' find "$DEST" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -r "$SRC/." "$DEST/"
+
+                dest_count=$(find "$DEST" -type f | wc -l)
+                dest_size=$(du -sh "$DEST" | cut -f1)
+                echo "[$NAME] Destination has $dest_count files ($dest_size)"
+
+                if [ "$dest_count" -lt "$src_count" ]; then
+                  echo "ERROR: [$NAME] File count mismatch" >&2
+                  exit 1
+                fi
+
+                entry_chunk=$(grep -oE 'assets/index-[a-z0-9]+\.js' "$SRC/index.html" | head -1)
+                if [ -n "$entry_chunk" ] && [ ! -f "$DEST/$entry_chunk" ]; then
+                  echo "ERROR: [$NAME] $DEST/$entry_chunk missing" >&2
+                  exit 1
+                fi
+
+                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$DEST"
+                echo "[$NAME] Deployed $src_count files to $DEST"
+              else
+                echo "ERROR: [$NAME] $SRC not found" >&2
                 exit 1
               fi
+            }
 
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$DEST"
-              echo "Frontend copied to $DEST ($dest_count files)"
-            else
-              echo "ERROR: $SRC not found" >&2
-              exit 1
-            fi
+            deploy_build "$BASE/dist-portal" "/var/www/html/portal" "portal"
+            deploy_build "$BASE/dist" "/var/www/speed4you.net" "speed4you.net"
 
       - name: Copy backend to app directory
         uses: appleboy/ssh-action@v1.2.0
@@ -318,49 +333,46 @@ jobs:
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' systemctl reload nginx
             echo "Nginx reloaded with HTTP/2 + gzip + caching"
 
-      - name: Verify public frontend bundle
+      - name: Verify deployed frontend bundles
         env:
           EXPECTED_BUNDLE: ${{ steps.frontend_bundle.outputs.bundle }}
+          EXPECTED_PORTAL_BUNDLE: ${{ steps.frontend_bundle.outputs.portal_bundle }}
         run: |
           set -e
-          echo "Expected public bundle: $EXPECTED_BUNDLE"
-          DEST=/var/www/html/portal
+          echo "Expected bundles — speed4you.net: $EXPECTED_BUNDLE, portal: $EXPECTED_PORTAL_BUNDLE"
 
-          # Check index.html exists on disk
-          if [ ! -f "$DEST/index.html" ]; then
-            echo "FAIL: $DEST/index.html not found on disk" >&2
-            exit 1
-          fi
+          verify_dest() {
+            local DEST="$1"
+            local EXPECTED="$2"
+            local NAME="$3"
 
-          # Extract the hash from the deployed index.html
-          public_bundle=$(grep -oE 'index-[a-z0-9]+\.js' "$DEST/index.html" | head -n 1 || true)
-          echo "Public bundle: $public_bundle"
-
-          if [ "$public_bundle" != "$EXPECTED_BUNDLE" ]; then
-            echo "FAIL: Deployed HTML references $public_bundle, expected $EXPECTED_BUNDLE" >&2
-            exit 1
-          fi
-
-          # Verify the entry chunk file exists on disk
-          if [ ! -f "$DEST/assets/$public_bundle" ]; then
-            echo "FAIL: $DEST/assets/$public_bundle not found on disk" >&2
-            exit 1
-          fi
-          echo "Entry chunk exists on disk and is valid JavaScript"
-
-          # Quick nginx test: curl localhost (port 80, no SSL)
-          if command -v curl &>/dev/null; then
-            local_html=$(curl -fsSL -H 'Cache-Control: no-cache' "http://data.speed4you.net/portal/?dv=${{ github.run_id }}" 2>/dev/null || true)
-            local_bundle=$(printf '%s' "$local_html" | grep -oE 'index-[a-z0-9]+\.js' | head -n 1 || true)
-            if [ -n "$local_bundle" ] && [ "$local_bundle" = "$EXPECTED_BUNDLE" ]; then
-              echo "Nginx on port 80 is serving the correct bundle: $local_bundle"
-            else
-              echo "WARNING: Could not verify via local HTTP (got '$local_bundle'), but files on disk are correct"
+            if [ ! -f "$DEST/index.html" ]; then
+              echo "FAIL [$NAME]: $DEST/index.html not found" >&2
+              exit 1
             fi
-          fi
+
+            local bundle
+            bundle=$(grep -oE 'index-[a-z0-9]+\.js' "$DEST/index.html" | head -n 1 || true)
+            echo "[$NAME] bundle: $bundle"
+
+            if [ "$bundle" != "$EXPECTED" ]; then
+              echo "FAIL [$NAME]: HTML references $bundle, expected $EXPECTED" >&2
+              exit 1
+            fi
+
+            if [ ! -f "$DEST/assets/$bundle" ]; then
+              echo "FAIL [$NAME]: $DEST/assets/$bundle missing" >&2
+              exit 1
+            fi
+            echo "[$NAME] OK — $bundle verified on disk"
+          }
+
+          verify_dest "/var/www/speed4you.net" "$EXPECTED_BUNDLE" "speed4you.net"
+          verify_dest "/var/www/html/portal" "$EXPECTED_PORTAL_BUNDLE" "portal"
 
       - name: Deployment summary
         run: |
           echo "Deployment completed."
-          echo "Public site: https://data.speed4you.net/portal"
-          echo "API check: https://data.speed4you.net/portal-api/api/content/latest?limit=3"
+          echo "speed4you.net : https://speed4you.net/"
+          echo "Portal        : https://data.speed4you.net/portal/"
+          echo "API check     : https://data.speed4you.net/portal-api/api/content/latest?limit=3"
