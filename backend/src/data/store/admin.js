@@ -25,15 +25,16 @@ async function touchAdminLogin(id) {
 }
 
 async function getMediaNormalizerState() {
-  return getAppState('media_normalizer_state', null);
+  return getAppState('media_normalizer_state', null, true);
 }
 
 async function saveMediaNormalizerState(payload) {
   return setAppState('media_normalizer_state', payload);
 }
 
-function getMediaNormalizerLog(limit = 25) {
-  const lines = appStateCache.get('media_normalizer_log')?.lines || [];
+async function getMediaNormalizerLog(limit = 25) {
+  const state = await getAppState('media_normalizer_log', null, true);
+  const lines = state?.lines || [];
   return lines.slice(-Math.max(1, limit));
 }
 

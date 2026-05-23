@@ -41,7 +41,7 @@ async function getStatus() {
     running,
     lock,
     state,
-    recentLogLines: getMediaNormalizerLog(25),
+    recentLogLines: await getMediaNormalizerLog(25),
   };
 }
 
