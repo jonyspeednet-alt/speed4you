@@ -26,34 +26,23 @@ jobs:
         run: npm ci
         working-directory: frontend
 
-      - name: Build frontend for /portal/ (data.speed4you.net)
-        run: |
-          npm run build
-          mv dist dist-portal
-        working-directory: frontend
-        env:
-          VITE_APP_BASE: /portal/
-
-      - name: Build frontend for / (speed4you.net)
+      - name: Build frontend
         run: npm run build
         working-directory: frontend
         env:
           VITE_APP_BASE: /
 
-      - name: Record frontend bundle fingerprints
+      - name: Record frontend bundle fingerprint
         id: frontend_bundle
         run: |
           set -e
           bundle=$(grep -oE 'index-[a-z0-9]+\.js' frontend/dist/index.html | head -n 1)
-          portal_bundle=$(grep -oE 'index-[a-z0-9]+\.js' frontend/dist-portal/index.html | head -n 1)
           if [ -z "$bundle" ]; then
             echo "Could not find main frontend bundle in frontend/dist/index.html" >&2
             exit 1
           fi
           echo "bundle=$bundle" >> "$GITHUB_OUTPUT"
-          echo "portal_bundle=$portal_bundle" >> "$GITHUB_OUTPUT"
-          echo "speed4you bundle: $bundle"
-          echo "portal   bundle: $portal_bundle"
+          echo "Built frontend main bundle: $bundle"
 
       - name: Install backend dependencies (lockfile only)
         run: npm ci
@@ -101,7 +90,7 @@ jobs:
             fi
             echo "Backup complete"
 
-      - name: Copy frontend to web roots
+      - name: Copy frontend to web root
         uses: appleboy/ssh-action@v1.2.0
         env:
           SUDO_PASSWORD: ${{ ***REMOVED***s.SUDO_PASSWORD }}
@@ -113,53 +102,45 @@ jobs:
           envs: SUDO_PASSWORD
           script: |
             set -e
-            BASE=/home/speed4you/actions-runner/_work/speed4you/speed4you/frontend
+            SRC=/home/speed4you/actions-runner/_work/speed4you/speed4you/frontend/dist
+            DEST=/var/www/speed4you.net
 
-            deploy_build() {
-              local SRC="$1"
-              local DEST="$2"
-              local NAME="$3"
+            available_kb=$(df --output=avail "$DEST" 2>/dev/null | tail -1)
+            if [ -n "$available_kb" ] && [ "$available_kb" -lt 51200 ]; then
+              echo "ERROR: Low disk space on $DEST ($available_kb KB available)" >&2
+              exit 1
+            fi
 
-              available_kb=$(df --output=avail "$DEST" 2>/dev/null | tail -1)
-              if [ -n "$available_kb" ] && [ "$available_kb" -lt 51200 ]; then
-                echo "ERROR: Low disk space on $DEST ($available_kb KB available)" >&2
+            if [ -d "$SRC" ]; then
+              src_count=$(find "$SRC" -type f | wc -l)
+              src_size=$(du -sh "$SRC" | cut -f1)
+              echo "Source has $src_count files ($src_size)"
+
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p "$DEST"
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' find "$DEST" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -r "$SRC/." "$DEST/"
+
+              dest_count=$(find "$DEST" -type f | wc -l)
+              dest_size=$(du -sh "$DEST" | cut -f1)
+              echo "Destination has $dest_count files ($dest_size)"
+
+              if [ "$dest_count" -lt "$src_count" ]; then
+                echo "ERROR: File count mismatch — source $src_count, destination $dest_count" >&2
                 exit 1
               fi
 
-              if [ -d "$SRC" ]; then
-                src_count=$(find "$SRC" -type f | wc -l)
-                src_size=$(du -sh "$SRC" | cut -f1)
-                echo "[$NAME] Source has $src_count files ($src_size)"
-
-                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p "$DEST"
-                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' find "$DEST" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -r "$SRC/." "$DEST/"
-
-                dest_count=$(find "$DEST" -type f | wc -l)
-                dest_size=$(du -sh "$DEST" | cut -f1)
-                echo "[$NAME] Destination has $dest_count files ($dest_size)"
-
-                if [ "$dest_count" -lt "$src_count" ]; then
-                  echo "ERROR: [$NAME] File count mismatch" >&2
-                  exit 1
-                fi
-
-                entry_chunk=$(grep -oE 'assets/index-[a-z0-9]+\.js' "$SRC/index.html" | head -1)
-                if [ -n "$entry_chunk" ] && [ ! -f "$DEST/$entry_chunk" ]; then
-                  echo "ERROR: [$NAME] $DEST/$entry_chunk missing" >&2
-                  exit 1
-                fi
-
-                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$DEST"
-                echo "[$NAME] Deployed $src_count files to $DEST"
-              else
-                echo "ERROR: [$NAME] $SRC not found" >&2
+              entry_chunk=$(grep -oE 'assets/index-[a-z0-9]+\.js' "$SRC/index.html" | head -1)
+              if [ -n "$entry_chunk" ] && [ ! -f "$DEST/$entry_chunk" ]; then
+                echo "ERROR: $DEST/$entry_chunk missing after copy" >&2
                 exit 1
               fi
-            }
 
-            deploy_build "$BASE/dist-portal" "/var/www/html/portal" "portal"
-            deploy_build "$BASE/dist" "/var/www/speed4you.net" "speed4you.net"
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$DEST"
+              echo "Frontend copied to $DEST ($dest_count files)"
+            else
+              echo "ERROR: $SRC not found" >&2
+              exit 1
+            fi
 
       - name: Copy backend to app directory
         uses: appleboy/ssh-action@v1.2.0
@@ -266,7 +247,7 @@ jobs:
             echo "Health check failed" >&2
             exit 1
 
-      - name: Configure nginx caching & HTTP/2
+      - name: Configure nginx HTTP/2 & gzip
         uses: appleboy/ssh-action@v1.2.0
         env:
           SUDO_PASSWORD: ${{ ***REMOVED***s.SUDO_PASSWORD }}
@@ -278,101 +259,62 @@ jobs:
           envs: SUDO_PASSWORD
           script: |
             set -e
-            CONF=$(grep -rl "location /portal" /etc/nginx/ 2>/dev/null | head -1 || true)
-            if [ -z "$CONF" ]; then
-              echo "No nginx config found for /portal — skipping"
-              exit 0
-            fi
-            echo "Found nginx config: $CONF"
-
-            # Remove all lines previously added by this deploy script, so we start clean
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i '/^    gzip on;/d' "$CONF"
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i '/^    gzip_types/d' "$CONF"
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i '/^    gzip_min_length/d' "$CONF"
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i '/^    gzip_vary on;/d' "$CONF"
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i '/cache-marker/d' "$CONF"
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i '/portal-cache/d' "$CONF"
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i '/CACHE-MARKER/d' "$CONF"
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i '/do not remove/d' "$CONF"
-
-            # Remove invalid standalone http2 directive
-            if grep -q '^[[:space:]]*http2 on;' "$CONF"; then
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i '/^[[:space:]]*http2 on;/d' "$CONF"
-              echo "Removed invalid standalone http2 on;"
-            fi
-
-            # Enable HTTP/2
-            if ! grep -q 'listen 443 ssl http2' "$CONF"; then
-              if grep -q 'listen 443 ssl;' "$CONF"; then
-                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i 's/listen 443 ssl;/listen 443 ssl http2;/' "$CONF"
-                echo "HTTP/2 enabled"
+            for CONF in /etc/nginx/sites-enabled/data.speed4you.net /etc/nginx/sites-enabled/speed4you.net; do
+              if [ ! -f "$CONF" ]; then
+                echo "Skipping $CONF (not found)"
+                continue
               fi
-            fi
+              echo "Configuring $CONF"
 
-            # Enable gzip
-            if ! grep -q 'gzip on;' "$CONF"; then
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i '/^server {/a\    gzip on;\n    gzip_types text/plain text/css application/json application/javascript image/svg+xml;\n    gzip_min_length 1000;\n    gzip_vary on;' "$CONF"
-              echo "gzip enabled"
-            fi
+              # Enable HTTP/2
+              if ! grep -q 'listen 443 ssl http2' "$CONF"; then
+                if grep -q 'listen 443 ssl;' "$CONF"; then
+                  printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i 's/listen 443 ssl;/listen 443 ssl http2;/' "$CONF"
+                  echo "HTTP/2 enabled"
+                fi
+              fi
 
-            # Write cache snippet file (always idempotent) — printf avoids YAML heredoc-indent clash
-            printf 'location ~ ^/portal/assets/ {\n    expires 1y;\n    add_header Cache-Control "public, immutable";\n    add_header Vary "Accept-Encoding";\n}\nlocation = /portal/index.html {\n    expires -1;\n    add_header Cache-Control "no-cache, no-store, must-revalidate";\n}\n' > /tmp/portal-cache.conf
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp /tmp/portal-cache.conf /etc/nginx/portal-cache.conf
-            echo "Cache snippet written"
-
-            # Add include directive to the /portal location block
-            # Handle both "location /portal {" and "location /portal/ {" variants
-            if ! grep -q 'include /etc/nginx/portal-cache.conf' "$CONF"; then
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i 's|^\([[:space:]]*\)location /portal[[:space:]]*{|\1location /portal {\n\1    include /etc/nginx/portal-cache.conf;|' "$CONF"
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i 's|^\([[:space:]]*\)location /portal/[[:space:]]*{|\1location /portal/ {\n\1    include /etc/nginx/portal-cache.conf;|' "$CONF"
-              echo "Include directive added to /portal block"
-            fi
+              # Enable gzip
+              if ! grep -q 'gzip on;' "$CONF"; then
+                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i '/^server {/a\    gzip on;\n    gzip_types text/plain text/css application/json application/javascript image/svg+xml;\n    gzip_min_length 1000;\n    gzip_vary on;' "$CONF"
+                echo "gzip enabled"
+              fi
+            done
 
             # Test and reload
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' nginx -t
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' systemctl reload nginx
-            echo "Nginx reloaded with HTTP/2 + gzip + caching"
+            echo "Nginx reloaded with HTTP/2 + gzip"
 
-      - name: Verify deployed frontend bundles
+      - name: Verify deployed frontend bundle
         env:
           EXPECTED_BUNDLE: ${{ steps.frontend_bundle.outputs.bundle }}
-          EXPECTED_PORTAL_BUNDLE: ${{ steps.frontend_bundle.outputs.portal_bundle }}
         run: |
           set -e
-          echo "Expected bundles — speed4you.net: $EXPECTED_BUNDLE, portal: $EXPECTED_PORTAL_BUNDLE"
+          echo "Expected bundle: $EXPECTED_BUNDLE"
+          DEST=/var/www/speed4you.net
 
-          verify_dest() {
-            local DEST="$1"
-            local EXPECTED="$2"
-            local NAME="$3"
+          if [ ! -f "$DEST/index.html" ]; then
+            echo "FAIL: $DEST/index.html not found" >&2
+            exit 1
+          fi
 
-            if [ ! -f "$DEST/index.html" ]; then
-              echo "FAIL [$NAME]: $DEST/index.html not found" >&2
-              exit 1
-            fi
+          bundle=$(grep -oE 'index-[a-z0-9]+\.js' "$DEST/index.html" | head -n 1 || true)
+          echo "Deployed bundle: $bundle"
 
-            local bundle
-            bundle=$(grep -oE 'index-[a-z0-9]+\.js' "$DEST/index.html" | head -n 1 || true)
-            echo "[$NAME] bundle: $bundle"
+          if [ "$bundle" != "$EXPECTED_BUNDLE" ]; then
+            echo "FAIL: HTML references $bundle, expected $EXPECTED_BUNDLE" >&2
+            exit 1
+          fi
 
-            if [ "$bundle" != "$EXPECTED" ]; then
-              echo "FAIL [$NAME]: HTML references $bundle, expected $EXPECTED" >&2
-              exit 1
-            fi
-
-            if [ ! -f "$DEST/assets/$bundle" ]; then
-              echo "FAIL [$NAME]: $DEST/assets/$bundle missing" >&2
-              exit 1
-            fi
-            echo "[$NAME] OK — $bundle verified on disk"
-          }
-
-          verify_dest "/var/www/speed4you.net" "$EXPECTED_BUNDLE" "speed4you.net"
-          verify_dest "/var/www/html/portal" "$EXPECTED_PORTAL_BUNDLE" "portal"
+          if [ ! -f "$DEST/assets/$bundle" ]; then
+            echo "FAIL: $DEST/assets/$bundle missing" >&2
+            exit 1
+          fi
+          echo "OK — $bundle verified on disk"
 
       - name: Deployment summary
         run: |
           echo "Deployment completed."
-          echo "speed4you.net : https://speed4you.net/"
-          echo "Portal        : https://data.speed4you.net/portal/"
-          echo "API check     : https://data.speed4you.net/portal-api/api/content/latest?limit=3"
+          echo "Site : https://speed4you.net/"
+          echo "API  : https://speed4you.net/portal-api/api/content/latest?limit=3"
