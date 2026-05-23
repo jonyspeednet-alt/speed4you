@@ -56,6 +56,7 @@ function normalizeItem(item) {
     poster: item.poster || posterFallback,
     backdrop: item.backdrop || item.poster || posterFallback,
     year: item.year || "Unknown",
+    releasedAt: item.releasedAt || null,
     rating: item.rating || "N/A",
     genre: item.genre || "Uncategorized",
     language: item.language || "Unknown",
@@ -481,7 +482,13 @@ function BrowsePage({ type }) {
           label="Sort By"
           value={sortBy}
           onChange={setSortBy}
-          options={["latest", "popular", "trending", "rating", "featured"]}
+          options={[
+            { label: "Release Date", value: "latest" },
+            { label: "Popular", value: "popular" },
+            { label: "Trending", value: "trending" },
+            { label: "Rating", value: "rating" },
+            { label: "Featured", value: "featured" },
+          ]}
         />
         <FilterField
           label="Collection"
@@ -541,7 +548,7 @@ function BrowsePage({ type }) {
           <span style={styles.statPill}>
             {selectedLanguage === "All" ? "All languages" : selectedLanguage}
           </span>
-          <span style={styles.statPill}>{sortBy}</span>
+          <span style={styles.statPill}>{sortBy === "latest" ? "Release Date" : sortBy}</span>
         </div>
       </section>
 
@@ -669,11 +676,15 @@ function FilterField({ label, value, onChange, options }) {
         className="browse-filter-button"
         style={styles.select}
       >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
+        {options.map((option) => {
+          const optValue = typeof option === "object" ? option.value : option;
+          const optLabel = typeof option === "object" ? option.label : option;
+          return (
+            <option key={optValue} value={optValue}>
+              {optLabel}
+            </option>
+          );
+        })}
       </select>
     </label>
   );
