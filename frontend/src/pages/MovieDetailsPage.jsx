@@ -11,6 +11,13 @@ import { DETAIL_STYLES, DETAIL_SKELETON, posterFallbackUrl } from '../styles/det
 const posterFallback = posterFallbackUrl;
 const MOVIE_CACHE_PREFIX = 'portal-movie-details-v1:';
 
+function formatReleaseDate(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
 function readMovieCache(slug) {
   if (typeof sessionStorage === 'undefined' || !slug) return null;
   try {
@@ -165,7 +172,7 @@ export default function MovieDetailsPage() {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--accent-cyan)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
                 <span style={s.ratingVal}>{movie.rating || 'N/A'}</span>
               </div>
-              {movie.year && <span style={s.metaChip}>{movie.year}</span>}
+              {(movie.releasedAt || movie.year) && <span style={s.metaChip}>{formatReleaseDate(movie.releasedAt) || movie.year}</span>}
               {runtime && <span style={s.metaChip}>{runtime}</span>}
               {language && <span style={s.metaChip}>{language}</span>}
             </div>
@@ -268,7 +275,7 @@ export default function MovieDetailsPage() {
             <h2 style={s.cardTitle}>Details</h2>
             <div style={{ ...s.statGrid, ...(isMobile ? s.statGridMobile : {}) }}>
               {[
-                { label: 'Year', value: movie.year },
+                { label: 'Released', value: formatReleaseDate(movie.releasedAt) || movie.year || '—' },
                 { label: 'Runtime', value: runtime || '—' },
                 { label: 'Language', value: language || '—' },
                 { label: 'Quality', value: movie.quality || 'HD' },

@@ -11,6 +11,13 @@ import { DETAIL_STYLES, DETAIL_SKELETON, posterFallbackUrl } from '../styles/det
 const posterFallback = posterFallbackUrl;
 const SERIES_CACHE_PREFIX = 'portal-series-details-v1:';
 
+function formatReleaseDate(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
 function toPositiveInt(value, fallback) {
   const n = Number(value);
   if (Number.isFinite(n) && n > 0) return Math.floor(n);
@@ -271,7 +278,7 @@ export default function SeriesDetailsPage() {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--accent-cyan)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
                 <span style={s.ratingVal}>{series.rating || 'N/A'}</span>
               </div>
-              {series.year && <span style={s.metaChip}>{series.year}</span>}
+              {(series.releasedAt || series.year) && <span style={s.metaChip}>{formatReleaseDate(series.releasedAt) || series.year}</span>}
               {totalEpisodes > 0 && <span style={s.metaChip}>{totalEpisodes} Episodes</span>}
               {(series.language || series.originalLanguage) && (
                 <span style={s.metaChip}>{series.language || series.originalLanguage}</span>
@@ -341,7 +348,7 @@ export default function SeriesDetailsPage() {
             <h2 style={s.cardTitle}>Series details</h2>
             <div style={{ ...s.statGrid, ...(isMobile ? s.statGridMobile : {}) }}>
               {[
-                { label: 'Year', value: series.year },
+                { label: 'Released', value: formatReleaseDate(series.releasedAt) || series.year || '—' },
                 { label: 'Seasons', value: seasons.length || '—' },
                 { label: 'Episodes', value: totalEpisodes || '—' },
                 { label: 'Language', value: series.language || series.originalLanguage || '—' },
