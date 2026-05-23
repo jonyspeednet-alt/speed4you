@@ -24,6 +24,13 @@ function getTmdbSrcSet(url) {
   return `${base}w185${path} 185w, ${base}w342${path} 342w, ${base}w500${path} 500w`;
 }
 
+function formatReleaseDate(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
 function ContentCard({
   item,
   type,
@@ -44,6 +51,7 @@ function ContentCard({
     .split(",")[0]
     .trim();
   const itemRating = item.rating || null;
+  const displayDate = formatReleaseDate(item.releasedAt) || item.year || null;
 
   return (
     <article
@@ -155,8 +163,8 @@ function ContentCard({
               }}
             >
               <span style={styles.genrePill}>{genre}</span>
-              {!compact && item.year ? (
-                <span style={styles.yearText}>{item.year}</span>
+              {!compact && displayDate ? (
+                <span style={styles.yearText}>{displayDate}</span>
               ) : null}
               {!compact ? (
                 <span style={styles.langText}>{item.language || "Mixed"}</span>
@@ -186,9 +194,9 @@ function ContentCard({
           <div className="content-rail-meta" style={styles.cardMeta}>
             <span>{genre}</span>
             <span style={styles.metaDot}>·</span>
-            {item.year ? (
+            {displayDate ? (
               <>
-                <span>{item.year}</span>
+                <span>{displayDate}</span>
                 <span style={styles.metaDot}>·</span>
               </>
             ) : null}

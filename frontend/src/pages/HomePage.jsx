@@ -21,6 +21,7 @@ function normalizeItem(item) {
     genre: item.genre || 'Featured',
     description: item.description || 'Freshly published on the portal.',
     year: item.year || 'Unknown',
+    releasedAt: item.releasedAt || null,
     rating: item.rating || 'N/A',
     type: item.type || 'movie',
     language: item.language || item.originalLanguage || 'Mixed',
