@@ -89,7 +89,7 @@ function ProfileMenu({ user, compact = false }) {
             My List
           </Link>
 
-          {user.role === 'admin' && (
+          {(user.role === 'admin' || user.role === 'super_admin') && (
             <Link
               to="/admin"
               role="menuitem"
