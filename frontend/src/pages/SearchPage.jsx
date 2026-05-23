@@ -15,6 +15,7 @@ function normalizeItem(item) {
     genre: item.genre || 'Uncategorized',
     language: item.language || 'Unknown',
     year: item.year || 'Unknown',
+    releasedAt: item.releasedAt || null,
     rating: item.rating || 'N/A',
   };
 }

@@ -5,6 +5,13 @@ import { useBreakpoint, useTVMode } from "../hooks";
 import { CardSkeleton } from "../components/feedback/Skeleton";
 import WatchlistButton from "../components/ui/WatchlistButton";
 
+function formatDate(d) {
+  if (!d) return null;
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return null;
+  return dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
 function WatchlistPage() {
   const { isMobile, isTablet } = useBreakpoint();
   const isTVMode = useTVMode();
@@ -205,7 +212,7 @@ function WatchlistPage() {
                       {item.title}
                     </h3>
                     <span style={styles.cardMeta}>
-                      {item.genre} • {item.year}
+                      {item.genre} • {formatDate(item.releasedAt) || item.year || "Unknown"}
                     </span>
                     {item.progress > 0 && (
                       <span style={styles.progressLabel}>
