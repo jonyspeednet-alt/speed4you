@@ -379,23 +379,46 @@ jobs:
             fi
             echo "SSL: $CERT"
 
-            # 4. Write nginx config from template
+            # 4. Write nginx config directly
             if echo "$PHP_SOCK" | grep -q '\.sock'; then
               PHP_PASS="unix:$PHP_SOCK"
             else
               PHP_PASS="$PHP_SOCK"
             fi
-            TMPL=/home/speed4you/actions-runner/_work/speed4you/speed4you/deploy/data-nginx.conf
             TMPF=/tmp/data-nginx.conf
-            if [ -f "$TMPL" ]; then
-              cp "$TMPL" "$TMPF"
-              sed -i "s|CERT_PH|$CERT|g; s|KEY_PH|$CERT_KEY|g; s|SOCK_PH|$PHP_PASS|g" "$TMPF"
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp "$TMPF" "$CONF" 2>/dev/null || true
-              rm -f "$TMPF"
-              echo "nginx config written"
-            else
-              echo "WARN: template $TMPL not found" >&2
-            fi
+            echo 'server {' > "$TMPF"
+            echo '    listen 443 ssl http2;' >> "$TMPF"
+            echo '    server_name data.speed4you.net;' >> "$TMPF"
+            echo '' >> "$TMPF"
+            echo "    ssl_certificate $CERT;" >> "$TMPF"
+            echo "    ssl_certificate_key $CERT_KEY;" >> "$TMPF"
+            echo '' >> "$TMPF"
+            echo '    root /var/www/html/data;' >> "$TMPF"
+            echo '    index index.html index.php /_h5ai/public/index.php;' >> "$TMPF"
+            echo '' >> "$TMPF"
+            echo '    location /.well-known/acme-challenge/ {' >> "$TMPF"
+            echo '        root /var/www/html;' >> "$TMPF"
+            echo '    }' >> "$TMPF"
+            echo '' >> "$TMPF"
+            echo '    location / {' >> "$TMPF"
+            echo '        try_files $uri $uri/ /_h5ai/public/index.php$is_args$args;' >> "$TMPF"
+            echo '    }' >> "$TMPF"
+            echo '' >> "$TMPF"
+            echo '    location ~ ^/_h5ai/private/ {' >> "$TMPF"
+            echo '        deny all;' >> "$TMPF"
+            echo '    }' >> "$TMPF"
+            echo '' >> "$TMPF"
+            echo '    location ~ \.php$ {' >> "$TMPF"
+            echo '        try_files $uri =404;' >> "$TMPF"
+            echo "        fastcgi_pass $PHP_PASS;" >> "$TMPF"
+            echo '        fastcgi_index index.php;' >> "$TMPF"
+            echo '        include fastcgi_params;' >> "$TMPF"
+            echo '        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;' >> "$TMPF"
+            echo '    }' >> "$TMPF"
+            echo '}' >> "$TMPF"
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp "$TMPF" "$CONF" 2>/dev/null || true
+            rm -f "$TMPF"
+            echo "nginx config written"
 
             # 5. PHP-FPM + permissions
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$H5AI_DIR" 2>/dev/null || true
