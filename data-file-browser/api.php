@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
+header('Cache-Control: max-age=5, must-revalidate');
 
 $root = '/var/www/html';
 $path = isset($_GET['path']) ? trim($_GET['path']) : '/';
@@ -28,7 +29,7 @@ $items = [];
 $dh = opendir($fullPath);
 if ($dh) {
     while (($file = readdir($dh)) !== false) {
-        if ($file === '.' || $file === '..' || $file === '.d.css' || $file === 'index.html') continue;
+        if ($file[0] === '.' || $file === 'index.html' || $file === 'api.php') continue;
         $filePath = $fullPath . '/' . $file;
         $stat = stat($filePath);
         $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
