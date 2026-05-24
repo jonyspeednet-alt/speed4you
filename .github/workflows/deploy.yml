@@ -163,6 +163,12 @@ jobs:
               echo "ERROR: $SRC not found" >&2
               exit 1
             fi
+            # Copy disk cleanup script
+            if [ -f "$SRC/scripts/cleanup-disk.sh" ]; then
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp "$SRC/scripts/cleanup-disk.sh" /usr/local/bin/cleanup-disk.sh
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chmod +x /usr/local/bin/cleanup-disk.sh
+              echo "Cleanup script installed"
+            fi
 
       - name: Install deps, write .env, restart, health check
         uses: appleboy/ssh-action@v1.2.0
