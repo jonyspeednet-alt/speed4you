@@ -423,7 +423,7 @@ jobs:
               echo "    }" >> /tmp/dataconf
               echo "    location ~ \\.php$ {" >> /tmp/dataconf
               echo '        try_files $uri =404;' >> /tmp/dataconf
-              echo "        fastcgi_pass $PHP_SOCK;" >> /tmp/dataconf
+              echo "        fastcgi_pass unix:$PHP_SOCK;" >> /tmp/dataconf
               echo "        fastcgi_index index.php;" >> /tmp/dataconf
               echo "        include fastcgi_params;" >> /tmp/dataconf
               echo '        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;' >> /tmp/dataconf
