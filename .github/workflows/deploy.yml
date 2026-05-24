@@ -328,6 +328,17 @@ jobs:
               for sock in /run/php/php*-fpm.sock /var/run/php/php*-fpm.sock; do [ -S "$sock" ] && { PHP_AVAIL=true; PHP_SOCK="$sock"; break; }; done
               if $PHP_AVAIL; then
                 echo "PHP-FPM socket found: $PHP_SOCK"
+                # Tune PHP-FPM for performance
+                FPM_CONF=$(printf '%s\n' /etc/php/*/fpm/pool.d/www.conf 2>/dev/null | head -1)
+                if [ -n "$FPM_CONF" ]; then
+                  printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i 's/^pm = dynamic/pm = ondemand/' "$FPM_CONF"
+                  printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i 's/^pm\.max_children = [0-9]*/pm.max_children = 50/' "$FPM_CONF"
+                  printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i 's/^pm\.start_servers = [0-9]*/pm.start_servers = 2/' "$FPM_CONF"
+                  printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i 's/^pm\.min_spare_servers = [0-9]*/pm.min_spare_servers = 1/' "$FPM_CONF"
+                  printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i 's/^pm\.max_spare_servers = [0-9]*/pm.max_spare_servers = 5/' "$FPM_CONF"
+                  printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' systemctl restart php*-fpm 2>/dev/null || true
+                  echo "PHP-FPM tuned (ondemand, max_children=50)"
+                fi
               else
                 echo "PHP-FPM socket not found. Checking installed packages..."
                 dpkg -l | grep php 2>/dev/null || echo "No php packages found"
@@ -363,46 +374,54 @@ jobs:
                 rm -rf "$TMPD" "$TMPZ"
               fi
             fi
-            # Write CSS for autoindex styling (one-liner, temp file + sudo cp)
-            echo 'body{font-family:"Segoe UI",sans-serif;background:#0f1117;color:#c9d1d9;max-width:960px;margin:32px auto;padding:0 16px}h1{font-weight:300;color:#58a6ff;border-bottom:1px solid #21262d;padding-bottom:12px}a{color:#58a6ff;text-decoration:none}a:hover{color:#79b8ff;text-decoration:underline}pre{background:#161b22;padding:16px;border-radius:8px;border:1px solid #21262d;overflow-x:auto}hr{display:none}' > /tmp/data-theme.css
+            # Write CSS for autoindex styling — polished dark theme (temp file + sudo cp)
+            echo 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,sans-serif;background:#0d1117;color:#c9d1d9;max-width:960px;margin:0 auto;padding:24px 20px}h1{font-size:24px;font-weight:600;color:#e6edf3;padding-bottom:12px;margin-bottom:20px;border-bottom:1px solid #30363d}pre{background:#161b22;padding:12px 20px;border-radius:8px;border:1px solid #30363d;font-size:14px;line-height:2;font-family:Consolas,"JetBrains Mono","Fira Code",monospace;overflow-x:auto}pre a{color:#c9d1d9;text-decoration:none;padding:2px 0;display:inline-block;transition:color .15s}pre a:hover{color:#58a6ff;text-decoration:none}hr{display:none}pre a[href*="/"]:not([href*="."]){color:#58a6ff;font-weight:500}pre a[href*="."]{color:#c9d1d9}pre a[href$=".mp4"],pre a[href$=".mkv"],pre a[href$=".avi"]{color:#d2a8ff}pre a[href$=".mp3"],pre a[href$=".flac"]{color:#7ee787}pre a[href$=".zip"],pre a[href$=".rar"]{color:#f0883e}pre a[href$=".jpg"],pre a[href$=".png"],pre a[href$=".webp"]{color:#79c0ff}' > /tmp/data-theme.css
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp /tmp/data-theme.css "$ROOT/.d.css" && rm -f /tmp/data-theme.css
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' rm -f "$ROOT/index.html" 2>/dev/null || true
-            # Build nginx config
+            # Build nginx config — use native autoindex (instant, C module) instead of routing all dirs through PHP
             echo "server {" > /tmp/dataconf
             echo "    listen 443 ssl http2;" >> /tmp/dataconf
             echo "    server_name data.speed4you.net;" >> /tmp/dataconf
             echo "    ssl_certificate $CERT;" >> /tmp/dataconf
             echo "    ssl_certificate_key $CERT_KEY;" >> /tmp/dataconf
             echo "    root $ROOT;" >> /tmp/dataconf
+            echo "    sendfile on;" >> /tmp/dataconf
+            echo "    tcp_nopush on;" >> /tmp/dataconf
+            echo "    open_file_cache max=1000 inactive=20s;" >> /tmp/dataconf
+            echo "    open_file_cache_valid 30s;" >> /tmp/dataconf
+            echo "    open_file_cache_min_uses 2;" >> /tmp/dataconf
+            echo "    open_file_cache_errors on;" >> /tmp/dataconf
+            echo "    autoindex on;" >> /tmp/dataconf
+            echo "    autoindex_exact_size off;" >> /tmp/dataconf
+            echo "    autoindex_localtime on;" >> /tmp/dataconf
+            echo '    sub_filter '</head>' '<link rel="stylesheet" href="/.d.css"></head>';' >> /tmp/dataconf
+            echo "    sub_filter_once on;" >> /tmp/dataconf
             echo '    gzip on;' >> /tmp/dataconf
             echo '    gzip_types text/plain text/css application/json application/javascript image/svg+xml;' >> /tmp/dataconf
             echo '    gzip_min_length 1000;' >> /tmp/dataconf
             echo '    gzip_vary on;' >> /tmp/dataconf
-            if $H5AI_OK; then
-              echo "    index index.html index.php /_h5ai/public/index.php;" >> /tmp/dataconf
-              echo "    location /.well-known/acme-challenge/ {" >> /tmp/dataconf
-              echo "        root /var/www/html;" >> /tmp/dataconf
-              echo "    }" >> /tmp/dataconf
-              echo "    location / {" >> /tmp/dataconf
-              echo '        try_files $uri $uri/ /_h5ai/public/index.php$is_args$args;' >> /tmp/dataconf
-              echo "    }" >> /tmp/dataconf
+            echo "    location /.well-known/acme-challenge/ {" >> /tmp/dataconf
+            echo "        root /var/www/html;" >> /tmp/dataconf
+            echo "    }" >> /tmp/dataconf
+            echo "    location / {" >> /tmp/dataconf
+            echo '        try_files $uri $uri/ =404;' >> /tmp/dataconf
+            echo "    }" >> /tmp/dataconf
+            if $PHP_AVAIL; then
               echo "    location ~ \\.php$ {" >> /tmp/dataconf
               echo '        try_files $uri =404;' >> /tmp/dataconf
               echo "        fastcgi_pass unix:$PHP_SOCK;" >> /tmp/dataconf
               echo "        fastcgi_index index.php;" >> /tmp/dataconf
               echo "        include fastcgi_params;" >> /tmp/dataconf
               echo '        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;' >> /tmp/dataconf
-              echo "    }" >> /tmp/dataconf
-            else
-              echo "    autoindex on;" >> /tmp/dataconf
-              echo "    autoindex_exact_size off;" >> /tmp/dataconf
-              echo "    autoindex_localtime on;" >> /tmp/dataconf
-              echo "    sub_filter '</head>' '<link rel=\"stylesheet\" href=\"/.d.css\"></head>';" >> /tmp/dataconf
-              echo "    sub_filter_once on;" >> /tmp/dataconf
-              echo "    location /.well-known/acme-challenge/ {" >> /tmp/dataconf
-              echo "        root /var/www/html;" >> /tmp/dataconf
+              echo "        fastcgi_buffer_size 128k;" >> /tmp/dataconf
+              echo "        fastcgi_buffers 256 16k;" >> /tmp/dataconf
+              echo "        fastcgi_busy_buffers_size 256k;" >> /tmp/dataconf
               echo "    }" >> /tmp/dataconf
             fi
+            echo "    location ~* \\.(css|js|png|jpg|jpeg|gif|ico|svg|woff2?|ttf|eot)$ {" >> /tmp/dataconf
+            echo '        expires 30d;' >> /tmp/dataconf
+            echo '        add_header Cache-Control "public, immutable";' >> /tmp/dataconf
+            echo "    }" >> /tmp/dataconf
             echo "}" >> /tmp/dataconf
             cat /tmp/dataconf
             echo "--- copying config ---"
