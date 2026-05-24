@@ -274,7 +274,10 @@ async function fetchMetadataByImdbId(imdbId, mediaType = 'movie') {
     } catch {}
   }
 
-  throw Object.assign(new Error(`No metadata found for ${imdbId}. Try a different ID.`), { statusCode: 404 });
+  const hint = !hasOmdbKey()
+    ? ' TMDb does not have this title and OMDB_API_KEY is not configured. Add OMDB_API_KEY to server .env for IMDb fallback.'
+    : '';
+  throw Object.assign(new Error(`No metadata found for ${imdbId}. Try a different ID.${hint}`), { statusCode: 404 });
 }
 
 async function enrichItemWithMetadata(item) {
