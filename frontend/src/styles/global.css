@@ -1215,7 +1215,8 @@ main,
   overscroll-behavior-x: contain;
   scrollbar-width: none;
   width: 100%;
-  max-width: none;
+  max-width: 100%;
+  box-sizing: border-box;
   margin: 0;
 }
 
