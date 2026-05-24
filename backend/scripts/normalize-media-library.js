@@ -67,7 +67,7 @@ function buildSignature(filePath, stat) {
 }
 
 function resolveFfTool(name) {
-  const override = process.env[name.toUpperCase()];
+  const override = process.env[name.toUpperCase() + '_PATH'];
   if (override) {
     return override;
   }
