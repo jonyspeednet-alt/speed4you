@@ -4,6 +4,7 @@ const { fork } = require('child_process');
 const {
   deleteItemsByScanSignatures,
   deleteScannerItemsNotInSignatures,
+  getAppState,
   getItemByScanSignature,
   getScannerRuns,
   loadScannerRoots,
@@ -47,6 +48,7 @@ const PREFERRED_POSTER_PATTERNS = [
 ];
 const DEFAULT_MOVIE_DEPTH = Math.max(1, Number(process.env.SCANNER_DEFAULT_MOVIE_DEPTH || 6));
 const DEFAULT_BATCH_SIZE = 25;
+const PROGRESS_EMIT_INTERVAL = Math.max(1, Number(process.env.SCANNER_PROGRESS_EMIT_INTERVAL || 10));
 const DEFAULT_MEDIA_LIBRARY_ROOT = process.env.SCANNER_MEDIA_ROOT || '/var/www/html';
 const ENABLE_AUTO_DISCOVER_ROOTS = process.env.SCANNER_AUTO_DISCOVER_ROOTS !== 'false';
 const AUTO_DISCOVER_MAX_DEPTH = Math.max(1, Number(process.env.SCANNER_AUTO_DISCOVER_MAX_DEPTH || 3));
@@ -716,8 +718,8 @@ function createBaseScannerItem(root, values) {
   };
 }
 
-function loadRootState(rootId) {
-  const state = loadScannerState();
+async function loadRootState(rootId) {
+  const state = await getAppState('scanner_state', { roots: {} });
   return state.roots?.[rootId] || { folders: {}, lastCompletedAt: '' };
 }
 
@@ -936,8 +938,8 @@ function updateRootProgress(summary, rootId, patch) {
   };
 }
 
-async function processMovieRoot(root, summary, progressCallback, scanContext) {
-  const rootState = loadRootState(root.id);
+async function processMovieRoot(root, summary, progressCallback, scanContext, existingSignatureSet) {
+  const rootState = await loadRootState(root.id);
   const nextRootState = {
     folders: { ...(rootState.folders || {}) },
     lastCompletedAt: '',
@@ -1029,7 +1031,7 @@ async function processMovieRoot(root, summary, progressCallback, scanContext) {
         continue;
       }
 
-      if (previousFingerprint && previousFingerprint === fingerprint && await hasAllCandidatesInCatalog(movieCandidates)) {
+      if (previousFingerprint && previousFingerprint === fingerprint && await hasAllCandidatesInCatalog(movieCandidates, existingSignatureSet)) {
         movieCandidates.forEach((candidate) => seenSignatures.add(candidate.scanSignature));
         summary.unchanged += movieCandidates.length;
         const current = summary.rootResults.find((entry) => entry.id === root.id);
@@ -1125,8 +1127,8 @@ async function processMovieRoot(root, summary, progressCallback, scanContext) {
   }
 }
 
-async function processSeriesRoot(root, summary, progressCallback, scanContext) {
-  const rootState = loadRootState(root.id);
+async function processSeriesRoot(root, summary, progressCallback, scanContext, existingSignatureSet) {
+  const rootState = await loadRootState(root.id);
   const nextRootState = {
     folders: { ...(rootState.folders || {}) },
     lastCompletedAt: '',
@@ -1262,11 +1264,11 @@ async function processSeriesRoot(root, summary, progressCallback, scanContext) {
   }
 }
 
-function summarizeRoot(root) {
+async function summarizeRoot(root) {
   const pathAssessment = assessScanPath(root.scanPath);
   const effectiveMaxDepth = root.maxDepth ?? (root.type === 'movie' ? DEFAULT_MOVIE_DEPTH : 1);
   const effectiveBatchSize = root.batchSize ?? DEFAULT_BATCH_SIZE;
-  const state = loadRootState(root.id);
+  const state = await loadRootState(root.id);
   const entry = {
     id: root.id,
     label: root.label,
@@ -1310,8 +1312,8 @@ function summarizeRoot(root) {
   return entry;
 }
 
-function getScannerHealth() {
-  const roots = getEffectiveRoots().map(summarizeRoot);
+async function getScannerHealth() {
+  const roots = await Promise.all(getEffectiveRoots().map(summarizeRoot));
   const runs = getScannerRuns(10);
   const healthyRoots = roots.filter((root) => root.checkable && root.exists && !root.error).length;
   const brokenRoots = roots.filter((root) => root.checkable && !root.exists).length;

@@ -171,8 +171,8 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.get('/health/scanner', (req, res) => {
-  const health = getScannerHealth();
+app.get('/health/scanner', async (req, res) => {
+  const health = await getScannerHealth();
   const includeSensitive = String(process.env.SCANNER_HEALTH_PUBLIC_VERBOSE || '').toLowerCase() === 'true';
   res.json(includeSensitive ? health : sanitizeScannerHealthForPublic(health));
 });
