@@ -82,6 +82,11 @@ export const adminService = {
     method: 'POST',
     body: JSON.stringify({ tmdbId, type }),
   }).finally(clearAdminCache),
+  getNormalizerConfig: () => apiClient('/admin/media-normalizer/config'),
+  setNormalizerConfig: (config) => apiClient('/admin/media-normalizer/config', {
+    method: 'POST',
+    body: JSON.stringify(config),
+  }),
 };
 
 export default adminService;

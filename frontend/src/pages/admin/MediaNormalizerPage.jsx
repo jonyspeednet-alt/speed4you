@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminService } from '../../services';
 
@@ -13,7 +13,7 @@ function formatSeconds(seconds) {
 }
 
 function formatBytes(bytes) {
-  if (!bytes || bytes <= 0) return '—';
+  if (!bytes || bytes <= 0) return '\u2014';
   const units = ['B', 'KB', 'MB', 'GB'];
   let i = 0;
   let size = bytes;
@@ -38,15 +38,55 @@ const LOG_COLORS = {
   info: '#7ee787',
 };
 
+const PRESETS = ['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow'];
+
+function Toast({ toast, onDismiss }) {
+  useEffect(() => {
+    const t = setTimeout(() => onDismiss(toast.id), 4000);
+    return () => clearTimeout(t);
+  }, [toast.id, onDismiss]);
+
+  const bgColor = toast.type === 'error' ? 'rgba(239,68,68,0.15)' : toast.type === 'success' ? 'rgba(34,197,94,0.12)' : 'rgba(59,130,246,0.12)';
+  const borderColor = toast.type === 'error' ? 'rgba(239,68,68,0.3)' : toast.type === 'success' ? 'rgba(34,197,94,0.3)' : 'rgba(59,130,246,0.3)';
+  const textColor = toast.type === 'error' ? '#f87171' : toast.type === 'success' ? '#4ade80' : '#60a5fa';
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px',
+      borderRadius: '12px', background: bgColor, border: `1px solid ${borderColor}`,
+      color: textColor, fontSize: '0.85rem', fontWeight: '600', minWidth: '280px',
+      maxWidth: '420px', boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+      animation: 'toastIn 0.25s ease-out',
+    }}>
+      <span style={{ flex: 1, lineHeight: 1.4 }}>{toast.message}</span>
+      <button type="button" onClick={() => onDismiss(toast.id)}
+        style={{ background: 'none', border: 'none', color: textColor, cursor: 'pointer', opacity: 0.6, fontSize: '1rem', padding: '2px 4px' }}>
+        &times;
+      </button>
+    </div>
+  );
+}
+
+let toastIdCounter = 0;
+
 export default function MediaNormalizerPage() {
   const queryClient = useQueryClient();
   const logEndRef = useRef(null);
   const [logFilter, setLogFilter] = useState('all');
+  const [toasts, setToasts] = useState([]);
+  const prevProcessedRef = useRef(null);
+  const prevFailedRef = useRef(null);
+  const [configOpen, setConfigOpen] = useState(false);
 
   const { data: normalizer = { running: false, state: null, recentLogLines: [] }, error: normalizerError } = useQuery({
     queryKey: ['admin', 'normalizer', 'status'],
     queryFn: () => adminService.getMediaNormalizerStatus(),
     refetchInterval: 2000,
+  });
+
+  const { data: normalizerConfig } = useQuery({
+    queryKey: ['admin', 'normalizer', 'config'],
+    queryFn: () => adminService.getNormalizerConfig(),
   });
 
   const normalizerMutation = useMutation({
@@ -61,6 +101,53 @@ export default function MediaNormalizerPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'normalizer', 'status'] }),
   });
 
+  const configMutation = useMutation({
+    mutationFn: (cfg) => adminService.setNormalizerConfig(cfg),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'normalizer', 'config'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'normalizer', 'status'] });
+    },
+  });
+
+  const addToast = useCallback((type, message) => {
+    const id = ++toastIdCounter;
+    setToasts(prev => [...prev, { id, type, message }]);
+  }, []);
+
+  const dismissToast = useCallback((id) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  // Detect new done/failed entries
+  useEffect(() => {
+    const processed = normalizer.state?.processed || {};
+    const failed = normalizer.state?.failed || {};
+
+    if (prevProcessedRef.current && prevFailedRef.current) {
+      const prevProc = prevProcessedRef.current;
+      const prevFail = prevFailedRef.current;
+
+      for (const [key, entry] of Object.entries(processed)) {
+        if (!prevProc[key] && entry.note === 'converted-and-replaced (full-transcode)') {
+          const name = key.split('/').pop() || key;
+          const saved = entry.inputSize && entry.outputSize
+            ? ` (saved ${formatBytes(entry.inputSize - entry.outputSize)})` : '';
+          addToast('success', `\u2705 ${name}${saved}`);
+        }
+      }
+
+      for (const [key] of Object.entries(failed)) {
+        if (!prevFail[key]) {
+          const name = key.split('/').pop() || key;
+          addToast('error', `\u274c ${name}`);
+        }
+      }
+    }
+
+    prevProcessedRef.current = processed;
+    prevFailedRef.current = failed;
+  }, [normalizer.state?.processed, normalizer.state?.failed, addToast]);
+
   const currentProgress = normalizer.state?.currentFileProgress || null;
   const pct = Math.max(0, Math.min(100, Number(currentProgress?.percent || 0)));
   const duration = Number(currentProgress?.durationSeconds || 0);
@@ -73,7 +160,6 @@ export default function MediaNormalizerPage() {
   const stats = normalizer.state?.stats || {};
   const total = (stats.converted || 0) + (stats.failed || 0) + (stats.skippedAlreadyOk || 0);
 
-  // Compute size savings from processed entries
   const { totalInput, totalOutput, savedBytes, compressionPct } = useMemo(() => {
     const processed = normalizer.state?.processed || {};
     let input = 0, output = 0;
@@ -91,7 +177,6 @@ export default function MediaNormalizerPage() {
     };
   }, [normalizer.state?.processed]);
 
-  // Extract recent conversions + failures from log lines
   const recentHistory = useMemo(() => {
     const lines = normalizer.recentLogLines || [];
     return lines.filter(l =>
@@ -109,8 +194,19 @@ export default function MediaNormalizerPage() {
     }
   }, [filteredLogs.length]);
 
+  const concurrency = normalizerConfig?.concurrency || 2;
+
   return (
     <div style={s.page}>
+      <style>{`
+        @keyframes toastIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+      `}</style>
+
+      {/* Toast container */}
+      <div style={s.toastContainer}>
+        {toasts.map(t => <Toast key={t.id} toast={t} onDismiss={dismissToast} />)}
+      </div>
+
       {/* Header */}
       <div style={s.header}>
         <div>
@@ -197,7 +293,7 @@ export default function MediaNormalizerPage() {
       {/* Main grid */}
       <div style={s.grid}>
 
-        {/* Left: Progress + Workers + History */}
+        {/* Left: Progress + Workers + History + Config */}
         <div style={s.leftCol}>
 
           {/* Current Progress */}
@@ -233,9 +329,9 @@ export default function MediaNormalizerPage() {
                 <div style={s.progressMeta}>
                   <span>{formatSeconds(elapsed)} / {formatSeconds(duration)}</span>
                   <span style={s.metaDivider}>|</span>
-                  <span>Speed: <strong style={{ color: '#4ade80' }}>{currentProgress.speed || '—'}</strong></span>
+                  <span>Speed: <strong style={{ color: '#4ade80' }}>{currentProgress.speed || '\u2014'}</strong></span>
                   <span style={s.metaDivider}>|</span>
-                  <span>Phase: <strong style={{ color: '#60a5fa' }}>{currentProgress.phase || '—'}</strong></span>
+                  <span>Phase: <strong style={{ color: '#60a5fa' }}>{currentProgress.phase || '\u2014'}</strong></span>
                 </div>
 
                 {currentProgress.fps && <div style={s.progressFps}>{currentProgress.fps} fps</div>}
@@ -256,29 +352,41 @@ export default function MediaNormalizerPage() {
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>
                   Workers
                 </h3>
-                <span style={s.concurrencyBadge}>2 concurrent</span>
+                <span style={s.concurrencyBadge}>{concurrency} concurrent</span>
               </div>
               <div style={s.workersGrid}>
-                <div style={currentProgress ? s.workerCard : s.workerCardIdle}>
-                  <div style={s.workerHeader}>
-                    {currentProgress ? <span style={s.workerActiveDot} /> : <span style={s.workerIdleDot} />}
-                    <span style={s.workerLabel}>Worker 1</span>
+                {Array.from({ length: Math.max(2, concurrency) }).map((_, i) => (
+                  <div key={i} style={(currentProgress && i === 0) ? s.workerCard : s.workerCardIdle}>
+                    <div style={s.workerHeader}>
+                      {(currentProgress && i === 0) ? <span style={s.workerActiveDot} /> : <span style={s.workerIdleDot} />}
+                      <span style={s.workerLabel}>Worker {i + 1}</span>
+                    </div>
+                    <span style={(currentProgress && i === 0) ? s.workerFile : s.workerIdleText}>
+                      {(currentProgress && i === 0) ? (currentProgress.filePath?.split('/').pop() || 'Processing...') : 'Waiting...'}
+                    </span>
+                    {(currentProgress && i === 0) && <div style={s.workerPhase}>{currentProgress.phase}</div>}
                   </div>
-                  <span style={currentProgress ? s.workerFile : s.workerIdleText}>
-                    {currentProgress ? (currentProgress.filePath?.split('/').pop() || 'Processing...') : 'Idle'}
-                  </span>
-                  {currentProgress && <div style={s.workerPhase}>{currentProgress.phase}</div>}
-                </div>
-                <div style={s.workerCardIdle}>
-                  <div style={s.workerHeader}>
-                    <span style={s.workerIdleDot} />
-                    <span style={s.workerLabel}>Worker 2</span>
-                  </div>
-                  <span style={s.workerIdleText}>Waiting for next file...</span>
-                </div>
+                ))}
               </div>
             </div>
           )}
+
+          {/* Config Panel (collapsible) */}
+          <div style={s.card}>
+            <button type="button" onClick={() => setConfigOpen(o => !o)} style={s.configToggle}>
+              <h3 style={{ ...s.cardTitle, marginBottom: 0 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+                Config
+              </h3>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                style={{ transform: configOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }}>
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            {configOpen && (
+              <ConfigForm config={normalizerConfig} onSubmit={(cfg) => configMutation.mutate(cfg)} isPending={configMutation.isPending} />
+            )}
+          </div>
 
           {/* Conversion History with Retry */}
           <div style={s.card}>
@@ -361,6 +469,70 @@ export default function MediaNormalizerPage() {
   );
 }
 
+function ConfigForm({ config, onSubmit, isPending }) {
+  const [crf, setCrf] = useState(config?.crf ?? 19);
+  const [preset, setPreset] = useState(config?.preset ?? 'medium');
+  const [concurrency, setConcurrency] = useState(config?.concurrency ?? 2);
+
+  useEffect(() => {
+    if (config) {
+      setCrf(config.crf ?? 19);
+      setPreset(config.preset ?? 'medium');
+      setConcurrency(config.concurrency ?? 2);
+    }
+  }, [config]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSubmit({ crf, preset, concurrency });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} style={s.configForm}>
+      <div style={s.configField}>
+        <label style={s.configLabel}>
+          CRF (quality) <span style={s.configVal}>{crf}</span>
+        </label>
+        <input type="range" min="0" max="51" value={crf}
+          onChange={(e) => setCrf(Number(e.target.value))}
+          style={s.configSlider} />
+        <div style={s.configHelp}>
+          <span>0 = lossless</span>
+          <span>23 = good</span>
+          <span>51 = worst</span>
+        </div>
+      </div>
+      <div style={s.configField}>
+        <label style={s.configLabel}>Preset (speed / compression)</label>
+        <select value={preset} onChange={(e) => setPreset(e.target.value)} style={s.configSelect}>
+          {PRESETS.map(p => <option key={p} value={p}>{p}</option>)}
+        </select>
+        <div style={s.configHelp}>
+          <span>ultrafast = fast, large</span>
+          <span>medium = balanced</span>
+          <span>veryslow = slow, small</span>
+        </div>
+      </div>
+      <div style={s.configField}>
+        <label style={s.configLabel}>
+          Max concurrent files <span style={s.configVal}>{concurrency}</span>
+        </label>
+        <input type="range" min="1" max="8" value={concurrency}
+          onChange={(e) => setConcurrency(Number(e.target.value))}
+          style={s.configSlider} />
+        <div style={s.configHelp}>
+          <span>Higher = more CPU/RAM</span>
+        </div>
+      </div>
+      <button type="submit" disabled={isPending}
+        style={s.configSaveBtn}>
+        {isPending ? 'Saving...' : 'Apply Config'}
+      </button>
+      <div style={s.configNote}>Takes effect on next file; no restart needed</div>
+    </form>
+  );
+}
+
 const SURFACE = 'var(--surface, #111318)';
 const SURFACE2 = 'var(--surface-2, #181b22)';
 const BORDER = 'var(--border-color, rgba(255,255,255,0.07))';
@@ -371,6 +543,8 @@ const ACCENT = 'var(--accent-primary, #6366f1)';
 
 const s = {
   page: { display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1200px' },
+  toastContainer: { position: 'fixed', top: '20px', right: '20px', display: 'flex', flexDirection: 'column', gap: '8px', zIndex: 9999 },
+
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '20px', flexWrap: 'wrap' },
   title: { fontSize: '1.5rem', fontWeight: '800', color: TEXT, margin: 0, letterSpacing: '-0.03em' },
   subtitle: { fontSize: '0.88rem', color: TEXT3, margin: '4px 0 0 0', lineHeight: 1.5 },
@@ -400,14 +574,12 @@ const s = {
   statTotal: { background: 'rgba(99,102,241,0.06)', borderColor: 'rgba(99,102,241,0.15)' },
   statSaved: { background: 'rgba(250,204,21,0.08)', borderColor: 'rgba(250,204,21,0.2)' },
 
-  // Savings bar
   savingsBar: { background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: '16px', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '10px' },
   savingsLabel: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: TEXT2, flexWrap: 'wrap', fontWeight: '500' },
   savingsHighlight: { color: '#facc15', fontWeight: '700', marginLeft: 'auto' },
   savingsTrack: { height: '8px', borderRadius: '999px', background: SURFACE2, overflow: 'hidden', border: `1px solid ${BORDER}` },
   savingsFill: { height: '100%', borderRadius: '999px', background: 'linear-gradient(90deg, #facc15, #f59e0b)', transition: 'width 0.5s ease' },
 
-  // Layout
   grid: { display: 'grid', gridTemplateColumns: '1fr 400px', gap: '20px', alignItems: 'start' },
   leftCol: { display: 'flex', flexDirection: 'column', gap: '16px' },
   rightCol: { display: 'flex', flexDirection: 'column', gap: '16px' },
@@ -417,6 +589,26 @@ const s = {
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' },
   cardTitle: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem', fontWeight: '700', color: TEXT, margin: 0 },
   eta: { fontSize: '0.78rem', color: '#4ade80', fontWeight: '600', padding: '4px 10px', borderRadius: '6px', background: 'rgba(34,197,94,0.08)' },
+
+  configToggle: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%',
+    cursor: 'pointer', background: 'none', border: 'none', padding: 0, color: 'inherit', fontSize: 'inherit',
+  },
+  configForm: { display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px', paddingTop: '16px', borderTop: `1px solid ${BORDER}` },
+  configField: { display: 'flex', flexDirection: 'column', gap: '6px' },
+  configLabel: { fontSize: '0.82rem', fontWeight: '600', color: TEXT, display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  configVal: { color: '#60a5fa', fontWeight: '700', fontSize: '0.9rem' },
+  configSlider: { width: '100%', height: '6px', borderRadius: '999px', appearance: 'none', background: SURFACE2, outline: 'none', cursor: 'pointer', accentColor: '#6366f1' },
+  configHelp: { display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: TEXT3 },
+  configSelect: {
+    padding: '8px 12px', borderRadius: '8px', background: SURFACE2, color: TEXT, border: `1px solid ${BORDER}`,
+    fontSize: '0.85rem', fontWeight: '500', cursor: 'pointer', outline: 'none',
+  },
+  configSaveBtn: {
+    padding: '12px 20px', borderRadius: '10px', background: ACCENT, color: '#fff', border: 'none',
+    fontSize: '0.88rem', fontWeight: '700', cursor: 'pointer', transition: 'opacity 0.15s',
+  },
+  configNote: { fontSize: '0.72rem', color: TEXT3, textAlign: 'center', fontStyle: 'italic' },
 
   progressSection: { display: 'flex', flexDirection: 'column', gap: '12px' },
   progressFileRow: { display: 'flex', alignItems: 'center', gap: '10px' },
@@ -432,7 +624,7 @@ const s = {
 
   emptyState: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', padding: '32px', color: TEXT3, fontSize: '0.88rem', textAlign: 'center' },
 
-  workersGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' },
+  workersGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '10px' },
   workerCard: { padding: '14px', borderRadius: '12px', background: SURFACE2, border: '1px solid rgba(34,197,94,0.2)', display: 'flex', flexDirection: 'column', gap: '8px' },
   workerCardIdle: { padding: '14px', borderRadius: '12px', background: SURFACE2, border: `1px solid ${BORDER}`, display: 'flex', flexDirection: 'column', gap: '8px' },
   workerHeader: { display: 'flex', alignItems: 'center', gap: '8px' },

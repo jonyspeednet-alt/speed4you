@@ -143,9 +143,62 @@ async function retryFile(filePath) {
   };
 }
 
+const CONFIG_KEY = 'media_normalizer_config';
+
+function getDefaultConfig() {
+  return {
+    crf: Number(process.env.MEDIA_NORMALIZER_CRF || 19),
+    preset: process.env.MEDIA_NORMALIZER_PRESET || 'medium',
+    concurrency: Number(process.env.MEDIA_NORMALIZER_MAX_CONCURRENCY || ''),
+  };
+}
+
+async function getConfig() {
+  const cfg = await getAppState(CONFIG_KEY);
+  const defaults = getDefaultConfig();
+  return { ...defaults, ...(cfg || {}) };
+}
+
+async function setConfig(updates) {
+  const current = await getConfig();
+  const merged = { ...current, ...updates };
+  // Validate
+  if (merged.crf !== undefined) {
+    const crf = Number(merged.crf);
+    if (crf < 0 || crf > 51 || !Number.isFinite(crf)) {
+      const err = new Error('CRF must be a number between 0 and 51');
+      err.statusCode = 400;
+      throw err;
+    }
+    merged.crf = crf;
+  }
+  if (merged.preset !== undefined) {
+    const valid = ['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow', 'placebo'];
+    if (!valid.includes(String(merged.preset).toLowerCase())) {
+      const err = new Error(`Preset must be one of: ${valid.join(', ')}`);
+      err.statusCode = 400;
+      throw err;
+    }
+    merged.preset = String(merged.preset).toLowerCase();
+  }
+  if (merged.concurrency !== undefined) {
+    const cc = Number(merged.concurrency);
+    if (cc < 1 || cc > 8 || !Number.isFinite(cc)) {
+      const err = new Error('Concurrency must be between 1 and 8');
+      err.statusCode = 400;
+      throw err;
+    }
+    merged.concurrency = cc;
+  }
+  await setAppState(CONFIG_KEY, merged);
+  return merged;
+}
+
 module.exports = {
   getMediaNormalizerStatus: getStatus,
   startMediaNormalizer: start,
   stopMediaNormalizer: stop,
   retryMediaNormalizerFile: retryFile,
+  getNormalizerConfig: getConfig,
+  setNormalizerConfig: setConfig,
 };
