@@ -161,9 +161,20 @@ app.use(globalApiLimiter);
 app.use(morgan(isProduction ? 'combined' : 'dev'));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+// Track active connections and in-flight requests for graceful shutdown
+let activeConnections = new Set();
+let activeRequests = 0;
+let shuttingDown = false;
+
 app.use((req, res, next) => {
   req.requestId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
   res.setHeader('X-Request-Id', req.requestId);
+
+  if (shuttingDown) {
+    return res.status(503).json({ error: 'Server is shutting down. Please retry.' });
+  }
+  activeRequests++;
+  res.on('finish', () => { activeRequests--; });
   next();
 });
 
@@ -286,29 +297,50 @@ async function startServer() {
     process.exit(1);
   });
 
+  // Track connections so we can drain them during shutdown
+  server.on('connection', (conn) => {
+    activeConnections.add(conn);
+    conn.on('close', () => activeConnections.delete(conn));
+  });
+
   const shutdown = async (signal) => {
     logger.info(`Received ${signal}. Starting graceful shutdown...`);
+    shuttingDown = true;
 
-    const forceShutdownTimer = setTimeout(() => {
-      logger.error('Could not close connections in time, forcefully shutting down');
+    const forceTimeout = setTimeout(() => {
+      logger.error('Graceful shutdown timeout — force closing');
+      for (const conn of activeConnections) {
+        conn.destroy();
+      }
       process.exit(1);
-    }, 10000);
-    if (typeof forceShutdownTimer.unref === 'function') {
-      forceShutdownTimer.unref();
+    }, 30000);
+    forceTimeout.unref();
+
+    // Stop accepting new connections
+    server.close(() => {
+      logger.info('HTTP server stopped listening');
+    });
+
+    // Wait for in-flight requests to finish
+    while (activeRequests > 0) {
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    logger.info('All active requests completed.');
+
+    // Destroy remaining idle connections
+    for (const conn of activeConnections) {
+      conn.destroy();
     }
 
-    server.close(async () => {
-      logger.info('HTTP server closed.');
-      clearTimeout(forceShutdownTimer);
-      try {
-        await closePool();
-        logger.info('Graceful shutdown completed.');
-        process.exit(0);
-      } catch (err) {
-        logger.error('Error during shutdown:', { error: err.message });
-        process.exit(1);
-      }
-    });
+    clearTimeout(forceTimeout);
+    try {
+      await closePool();
+      logger.info('Graceful shutdown completed.');
+      process.exit(0);
+    } catch (err) {
+      logger.error('Error during shutdown:', { error: err.message });
+      process.exit(1);
+    }
   };
 
 
