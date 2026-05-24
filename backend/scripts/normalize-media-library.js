@@ -745,7 +745,10 @@ async function processFileCandidate(state, candidate) {
 
   if (!status.normalize) {
     await withStateLock(() => {
-      state.processed[filePath] = { signature: sig, normalized: true, note: 'already-target-format', timestamp: Date.now() };
+      state.processed[filePath] = {
+        signature: sig, normalized: true, note: 'already-target-format', timestamp: Date.now(),
+        inputSize: stat.size, outputSize: stat.size,
+      };
       state.stats.skippedAlreadyOk += 1;
     });
     await persistState(state, { currentFileProgress: null });
@@ -836,15 +839,21 @@ async function processFileCandidate(state, candidate) {
     }
 
     const finalStat = fs.statSync(finalOutputPath);
+    const inputSize = stat.size;
+    const outputSize = finalStat.size;
     state.processed[finalOutputPath] = {
       signature: buildSignature(finalOutputPath, fs.statSync(finalOutputPath)),
       normalized: true,
       note: 'converted-and-replaced (full-transcode)',
       timestamp: Date.now(),
+      inputSize,
+      outputSize,
     };
     delete state.processed[filePath];
     delete state.failed[filePath];
     state.stats.converted += 1;
+    state.stats.totalBytesInput = (state.stats.totalBytesInput || 0) + inputSize;
+    state.stats.totalBytesOutput = (state.stats.totalBytesOutput || 0) + outputSize;
     const refreshResult = refreshCatalogAfterNormalization(filePath, finalOutputPath);
     await persistState(state, { currentFileProgress: null, currentOperation: null });
     await logInfo(

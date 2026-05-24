@@ -80,6 +80,7 @@ router.get('/db/health', asyncRoute(adminController.getDbHealth));
 router.get('/media-normalizer/status', asyncRoute(adminController.getMediaNormalizerStatus));
 router.post('/media-normalizer/start', asyncRoute(adminController.startMediaNormalizer));
 router.post('/media-normalizer/stop', asyncRoute(adminController.stopMediaNormalizer));
+router.post('/media-normalizer/retry', asyncRoute(adminController.retryMediaNormalizerFile));
 
 // Duplicates
 router.get('/duplicates/review', adminController.getDuplicatesReport);
