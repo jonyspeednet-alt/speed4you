@@ -343,30 +343,41 @@ jobs:
             fi
             echo "CERT: $CERT"
             echo "KEY: $CERT_KEY"
+            # Create h5ai directory with sudo
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p "$H5AI_DIR"
             # Install h5ai or create fallback index
             if [ ! -f "$H5AI_DIR/_h5ai/public/index.php" ]; then
+              echo "h5ai not found, attempting download..."
+              TMPZ=/tmp/h5ai.zip
+              TMPD=/tmp/h5aitmp
               if command -v curl >/dev/null 2>&1; then
-                DL="curl -sL --connect-timeout 10 --max-time 30"
+                curl -sL --connect-timeout 10 --max-time 30 https://release.larsjung.de/h5ai/h5ai-0.30.0.zip -o "$TMPZ" 2>/dev/null || true
               elif command -v wget >/dev/null 2>&1; then
-                DL="wget -q --timeout=30 -O"
+                wget -q --timeout=30 https://release.larsjung.de/h5ai/h5ai-0.30.0.zip -O "$TMPZ" 2>/dev/null || true
               fi
-              if [ -n "$DL" ]; then
-                echo "Downloading h5ai..."
-                $DL https://release.larsjung.de/h5ai/h5ai-0.30.0.zip /tmp/h5ai.zip 2>/dev/null || true
-                if [ -f /tmp/h5ai.zip ] && [ -s /tmp/h5ai.zip ] && command -v unzip >/dev/null 2>&1; then
-                  unzip -qo /tmp/h5ai.zip -d /tmp/h5ai-tmp 2>/dev/null || true
-                  if [ -d /tmp/h5ai-tmp/_h5ai ]; then
-                    cp -r /tmp/h5ai-tmp/_h5ai "$H5AI_DIR/"
-                    echo "h5ai installed"
-                  fi
-                  rm -rf /tmp/h5ai-tmp /tmp/h5ai.zip
+              if [ -f "$TMPZ" ] && [ -s "$TMPZ" ] && command -v unzip >/dev/null 2>&1; then
+                unzip -qo "$TMPZ" -d "$TMPD" 2>/dev/null || true
+                if [ -d "$TMPD/_h5ai" ]; then
+                  printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -r "$TMPD/_h5ai" "$H5AI_DIR/"
+                  echo "h5ai installed"
                 fi
+                rm -rf "$TMPD"
               fi
+              rm -f "$TMPZ"
+            else
+              echo "h5ai already installed"
             fi
-            # Fallback index.html if h5ai not installed
-            if [ ! -f "$H5AI_DIR/index.html" ] && [ ! -f "$H5AI_DIR/_h5ai/public/index.php" ]; then
+            # Fallback index.html if nothing exists
+            H5AI_OK=false
+            if [ -f "$H5AI_DIR/_h5ai/public/index.php" ]; then H5AI_OK=true; fi
+            if ! $H5AI_OK; then
               echo "Creating fallback index.html"
-              echo '<!DOCTYPE html><html><head><title>Data Portal</title><meta charset="utf-8"><style>body{font-family:sans-serif;background:#0a0c10;color:#f1f5f9;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;flex-direction:column;gap:12px}h1{font-size:2rem;font-weight:200}p{color:#94a3b8}a{color:#6366f1}</style></head><body><h1>Data Portal</h1><p>Media files are served here.</p><p><a href="https://speed4you.net/">Back to Portal</a></p></body></html>' > "$H5AI_DIR/index.html"
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sh -c "echo '<!DOCTYPE html>
+<html lang=\"en\">
+<head><meta charset=\"utf-8\"><title>Data Portal</title>
+<style>body{font-family:sans-serif;background:#0a0c10;color:#f1f5f9;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;flex-direction:column;gap:12px}h1{font-size:2rem;font-weight:200}p{color:#94a3b8}a{color:#6366f1}</style>
+</head><body><h1>Data Portal</h1><p>Welcome to the Data Portal.</p><p><a href=\"https://speed4you.net/\">Back to Portal</a></p></body></html>
+' > \"$H5AI_DIR/index.html\""
             fi
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$H5AI_DIR" 2>/dev/null || true
             echo "server {" > /tmp/dataconf
@@ -395,6 +406,7 @@ jobs:
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp /tmp/dataconf "$CONF" && echo "Config copied OK" || echo "Config copy FAILED"
             echo "=== testing nginx ==="
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' nginx -t && printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' systemctl reload nginx && echo "nginx OK" || echo "nginx FAILED"
+            echo "=== data.speed4you.net setup complete ==="
 
       - name: Verify deployed frontend bundle
         env:
