@@ -111,12 +111,23 @@ exports.getDashboard = async (req, res) => {
   const stats = await getStats();
   const recentContent = await getRecentItems(8);
   const { items: scannerDrafts } = await listItems({ source: 'scanner', status: 'draft' }, 0, 12);
+  const allUsers = await listUsers();
+  const scannerHealth = await getScannerHealth();
 
   res.json({
-    stats,
+    stats: {
+      ...stats,
+      totalAdminUsers: allUsers.length,
+    },
     recentContent,
     scannerDrafts,
     scannerRoots: listScannerRoots(),
+    scannerHealth: {
+      totalRoots: scannerHealth.totalRoots,
+      healthyRoots: scannerHealth.healthyRoots,
+      brokenRoots: scannerHealth.brokenRoots,
+      currentJob: scannerHealth.currentJob,
+    },
   });
 };
 
