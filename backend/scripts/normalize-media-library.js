@@ -509,6 +509,7 @@ function buildEncodeArgs(inputPath, outputPath, streamMap) {
     '-preset', DEFAULT_PRESET,
     '-crf', String(DEFAULT_CRF),
     '-pix_fmt', 'yuv420p',
+    '-vsync', 'cfr',
     '-c:a', 'aac',
     '-b:a', '192k',
     '-movflags', '+faststart',
@@ -694,6 +695,10 @@ async function processOneFile(state, roots) {
       const signature = buildSignature(filePath, stat);
       const processedEntry = state.processed[filePath];
       if (processedEntry?.signature === signature) {
+        continue;
+      }
+      const failedEntry = state.failed[filePath];
+      if (failedEntry?.signature === signature) {
         continue;
       }
 
