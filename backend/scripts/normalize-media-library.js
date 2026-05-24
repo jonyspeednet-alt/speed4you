@@ -2,6 +2,7 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const os = require('os');
 const { spawn } = require('child_process');
 const { cleanSearchTitle, enrichItemWithMetadata, hasTmdbKey } = require('../src/services/metadata-enricher');
 const {
@@ -26,8 +27,13 @@ const DEFAULT_MIN_FREE_GB = Number(process.env.MEDIA_NORMALIZER_MIN_FREE_GB || 1
 const DEFAULT_CRF = Number(process.env.MEDIA_NORMALIZER_CRF || 19);
 const DEFAULT_PRESET = process.env.MEDIA_NORMALIZER_PRESET || 'medium';
 const DUPLICATE_HOLD_DIR_NAME = process.env.MEDIA_NORMALIZER_DUPLICATE_DIR || '_duplicate_hold';
-let activeFfmpeg = null;
+const MAX_CONCURRENCY = Math.min(
+  os.cpus().length || 2,
+  Number(process.env.MEDIA_NORMALIZER_MAX_CONCURRENCY || 2),
+);
+let activeFfmpegSet = new Set();
 let isShuttingDown = false;
+let stateMutex = Promise.resolve();
 
 async function appendRuntimeLog(message) {
   await appendMediaNormalizerLog([message]);
@@ -525,7 +531,7 @@ async function transcodeToTarget(inputPath, outputPath, durationSeconds, onProgr
   const args = buildEncodeArgs(inputPath, outputPath, streamMap);
   await new Promise((resolve, reject) => {
     const ffmpeg = spawn(ffmpegBin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
-    activeFfmpeg = ffmpeg;
+    activeFfmpegSet.add(ffmpeg);
     const stderr = [];
     let progressBuffer = '';
     let lastEmitAt = 0;
@@ -572,7 +578,7 @@ async function transcodeToTarget(inputPath, outputPath, durationSeconds, onProgr
     ffmpeg.stderr.on('data', (chunk) => stderr.push(chunk));
     ffmpeg.on('error', reject);
     ffmpeg.on('close', (code) => {
-      activeFfmpeg = null;
+      activeFfmpegSet.delete(ffmpeg);
       if (code !== 0) {
         reject(new Error(Buffer.concat(stderr).toString('utf8') || `ffmpeg exited with code ${code}`));
         return;
@@ -683,182 +689,196 @@ function trimMap(obj, maxEntries) {
   return Object.fromEntries(entries.slice(0, maxEntries));
 }
 
-async function processOneFile(state, roots) {
+async function withStateLock(fn) {
+  let next;
+  stateMutex = new Promise(async (resolve) => {
+    await stateMutex;
+    try {
+      next = await fn();
+    } catch (e) {
+      next = Promise.reject(e);
+    } finally {
+      resolve();
+    }
+  });
+  return next;
+}
+
+function findProcessingCandidates(state, roots, maxCount) {
+  const candidates = [];
   for (const root of roots) {
     for (const filePath of walkVideoFiles(root)) {
+      if (candidates.length >= maxCount) break;
       let stat;
-      try {
-        stat = fs.statSync(filePath);
-      } catch {
-        continue;
-      }
+      try { stat = fs.statSync(filePath); } catch { continue; }
+      const sig = buildSignature(filePath, stat);
+      if (state.processed[filePath]?.signature === sig) continue;
+      if (state.failed[filePath]?.signature === sig) continue;
+      candidates.push({ filePath, root, stat, sig });
+    }
+    if (candidates.length >= maxCount) break;
+  }
+  return candidates;
+}
 
-      const signature = buildSignature(filePath, stat);
-      const processedEntry = state.processed[filePath];
-      if (processedEntry?.signature === signature) {
-        continue;
-      }
-      const failedEntry = state.failed[filePath];
-      if (failedEntry?.signature === signature) {
-        continue;
-      }
+async function processFileCandidate(state, candidate) {
+  const { filePath, root, stat, sig } = candidate;
 
-      const freeGb = getFreeDiskGb(path.dirname(filePath));
-      if (freeGb < DEFAULT_MIN_FREE_GB) {
-        await logInfo(`[media-normalizer] pause low disk (${freeGb.toFixed(2)} GB) near ${filePath}`);
-        return { worked: false, reason: 'low-disk' };
-      }
+  const freeGb = getFreeDiskGb(path.dirname(filePath));
+  if (freeGb / MAX_CONCURRENCY < DEFAULT_MIN_FREE_GB) {
+    await logInfo(`[media-normalizer] pause low disk (${freeGb.toFixed(2)} GB) near ${filePath}`);
+    return { worked: false, reason: 'low-disk' };
+  }
 
-      let status;
-      try {
-        status = await needsNormalization(filePath);
-      } catch (error) {
-        state.failed[filePath] = {
-          signature,
-          message: error.message.split('\n')[0],
-          timestamp: Date.now(),
-        };
-        state.stats.failed += 1;
-        await persistState(state, { currentFileProgress: null });
-        await logInfo(`[media-normalizer] probe-failed ${filePath} -> ${error.message.split('\n')[0]}`);
-        return { worked: true, reason: 'probe-failed' };
-      }
+  let status;
+  try {
+    status = await needsNormalization(filePath);
+  } catch (error) {
+    await withStateLock(() => {
+      state.failed[filePath] = { signature: sig, message: error.message.split('\n')[0], timestamp: Date.now() };
+      state.stats.failed += 1;
+    });
+    await persistState(state, { currentFileProgress: null });
+    await logInfo(`[media-normalizer] probe-failed ${filePath} -> ${error.message.split('\n')[0]}`);
+    return { worked: true, reason: 'probe-failed' };
+  }
 
-      if (!status.normalize) {
-        state.processed[filePath] = {
-          signature,
-          normalized: true,
-          note: 'already-target-format',
-          timestamp: Date.now(),
-        };
-        state.stats.skippedAlreadyOk += 1;
-        await persistState(state, { currentFileProgress: null });
-        await logInfo(`[media-normalizer] skip-ok ${filePath}`);
-        return { worked: true, reason: 'already-ok' };
-      }
+  if (!status.normalize) {
+    await withStateLock(() => {
+      state.processed[filePath] = { signature: sig, normalized: true, note: 'already-target-format', timestamp: Date.now() };
+      state.stats.skippedAlreadyOk += 1;
+    });
+    await persistState(state, { currentFileProgress: null });
+    await logInfo(`[media-normalizer] skip-ok ${filePath}`);
+    return { worked: true, reason: 'already-ok' };
+  }
 
-      const dir = path.dirname(filePath);
-      const finalBaseName = await resolveFinalBaseName(filePath);
-      const finalOutputPath = path.join(dir, `${finalBaseName}.mp4`);
-      const randomPart = crypto.randomBytes(4).toString('hex');
-      const tempOutput = path.join(dir, `${finalBaseName}.normalizing.${process.pid}.${randomPart}.mp4`);
-      const backupPath = path.join(dir, `${path.basename(filePath)}.pre-normalize.${Date.now()}.bak`);
+  const dir = path.dirname(filePath);
+  const finalBaseName = await resolveFinalBaseName(filePath);
+  const finalOutputPath = path.join(dir, `${finalBaseName}.mp4`);
+  const randomPart = crypto.randomBytes(4).toString('hex');
+  const tempOutput = path.join(dir, `${finalBaseName}.normalizing.${process.pid}.${randomPart}.mp4`);
+  const backupPath = path.join(dir, `${path.basename(filePath)}.pre-normalize.${Date.now()}.bak`);
 
-      // Require free space >= input-size + safety margin before starting conversion.
-      const availableBytes = Math.max(0, getFreeDiskGb(dir) * (1024 ** 3));
-      const requiredBytes = Math.max(stat.size * 1.15, stat.size + (512 * 1024 * 1024));
-      if (availableBytes < requiredBytes) {
-        await logInfo(`[media-normalizer] pause low disk for safe convert near ${filePath}; need=${formatBytes(requiredBytes)} free=${formatBytes(availableBytes)}`);
-        return { worked: false, reason: 'low-disk-for-file' };
-      }
+  const availableBytes = Math.max(0, getFreeDiskGb(dir) * (1024 ** 3));
+  const requiredBytes = Math.max(stat.size * 1.15, stat.size + (512 * 1024 * 1024));
+  if (availableBytes / MAX_CONCURRENCY < requiredBytes) {
+    await logInfo(`[media-normalizer] pause low disk for safe convert near ${filePath}; need=${formatBytes(requiredBytes)} free=${formatBytes(availableBytes)}`);
+    return { worked: false, reason: 'low-disk-for-file' };
+  }
 
-      try {
-        await logInfo(`[media-normalizer] start ${filePath} strategy=full-transcode`);
-        state.currentOperation = {
-          inputPath: filePath,
-          finalOutputPath,
-          tempOutput,
-          backupPath,
-          heldTargetPath: null,
-          startedAt: new Date().toISOString(),
-        };
-        state.currentFileProgress = {
-          filePath,
-          phase: 'preparing',
-          percent: 0,
-          progressSeconds: 0,
-          durationSeconds: Number(status.meta?.duration || 0),
-          speed: '',
-          fps: '',
-          strategy: 'full-transcode',
-          startedAt: new Date().toISOString(),
-        };
-        await persistState(state);
+  try {
+    await logInfo(`[media-normalizer] start ${filePath} strategy=full-transcode`);
+    state.currentOperation = {
+      inputPath: filePath,
+      finalOutputPath,
+      tempOutput,
+      backupPath,
+      heldTargetPath: null,
+      startedAt: new Date().toISOString(),
+    };
+    state.currentFileProgress = {
+      filePath,
+      phase: 'preparing',
+      percent: 0,
+      progressSeconds: 0,
+      durationSeconds: Number(status.meta?.duration || 0),
+      speed: '',
+      fps: '',
+      strategy: 'full-transcode',
+      startedAt: new Date().toISOString(),
+    };
+    await persistState(state);
 
-        await transcodeToTarget(
-          filePath,
-          tempOutput,
-          Number(status.meta?.duration || 0),
-          (progress) => {
-            state.currentFileProgress = {
-              ...state.currentFileProgress,
-              ...progress,
-              filePath,
-              strategy: 'full-transcode',
-              updatedAt: new Date().toISOString(),
-            };
-            void persistState(state);
-          },
-          {
-            videoIndex: Number(status.meta?.primaryVideoIndex),
-            audioIndex: Number(status.meta?.primaryAudioIndex),
-          },
-        );
+    await transcodeToTarget(
+      filePath,
+      tempOutput,
+      Number(status.meta?.duration || 0),
+      (progress) => {
         state.currentFileProgress = {
           ...state.currentFileProgress,
-          phase: 'validating',
-          percent: 99.5,
+          ...progress,
+          filePath,
+          strategy: 'full-transcode',
           updatedAt: new Date().toISOString(),
         };
+        void persistState(state);
+      },
+      {
+        videoIndex: Number(status.meta?.primaryVideoIndex),
+        audioIndex: Number(status.meta?.primaryAudioIndex),
+      },
+    );
+    state.currentFileProgress = {
+      ...state.currentFileProgress,
+      phase: 'validating',
+      percent: 99.5,
+      updatedAt: new Date().toISOString(),
+    };
+    await persistState(state);
+    await assertOutputLooksValid(filePath, tempOutput, Number(status.meta?.duration || 0));
+
+    if (fs.existsSync(finalOutputPath) && path.resolve(finalOutputPath) !== path.resolve(filePath)) {
+      const existingStat = fs.statSync(finalOutputPath);
+      if (existingStat.isFile() && existingStat.size > 0) {
+        const heldPath = moveToDuplicateHold(finalOutputPath, 'preexisting-duplicate');
+        state.currentOperation.heldTargetPath = heldPath;
         await persistState(state);
-        await assertOutputLooksValid(filePath, tempOutput, Number(status.meta?.duration || 0));
-
-        if (fs.existsSync(finalOutputPath) && path.resolve(finalOutputPath) !== path.resolve(filePath)) {
-          const existingStat = fs.statSync(finalOutputPath);
-          if (existingStat.isFile() && existingStat.size > 0) {
-            const heldPath = moveToDuplicateHold(finalOutputPath, 'preexisting-duplicate');
-            state.currentOperation.heldTargetPath = heldPath;
-            await persistState(state);
-            await logInfo(`[media-normalizer] moved existing target to duplicate hold: ${heldPath}`);
-          }
-        }
-
-        fs.renameSync(filePath, backupPath);
-        fs.renameSync(tempOutput, finalOutputPath);
-
-        if (fs.existsSync(backupPath)) {
-          fs.unlinkSync(backupPath);
-        }
-
-        const finalStat = fs.statSync(finalOutputPath);
-        state.processed[finalOutputPath] = {
-          signature: buildSignature(finalOutputPath, fs.statSync(finalOutputPath)),
-          normalized: true,
-          note: 'converted-and-replaced (full-transcode)',
-          timestamp: Date.now(),
-        };
-        delete state.processed[filePath];
-        delete state.failed[filePath];
-        state.stats.converted += 1;
-        const refreshResult = refreshCatalogAfterNormalization(filePath, finalOutputPath);
-        await persistState(state, { currentFileProgress: null, currentOperation: null });
-        await logInfo(
-          `[media-normalizer] done ${filePath} catalogItemsUpdated=${refreshResult.updatedItems} catalogEpisodesUpdated=${refreshResult.updatedEpisodes}`,
-        );
-        return { worked: true, reason: 'converted' };
-      } catch (error) {
-        if (fs.existsSync(tempOutput)) {
-          try { fs.unlinkSync(tempOutput); } catch {}
-        }
-        if (fs.existsSync(backupPath) && !fs.existsSync(filePath)) {
-          try { fs.renameSync(backupPath, filePath); } catch {}
-        }
-        if (state.currentOperation?.heldTargetPath && state.currentOperation.finalOutputPath) {
-          try { restoreFromDuplicateHold(state.currentOperation.heldTargetPath, state.currentOperation.finalOutputPath); } catch {}
-        }
-        state.failed[filePath] = {
-          signature,
-          message: error.message.split('\n')[0],
-          timestamp: Date.now(),
-        };
-        state.stats.failed += 1;
-        await persistState(state, { currentFileProgress: null, currentOperation: null });
-        await logInfo(`[media-normalizer] failed ${filePath} -> ${error.message.split('\n')[0]}`);
-        return { worked: true, reason: 'failed' };
+        await logInfo(`[media-normalizer] moved existing target to duplicate hold: ${heldPath}`);
       }
     }
+
+    fs.renameSync(filePath, backupPath);
+    fs.renameSync(tempOutput, finalOutputPath);
+
+    if (fs.existsSync(backupPath)) {
+      fs.unlinkSync(backupPath);
+    }
+
+    const finalStat = fs.statSync(finalOutputPath);
+    state.processed[finalOutputPath] = {
+      signature: buildSignature(finalOutputPath, fs.statSync(finalOutputPath)),
+      normalized: true,
+      note: 'converted-and-replaced (full-transcode)',
+      timestamp: Date.now(),
+    };
+    delete state.processed[filePath];
+    delete state.failed[filePath];
+    state.stats.converted += 1;
+    const refreshResult = refreshCatalogAfterNormalization(filePath, finalOutputPath);
+    await persistState(state, { currentFileProgress: null, currentOperation: null });
+    await logInfo(
+      `[media-normalizer] done ${filePath} catalogItemsUpdated=${refreshResult.updatedItems} catalogEpisodesUpdated=${refreshResult.updatedEpisodes}`,
+    );
+    return { worked: true, reason: 'converted' };
+  } catch (error) {
+    if (fs.existsSync(tempOutput)) {
+      try { fs.unlinkSync(tempOutput); } catch {}
+    }
+    if (fs.existsSync(backupPath) && !fs.existsSync(filePath)) {
+      try { fs.renameSync(backupPath, filePath); } catch {}
+    }
+    if (state.currentOperation?.heldTargetPath && state.currentOperation.finalOutputPath) {
+      try { restoreFromDuplicateHold(state.currentOperation.heldTargetPath, state.currentOperation.finalOutputPath); } catch {}
+    }
+    state.failed[filePath] = {
+      signature: sig,
+      message: error.message.split('\n')[0],
+      timestamp: Date.now(),
+    };
+    state.stats.failed += 1;
+    await persistState(state, { currentFileProgress: null, currentOperation: null });
+    await logInfo(`[media-normalizer] failed ${filePath} -> ${error.message.split('\n')[0]}`);
+    return { worked: true, reason: 'failed' };
   }
-  return { worked: false, reason: 'no-candidate' };
+}
+
+async function processOneFile(state, roots) {
+  const candidates = findProcessingCandidates(state, roots, 1);
+  if (!candidates.length) {
+    return { worked: false, reason: 'no-candidate' };
+  }
+  return processFileCandidate(state, candidates[0]);
 }
 
 async function main() {
@@ -873,7 +893,7 @@ async function main() {
   }
 
   await logInfo('[media-normalizer] started');
-  await logInfo(`[media-normalizer] roots=${roots.length}, interval=${DEFAULT_SCAN_INTERVAL_MS}ms, minFree=${DEFAULT_MIN_FREE_GB}GB`);
+  await logInfo(`[media-normalizer] roots=${roots.length}, interval=${DEFAULT_SCAN_INTERVAL_MS}ms, minFree=${DEFAULT_MIN_FREE_GB}GB, concurrency=${MAX_CONCURRENCY}`);
 
   const state = await loadState();
   recoverInterruptedOperation(state);
@@ -887,8 +907,10 @@ async function main() {
       return;
     }
     isShuttingDown = true;
-    if (activeFfmpeg && !activeFfmpeg.killed) {
-      try { activeFfmpeg.kill('SIGKILL'); } catch {}
+    for (const proc of activeFfmpegSet) {
+      if (!proc.killed) {
+        try { proc.kill('SIGKILL'); } catch {}
+      }
     }
     process.exit(0);
   };
@@ -900,11 +922,17 @@ async function main() {
     state.lastScanStartedAt = new Date().toISOString();
     await persistState(state);
 
-    const cycle = await processOneFile(state, roots);
-    if (cycle.reason === 'no-candidate') {
+    if (isShuttingDown) break;
+
+    const candidates = findProcessingCandidates(state, roots, MAX_CONCURRENCY);
+    if (!candidates.length) {
       await sleep(DEFAULT_SCAN_INTERVAL_MS);
       continue;
     }
+
+    await Promise.all(candidates.map((c) => processFileCandidate(state, c)));
+    await persistState(state, { currentFileProgress: null, currentOperation: null });
+    // Brief pause between batches to let disk breathe
     await sleep(1000);
   }
 }
