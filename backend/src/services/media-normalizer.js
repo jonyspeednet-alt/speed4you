@@ -41,6 +41,7 @@ async function getStatus() {
 
   return {
     running,
+    paused: state?.paused === true,
     lock,
     state,
     recentLogLines: await getMediaNormalizerLog(25),
@@ -143,6 +144,60 @@ async function retryFile(filePath) {
   };
 }
 
+async function retryAllFailed() {
+  const state = await getMediaNormalizerState();
+  if (!state || !state.failed || Object.keys(state.failed).length === 0) {
+    return { retried: false, reason: 'no-failed-files', status: await getStatus() };
+  }
+
+  const failedPaths = Object.keys(state.failed);
+  let cleanedCount = 0;
+
+  for (const filePath of failedPaths) {
+    delete state.failed[filePath];
+    cleanedCount++;
+    const mp4Path = filePath.replace(/\.\w+$/, '.mp4');
+    if (mp4Path !== filePath && state.processed?.[mp4Path]) {
+      delete state.processed[mp4Path];
+    }
+  }
+
+  await saveMediaNormalizerState({
+    ...state,
+    updatedAt: new Date().toISOString(),
+  });
+
+  return {
+    retried: true,
+    count: cleanedCount,
+    status: await getStatus(),
+  };
+}
+
+async function pause() {
+  const state = await getMediaNormalizerState();
+  const current = await getStatus();
+  if (!current.running) {
+    return { paused: false, reason: 'not-running', status: current };
+  }
+  await saveMediaNormalizerState({
+    ...(state || {}),
+    paused: true,
+    updatedAt: new Date().toISOString(),
+  });
+  return { paused: true, status: { ...current, paused: true } };
+}
+
+async function resume() {
+  const state = await getMediaNormalizerState();
+  await saveMediaNormalizerState({
+    ...(state || {}),
+    paused: false,
+    updatedAt: new Date().toISOString(),
+  });
+  return { resumed: true, status: await getStatus() };
+}
+
 const CONFIG_KEY = 'media_normalizer_config';
 
 function getDefaultConfig() {
@@ -199,6 +254,9 @@ module.exports = {
   startMediaNormalizer: start,
   stopMediaNormalizer: stop,
   retryMediaNormalizerFile: retryFile,
+  retryAllFailedMediaNormalizerFiles: retryAllFailed,
+  pauseMediaNormalizer: pause,
+  resumeMediaNormalizer: resume,
   getNormalizerConfig: getConfig,
   setNormalizerConfig: setConfig,
 };

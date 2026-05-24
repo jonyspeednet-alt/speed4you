@@ -83,6 +83,15 @@ router.post('/media-normalizer/stop', asyncRoute(adminController.stopMediaNormal
 router.post('/media-normalizer/retry', asyncRoute(adminController.retryMediaNormalizerFile));
 router.get('/media-normalizer/config', asyncRoute(adminController.getNormalizerConfig));
 router.post('/media-normalizer/config', asyncRoute(adminController.setNormalizerConfig));
+router.post('/media-normalizer/pause', asyncRoute(adminController.pauseMediaNormalizer));
+router.post('/media-normalizer/resume', asyncRoute(adminController.resumeMediaNormalizer));
+router.post('/media-normalizer/retry-all', asyncRoute(adminController.retryAllMediaNormalizerFailed));
+
+// User Management
+router.get('/users', asyncRoute(adminController.listAdminUsers));
+router.post('/users', asyncRoute(adminController.createAdminUser));
+router.put('/users/:id', asyncRoute(adminController.updateAdminUser));
+router.delete('/users/:id', asyncRoute(adminController.deleteAdminUser));
 
 // Duplicates
 router.get('/duplicates/review', adminController.getDuplicatesReport);

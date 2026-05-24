@@ -21,6 +21,7 @@ export const adminService = {
     body: JSON.stringify({ rootIds }),
   }).finally(clearAdminCache),
   stopScanner: () => apiClient('/admin/scanner/stop', { method: 'POST' }).finally(clearAdminCache),
+  clearScannerMetadataCache: () => apiClient('/admin/scanner/cache/clear', { method: 'POST' }).finally(clearAdminCache),
   getMediaNormalizerStatus: () => apiClient('/admin/media-normalizer/status'),
   startMediaNormalizer: () => apiClient('/admin/media-normalizer/start', { method: 'POST' }).finally(clearAdminCache),
   stopMediaNormalizer: () => apiClient('/admin/media-normalizer/stop', { method: 'POST' }).finally(clearAdminCache),
@@ -87,6 +88,13 @@ export const adminService = {
     method: 'POST',
     body: JSON.stringify(config),
   }),
+  pauseMediaNormalizer: () => apiClient('/admin/media-normalizer/pause', { method: 'POST' }),
+  resumeMediaNormalizer: () => apiClient('/admin/media-normalizer/resume', { method: 'POST' }),
+  retryAllFailedFiles: () => apiClient('/admin/media-normalizer/retry-all', { method: 'POST' }),
+  listAdminUsers: () => apiClient('/admin/users'),
+  createAdminUser: (data) => apiClient('/admin/users', { method: 'POST', body: JSON.stringify(data) }),
+  updateAdminUser: (id, data) => apiClient(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteAdminUser: (id) => apiClient(`/admin/users/${id}`, { method: 'DELETE' }),
 };
 
 export default adminService;

@@ -101,6 +101,24 @@ export default function MediaNormalizerPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'normalizer', 'status'] }),
   });
 
+  const retryAllMutation = useMutation({
+    mutationFn: () => adminService.retryAllFailedFiles(),
+    onSuccess: (data) => {
+      if (data?.count) addToast('success', `\u2728 Queued ${data.count} files for retry`);
+      queryClient.invalidateQueries({ queryKey: ['admin', 'normalizer', 'status'] });
+    },
+  });
+
+  const pauseMutation = useMutation({
+    mutationFn: () => adminService.pauseMediaNormalizer(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'normalizer', 'status'] }),
+  });
+
+  const resumeMutation = useMutation({
+    mutationFn: () => adminService.resumeMediaNormalizer(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'normalizer', 'status'] }),
+  });
+
   const configMutation = useMutation({
     mutationFn: (cfg) => adminService.setNormalizerConfig(cfg),
     onSuccess: () => {
@@ -214,19 +232,42 @@ export default function MediaNormalizerPage() {
           <p style={s.subtitle}>Converts media to MP4 / H.264 / AAC with faststart for smooth playback</p>
         </div>
         <div style={s.headerRight}>
-          <span style={{ ...s.badge, ...(normalizer.running ? s.badgeRunning : s.badgeIdle) }}>
+          <span style={{
+            ...s.badge,
+            ...(normalizer.paused ? s.badgePaused : normalizer.running ? s.badgeRunning : s.badgeIdle)
+          }}>
             <span style={s.badgeDot} />
-            {normalizer.running ? 'Running' : 'Idle'}
+            {normalizer.paused ? 'Paused' : normalizer.running ? 'Running' : 'Idle'}
           </span>
           <div style={s.controls}>
             <button
               type="button"
               style={{ ...s.btn, ...(normalizer.running || normalizerMutation.isPending ? s.btnDisabled : s.btnStart) }}
               onClick={() => normalizerMutation.mutate('start')}
-              disabled={normalizerMutation.isPending || normalizer.running}
+              disabled={normalizerMutation.isPending || normalizer.running || normalizer.paused}
             >
               {normalizerMutation.isPending && normalizerMutation.variables === 'start' ? 'Starting...' : 'Start'}
             </button>
+            {normalizer.running && (
+              <button
+                type="button"
+                style={{ ...s.btn, ...s.btnPause }}
+                onClick={() => pauseMutation.mutate()}
+                disabled={pauseMutation.isPending}
+              >
+                {pauseMutation.isPending ? '...' : 'Pause'}
+              </button>
+            )}
+            {normalizer.paused && (
+              <button
+                type="button"
+                style={{ ...s.btn, ...s.btnResume }}
+                onClick={() => resumeMutation.mutate()}
+                disabled={resumeMutation.isPending}
+              >
+                {resumeMutation.isPending ? '...' : 'Resume'}
+              </button>
+            )}
             <button
               type="button"
               style={{ ...s.btn, ...(!normalizer.running || normalizerMutation.isPending ? s.btnDisabled : s.btnStop) }}
@@ -395,6 +436,15 @@ export default function MediaNormalizerPage() {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
                 Recent Activity
               </h3>
+              {(normalizer.state?.failed && Object.keys(normalizer.state.failed).length > 0) && (
+                <button type="button" style={s.retryAllBtn}
+                  onClick={() => retryAllMutation.mutate()}
+                  disabled={retryAllMutation.isPending}
+                  title="Retry all failed files">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+                  Retry All ({Object.keys(normalizer.state.failed).length})
+                </button>
+              )}
             </div>
             <div style={s.historyList}>
               {recentHistory.length > 0 ? recentHistory.map((line, i) => {
@@ -552,6 +602,7 @@ const s = {
 
   badge: { display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderRadius: '999px', fontSize: '0.82rem', fontWeight: '700' },
   badgeRunning: { background: 'rgba(34,197,94,0.12)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.25)' },
+  badgePaused: { background: 'rgba(250,204,21,0.12)', color: '#facc15', border: '1px solid rgba(250,204,21,0.25)' },
   badgeIdle: { background: SURFACE2, color: TEXT3, border: `1px solid ${BORDER}` },
   badgeDot: { display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: 'currentColor', animation: 'pulse 1.5s ease-in-out infinite' },
 
@@ -559,7 +610,15 @@ const s = {
   btn: { padding: '10px 24px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: '700', cursor: 'pointer', border: 'none', transition: 'all 180ms ease', minWidth: '100px' },
   btnStart: { background: 'rgba(34,197,94,0.12)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.25)' },
   btnStop: { background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' },
+  btnPause: { background: 'rgba(250,204,21,0.1)', color: '#facc15', border: '1px solid rgba(250,204,21,0.2)' },
+  btnResume: { background: 'rgba(34,197,94,0.1)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.2)' },
   btnDisabled: { background: SURFACE2, color: TEXT3, cursor: 'not-allowed', border: `1px solid ${BORDER}`, opacity: 0.5 },
+  retryAllBtn: {
+    display: 'flex', alignItems: 'center', gap: '4px',
+    padding: '6px 12px', borderRadius: '8px', fontSize: '0.72rem', fontWeight: '700',
+    cursor: 'pointer', border: 'none', background: 'rgba(59,130,246,0.1)', color: '#60a5fa',
+    transition: 'all 150ms ease', whiteSpace: 'nowrap',
+  },
 
   errorBanner: { display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', borderRadius: '12px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#f87171', fontSize: '0.85rem', fontWeight: '500' },
 

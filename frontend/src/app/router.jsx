@@ -20,6 +20,9 @@ const AdminDashboard = lazy(() => import('../pages/admin/AdminDashboard'));
 const AddContentPage = lazy(() => import('../pages/admin/AddContentPage'));
 const ContentLibraryPage = lazy(() => import('../pages/admin/ContentLibraryPage'));
 const MediaNormalizerPage = lazy(() => import('../pages/admin/MediaNormalizerPage'));
+const ScannerPage = lazy(() => import('../pages/admin/ScannerPage'));
+const UsersPage = lazy(() => import('../pages/admin/UsersPage'));
+const SearchAnalyticsPage = lazy(() => import('../pages/admin/SearchAnalyticsPage'));
 
 function withRouteFallback(element, routeType = 'default') {
   const getFallback = () => {
@@ -168,8 +171,16 @@ const router = createBrowserRouter([
         element: withRouteFallback(<MediaNormalizerPage />, 'default'),
       },
       {
+        path: 'scanner',
+        element: withRouteFallback(<ScannerPage />, 'default'),
+      },
+      {
         path: 'users',
-        element: <Navigate to="/admin" replace />,
+        element: withRouteFallback(<UsersPage />, 'default'),
+      },
+      {
+        path: 'analytics',
+        element: withRouteFallback(<SearchAnalyticsPage />, 'default'),
       },
       {
         path: '*',

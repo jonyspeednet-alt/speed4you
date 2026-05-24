@@ -14,8 +14,9 @@ const {
 const { getCurrentScanJob, getScannerHealth, listScannerRoots, startScanJob, stopScanJob } = require('../services/scanner');
 const { fetchMetadataByTmdbId, fetchMetadataFromOmdb } = require('../services/metadata-enricher');
 const { clearMetadataCache, getEnhancedCacheStats } = require('../services/scanner-enhanced-metadata');
-const { getMediaNormalizerStatus, startMediaNormalizer, stopMediaNormalizer, retryMediaNormalizerFile, getNormalizerConfig, setNormalizerConfig } = require('../services/media-normalizer');
+const { getMediaNormalizerStatus, startMediaNormalizer, stopMediaNormalizer, retryMediaNormalizerFile, retryAllFailedMediaNormalizerFiles, pauseMediaNormalizer, resumeMediaNormalizer, getNormalizerConfig, setNormalizerConfig } = require('../services/media-normalizer');
 const { getDuplicateReviewReport, runDuplicateCleanup } = require('../services/duplicate-review');
+const { listUsers, createUser, updateUser, deleteUser } = require('../services/admin-user');
 const { AppError } = require('../utils/error');
 const db = require('../config/database');
 const { saveBufferAsset, saveDataUrlAsset } = require('../utils/assetHelper');
@@ -341,6 +342,38 @@ exports.getNormalizerConfig = async (req, res) => {
 exports.setNormalizerConfig = async (req, res) => {
   const updates = req.body || {};
   res.json(await setNormalizerConfig(updates));
+};
+
+exports.pauseMediaNormalizer = async (req, res) => {
+  res.json(await pauseMediaNormalizer());
+};
+
+exports.resumeMediaNormalizer = async (req, res) => {
+  res.json(await resumeMediaNormalizer());
+};
+
+exports.retryAllMediaNormalizerFailed = async (req, res) => {
+  res.json(await retryAllFailedMediaNormalizerFiles());
+};
+
+// User management
+exports.listAdminUsers = async (req, res) => {
+  res.json(await listUsers());
+};
+
+exports.createAdminUser = async (req, res) => {
+  const { username, ***REMOVED***, role } = req.body || {};
+  res.status(201).json(await createUser(username, ***REMOVED***, role));
+};
+
+exports.updateAdminUser = async (req, res) => {
+  const id = req.params.id;
+  res.json(await updateUser(id, req.body || {}));
+};
+
+exports.deleteAdminUser = async (req, res) => {
+  const id = req.params.id;
+  res.json(await deleteUser(id));
 };
 
 exports.getDuplicatesReport = (req, res) => {
