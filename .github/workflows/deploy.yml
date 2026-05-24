@@ -302,6 +302,92 @@ jobs:
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' systemctl reload nginx
             echo "Nginx reloaded with HTTP/2 + gzip"
 
+      - name: Setup h5ai data portal on data.speed4you.net
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          SUDO_PASSWORD: ${{ ***REMOVED***s.SUDO_PASSWORD }}
+        with:
+          host: ${{ ***REMOVED***s.DEPLOY_HOST }}
+          username: ${{ ***REMOVED***s.DEPLOY_USER }}
+          key: ${{ ***REMOVED***s.DEPLOY_SSH_KEY }}
+          port: ${{ ***REMOVED***s.DEPLOY_PORT }}
+          envs: SUDO_PASSWORD
+          script: |
+            set -e
+            H5AI_DIR=/var/www/html/data
+            CONF=/etc/nginx/sites-enabled/data.speed4you.net
+            SPEED_CONF=/etc/nginx/sites-enabled/speed4you.net
+
+            # 1. Install PHP-FPM if missing
+            if ! command -v php-fpm >/dev/null 2>&1 && ! command -v php-fpm8.2 >/dev/null 2>&1 && ! command -v php-fpm8.1 >/dev/null 2>&1 && ! command -v php8.2 >/dev/null 2>&1; then
+              echo "Installing PHP-FPM..."
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' apt-get update -qq
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' apt-get install -y -qq php-fpm php-mbstring php-zip php-gd php-xml php-curl
+            fi
+
+            # 2. Detect PHP-FPM socket
+            PHP_SOCK=$(ls /var/run/php/php*-fpm.sock 2>/dev/null | head -1)
+            if [ -z "$PHP_SOCK" ]; then
+              PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null || echo "8.1")
+              PHP_SOCK="/var/run/php/php${PHP_VER}-fpm.sock"
+              if [ ! -S "$PHP_SOCK" ]; then
+                PHP_SOCK="127.0.0.1:9000"
+              fi
+            fi
+            echo "PHP-FPM: $PHP_SOCK"
+
+            # 3. Install h5ai
+            mkdir -p "$H5AI_DIR"
+            if [ ! -f "$H5AI_DIR/_h5ai/public/index.php" ]; then
+              echo "Downloading h5ai..."
+              cd /tmp
+              curl -sL https://release.larsjung.de/h5ai/h5ai-0.30.0.zip -o h5ai.zip
+              unzip -qo h5ai.zip -d h5ai-tmp
+              cp -r h5ai-tmp/_h5ai "$H5AI_DIR/"
+              rm -rf h5ai-tmp h5ai.zip
+              echo "h5ai installed"
+            else
+              echo "h5ai already installed"
+            fi
+
+            # 4. Extract SSL cert paths from current data.speed4you.net config
+            CERT=$(grep -m1 'ssl_certificate ' "$CONF" | awk '{print $2}' | tr -d ';')
+            CERT_KEY=$(grep -m1 'ssl_certificate_key ' "$CONF" | awk '{print $2}' | tr -d ';')
+            # Fallback to speed4you.net cert if not found
+            if [ -z "$CERT" ]; then
+              CERT=$(grep -m1 'ssl_certificate ' "$SPEED_CONF" | awk '{print $2}' | tr -d ';')
+              CERT_KEY=$(grep -m1 'ssl_certificate_key ' "$SPEED_CONF" | awk '{print $2}' | tr -d ';')
+            fi
+            echo "SSL cert: $CERT"
+
+            # 5. Write nginx config for data.speed4you.net from template
+            if echo "$PHP_SOCK" | grep -q '\.sock'; then
+              PHP_PASS="unix:$PHP_SOCK"
+            else
+              PHP_PASS="$PHP_SOCK"
+            fi
+            TMPL=/home/speed4you/actions-runner/_work/speed4you/speed4you/deploy/data-nginx.conf
+            TMPF=/tmp/data-nginx.conf
+            if [ -f "$TMPL" ]; then
+              cp "$TMPL" "$TMPF"
+              sed -i "s|CERT_PH|$CERT|g; s|KEY_PH|$CERT_KEY|g; s|SOCK_PH|$PHP_PASS|g" "$TMPF"
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp "$TMPF" "$CONF"
+              rm -f "$TMPF"
+              echo "nginx config written from template"
+            else
+              echo "WARN: template $TMPL not found, skipping" >&2
+            fi
+
+            # 6. Ensure PHP-FPM is running
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' systemctl enable php*-fpm 2>/dev/null || true
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' systemctl start php*-fpm 2>/dev/null || true
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$H5AI_DIR"
+
+            # 7. Test and reload nginx
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' nginx -t
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' systemctl reload nginx
+            echo "data.speed4you.net -> h5ai on $H5AI_DIR"
+
       - name: Verify deployed frontend bundle
         env:
           EXPECTED_BUNDLE: ${{ steps.frontend_bundle.outputs.bundle }}
