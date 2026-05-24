@@ -208,7 +208,7 @@ function renderBreadcrumbs() {
   const crumbs = getBreadcrumbs(currentPath);
   el.innerHTML = crumbs.map((c, i) => {
     if (i === crumbs.length - 1) return '<span class="current">' + escHtml(c.label) + '</span>';
-    return '<a href="#" onclick="navigateTo(\'' + c.path + '\');return false">' + escHtml(c.label) + '</a><span class="sep">/</span>';
+    return '<a href="#" data-path="' + escHtml(c.path) + '">' + escHtml(c.label) + '</a><span class="sep">/</span>';
   }).join('');
 }
 
@@ -225,6 +225,15 @@ function escHtml(s) {
   d.textContent = s;
   return d.innerHTML;
 }
+
+// Event delegation for directory clicks
+document.getElementById('content').addEventListener('click', function(e) {
+  const a = e.target.closest('a[data-path]');
+  if (a && a.dataset.path) {
+    e.preventDefault();
+    navigateTo(a.dataset.path);
+  }
+});
 
 function filterFiles() {
   const q = document.getElementById('filter').value.toLowerCase();
@@ -271,8 +280,8 @@ function renderContent() {
       const icon = getFileIcon(type);
       const href = item.isDir ? '#' : item.path;
       const target = item.isDir ? '' : ' target="_blank"';
-      const click = item.isDir ? ' onclick="navigateTo(\'' + item.path + '\');return false"' : '';
-      html += '<a class="file-row type-' + type + '" href="' + href + '"' + target + click + ' data-name="' + escHtml(item.name.toLowerCase()) + '">';
+      const dataPath = item.isDir ? ' data-path="' + escHtml(item.path) + '"' : '';
+      html += '<a class="file-row type-' + type + '" href="' + href + '"' + target + dataPath + ' data-name="' + escHtml(item.name.toLowerCase()) + '">';
       html += '<span class="file-icon">' + icon + '</span>';
       html += '<span class="file-name">' + escHtml(item.name) + '</span>';
       html += '<span class="file-size">' + (item.isDir ? '-' : formatSize(item.size)) + '</span>';
@@ -288,8 +297,8 @@ function renderContent() {
       const icon = getFileIcon(type);
       const href = item.isDir ? '#' : item.path;
       const target = item.isDir ? '' : ' target="_blank"';
-      const click = item.isDir ? ' onclick="navigateTo(\'' + item.path + '\');return false"' : '';
-      html += '<a class="grid-item type-' + type + '" href="' + href + '"' + target + click + ' data-name="' + escHtml(item.name.toLowerCase()) + '">';
+      const dataPath = item.isDir ? ' data-path="' + escHtml(item.path) + '"' : '';
+      html += '<a class="grid-item type-' + type + '" href="' + href + '"' + target + dataPath + ' data-name="' + escHtml(item.name.toLowerCase()) + '">';
       html += '<span class="file-icon">' + icon + '</span>';
       html += '<span class="file-name">' + escHtml(item.name) + '</span>';
       html += '<span class="file-meta">' + (item.isDir ? 'Folder' : formatSize(item.size)) + '</span>';
@@ -343,6 +352,7 @@ function handleHash() {
   const hash = window.location.hash;
   if (hash.startsWith('#!path=')) {
     path = hash.substring(7);
+    path = decodeURIComponent(path);
   }
   currentPath = path;
   loadDirectory(path);
