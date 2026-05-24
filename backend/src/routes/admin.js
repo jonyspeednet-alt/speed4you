@@ -81,6 +81,8 @@ router.get('/media-normalizer/status', asyncRoute(adminController.getMediaNormal
 router.post('/media-normalizer/start', asyncRoute(adminController.startMediaNormalizer));
 router.post('/media-normalizer/stop', asyncRoute(adminController.stopMediaNormalizer));
 router.post('/media-normalizer/retry', asyncRoute(adminController.retryMediaNormalizerFile));
+router.get('/media-normalizer/config', asyncRoute(adminController.getNormalizerConfig));
+router.post('/media-normalizer/config', asyncRoute(adminController.setNormalizerConfig));
 
 // Duplicates
 router.get('/duplicates/review', adminController.getDuplicatesReport);

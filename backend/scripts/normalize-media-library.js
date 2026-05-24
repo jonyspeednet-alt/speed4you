@@ -8,6 +8,7 @@ const { cleanSearchTitle, enrichItemWithMetadata, hasTmdbKey } = require('../src
 const {
   appendMediaNormalizerLog,
   getMediaNormalizerState,
+  getAppState,
   loadScannerRoots,
   refreshCatalogReferencesForNormalizedFile,
   saveMediaNormalizerState,
@@ -24,8 +25,6 @@ const TARGET_VIDEO_CODECS = new Set(['h264', 'avc1']);
 const TARGET_AUDIO_CODECS = new Set(['aac', 'mp4a']);
 const DEFAULT_SCAN_INTERVAL_MS = Number(process.env.MEDIA_NORMALIZER_SCAN_INTERVAL_MS || 15000);
 const DEFAULT_MIN_FREE_GB = Number(process.env.MEDIA_NORMALIZER_MIN_FREE_GB || 10);
-const DEFAULT_CRF = Number(process.env.MEDIA_NORMALIZER_CRF || 19);
-const DEFAULT_PRESET = process.env.MEDIA_NORMALIZER_PRESET || 'medium';
 const DUPLICATE_HOLD_DIR_NAME = process.env.MEDIA_NORMALIZER_DUPLICATE_DIR || '_duplicate_hold';
 const MAX_CONCURRENCY = Math.min(
   os.cpus().length || 2,
@@ -34,6 +33,25 @@ const MAX_CONCURRENCY = Math.min(
 let activeFfmpegSet = new Set();
 let isShuttingDown = false;
 let stateMutex = Promise.resolve();
+let currentConcurrency = MAX_CONCURRENCY;
+
+const CONFIG_STATE_KEY = 'media_normalizer_config';
+
+async function getDynamicConfig() {
+  try {
+    const cfg = await getAppState(CONFIG_STATE_KEY);
+    if (cfg && typeof cfg === 'object') {
+      return {
+        crf: Number(cfg.crf) || Number(process.env.MEDIA_NORMALIZER_CRF || 19),
+        preset: cfg.preset || process.env.MEDIA_NORMALIZER_PRESET || 'medium',
+      };
+    }
+  } catch {}
+  return {
+    crf: Number(process.env.MEDIA_NORMALIZER_CRF || 19),
+    preset: process.env.MEDIA_NORMALIZER_PRESET || 'medium',
+  };
+}
 
 async function appendRuntimeLog(message) {
   await appendMediaNormalizerLog([message]);
@@ -494,13 +512,15 @@ async function needsNormalization(filePath) {
   };
 }
 
-function buildEncodeArgs(inputPath, outputPath, streamMap) {
+function buildEncodeArgs(inputPath, outputPath, streamMap, encodeOpts = {}) {
   const videoMap = Number.isFinite(streamMap?.videoIndex) && streamMap.videoIndex >= 0
     ? `0:${streamMap.videoIndex}`
     : '0:v:0';
   const audioMap = Number.isFinite(streamMap?.audioIndex) && streamMap.audioIndex >= 0
     ? `0:${streamMap.audioIndex}`
     : '0:a:0?';
+  const crf = encodeOpts.crf || Number(process.env.MEDIA_NORMALIZER_CRF || 19);
+  const preset = encodeOpts.preset || process.env.MEDIA_NORMALIZER_PRESET || 'medium';
 
   const args = [
     '-y',
@@ -513,8 +533,8 @@ function buildEncodeArgs(inputPath, outputPath, streamMap) {
     '-sn',
     '-dn',
     '-c:v', 'libx264',
-    '-preset', DEFAULT_PRESET,
-    '-crf', String(DEFAULT_CRF),
+    '-preset', preset,
+    '-crf', String(crf),
     '-pix_fmt', 'yuv420p',
     '-vsync', 'cfr',
     '-c:a', 'aac',
@@ -526,9 +546,9 @@ function buildEncodeArgs(inputPath, outputPath, streamMap) {
   return args;
 }
 
-async function transcodeToTarget(inputPath, outputPath, durationSeconds, onProgress, streamMap) {
+async function transcodeToTarget(inputPath, outputPath, durationSeconds, onProgress, streamMap, encodeOpts = {}) {
   const ffmpegBin = resolveFfTool('ffmpeg');
-  const args = buildEncodeArgs(inputPath, outputPath, streamMap);
+  const args = buildEncodeArgs(inputPath, outputPath, streamMap, encodeOpts);
   await new Promise((resolve, reject) => {
     const ffmpeg = spawn(ffmpegBin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
     activeFfmpegSet.add(ffmpeg);
@@ -725,7 +745,7 @@ async function processFileCandidate(state, candidate) {
   const { filePath, root, stat, sig } = candidate;
 
   const freeGb = getFreeDiskGb(path.dirname(filePath));
-  if (freeGb / MAX_CONCURRENCY < DEFAULT_MIN_FREE_GB) {
+  if (freeGb / (currentConcurrency || MAX_CONCURRENCY) < DEFAULT_MIN_FREE_GB) {
     await logInfo(`[media-normalizer] pause low disk (${freeGb.toFixed(2)} GB) near ${filePath}`);
     return { worked: false, reason: 'low-disk' };
   }
@@ -765,7 +785,7 @@ async function processFileCandidate(state, candidate) {
 
   const availableBytes = Math.max(0, getFreeDiskGb(dir) * (1024 ** 3));
   const requiredBytes = Math.max(stat.size * 1.15, stat.size + (512 * 1024 * 1024));
-  if (availableBytes / MAX_CONCURRENCY < requiredBytes) {
+  if (availableBytes / (currentConcurrency || MAX_CONCURRENCY) < requiredBytes) {
     await logInfo(`[media-normalizer] pause low disk for safe convert near ${filePath}; need=${formatBytes(requiredBytes)} free=${formatBytes(availableBytes)}`);
     return { worked: false, reason: 'low-disk-for-file' };
   }
@@ -793,6 +813,7 @@ async function processFileCandidate(state, candidate) {
     };
     await persistState(state);
 
+    const encodeOpts = await getDynamicConfig();
     await transcodeToTarget(
       filePath,
       tempOutput,
@@ -811,6 +832,7 @@ async function processFileCandidate(state, candidate) {
         videoIndex: Number(status.meta?.primaryVideoIndex),
         audioIndex: Number(status.meta?.primaryAudioIndex),
       },
+      encodeOpts,
     );
     state.currentFileProgress = {
       ...state.currentFileProgress,
@@ -902,7 +924,8 @@ async function main() {
   }
 
   await logInfo('[media-normalizer] started');
-  await logInfo(`[media-normalizer] roots=${roots.length}, interval=${DEFAULT_SCAN_INTERVAL_MS}ms, minFree=${DEFAULT_MIN_FREE_GB}GB, concurrency=${MAX_CONCURRENCY}`);
+  const startupCfg = await getDynamicConfig();
+  await logInfo(`[media-normalizer] roots=${roots.length}, interval=${DEFAULT_SCAN_INTERVAL_MS}ms, minFree=${DEFAULT_MIN_FREE_GB}GB, concurrency=${MAX_CONCURRENCY}, crf=${startupCfg.crf}, preset=${startupCfg.preset}`);
 
   const state = await loadState();
   recoverInterruptedOperation(state);
@@ -933,7 +956,12 @@ async function main() {
 
     if (isShuttingDown) break;
 
-    const candidates = findProcessingCandidates(state, roots, MAX_CONCURRENCY);
+    const cfg = await getDynamicConfig();
+    currentConcurrency = Math.max(1, Math.min(
+      os.cpus().length || 2,
+      cfg.concurrency ? Number(cfg.concurrency) : MAX_CONCURRENCY,
+    ));
+    const candidates = findProcessingCandidates(state, roots, currentConcurrency);
     if (!candidates.length) {
       await sleep(DEFAULT_SCAN_INTERVAL_MS);
       continue;
