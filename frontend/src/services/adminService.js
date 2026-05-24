@@ -24,6 +24,10 @@ export const adminService = {
   getMediaNormalizerStatus: () => apiClient('/admin/media-normalizer/status'),
   startMediaNormalizer: () => apiClient('/admin/media-normalizer/start', { method: 'POST' }).finally(clearAdminCache),
   stopMediaNormalizer: () => apiClient('/admin/media-normalizer/stop', { method: 'POST' }).finally(clearAdminCache),
+  retryMediaNormalizerFile: (filePath) => apiClient('/admin/media-normalizer/retry', {
+    method: 'POST',
+    body: JSON.stringify({ filePath }),
+  }).finally(clearAdminCache),
   getDuplicateReview: () => cachedGet('/admin/duplicates/review'),
   runDuplicateCleanup: () => apiClient('/admin/duplicates/cleanup', { method: 'POST' }).finally(clearAdminCache),
   pruneCatalog: () => apiClient('/admin/maintenance/prune', { method: 'POST' }).finally(clearAdminCache),
