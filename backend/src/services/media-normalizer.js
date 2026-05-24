@@ -4,6 +4,8 @@ const {
   getMediaNormalizerLog,
   getMediaNormalizerState,
   saveMediaNormalizerState,
+  getAppState,
+  setAppState,
 } = require('../data/store');
 
 const scriptPath = path.resolve(__dirname, '../../scripts/normalize-media-library.js');
@@ -106,8 +108,44 @@ async function stop() {
   return { stopped: true, signaledPid: pid, status: await getStatus() };
 }
 
+async function retryFile(filePath) {
+  const state = await getMediaNormalizerState();
+  if (!state) {
+    return { retried: false, reason: 'no-state' };
+  }
+
+  const cleaned = [];
+  if (state.failed?.[filePath]) {
+    delete state.failed[filePath];
+    cleaned.push('failed');
+  }
+  if (state.processed?.[filePath]) {
+    delete state.processed[filePath];
+    cleaned.push('processed');
+  }
+  // Also handle .mp4 variant if the original was .mkv etc.
+  const mp4Path = filePath.replace(/\.\w+$/, '.mp4');
+  if (mp4Path !== filePath && state.processed?.[mp4Path]) {
+    delete state.processed[mp4Path];
+    if (!cleaned.includes('processed')) cleaned.push('processed');
+  }
+
+  await saveMediaNormalizerState({
+    ...state,
+    updatedAt: new Date().toISOString(),
+  });
+
+  return {
+    retried: true,
+    filePath,
+    cleaned,
+    status: await getStatus(),
+  };
+}
+
 module.exports = {
   getMediaNormalizerStatus: getStatus,
   startMediaNormalizer: start,
   stopMediaNormalizer: stop,
+  retryMediaNormalizerFile: retryFile,
 };

@@ -14,7 +14,7 @@ const {
 const { getCurrentScanJob, getScannerHealth, listScannerRoots, startScanJob, stopScanJob } = require('../services/scanner');
 const { fetchMetadataByTmdbId, fetchMetadataFromOmdb } = require('../services/metadata-enricher');
 const { clearMetadataCache, getEnhancedCacheStats } = require('../services/scanner-enhanced-metadata');
-const { getMediaNormalizerStatus, startMediaNormalizer, stopMediaNormalizer } = require('../services/media-normalizer');
+const { getMediaNormalizerStatus, startMediaNormalizer, stopMediaNormalizer, retryMediaNormalizerFile } = require('../services/media-normalizer');
 const { getDuplicateReviewReport, runDuplicateCleanup } = require('../services/duplicate-review');
 const { AppError } = require('../utils/error');
 const db = require('../config/database');
@@ -324,6 +324,14 @@ exports.startMediaNormalizer = async (req, res) => {
 
 exports.stopMediaNormalizer = async (req, res) => {
   res.status(202).json(await stopMediaNormalizer());
+};
+
+exports.retryMediaNormalizerFile = async (req, res) => {
+  const filePath = String(req.body?.filePath || '').trim();
+  if (!filePath) {
+    return res.status(400).json({ error: 'filePath is required' });
+  }
+  res.json(await retryMediaNormalizerFile(filePath));
 };
 
 exports.getDuplicatesReport = (req, res) => {
