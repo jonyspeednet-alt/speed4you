@@ -956,6 +956,13 @@ async function main() {
 
     if (isShuttingDown) break;
 
+    // Check for paused state
+    const currentState = await getMediaNormalizerState();
+    if (currentState?.paused) {
+      await sleep(3000);
+      continue;
+    }
+
     const cfg = await getDynamicConfig();
     currentConcurrency = Math.max(1, Math.min(
       os.cpus().length || 2,

@@ -34,3 +34,5 @@ DEPLOYMENT-SECRETS.md
 # Backup and scratch files
 *.backup
 scratch.js
+tmp-nginx-*.conf
+frontend/dist.zip
