@@ -795,7 +795,7 @@ const styles = {
   checkItem: { display: 'flex', gap: '8px', alignItems: 'center', color: TEXT2, fontSize: '0.85rem' },
   checkOk: { color: '#4ade80' },
   checkMuted: { color: TEXT3 },
-  actions: { display: 'flex', gap: '10px', flexWrap: 'wrap' },
+  actions: { display: 'flex', gap: '10px', flexWrap: 'wrap', position: 'sticky', bottom: 0, padding: '16px 24px', background: SURFACE, borderTop: `1px solid ${BORDER}`, zIndex: 20, boxShadow: '0 -4px 20px rgba(0,0,0,0.4)' },
   secondaryBtn: { padding: '10px 20px', background: SURFACE2, color: TEXT, borderRadius: '8px', fontWeight: '600', border: `1px solid ${BORDER}`, cursor: 'pointer', fontSize: '0.875rem' },
   submitBtn: { padding: '10px 22px', background: ACCENT, color: '#fff', borderRadius: '8px', fontWeight: '600', fontSize: '0.875rem', cursor: 'pointer', border: 'none' },
   deleteBtn: { padding: '10px 20px', background: 'rgba(239,68,68,0.08)', color: '#f87171', borderRadius: '8px', fontWeight: '600', border: '1px solid rgba(239,68,68,0.15)', cursor: 'pointer', fontSize: '0.875rem' },
