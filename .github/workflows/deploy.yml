@@ -219,11 +219,13 @@ jobs:
               CORS="${CORS},https://103.79.182.226"
             fi
 
+            # Use OMDB_API_KEY from ***REMOVED***, fallback to hardcoded key if not set (remove once ***REMOVED*** is configured)
+            OMDB_KEY="${OMDB_API_KEY:-***REMOVED***}"
             cat > .env <<EOF
             PORT=4100
             JWT_SECRET=${JWT_SECRET}
             TMDB_API_KEY=${TMDB_API_KEY}
-            OMDB_API_KEY=${OMDB_API_KEY}
+            OMDB_API_KEY=${OMDB_KEY}
             CORS_ALLOWED_ORIGINS=${CORS}
             PLAYER_CACHE_ROOT=${PLAYER_CACHE_ROOT}
             DB_HOST=${DB_HOST}
