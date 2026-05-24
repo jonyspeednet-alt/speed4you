@@ -428,6 +428,7 @@ function* walkVideoFiles(rootPath) {
     for (const entry of entries) {
       const absolutePath = path.join(current, entry.name);
       if (entry.isDirectory()) {
+        if (entry.name.startsWith('.')) continue;
         queue.push(absolutePath);
         continue;
       }
