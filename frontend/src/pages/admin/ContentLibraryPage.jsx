@@ -803,3 +803,5 @@ const styles = {
   presetChip: { display: 'inline-flex', alignItems: 'center', gap: '2px', background: surface2, borderRadius: '5px', paddingRight: '2px', border: `1px solid ${border}` },
   presetDel: { width: '18px', height: '18px', borderRadius: '3px', background: 'rgba(239,68,68,0.1)', color: '#f87171', fontWeight: '700', fontSize: '0.68rem', lineHeight: 1, cursor: 'pointer', border: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
 };
+
+export default ContentLibraryPage;
