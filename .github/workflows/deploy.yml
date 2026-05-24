@@ -372,12 +372,10 @@ jobs:
             if [ -f "$H5AI_DIR/_h5ai/public/index.php" ]; then H5AI_OK=true; fi
             if ! $H5AI_OK; then
               echo "Creating fallback index.html"
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sh -c "echo '<!DOCTYPE html>
-<html lang=\"en\">
-<head><meta charset=\"utf-8\"><title>Data Portal</title>
-<style>body{font-family:sans-serif;background:#0a0c10;color:#f1f5f9;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;flex-direction:column;gap:12px}h1{font-size:2rem;font-weight:200}p{color:#94a3b8}a{color:#6366f1}</style>
-</head><body><h1>Data Portal</h1><p>Welcome to the Data Portal.</p><p><a href=\"https://speed4you.net/\">Back to Portal</a></p></body></html>
-' > \"$H5AI_DIR/index.html\""
+              TMPI=/tmp/data-portal-index.html
+              echo '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Data Portal</title><style>body{font-family:sans-serif;background:#0a0c10;color:#f1f5f9;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;flex-direction:column;gap:12px}h1{font-size:2rem;font-weight:200}p{color:#94a3b8}a{color:#6366f1}</style></head><body><h1>Data Portal</h1><p>Welcome to the Data Portal.</p><p><a href="https://speed4you.net/">Back to Portal</a></p></body></html>' > "$TMPI"
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp "$TMPI" "$H5AI_DIR/index.html"
+              rm -f "$TMPI"
             fi
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$H5AI_DIR" 2>/dev/null || true
             echo "server {" > /tmp/dataconf
