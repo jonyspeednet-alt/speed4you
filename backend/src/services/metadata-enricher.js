@@ -251,6 +251,32 @@ async function fetchMetadataByTmdbId(tmdbId, mediaType = 'movie') {
   };
 }
 
+async function fetchMetadataByImdbId(imdbId, mediaType = 'movie') {
+  const normalizedType = mediaType === 'series' || mediaType === 'tv' ? 'tv' : 'movie';
+
+  // First try TMDb's find endpoint to get the TMDb ID
+  if (hasTmdbKey()) {
+    try {
+      const found = await tmdbFetchJson(`/find/${imdbId}`, { external_source: 'imdb_id' });
+      const results = found?.movie_results || found?.tv_results || [];
+      const tmdbResults = normalizedType === 'tv' ? (found?.tv_results || []) : results;
+      if (tmdbResults.length > 0) {
+        const tmdbId = tmdbResults[0].id;
+        return fetchMetadataByTmdbId(tmdbId, normalizedType);
+      }
+    } catch {}
+  }
+
+  // Fallback to OMDB
+  if (hasOmdbKey()) {
+    try {
+      return await fetchMetadataFromOmdb(imdbId);
+    } catch {}
+  }
+
+  throw Object.assign(new Error(`No metadata found for ${imdbId}. Try a different ID.`), { statusCode: 404 });
+}
+
 async function enrichItemWithMetadata(item) {
   const parsedTitle = cleanSearchTitle(item.title);
 
@@ -419,6 +445,7 @@ module.exports = {
   cleanSearchTitle,
   enrichItemWithMetadata,
   fetchMetadataByTmdbId,
+  fetchMetadataByImdbId,
   fetchMetadataFromOmdb,
   hasTmdbKey,
   hasOmdbKey,
