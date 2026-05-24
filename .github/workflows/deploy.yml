@@ -379,19 +379,34 @@ jobs:
               if ! $H5AI_OK; then
                 TMPZ=/tmp/h5ai.zip; TMPD=/tmp/h5aitmp
                 echo "Downloading h5ai..."
-                (curl -sL --connect-timeout 15 --max-time 60 https://release.larsjung.de/h5ai/h5ai-0.30.0.zip -o "$TMPZ" || curl -sL --connect-timeout 15 --max-time 60 https://github.com/lrsjng/h5ai/archive/refs/tags/v0.30.0.zip -o "$TMPZ") 2>&1
+                for dlurl in \
+                  "https://github.com/lrsjng/h5ai/archive/refs/tags/v0.30.0.zip" \
+                  "https://api.github.com/repos/lrsjng/h5ai/zipball/v0.30.0"; do
+                  echo "Trying: $dlurl"
+                  curl -fSslL --connect-timeout 15 --max-time 60 "$dlurl" -o "$TMPZ" 2>&1 && break
+                  echo "Failed, trying next URL..."
+                done
                 if [ -f "$TMPZ" ] && [ -s "$TMPZ" ]; then
-                  echo "h5ai downloaded ($(du -h "$TMPZ" | cut -f1))"
-                  command -v unzip >/dev/null 2>&1 && unzip -qo "$TMPZ" -d "$TMPD" 2>&1 || echo "unzip failed"
+                  size=$(stat --printf="%s" "$TMPZ" 2>/dev/null || wc -c < "$TMPZ")
+                  echo "h5ai downloaded ($size bytes)"
+                  if [ "$size" -gt 10000 ]; then
+                    command -v unzip >/dev/null 2>&1 && unzip -qo "$TMPZ" -d "$TMPD" 2>&1 || echo "unzip failed"
+                  else
+                    echo "Downloaded file too small ($size bytes), might be an error page"
+                    cat "$TMPZ" | head -c 500
+                  fi
                 else
-                  echo "Failed to download h5ai"
+                  echo "Failed to download h5ai from all URLs"
                 fi
-                if [ -d "$TMPD/_h5ai" ]; then
-                  printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -r "$TMPD/_h5ai" "$ROOT/"
-                  printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$ROOT/_h5ai"
-                  echo "h5ai copied to $ROOT/_h5ai"
+                if [ -d "$TMPD/_h5ai" ] || [ -d "$TMPD/lrsjng-h5ai-*/_h5ai" ]; then
+                  H5AI_SRC=$(find "$TMPD" -type d -name _h5ai 2>/dev/null | head -1)
+                  if [ -n "$H5AI_SRC" ]; then
+                    printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -r "$H5AI_SRC" "$ROOT/"
+                    printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$ROOT/_h5ai"
+                    echo "h5ai copied from $H5AI_SRC to $ROOT/_h5ai"
+                  fi
                 fi
-                [ -f "$ROOT/_h5ai/public/index.php" ] && { H5AI_OK=true; echo "h5ai installed successfully"; }
+                [ -f "$ROOT/_h5ai/public/index.php" ] && { H5AI_OK=true; echo "h5ai installed successfully"; } || echo "h5ai installation failed"
                 rm -rf "$TMPD" "$TMPZ"
               fi
             fi
