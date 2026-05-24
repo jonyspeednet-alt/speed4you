@@ -40,6 +40,8 @@ function AddContentPage() {
   const [error, setError] = useState('');
   const [itemMeta, setItemMeta] = useState(null);
   const [formData, setFormData] = useState(emptyForm);
+  const [activeSection, setActiveSection] = useState('');
+  const [episodesExpanded, setEpisodesExpanded] = useState(true);
 
   useEffect(() => {
     if (!isEditMode) {
@@ -338,6 +340,36 @@ function AddContentPage() {
     }
   };
 
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) setActiveSection(entry.target.id);
+      });
+    }, { rootMargin: '-80px 0px -60% 0px' });
+    const sections = document.querySelectorAll('[data-section]');
+    sections.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, [loadingItem, formData.type]);
+
+  const autoResize = (el) => {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  };
+
+  const scrollToSection = (sectionId) => {
+    const el = document.getElementById(sectionId);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const SECTION_NAV = [
+    { id: 'section-metadata', label: 'Metadata' },
+    { id: 'section-details', label: 'Details' },
+    ...(formData.type === 'series' ? [{ id: 'section-episodes', label: `Episodes (${(formData.seasons || []).reduce((s, seas) => s + (seas.episodes || []).length, 0)})` }] : []),
+    { id: 'section-artwork', label: 'Artwork' },
+    { id: 'section-checklist', label: 'Checklist' },
+  ];
+
   const handleDelete = async () => {
     if (!isEditMode || loading) {
       return;
@@ -387,6 +419,17 @@ function AddContentPage() {
 
       {error ? <div style={styles.errorBox}>{error}</div> : null}
 
+      {!loadingItem && (
+        <nav style={styles.sectionNav}>
+          {SECTION_NAV.map((s) => (
+            <button key={s.id} type="button" onClick={() => scrollToSection(s.id)}
+              style={{ ...styles.sectionNavItem, ...(activeSection === s.id ? styles.sectionNavItemActive : {}) }}>
+              {s.label}
+            </button>
+          ))}
+        </nav>
+      )}
+
       {loadingItem ? (
         <div style={styles.section}>Loading content details...</div>
       ) : (
@@ -428,7 +471,7 @@ function AddContentPage() {
           <form onSubmit={handleSubmit} style={styles.form}>
             <div style={{ ...styles.contentGrid, ...(isMobile || isTablet ? styles.contentGridMobile : {}) }}>
               <div style={styles.formStack}>
-                <section style={styles.section}>
+                <section id="section-metadata" data-section style={styles.section}>
                   <span style={styles.sectionEyebrow}>Metadata Assist</span>
                   <div style={{ ...styles.tmdbRow, ...(isMobile ? styles.tmdbRowMobile : {}) }}>
                     <div style={styles.field}>
@@ -479,12 +522,12 @@ function AddContentPage() {
 
                   <div style={styles.field}>
                     <label style={styles.label}>Description</label>
-                    <textarea name="description" value={formData.description} onChange={handleChange} style={styles.textarea} rows={5} />
+                    <textarea name="description" value={formData.description} onChange={handleChange} onInput={(e) => autoResize(e.target)} style={styles.textarea} rows={3} />
                   </div>
                   {itemMeta?.metadataError ? <div style={styles.errorBox}>{itemMeta.metadataError}</div> : null}
                 </section>
 
-                <section style={styles.section}>
+                <section id="section-details" data-section style={styles.section}>
                   <span style={styles.sectionEyebrow}>Release Details</span>
                   <div style={styles.row}>
                     <div style={styles.field}>
@@ -557,24 +600,31 @@ function AddContentPage() {
 
                   <div style={styles.field}>
                     <label style={styles.label}>Admin Notes</label>
-                    <textarea name="adminNotes" value={formData.adminNotes} onChange={handleChange} style={styles.textarea} rows={4} placeholder="Internal note for future management..." />
+                    <textarea name="adminNotes" value={formData.adminNotes} onChange={handleChange} onInput={(e) => autoResize(e.target)} style={styles.textarea} rows={2} placeholder="Internal note for future management..." />
                   </div>
                 </section>
 
                 {formData.type === 'series' && Array.isArray(formData.seasons) && formData.seasons.length > 0 && (
-                  <section style={styles.section}>
-                    <span style={styles.sectionEyebrow}>Episode Media Control</span>
-                    <div style={styles.infoBox}>
-                      Manual override from here will save episode-specific `Media URL`, so each episode can point to its own file.
+                  <section id="section-episodes" data-section style={styles.section}>
+                    <div style={styles.sectionHeader}>
+                      <span style={styles.sectionEyebrow}>Episode Media Control</span>
+                      <button type="button" onClick={() => setEpisodesExpanded(!episodesExpanded)}
+                        style={styles.collapseBtn}>
+                        {episodesExpanded ? '▲ Collapse' : '▼ Episodes'}
+                      </button>
                     </div>
+                    <div style={{ display: episodesExpanded ? 'grid' : 'none', gap: '16px' }}>
+                      <div style={styles.infoBox}>
+                        Manual override from here will save episode-specific `Media URL`, so each episode can point to its own file.
+                      </div>
 
-                    <div style={styles.seasonEditorStack}>
-                      {formData.seasons.map((season, seasonIndex) => (
-                        <div key={season.id || seasonIndex} style={styles.seasonCard}>
-                          <div style={styles.seasonHeader}>
-                            <strong style={styles.seasonTitle}>Season {season.number || seasonIndex + 1}</strong>
-                            <span style={styles.seasonMeta}>{(season.episodes || []).length} episodes</span>
-                          </div>
+                      <div style={styles.seasonEditorStack}>
+                        {formData.seasons.map((season, seasonIndex) => (
+                          <div key={season.id || seasonIndex} style={styles.seasonCard}>
+                            <div style={styles.seasonHeader}>
+                              <strong style={styles.seasonTitle}>Season {season.number || seasonIndex + 1}</strong>
+                              <span style={styles.seasonMeta}>{(season.episodes || []).length} episodes</span>
+                            </div>
 
                           <div style={styles.row}>
                             <div style={styles.field}>
@@ -626,23 +676,24 @@ function AddContentPage() {
                                   <textarea
                                     value={episode.description || ''}
                                     onChange={(event) => handleEpisodeChange(seasonIndex, episodeIndex, 'description', event.target.value)}
+                                    onInput={(e) => autoResize(e.target)}
                                     style={styles.textarea}
-                                    rows={3}
+                                    rows={2}
                                     placeholder="Optional episode notes"
                                   />
                                 </div>
                               </div>
                             ))}
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   </section>
                 )}
               </div>
 
               <aside style={{ ...styles.assetRail, ...(isMobile || isTablet ? styles.assetRailMobile : {}) }}>
-                <section style={styles.section}>
+                <section id="section-artwork" data-section style={styles.section}>
                   <span style={styles.sectionEyebrow}>Artwork Studio</span>
                   <div style={styles.field}>
                     <label style={styles.label}>Poster Image URL</label>
@@ -668,7 +719,7 @@ function AddContentPage() {
                   </div>
                 </section>
 
-                <section style={styles.section}>
+                <section id="section-checklist" data-section style={styles.section}>
                   <span style={styles.sectionEyebrow}>Publish Checklist</span>
                   <div style={styles.checklist}>
                     <div style={styles.checkItem}><span style={formData.title ? styles.checkOk : styles.checkMuted}>*</span><span>Title ready</span></div>
@@ -749,6 +800,11 @@ const styles = {
   statusCard: { padding: '12px 14px', borderRadius: '8px', background: SURFACE2, border: `1px solid ${BORDER}`, display: 'grid', gap: '4px' },
   statusLabel: { fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT3, fontWeight: '600' },
   statusValue: { color: TEXT, fontWeight: '600', fontSize: '0.9rem', textTransform: 'capitalize' },
+  sectionNav: { display: 'flex', gap: '6px', flexWrap: 'wrap', padding: '6px 0', position: 'sticky', top: '68px', zIndex: 5, background: 'var(--bg-primary, #0a0c10)' },
+  sectionNavItem: { padding: '7px 14px', borderRadius: '8px', background: SURFACE2, border: `1px solid ${BORDER}`, color: TEXT2, fontWeight: '600', fontSize: '0.78rem', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 150ms' },
+  sectionNavItemActive: { background: ACCENT_LIGHT, borderColor: ACCENT_BORDER, color: TEXT },
+  sectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' },
+  collapseBtn: { padding: '4px 10px', borderRadius: '6px', background: SURFACE2, border: `1px solid ${BORDER}`, color: TEXT2, fontWeight: '600', fontSize: '0.72rem', cursor: 'pointer', lineHeight: 1 },
   section: { padding: '20px', borderRadius: '10px', background: SURFACE, border: `1px solid ${BORDER}`, display: 'grid', gap: '16px' },
   metaGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' },
   metaList: { display: 'grid', gap: '8px', color: TEXT2, lineHeight: '1.7', fontSize: '0.875rem' },
