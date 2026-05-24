@@ -12,7 +12,7 @@ const {
   vacuumDatabase,
 } = require('../data/store');
 const { getCurrentScanJob, getScannerHealth, listScannerRoots, startScanJob, stopScanJob } = require('../services/scanner');
-const { fetchMetadataByTmdbId, fetchMetadataFromOmdb } = require('../services/metadata-enricher');
+const { fetchMetadataByTmdbId, fetchMetadataByImdbId } = require('../services/metadata-enricher');
 const { clearMetadataCache, getEnhancedCacheStats } = require('../services/scanner-enhanced-metadata');
 const { getMediaNormalizerStatus, startMediaNormalizer, stopMediaNormalizer, retryMediaNormalizerFile, retryAllFailedMediaNormalizerFiles, pauseMediaNormalizer, resumeMediaNormalizer, getNormalizerConfig, setNormalizerConfig } = require('../services/media-normalizer');
 const { getDuplicateReviewReport, runDuplicateCleanup } = require('../services/duplicate-review');
@@ -402,7 +402,7 @@ exports.fetchTmdbMetadata = async (req, res) => {
 
   let metadata;
   if (inputId.toLowerCase().startsWith('tt')) {
-    metadata = await fetchMetadataFromOmdb(inputId);
+    metadata = await fetchMetadataByImdbId(inputId, mediaType);
   } else {
     const tmdbId = Number(inputId);
     if (isNaN(tmdbId)) {
