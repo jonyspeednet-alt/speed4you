@@ -210,7 +210,8 @@ function listDirectoryEntries(dirPath) {
     return fs.readdirSync(dirPath, { withFileTypes: true })
       .filter((entry) => entry.name !== DUPLICATE_HOLD_DIR_NAME)
       .filter((entry) => !/\.normalizing\.\d+\.[a-f0-9]+$/i.test(entry.name))
-      .filter((entry) => !/\.pre-normalize\.\d+(?:\.bak)?$/i.test(entry.name));
+      .filter((entry) => !/\.pre-normalize\.\d+(?:\.bak)?$/i.test(entry.name))
+      .filter((entry) => !entry.name.startsWith('.'));
   } catch {
     return [];
   }
