@@ -290,18 +290,18 @@ export default function AdminDashboard() {
 
           {/* Media Normalizer */}
           <div style={s.card}>
-            <div style={s.normalizerHeader}>
-              <h2 style={s.sectionTitle}>Media Normalizer</h2>
+            <div style={{ ...s.normalizerHeader, marginBottom: 0 }}>
+              <div>
+                <h2 style={s.sectionTitle}>Media Normalizer</h2>
+                <p style={s.normalizerDesc}>
+                  Converts media to MP4 / H.264 / AAC with faststart for smooth playback.
+                </p>
+              </div>
               <span style={{ ...s.statusDot, ...(normalizer.running ? s.statusDotGreen : s.statusDotGray) }}>
                 {normalizer.running ? 'Running' : 'Idle'}
               </span>
             </div>
 
-            <p style={s.normalizerDesc}>
-              Converts media to MP4 / H.264 / AAC with faststart for smooth playback.
-            </p>
-
-            {/* Stats */}
             <div style={s.normalizerStats}>
               {[
                 { label: 'Converted', value: normalizer.state?.stats?.converted || 0 },
@@ -315,7 +315,6 @@ export default function AdminDashboard() {
               ))}
             </div>
 
-            {/* Progress */}
             {currentProgress && (
               <div style={s.progressBlock}>
                 <div style={s.progressTopRow}>
@@ -327,47 +326,13 @@ export default function AdminDashboard() {
                 <div style={s.progressTrack}>
                   <div style={{ ...s.progressFill, width: `${pct}%` }} />
                 </div>
-                <div style={s.progressMeta}>
-                  <span>{formatSeconds(currentProgress.progressSeconds)} / {formatSeconds(currentProgress.durationSeconds)}</span>
-                  <span>Speed: {currentProgress.speed || '—'}</span>
-                  <span>{currentProgress.phase || ''}</span>
-                </div>
               </div>
             )}
 
-            {/* Controls */}
-            <div style={s.normalizerControls}>
-              <button
-                type="button"
-                style={{ ...s.normBtn, ...(normalizer.running || normalizerMutation.isPending ? s.normBtnDisabled : s.normBtnStart) }}
-                onClick={() => normalizerMutation.mutate('start')}
-                disabled={normalizerMutation.isPending || normalizer.running}
-              >
-                Start
-              </button>
-              <button
-                type="button"
-                style={{ ...s.normBtn, ...(!normalizer.running || normalizerMutation.isPending ? s.normBtnDisabled : s.normBtnStop) }}
-                onClick={() => normalizerMutation.mutate('stop')}
-                disabled={normalizerMutation.isPending || !normalizer.running}
-              >
-                Stop
-              </button>
-            </div>
-
-            {normalizerError && (
-              <div style={s.errorInline}>{normalizerError.message || 'Status check failed'}</div>
-            )}
-
-            {/* Log */}
-            <div style={s.logBox}>
-              {(normalizer.recentLogLines || []).length > 0
-                ? normalizer.recentLogLines.slice(-8).map((line, i) => (
-                  <div key={i} style={s.logLine}>{line}</div>
-                ))
-                : <div style={{ color: TEXT3 }}>No logs yet.</div>
-              }
-            </div>
+            <Link to="/admin/normalizer" style={s.viewDetailsBtn}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
+              View Details
+            </Link>
           </div>
 
         </div>
@@ -570,8 +535,8 @@ const s = {
   },
 
   // Normalizer
-  normalizerHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' },
-  normalizerDesc: { fontSize: '0.85rem', color: TEXT3, lineHeight: 1.6, margin: 0, fontWeight: '500' },
+  normalizerHeader: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' },
+  normalizerDesc: { fontSize: '0.82rem', color: TEXT3, lineHeight: 1.5, margin: '4px 0 0 0', fontWeight: '500' },
   normalizerStats: { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px' },
   normalizerStat: {
     padding: '14px',
@@ -625,6 +590,13 @@ const s = {
   normBtnStart: { background: 'rgba(34,197,94,0.12)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.2)' },
   normBtnStop: { background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' },
   normBtnDisabled: { background: SURFACE2, color: TEXT3, cursor: 'not-allowed', border: `1px solid ${BORDER}`, opacity: 0.6 },
+
+  viewDetailsBtn: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+    padding: '10px', borderRadius: '10px', fontSize: '0.82rem', fontWeight: '700',
+    color: ACCENT, background: ACCENT_LIGHT, border: `1px solid ${ACCENT_BORDER}`,
+    textDecoration: 'none', transition: 'all 180ms ease', cursor: 'pointer',
+  },
 
   errorInline: {
     padding: '10px 14px',

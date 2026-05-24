@@ -19,6 +19,7 @@ const LoginPage = lazy(() => import('../pages/LoginPage'));
 const AdminDashboard = lazy(() => import('../pages/admin/AdminDashboard'));
 const AddContentPage = lazy(() => import('../pages/admin/AddContentPage'));
 const ContentLibraryPage = lazy(() => import('../pages/admin/ContentLibraryPage'));
+const MediaNormalizerPage = lazy(() => import('../pages/admin/MediaNormalizerPage'));
 
 function withRouteFallback(element, routeType = 'default') {
   const getFallback = () => {
@@ -161,6 +162,10 @@ const router = createBrowserRouter([
       {
         path: 'series',
         element: withRouteFallback(<ContentLibraryPage />, 'browse'),
+      },
+      {
+        path: 'normalizer',
+        element: withRouteFallback(<MediaNormalizerPage />, 'default'),
       },
       {
         path: 'users',
