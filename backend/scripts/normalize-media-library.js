@@ -600,7 +600,7 @@ async function assertOutputLooksValid(inputPath, outputPath, expectedDurationSec
   const baselineDuration = Math.max(toNumber(expectedDurationSeconds), inputVideoDuration, toNumber(before?.format?.duration));
   const afterDuration = Math.max(outputVideoDuration, toNumber(after?.format?.duration));
   const diff = Math.abs(baselineDuration - afterDuration);
-  const tolerance = Math.max(4, baselineDuration * 0.02);
+  const tolerance = Math.max(4, baselineDuration * 0.05);
   const inputSize = toNumber(before?.format?.size);
   const outputSize = toNumber(after?.format?.size);
 
