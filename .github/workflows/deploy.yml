@@ -318,9 +318,31 @@ jobs:
             H5AI_DIR=/var/www/html/data
             echo "=== h5ai setup start ==="
             mkdir -p "$H5AI_DIR"
-            CERT=$(grep -m1 'ssl_certificate ' "$SPEED_CONF" | awk '{print $2}' | tr -d ';')
-            CERT_KEY=$(grep -m1 'ssl_certificate_key ' "$SPEED_CONF" | awk '{print $2}' | tr -d ';')
-            echo "Cert: $CERT"
+            # Use data.speed4you.net specific cert (acme.sh), fallback to speed4you.net cert
+            for p in \
+              /home/speed4you/.acme.sh/data.speed4you.net_ecc/fullchain.cer \
+              /home/speed4you/.acme.sh/data.speed4you.net/fullchain.cer; do
+              if [ -f "$p" ]; then
+                CERT="$p"
+                KEY_PREFIX="${p%fullchain.cer}"
+                if [ -f "${KEY_PREFIX}data.speed4you.net.key" ]; then
+                  CERT_KEY="${KEY_PREFIX}data.speed4you.net.key"
+                elif [ -f "${KEY_PREFIX}data.speed4you.net_ecc.key" ]; then
+                  CERT_KEY="${KEY_PREFIX}data.speed4you.net_ecc.key"
+                else
+                  CERT_KEY="${KEY_PREFIX}data.speed4you.net.key"
+                fi
+                echo "Found data.speed4you.net cert: $CERT"
+                break
+              fi
+            done
+            if [ -z "$CERT" ]; then
+              echo "No data.speed4you.net cert found, using speed4you.net cert"
+              CERT=$(grep -m1 'ssl_certificate ' "$SPEED_CONF" | awk '{print $2}' | tr -d ';')
+              CERT_KEY=$(grep -m1 'ssl_certificate_key ' "$SPEED_CONF" | awk '{print $2}' | tr -d ';')
+            fi
+            echo "CERT: $CERT"
+            echo "KEY: $CERT_KEY"
             echo "server {" > /tmp/dataconf
             echo "    listen 443 ssl http2;" >> /tmp/dataconf
             echo "    server_name data.speed4you.net;" >> /tmp/dataconf
