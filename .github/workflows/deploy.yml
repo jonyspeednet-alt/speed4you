@@ -370,15 +370,8 @@ jobs:
                 rm -rf "$TMPD" "$TMPZ"
               fi
             fi
-            # Write CSS for autoindex styling (temp file + sudo cp)
-            cat > /tmp/data-theme.css << 'CSSEOF'
-body{font-family:'Segoe UI',sans-serif;background:#0f1117;color:#c9d1d9;max-width:960px;margin:32px auto;padding:0 16px}
-h1{font-weight:300;color:#58a6ff;border-bottom:1px solid #21262d;padding-bottom:12px}
-a{color:#58a6ff;text-decoration:none}
-a:hover{color:#79b8ff;text-decoration:underline}
-pre{background:#161b22;padding:16px;border-radius:8px;border:1px solid #21262d;overflow-x:auto}
-hr{display:none}
-CSSEOF
+            # Write CSS for autoindex styling (one-liner, temp file + sudo cp)
+            echo 'body{font-family:"Segoe UI",sans-serif;background:#0f1117;color:#c9d1d9;max-width:960px;margin:32px auto;padding:0 16px}h1{font-weight:300;color:#58a6ff;border-bottom:1px solid #21262d;padding-bottom:12px}a{color:#58a6ff;text-decoration:none}a:hover{color:#79b8ff;text-decoration:underline}pre{background:#161b22;padding:16px;border-radius:8px;border:1px solid #21262d;overflow-x:auto}hr{display:none}' > /tmp/data-theme.css
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp /tmp/data-theme.css "$ROOT/.d.css" && rm -f /tmp/data-theme.css
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' rm -f "$ROOT/index.html" 2>/dev/null || true
             # Build nginx config
