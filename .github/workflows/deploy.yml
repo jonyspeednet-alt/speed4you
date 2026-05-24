@@ -379,56 +379,49 @@ jobs:
             fi
             echo "SSL: $CERT"
 
-            # 4. Write nginx config directly
-            if echo "$PHP_SOCK" | grep -q '\.sock'; then
-              PHP_PASS="unix:$PHP_SOCK"
-            else
-              PHP_PASS="$PHP_SOCK"
-            fi
-            TMPF=/tmp/data-nginx.conf
-            echo 'server {' > "$TMPF"
-            echo '    listen 443 ssl http2;' >> "$TMPF"
-            echo '    server_name data.speed4you.net;' >> "$TMPF"
-            echo '' >> "$TMPF"
-            echo "    ssl_certificate $CERT;" >> "$TMPF"
-            echo "    ssl_certificate_key $CERT_KEY;" >> "$TMPF"
-            echo '' >> "$TMPF"
-            echo '    root /var/www/html/data;' >> "$TMPF"
-            echo '    index index.html index.php /_h5ai/public/index.php;' >> "$TMPF"
-            echo '' >> "$TMPF"
-            echo '    location /.well-known/acme-challenge/ {' >> "$TMPF"
-            echo '        root /var/www/html;' >> "$TMPF"
-            echo '    }' >> "$TMPF"
-            echo '' >> "$TMPF"
-            echo '    location / {' >> "$TMPF"
-            echo '        try_files $uri $uri/ /_h5ai/public/index.php$is_args$args;' >> "$TMPF"
-            echo '    }' >> "$TMPF"
-            echo '' >> "$TMPF"
-            echo '    location ~ ^/_h5ai/private/ {' >> "$TMPF"
-            echo '        deny all;' >> "$TMPF"
-            echo '    }' >> "$TMPF"
-            echo '' >> "$TMPF"
-            echo '    location ~ \.php$ {' >> "$TMPF"
-            echo '        try_files $uri =404;' >> "$TMPF"
-            echo "        fastcgi_pass $PHP_PASS;" >> "$TMPF"
-            echo '        fastcgi_index index.php;' >> "$TMPF"
-            echo '        include fastcgi_params;' >> "$TMPF"
-            echo '        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;' >> "$TMPF"
-            echo '    }' >> "$TMPF"
-            echo '}' >> "$TMPF"
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp "$TMPF" "$CONF" 2>/dev/null || true
-            rm -f "$TMPF"
+            # 4. Write nginx config
+            echo "Using SSL cert: $CERT"
+            echo "Using SSL key: $CERT_KEY"
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' tee "$CONF" > /dev/null << 'NGINXEOF'
+            server {
+                listen 443 ssl http2;
+                server_name data.speed4you.net;
+                ssl_certificate CERTPH;
+                ssl_certificate_key KEYPH;
+                root /var/www/html/data;
+                index index.html index.php /_h5ai/public/index.php;
+                location /.well-known/acme-challenge/ {
+                    root /var/www/html;
+                }
+                location / {
+                    try_files $uri $uri/ /_h5ai/public/index.php$is_args$args;
+                }
+                location ~ ^/_h5ai/private/ {
+                    deny all;
+                }
+                location ~ \.php$ {
+                    try_files $uri =404;
+                    fastcgi_pass SOCKPH;
+                    fastcgi_index index.php;
+                    include fastcgi_params;
+                    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+                }
+            }
+            NGINXEOF
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i "s|CERTPH|$CERT|g; s|KEYPH|$CERT_KEY|g; s|SOCKPH|$PHP_PASS|g" "$CONF"
             echo "nginx config written"
 
             # 5. PHP-FPM + permissions
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$H5AI_DIR" 2>/dev/null || true
 
             # 6. Test and reload nginx
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' nginx -t 2>&1
             if printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' nginx -t 2>/dev/null; then
               printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' systemctl reload nginx 2>/dev/null || true
               echo "nginx reloaded"
             else
               echo "nginx config error"
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cat "$CONF"
             fi
 
       - name: Verify deployed frontend bundle
