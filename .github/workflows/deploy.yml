@@ -351,11 +351,26 @@ jobs:
             echo "KEY: $CERT_KEY"
             # Try to install PHP-FPM + h5ai for nice UI; fallback to styled autoindex
             PHP_AVAIL=false
-            for sock in /run/php/php*-fpm.sock; do [ -S "$sock" ] && { PHP_AVAIL=true; PHP_SOCK="$sock"; break; }; done
+            for sock in /run/php/php*-fpm.sock /var/run/php/php*-fpm.sock; do [ -S "$sock" ] && { PHP_AVAIL=true; PHP_SOCK="$sock"; break; }; done
             if ! $PHP_AVAIL; then
+              echo "Updating apt sources..."
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' DEBIAN_FRONTEND=noninteractive apt-get update -qq 2>&1 || echo "apt-get update had issues (continuing)"
               echo "Installing PHP-FPM..."
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' DEBIAN_FRONTEND=noninteractive apt-get install -y -qq php-fpm php-json 2>/dev/null || true
-              for sock in /run/php/php*-fpm.sock; do [ -S "$sock" ] && { PHP_AVAIL=true; PHP_SOCK="$sock"; break; }; done
+              for i in 1 2 3; do
+                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' DEBIAN_FRONTEND=noninteractive apt-get install -y php-fpm php-json 2>&1 && { echo "PHP-FPM installed"; break; }
+                if [ $i -lt 3 ]; then echo "Retrying PHP-FPM install ($i/3)..."; sleep 5; fi
+              done
+              echo "Starting PHP-FPM..."
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' service php*-fpm start 2>/dev/null || true
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' systemctl start php*-fpm 2>/dev/null || true
+              sleep 2
+              for sock in /run/php/php*-fpm.sock /var/run/php/php*-fpm.sock; do [ -S "$sock" ] && { PHP_AVAIL=true; PHP_SOCK="$sock"; break; }; done
+              if $PHP_AVAIL; then
+                echo "PHP-FPM socket found: $PHP_SOCK"
+              else
+                echo "PHP-FPM socket not found. Checking installed packages..."
+                dpkg -l | grep php 2>/dev/null || echo "No php packages found"
+              fi
             fi
             H5AI_OK=false
             if $PHP_AVAIL; then
@@ -363,10 +378,20 @@ jobs:
               [ -f "$ROOT/_h5ai/public/index.php" ] && H5AI_OK=true
               if ! $H5AI_OK; then
                 TMPZ=/tmp/h5ai.zip; TMPD=/tmp/h5aitmp
-                (curl -sL --connect-timeout 10 --max-time 30 https://release.larsjung.de/h5ai/h5ai-0.30.0.zip -o "$TMPZ" || wget -q --timeout=30 https://release.larsjung.de/h5ai/h5ai-0.30.0.zip -O "$TMPZ") 2>/dev/null
-                [ -f "$TMPZ" ] && [ -s "$TMPZ" ] && command -v unzip >/dev/null 2>&1 && unzip -qo "$TMPZ" -d "$TMPD" 2>/dev/null
-                [ -d "$TMPD/_h5ai" ] && printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -r "$TMPD/_h5ai" "$ROOT/" && printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$ROOT/_h5ai"
-                [ -f "$ROOT/_h5ai/public/index.php" ] && H5AI_OK=true
+                echo "Downloading h5ai..."
+                (curl -sL --connect-timeout 15 --max-time 60 https://release.larsjung.de/h5ai/h5ai-0.30.0.zip -o "$TMPZ" || curl -sL --connect-timeout 15 --max-time 60 https://github.com/lrsjng/h5ai/archive/refs/tags/v0.30.0.zip -o "$TMPZ") 2>&1
+                if [ -f "$TMPZ" ] && [ -s "$TMPZ" ]; then
+                  echo "h5ai downloaded ($(du -h "$TMPZ" | cut -f1))"
+                  command -v unzip >/dev/null 2>&1 && unzip -qo "$TMPZ" -d "$TMPD" 2>&1 || echo "unzip failed"
+                else
+                  echo "Failed to download h5ai"
+                fi
+                if [ -d "$TMPD/_h5ai" ]; then
+                  printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -r "$TMPD/_h5ai" "$ROOT/"
+                  printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$ROOT/_h5ai"
+                  echo "h5ai copied to $ROOT/_h5ai"
+                fi
+                [ -f "$ROOT/_h5ai/public/index.php" ] && { H5AI_OK=true; echo "h5ai installed successfully"; }
                 rm -rf "$TMPD" "$TMPZ"
               fi
             fi
