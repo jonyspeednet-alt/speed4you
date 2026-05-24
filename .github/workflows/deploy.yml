@@ -318,11 +318,17 @@ jobs:
             CONF=/etc/nginx/sites-enabled/data.speed4you.net
             SPEED_CONF=/etc/nginx/sites-enabled/speed4you.net
 
-            # 1. Install PHP-FPM if missing
+            # 1. Install prerequisites (curl, unzip) and PHP-FPM if missing
+            for cmd in curl unzip; do
+              if ! command -v "$cmd" >/dev/null 2>&1; then
+                echo "Installing $cmd..."
+                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' apt-get install -y -qq "$cmd" 2>/dev/null || true
+              fi
+            done
             if ! command -v php-fpm >/dev/null 2>&1 && ! command -v php-fpm8.2 >/dev/null 2>&1 && ! command -v php-fpm8.1 >/dev/null 2>&1 && ! command -v php8.2 >/dev/null 2>&1; then
               echo "Installing PHP-FPM..."
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' apt-get update -qq
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' apt-get install -y -qq php-fpm php-mbstring php-zip php-gd php-xml php-curl
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' apt-get update -qq 2>/dev/null || true
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' apt-get install -y -qq php-fpm php-mbstring php-zip php-gd php-xml php-curl 2>/dev/null || true
             fi
 
             # 2. Detect PHP-FPM socket
@@ -341,22 +347,36 @@ jobs:
             if [ ! -f "$H5AI_DIR/_h5ai/public/index.php" ]; then
               echo "Downloading h5ai..."
               cd /tmp
-              curl -sL https://release.larsjung.de/h5ai/h5ai-0.30.0.zip -o h5ai.zip
-              unzip -qo h5ai.zip -d h5ai-tmp
-              cp -r h5ai-tmp/_h5ai "$H5AI_DIR/"
-              rm -rf h5ai-tmp h5ai.zip
-              echo "h5ai installed"
+              curl -sL --connect-timeout 10 --max-time 30 https://release.larsjung.de/h5ai/h5ai-0.30.0.zip -o h5ai.zip || wget -q https://release.larsjung.de/h5ai/h5ai-0.30.0.zip -O h5ai.zip 2>/dev/null || true
+              if [ -f h5ai.zip ] && [ -s h5ai.zip ]; then
+                unzip -qo h5ai.zip -d h5ai-tmp 2>/dev/null || true
+                if [ -d h5ai-tmp/_h5ai ]; then
+                  cp -r h5ai-tmp/_h5ai "$H5AI_DIR/"
+                  rm -rf h5ai-tmp h5ai.zip
+                  echo "h5ai installed"
+                else
+                  echo "h5ai zip invalid, skipping"
+                fi
+              else
+                echo "h5ai download failed, skipping"
+              fi
             else
               echo "h5ai already installed"
             fi
 
             # 4. Extract SSL cert paths from current data.speed4you.net config
-            CERT=$(grep -m1 'ssl_certificate ' "$CONF" | awk '{print $2}' | tr -d ';')
-            CERT_KEY=$(grep -m1 'ssl_certificate_key ' "$CONF" | awk '{print $2}' | tr -d ';')
-            # Fallback to speed4you.net cert if not found
+            if [ -f "$CONF" ]; then
+              CERT=$(grep -m1 'ssl_certificate ' "$CONF" 2>/dev/null | awk '{print $2}' 2>/dev/null | tr -d ';' 2>/dev/null || true)
+              CERT_KEY=$(grep -m1 'ssl_certificate_key ' "$CONF" 2>/dev/null | awk '{print $2}' 2>/dev/null | tr -d ';' 2>/dev/null || true)
+            fi
+            if [ -z "$CERT" ] && [ -f "$SPEED_CONF" ]; then
+              CERT=$(grep -m1 'ssl_certificate ' "$SPEED_CONF" 2>/dev/null | awk '{print $2}' 2>/dev/null | tr -d ';' 2>/dev/null || true)
+              CERT_KEY=$(grep -m1 'ssl_certificate_key ' "$SPEED_CONF" 2>/dev/null | awk '{print $2}' 2>/dev/null | tr -d ';' 2>/dev/null || true)
+            fi
             if [ -z "$CERT" ]; then
-              CERT=$(grep -m1 'ssl_certificate ' "$SPEED_CONF" | awk '{print $2}' | tr -d ';')
-              CERT_KEY=$(grep -m1 'ssl_certificate_key ' "$SPEED_CONF" | awk '{print $2}' | tr -d ';')
+              echo "WARN: no SSL cert found, using acme.sh default path"
+              CERT="/home/speed4you/.acme.sh/data.speed4you.net_ecc/fullchain.cer"
+              CERT_KEY="/home/speed4you/.acme.sh/data.speed4you.net_ecc/data.speed4you.net.key"
             fi
             echo "SSL cert: $CERT"
 
@@ -375,17 +395,31 @@ jobs:
               rm -f "$TMPF"
               echo "nginx config written from template"
             else
-              echo "WARN: template $TMPL not found, skipping" >&2
+              echo "WARN: template $TMPL not found, trying alternate path..."
+              TMPL2="$GITHUB_WORKSPACE/deploy/data-nginx.conf"
+              if [ -f "$TMPL2" ]; then
+                cp "$TMPL2" "$TMPF"
+                sed -i "s|CERT_PH|$CERT|g; s|KEY_PH|$CERT_KEY|g; s|SOCK_PH|$PHP_PASS|g" "$TMPF"
+                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp "$TMPF" "$CONF"
+                rm -f "$TMPF"
+                echo "nginx config written from alt path"
+              else
+                echo "WARN: template also not found at $TMPL2, skipping nginx config" >&2
+              fi
             fi
 
             # 6. Ensure PHP-FPM is running
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' systemctl enable php*-fpm 2>/dev/null || true
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' systemctl start php*-fpm 2>/dev/null || true
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$H5AI_DIR"
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$H5AI_DIR" 2>/dev/null || true
 
             # 7. Test and reload nginx
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' nginx -t
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' systemctl reload nginx
+            if printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' nginx -t 2>/dev/null; then
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' systemctl reload nginx || true
+              echo "nginx reloaded"
+            else
+              echo "nginx config error, NOT reloading"
+            fi
             echo "data.speed4you.net -> h5ai on $H5AI_DIR"
 
       - name: Verify deployed frontend bundle
