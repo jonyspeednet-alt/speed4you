@@ -303,7 +303,6 @@ jobs:
             echo "Nginx reloaded with HTTP/2 + gzip"
 
       - name: Setup h5ai data portal on data.speed4you.net
-        continue-on-error: true
         uses: appleboy/ssh-action@v1.2.0
         env:
           SUDO_PASSWORD: ${{ ***REMOVED***s.SUDO_PASSWORD }}
@@ -314,115 +313,40 @@ jobs:
           port: ${{ ***REMOVED***s.DEPLOY_PORT }}
           envs: SUDO_PASSWORD
           script: |
-            set -e
-            H5AI_DIR=/var/www/html/data
             CONF=/etc/nginx/sites-enabled/data.speed4you.net
             SPEED_CONF=/etc/nginx/sites-enabled/speed4you.net
-
-            # 1. Check for PHP-FPM
-            PHP_AVAIL=false
-            PHP_SOCK=""
-            if command -v php-fpm >/dev/null 2>&1; then
-              PHP_AVAIL=true
-              PHP_SOCK=$(ls /var/run/php/php*-fpm.sock 2>/dev/null | head -1)
-            fi
-            if [ -z "$PHP_SOCK" ]; then
-              for s in /var/run/php/php*-fpm.sock; do
-                if [ -S "$s" ]; then PHP_SOCK="$s"; break; fi
-              done
-            fi
-            if [ -z "$PHP_SOCK" ]; then PHP_SOCK="127.0.0.1:9000"; fi
-            echo "PHP avail=$PHP_AVAIL sock=$PHP_SOCK"
-
-            # 2. Try to install h5ai (if curl/wget available)
+            H5AI_DIR=/var/www/html/data
+            echo "=== h5ai setup start ==="
             mkdir -p "$H5AI_DIR"
-            if [ ! -f "$H5AI_DIR/_h5ai/public/index.php" ]; then
-              if command -v curl >/dev/null 2>&1; then
-                echo "Downloading h5ai via curl..."
-                curl -sL --connect-timeout 10 --max-time 30 https://release.larsjung.de/h5ai/h5ai-0.30.0.zip -o /tmp/h5ai.zip 2>/dev/null || true
-              elif command -v wget >/dev/null 2>&1; then
-                echo "Downloading h5ai via wget..."
-                wget -q --timeout=30 https://release.larsjung.de/h5ai/h5ai-0.30.0.zip -O /tmp/h5ai.zip 2>/dev/null || true
-              fi
-              if [ -f /tmp/h5ai.zip ] && [ -s /tmp/h5ai.zip ]; then
-                if command -v unzip >/dev/null 2>&1; then
-                  unzip -qo /tmp/h5ai.zip -d /tmp/h5ai-tmp 2>/dev/null || true
-                  if [ -d /tmp/h5ai-tmp/_h5ai ]; then
-                    cp -r /tmp/h5ai-tmp/_h5ai "$H5AI_DIR/"
-                    echo "h5ai installed"
-                  fi
-                  rm -rf /tmp/h5ai-tmp
-                fi
-                rm -f /tmp/h5ai.zip
-              fi
-              if [ ! -f "$H5AI_DIR/_h5ai/public/index.php" ]; then
-                echo "h5ai not installed, will serve static index"
-              fi
-            else
-              echo "h5ai already installed"
-            fi
-
-            # 3. Extract SSL cert paths
-            CERT=""; CERT_KEY=""
-            if [ -f "$CONF" ]; then
-              CERT=$(grep -m1 'ssl_certificate ' "$CONF" 2>/dev/null | awk '{print $2}' 2>/dev/null | tr -d ';' 2>/dev/null || true)
-              CERT_KEY=$(grep -m1 'ssl_certificate_key ' "$CONF" 2>/dev/null | awk '{print $2}' 2>/dev/null | tr -d ';' 2>/dev/null || true)
-            fi
-            if [ -z "$CERT" ] && [ -f "$SPEED_CONF" ]; then
-              CERT=$(grep -m1 'ssl_certificate ' "$SPEED_CONF" 2>/dev/null | awk '{print $2}' 2>/dev/null | tr -d ';' 2>/dev/null || true)
-              CERT_KEY=$(grep -m1 'ssl_certificate_key ' "$SPEED_CONF" 2>/dev/null | awk '{print $2}' 2>/dev/null | tr -d ';' 2>/dev/null || true)
-            fi
-            if [ -z "$CERT" ]; then
-              echo "WARN: no SSL cert in nginx configs"
-              CERT="/home/speed4you/.acme.sh/data.speed4you.net_ecc/fullchain.cer"
-              CERT_KEY="/home/speed4you/.acme.sh/data.speed4you.net_ecc/data.speed4you.net.key"
-            fi
-            echo "SSL: $CERT"
-
-            # 4. Write nginx config
-            echo "Using SSL cert: $CERT"
-            echo "Using SSL key: $CERT_KEY"
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' tee "$CONF" > /dev/null << 'NGINXEOF'
-            server {
-                listen 443 ssl http2;
-                server_name data.speed4you.net;
-                ssl_certificate CERTPH;
-                ssl_certificate_key KEYPH;
-                root /var/www/html/data;
-                index index.html index.php /_h5ai/public/index.php;
-                location /.well-known/acme-challenge/ {
-                    root /var/www/html;
-                }
-                location / {
-                    try_files $uri $uri/ /_h5ai/public/index.php$is_args$args;
-                }
-                location ~ ^/_h5ai/private/ {
-                    deny all;
-                }
-                location ~ \.php$ {
-                    try_files $uri =404;
-                    fastcgi_pass SOCKPH;
-                    fastcgi_index index.php;
-                    include fastcgi_params;
-                    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-                }
-            }
-            NGINXEOF
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i "s|CERTPH|$CERT|g; s|KEYPH|$CERT_KEY|g; s|SOCKPH|$PHP_PASS|g" "$CONF"
-            echo "nginx config written"
-
-            # 5. PHP-FPM + permissions
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$H5AI_DIR" 2>/dev/null || true
-
-            # 6. Test and reload nginx
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' nginx -t 2>&1
-            if printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' nginx -t 2>/dev/null; then
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' systemctl reload nginx 2>/dev/null || true
-              echo "nginx reloaded"
-            else
-              echo "nginx config error"
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cat "$CONF"
-            fi
+            CERT=$(grep -m1 'ssl_certificate ' "$SPEED_CONF" | awk '{print $2}' | tr -d ';')
+            CERT_KEY=$(grep -m1 'ssl_certificate_key ' "$SPEED_CONF" | awk '{print $2}' | tr -d ';')
+            echo "Cert: $CERT"
+            echo "server {" > /tmp/dataconf
+            echo "    listen 443 ssl http2;" >> /tmp/dataconf
+            echo "    server_name data.speed4you.net;" >> /tmp/dataconf
+            echo "    ssl_certificate $CERT;" >> /tmp/dataconf
+            echo "    ssl_certificate_key $CERT_KEY;" >> /tmp/dataconf
+            echo "    root /var/www/html/data;" >> /tmp/dataconf
+            echo "    index index.html index.php /_h5ai/public/index.php;" >> /tmp/dataconf
+            echo "    location /.well-known/acme-challenge/ {" >> /tmp/dataconf
+            echo "        root /var/www/html;" >> /tmp/dataconf
+            echo "    }" >> /tmp/dataconf
+            echo "    location / {" >> /tmp/dataconf
+            echo '        try_files $uri $uri/ /_h5ai/public/index.php$is_args$args;' >> /tmp/dataconf
+            echo "    }" >> /tmp/dataconf
+            echo "    location ~ \\.php$ {" >> /tmp/dataconf
+            echo '        try_files $uri =404;' >> /tmp/dataconf
+            echo "        fastcgi_pass 127.0.0.1:9000;" >> /tmp/dataconf
+            echo "        fastcgi_index index.php;" >> /tmp/dataconf
+            echo "        include fastcgi_params;" >> /tmp/dataconf
+            echo '        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;' >> /tmp/dataconf
+            echo "    }" >> /tmp/dataconf
+            echo "}" >> /tmp/dataconf
+            cat /tmp/dataconf
+            echo "--- copying config ---"
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp /tmp/dataconf "$CONF" && echo "Config copied OK" || echo "Config copy FAILED"
+            echo "=== testing nginx ==="
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' nginx -t && printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' systemctl reload nginx && echo "nginx OK" || echo "nginx FAILED"
 
       - name: Verify deployed frontend bundle
         env:
