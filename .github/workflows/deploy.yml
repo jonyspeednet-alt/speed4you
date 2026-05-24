@@ -349,57 +349,37 @@ jobs:
             fi
             echo "CERT: $CERT"
             echo "KEY: $CERT_KEY"
-            # Install PHP-FPM if not available (required for h5ai)
-            PHP_AVAIL=false; PHP_SOCK=""
-            if command -v php >/dev/null 2>&1; then
-              ls -t /run/php/php*-fpm.sock 2>/dev/null | head -1 > /tmp/php_sock && PHP_SOCK=$(cat /tmp/php_sock)
-              if [ -n "$PHP_SOCK" ] && [ -S "$PHP_SOCK" ]; then PHP_AVAIL=true; fi
-              if ! $PHP_AVAIL && ss -tln 2>/dev/null | grep -q ':9000'; then
-                PHP_AVAIL=true; PHP_SOCK="127.0.0.1:9000"
-              fi
-              if ! $PHP_AVAIL; then
-                for sock in /run/php/php*-fpm.sock; do
-                  [ -S "$sock" ] && { PHP_AVAIL=true; PHP_SOCK="$sock"; break; }
-                done
-              fi
-            fi
+            # Try to install PHP-FPM + h5ai for nice UI; fallback to styled autoindex
+            PHP_AVAIL=false
+            for sock in /run/php/php*-fpm.sock; do [ -S "$sock" ] && { PHP_AVAIL=true; PHP_SOCK="$sock"; break; }; done
             if ! $PHP_AVAIL; then
-              echo "PHP-FPM not found, installing..."
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' apt-get update -qq 2>/dev/null
+              echo "Installing PHP-FPM..."
               printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' DEBIAN_FRONTEND=noninteractive apt-get install -y -qq php-fpm php-json 2>/dev/null || true
-              for sock in /run/php/php*-fpm.sock; do
-                [ -S "$sock" ] && { PHP_AVAIL=true; PHP_SOCK="$sock"; break; }
-              done
-              if $PHP_AVAIL; then echo "PHP-FPM installed ($PHP_SOCK)"; else echo "PHP-FPM install failed"; fi
-            else
-              echo "PHP-FPM available ($PHP_SOCK)"
+              for sock in /run/php/php*-fpm.sock; do [ -S "$sock" ] && { PHP_AVAIL=true; PHP_SOCK="$sock"; break; }; done
             fi
-            # Install h5ai
             H5AI_OK=false
-            if $PHP_AVAIL && [ ! -f "$ROOT/_h5ai/public/index.php" ]; then
-              echo "Installing h5ai..."
-              TMPZ=/tmp/h5ai.zip; TMPD=/tmp/h5aitmp
-              if command -v curl >/dev/null 2>&1; then
-                curl -sL --connect-timeout 10 --max-time 30 https://release.larsjung.de/h5ai/h5ai-0.30.0.zip -o "$TMPZ" 2>/dev/null || true
-              elif command -v wget >/dev/null 2>&1; then
-                wget -q --timeout=30 https://release.larsjung.de/h5ai/h5ai-0.30.0.zip -O "$TMPZ" 2>/dev/null || true
+            if $PHP_AVAIL; then
+              echo "PHP-FPM available ($PHP_SOCK)"
+              [ -f "$ROOT/_h5ai/public/index.php" ] && H5AI_OK=true
+              if ! $H5AI_OK; then
+                TMPZ=/tmp/h5ai.zip; TMPD=/tmp/h5aitmp
+                (curl -sL --connect-timeout 10 --max-time 30 https://release.larsjung.de/h5ai/h5ai-0.30.0.zip -o "$TMPZ" || wget -q --timeout=30 https://release.larsjung.de/h5ai/h5ai-0.30.0.zip -O "$TMPZ") 2>/dev/null
+                [ -f "$TMPZ" ] && [ -s "$TMPZ" ] && command -v unzip >/dev/null 2>&1 && unzip -qo "$TMPZ" -d "$TMPD" 2>/dev/null
+                [ -d "$TMPD/_h5ai" ] && printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -r "$TMPD/_h5ai" "$ROOT/" && printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$ROOT/_h5ai"
+                [ -f "$ROOT/_h5ai/public/index.php" ] && H5AI_OK=true
+                rm -rf "$TMPD" "$TMPZ"
               fi
-              if [ -f "$TMPZ" ] && [ -s "$TMPZ" ] && command -v unzip >/dev/null 2>&1; then
-                unzip -qo "$TMPZ" -d "$TMPD" 2>/dev/null || true
-                if [ -d "$TMPD/_h5ai" ]; then
-                  printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -r "$TMPD/_h5ai" "$ROOT/"
-                  printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$ROOT/_h5ai"
-                  echo "h5ai copied"
-                  [ -f "$ROOT/_h5ai/public/index.php" ] && H5AI_OK=true
-                fi
-                rm -rf "$TMPD"
-              fi
-              rm -f "$TMPZ"
-            elif [ -f "$ROOT/_h5ai/public/index.php" ]; then
-              H5AI_OK=true
             fi
-            if $H5AI_OK; then echo "h5ai ready"; else echo "h5ai unavailable, using autoindex"; fi
-            # Remove any index.html that would block directory index
+            # Write CSS for autoindex styling (temp file + sudo cp)
+            cat > /tmp/data-theme.css << 'CSSEOF'
+body{font-family:'Segoe UI',sans-serif;background:#0f1117;color:#c9d1d9;max-width:960px;margin:32px auto;padding:0 16px}
+h1{font-weight:300;color:#58a6ff;border-bottom:1px solid #21262d;padding-bottom:12px}
+a{color:#58a6ff;text-decoration:none}
+a:hover{color:#79b8ff;text-decoration:underline}
+pre{background:#161b22;padding:16px;border-radius:8px;border:1px solid #21262d;overflow-x:auto}
+hr{display:none}
+CSSEOF
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp /tmp/data-theme.css "$ROOT/.d.css" && rm -f /tmp/data-theme.css
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' rm -f "$ROOT/index.html" 2>/dev/null || true
             # Build nginx config
             echo "server {" > /tmp/dataconf
@@ -427,6 +407,8 @@ jobs:
               echo "    autoindex on;" >> /tmp/dataconf
               echo "    autoindex_exact_size off;" >> /tmp/dataconf
               echo "    autoindex_localtime on;" >> /tmp/dataconf
+              echo "    sub_filter '</head>' '<link rel=\"stylesheet\" href=\"/.d.css\"></head>';" >> /tmp/dataconf
+              echo "    sub_filter_once on;" >> /tmp/dataconf
               echo "    location /.well-known/acme-challenge/ {" >> /tmp/dataconf
               echo "        root /var/www/html;" >> /tmp/dataconf
               echo "    }" >> /tmp/dataconf
