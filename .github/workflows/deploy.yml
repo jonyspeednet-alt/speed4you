@@ -302,7 +302,7 @@ jobs:
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' systemctl reload nginx
             echo "Nginx reloaded with HTTP/2 + gzip"
 
-      - name: Setup h5ai data portal on data.speed4you.net
+      - name: Setup data portal on data.speed4you.net
         uses: appleboy/ssh-action@v1.2.0
         env:
           SUDO_PASSWORD: ${{ ***REMOVED***s.SUDO_PASSWORD }}
@@ -315,9 +315,15 @@ jobs:
           script: |
             CONF=/etc/nginx/sites-enabled/data.speed4you.net
             SPEED_CONF=/etc/nginx/sites-enabled/speed4you.net
-            H5AI_DIR=/var/www/html/data
-            echo "=== h5ai setup start ==="
-            mkdir -p "$H5AI_DIR"
+            ROOT=/var/www/html
+            echo "=== data portal setup start ==="
+            # Remove any old redirect configs that might conflict
+            for old in /etc/nginx/sites-enabled/data.speed4you.net.conf /etc/nginx/conf.d/data.speed4you.net.conf; do
+              if [ -f "$old" ]; then
+                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' rm -f "$old"
+                echo "Removed old config: $old"
+              fi
+            done
             # Use data.speed4you.net specific cert (acme.sh), fallback to speed4you.net cert
             for p in \
               /home/speed4you/.acme.sh/data.speed4you.net_ecc/fullchain.cer \
@@ -343,11 +349,15 @@ jobs:
             fi
             echo "CERT: $CERT"
             echo "KEY: $CERT_KEY"
-            # Create h5ai directory with sudo
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p "$H5AI_DIR"
-            # Install h5ai or create fallback index
-            if [ ! -f "$H5AI_DIR/_h5ai/public/index.php" ]; then
-              echo "h5ai not found, attempting download..."
+            # Check if PHP-FPM is available for h5ai
+            PHP_AVAIL=false
+            if command -v php >/dev/null 2>&1 && (ss -tln | grep -q ':9000' || pgrep -x php-fpm >/dev/null 2>&1); then
+              PHP_AVAIL=true
+            fi
+            H5AI_OK=false
+            # Try installing h5ai if PHP is available
+            if $PHP_AVAIL && [ ! -f "$ROOT/_h5ai/public/index.php" ]; then
+              echo "PHP available, attempting h5ai install..."
               TMPZ=/tmp/h5ai.zip
               TMPD=/tmp/h5aitmp
               if command -v curl >/dev/null 2>&1; then
@@ -358,46 +368,54 @@ jobs:
               if [ -f "$TMPZ" ] && [ -s "$TMPZ" ] && command -v unzip >/dev/null 2>&1; then
                 unzip -qo "$TMPZ" -d "$TMPD" 2>/dev/null || true
                 if [ -d "$TMPD/_h5ai" ]; then
-                  printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -r "$TMPD/_h5ai" "$H5AI_DIR/"
+                  printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -r "$TMPD/_h5ai" "$ROOT/"
+                  printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$ROOT/_h5ai"
                   echo "h5ai installed"
+                  if [ -f "$ROOT/_h5ai/public/index.php" ]; then H5AI_OK=true; fi
                 fi
                 rm -rf "$TMPD"
               fi
               rm -f "$TMPZ"
-            else
+            elif [ -f "$ROOT/_h5ai/public/index.php" ]; then
+              H5AI_OK=true
               echo "h5ai already installed"
+            else
+              echo "PHP not available, using nginx autoindex"
             fi
-            # Fallback index.html if nothing exists
-            H5AI_OK=false
-            if [ -f "$H5AI_DIR/_h5ai/public/index.php" ]; then H5AI_OK=true; fi
-            if ! $H5AI_OK; then
-              echo "Creating fallback index.html"
-              TMPI=/tmp/data-portal-index.html
-              echo '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Data Portal</title><style>body{font-family:sans-serif;background:#0a0c10;color:#f1f5f9;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;flex-direction:column;gap:12px}h1{font-size:2rem;font-weight:200}p{color:#94a3b8}a{color:#6366f1}</style></head><body><h1>Data Portal</h1><p>Welcome to the Data Portal.</p><p><a href="https://speed4you.net/">Back to Portal</a></p></body></html>' > "$TMPI"
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp "$TMPI" "$H5AI_DIR/index.html"
-              rm -f "$TMPI"
+            # Remove any existing index.html that would block autoindex/h5ai
+            if [ -f "$ROOT/index.html" ] && [ "$ROOT/index.html" -ef /dev/null 2>/dev/null ] || [ ! -s "$ROOT/index.html" ]; then
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' rm -f "$ROOT/index.html" 2>/dev/null || true
             fi
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$H5AI_DIR" 2>/dev/null || true
+            # Build nginx config
             echo "server {" > /tmp/dataconf
             echo "    listen 443 ssl http2;" >> /tmp/dataconf
             echo "    server_name data.speed4you.net;" >> /tmp/dataconf
             echo "    ssl_certificate $CERT;" >> /tmp/dataconf
             echo "    ssl_certificate_key $CERT_KEY;" >> /tmp/dataconf
-            echo "    root /var/www/html/data;" >> /tmp/dataconf
-            echo "    index index.html index.php /_h5ai/public/index.php;" >> /tmp/dataconf
-            echo "    location /.well-known/acme-challenge/ {" >> /tmp/dataconf
-            echo "        root /var/www/html;" >> /tmp/dataconf
-            echo "    }" >> /tmp/dataconf
-            echo "    location / {" >> /tmp/dataconf
-            echo '        try_files $uri $uri/ /_h5ai/public/index.php$is_args$args;' >> /tmp/dataconf
-            echo "    }" >> /tmp/dataconf
-            echo "    location ~ \\.php$ {" >> /tmp/dataconf
-            echo '        try_files $uri =404;' >> /tmp/dataconf
-            echo "        fastcgi_pass 127.0.0.1:9000;" >> /tmp/dataconf
-            echo "        fastcgi_index index.php;" >> /tmp/dataconf
-            echo "        include fastcgi_params;" >> /tmp/dataconf
-            echo '        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;' >> /tmp/dataconf
-            echo "    }" >> /tmp/dataconf
+            echo "    root $ROOT;" >> /tmp/dataconf
+            if $H5AI_OK; then
+              echo "    index index.html index.php /_h5ai/public/index.php;" >> /tmp/dataconf
+              echo "    location /.well-known/acme-challenge/ {" >> /tmp/dataconf
+              echo "        root /var/www/html;" >> /tmp/dataconf
+              echo "    }" >> /tmp/dataconf
+              echo "    location / {" >> /tmp/dataconf
+              echo '        try_files $uri $uri/ /_h5ai/public/index.php$is_args$args;' >> /tmp/dataconf
+              echo "    }" >> /tmp/dataconf
+              echo "    location ~ \\.php$ {" >> /tmp/dataconf
+              echo '        try_files $uri =404;' >> /tmp/dataconf
+              echo "        fastcgi_pass 127.0.0.1:9000;" >> /tmp/dataconf
+              echo "        fastcgi_index index.php;" >> /tmp/dataconf
+              echo "        include fastcgi_params;" >> /tmp/dataconf
+              echo '        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;' >> /tmp/dataconf
+              echo "    }" >> /tmp/dataconf
+            else
+              echo "    autoindex on;" >> /tmp/dataconf
+              echo "    autoindex_exact_size off;" >> /tmp/dataconf
+              echo "    autoindex_localtime on;" >> /tmp/dataconf
+              echo "    location /.well-known/acme-challenge/ {" >> /tmp/dataconf
+              echo "        root /var/www/html;" >> /tmp/dataconf
+              echo "    }" >> /tmp/dataconf
+            fi
             echo "}" >> /tmp/dataconf
             cat /tmp/dataconf
             echo "--- copying config ---"
