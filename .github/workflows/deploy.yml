@@ -343,6 +343,32 @@ jobs:
             fi
             echo "CERT: $CERT"
             echo "KEY: $CERT_KEY"
+            # Install h5ai or create fallback index
+            if [ ! -f "$H5AI_DIR/_h5ai/public/index.php" ]; then
+              if command -v curl >/dev/null 2>&1; then
+                DL="curl -sL --connect-timeout 10 --max-time 30"
+              elif command -v wget >/dev/null 2>&1; then
+                DL="wget -q --timeout=30 -O"
+              fi
+              if [ -n "$DL" ]; then
+                echo "Downloading h5ai..."
+                $DL https://release.larsjung.de/h5ai/h5ai-0.30.0.zip /tmp/h5ai.zip 2>/dev/null || true
+                if [ -f /tmp/h5ai.zip ] && [ -s /tmp/h5ai.zip ] && command -v unzip >/dev/null 2>&1; then
+                  unzip -qo /tmp/h5ai.zip -d /tmp/h5ai-tmp 2>/dev/null || true
+                  if [ -d /tmp/h5ai-tmp/_h5ai ]; then
+                    cp -r /tmp/h5ai-tmp/_h5ai "$H5AI_DIR/"
+                    echo "h5ai installed"
+                  fi
+                  rm -rf /tmp/h5ai-tmp /tmp/h5ai.zip
+                fi
+              fi
+            fi
+            # Fallback index.html if h5ai not installed
+            if [ ! -f "$H5AI_DIR/index.html" ] && [ ! -f "$H5AI_DIR/_h5ai/public/index.php" ]; then
+              echo "Creating fallback index.html"
+              echo '<!DOCTYPE html><html><head><title>Data Portal</title><meta charset="utf-8"><style>body{font-family:sans-serif;background:#0a0c10;color:#f1f5f9;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;flex-direction:column;gap:12px}h1{font-size:2rem;font-weight:200}p{color:#94a3b8}a{color:#6366f1}</style></head><body><h1>Data Portal</h1><p>Media files are served here.</p><p><a href="https://speed4you.net/">Back to Portal</a></p></body></html>' > "$H5AI_DIR/index.html"
+            fi
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$H5AI_DIR" 2>/dev/null || true
             echo "server {" > /tmp/dataconf
             echo "    listen 443 ssl http2;" >> /tmp/dataconf
             echo "    server_name data.speed4you.net;" >> /tmp/dataconf
