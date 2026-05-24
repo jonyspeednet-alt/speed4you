@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Files - data.speed4you.net</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0d1117;--bg-card:#161b22;--bg-hover:#1c2128;--border:#30363d;--text:#e6edf3;--text-dim:#8b949e;--text-muted:#6e7681;--accent:#58a6ff;--accent-hover:#79c0ff;--green:#3fb950;--orange:#d29922;--red:#f85149;--purple:#bc8cff;--pink:#f778ba;--cyan:#39d2c0;--radius:8px;--transition:all .15s ease}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.container{max-width:1100px;margin:0 auto;padding:24px 20px}
+
+/* Header */
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:12px}
+.header-left{display:flex;align-items:center;gap:12px}
+.header-left .logo{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--purple));border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;font-weight:700}
+.header-left h1{font-size:20px;font-weight:600;color:var(--text)}
+.header-right{display:flex;align-items:center;gap:12px}
+.view-toggle{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:var(--bg-card)}
+.view-toggle button{background:none;border:none;color:var(--text-dim);padding:6px 10px;cursor:pointer;font-size:14px;transition:var(--transition)}
+.view-toggle button.active{color:var(--text);background:var(--bg-hover)}
+.view-toggle button:hover{color:var(--text)}
+.search-box{display:flex;align-items:center;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;padding:6px 12px;gap:8px;width:200px;transition:var(--transition)}
+.search-box:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(88,166,255,.15)}
+.search-box input{background:none;border:none;color:var(--text);font-size:14px;outline:none;width:100%}
+.search-box input::placeholder{color:var(--text-muted)}
+.search-box .icon{color:var(--text-muted);font-size:14px}
+
+/* Breadcrumb */
+.breadcrumb{display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:20px;padding:10px 14px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);font-size:14px}
+.breadcrumb a{color:var(--accent);text-decoration:none;padding:2px 6px;border-radius:4px;transition:var(--transition)}
+.breadcrumb a:hover{background:rgba(88,166,255,.1);color:var(--accent-hover)}
+.breadcrumb .sep{color:var(--text-muted);font-size:12px;margin:0 2px}
+.breadcrumb .current{color:var(--text-dim);padding:2px 6px}
+
+/* Stats bar */
+.stats{display:flex;align-items:center;gap:16px;margin-bottom:16px;font-size:13px;color:var(--text-dim)}
+.stats span{display:flex;align-items:center;gap:4px}
+
+/* Loading */
+.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 20px;gap:16px}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading p{color:var(--text-dim);font-size:14px}
+
+/* Empty state */
+.empty{text-align:center;padding:80px 20px;color:var(--text-dim)}
+.empty .icon{font-size:48px;margin-bottom:12px}
+.empty p{font-size:14px}
+
+/* Error state */
+.error{text-align:center;padding:60px 20px}
+.error .icon{font-size:48px;margin-bottom:12px}
+.error p{color:var(--text-dim);margin-bottom:16px}
+.error button{background:var(--accent);color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:14px;transition:var(--transition)}
+.error button:hover{background:var(--accent-hover)}
+
+/* List view */
+.file-list{display:flex;flex-direction:column;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.file-list .list-header{display:flex;padding:10px 16px;background:var(--bg-card);border-bottom:1px solid var(--border);font-size:12px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;cursor:pointer;user-select:none}
+.file-list .list-header span:hover{color:var(--text)}
+.file-list .list-header .col-name{flex:1;min-width:0}
+.file-list .list-header .col-size{width:100px;text-align:right}
+.file-list .list-header .col-date{width:160px;text-align:right}
+.file-list .list-header .sort-icon{margin-left:4px;font-size:10px}
+
+.file-row{display:flex;align-items:center;padding:8px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:var(--transition);text-decoration:none;color:var(--text)}
+.file-row:last-child{border-bottom:none}
+.file-row:hover{background:var(--bg-hover)}
+.file-row .file-icon{width:28px;text-align:center;font-size:18px;margin-right:12px;flex-shrink:0}
+.file-row .file-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:500}
+.file-row .file-size{width:100px;text-align:right;font-size:13px;color:var(--text-dim);flex-shrink:0}
+.file-row .file-date{width:160px;text-align:right;font-size:13px;color:var(--text-dim);flex-shrink:0}
+
+/* Grid view */
+.file-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.file-grid .grid-item{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;text-decoration:none;transition:var(--transition);text-align:center;gap:8px;min-height:140px}
+.file-grid .grid-item:hover{background:var(--bg-hover);border-color:var(--accent);transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,.3)}
+.file-grid .grid-item .file-icon{font-size:36px;line-height:1}
+.file-grid .grid-item .file-name{font-size:13px;color:var(--text);word-break:break-word;line-height:1.3;max-width:100%}
+.file-grid .grid-item .file-meta{font-size:11px;color:var(--text-dim)}
+
+/* File type colors */
+.type-dir .file-icon{color:var(--accent)}
+.type-video .file-icon{color:var(--purple)}
+.type-audio .file-icon{color:var(--green)}
+.type-image .file-icon{color:var(--cyan)}
+.type-archive .file-icon{color:var(--orange)}
+.type-doc .file-icon{color:var(--pink)}
+.type-code .file-icon{color:var(--green)}
+.type-other .file-icon{color:var(--text-dim)}
+
+/* Responsive */
+@media(max-width:640px){
+.container{padding:16px 12px}
+.header{flex-direction:column;align-items:stretch;gap:8px}
+.header-left h1{font-size:18px}
+.header-right{flex-wrap:wrap;gap:8px}
+.search-box{width:100%}
+.file-list .list-header .col-date{display:none}
+.file-row .file-date{display:none}
+.file-list .list-header .col-size{width:80px}
+.file-row .file-size{width:80px}
+.file-grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}
+.stats{flex-wrap:wrap;gap:8px}
+}
+</style>
+</head>
+<body>
+<div class="container" id="app">
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">F</div>
+      <h1>File Browser</h1>
+    </div>
+    <div class="header-right">
+      <div class="search-box">
+        <span class="icon">&#128269;</span>
+        <input type="text" id="filter" placeholder="Filter files..." oninput="filterFiles()">
+      </div>
+      <div class="view-toggle">
+        <button id="listViewBtn" class="active" onclick="setView('list')" title="List view">&#9776;</button>
+        <button id="gridViewBtn" onclick="setView('grid')" title="Grid view">&#9638;</button>
+      </div>
+    </div>
+  </header>
+
+  <nav class="breadcrumb" id="breadcrumb"></nav>
+
+  <div class="stats" id="stats"></div>
+
+  <div id="content"><div class="loading"><div class="spinner"></div><p>Loading directory...</p></div></div>
+</div>
+
+<script>
+let currentPath = '/';
+let items = [];
+let viewMode = 'list';
+
+function getFileType(ext, isDir) {
+  if (isDir) return 'dir';
+  const v = ['mp4','mkv','avi','mov','wmv','flv','webm','m4v','mpg','mpeg','3gp','ts','m2ts'];
+  const a = ['mp3','flac','wav','ogg','aac','wma','opus','m4a','ac3','dts'];
+  const i = ['jpg','jpeg','png','gif','webp','svg','bmp','ico','avif','tiff','tif','heic','raw'];
+  const z = ['zip','rar','7z','tar','gz','bz2','xz','zst','tgz','z','iso'];
+  const d = ['pdf','doc','docx','xls','xlsx','ppt','pptx','txt','epub','md','rtf','csv','json','xml','yaml','yml'];
+  const c = ['js','ts','jsx','tsx','py','java','c','cpp','h','hpp','go','rs','rb','php','sh','bash','css','scss','less','html','htm','sql','swift','kt','dart'];
+  if (v.includes(ext)) return 'video';
+  if (a.includes(ext)) return 'audio';
+  if (i.includes(ext)) return 'image';
+  if (z.includes(ext)) return 'archive';
+  if (d.includes(ext)) return 'doc';
+  if (c.includes(ext)) return 'code';
+  return 'other';
+}
+
+function getFileIcon(type) {
+  const icons = {
+    dir: '&#128193;', video: '&#127909;', audio: '&#127925;', image: '&#128247;',
+    archive: '&#128451;', doc: '&#128196;', code: '&#128187;', other: '&#128462;'
+  };
+  return icons[type] || icons.other;
+}
+
+function formatSize(bytes) {
+  if (bytes === 0) return '-';
+  const u = ['B','KB','MB','GB','TB'];
+  let i = 0;
+  let s = bytes;
+  while (s >= 1024 && i < u.length - 1) { s /= 1024; i++; }
+  return s.toFixed(i > 0 ? 1 : 0) + ' ' + u[i];
+}
+
+function formatDate(ts) {
+  const d = new Date(ts * 1000);
+  const now = new Date();
+  const diff = now - d;
+  if (diff < 86400000) return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  if (diff < 604800000) return d.toLocaleDateString([], {weekday:'short'});
+  return d.toLocaleDateString([], {month:'short', day:'numeric', year:'numeric'});
+}
+
+function getParentPath(path) {
+  if (path === '/') return null;
+  const p = path.replace(/\/$/,'');
+  const idx = p.lastIndexOf('/');
+  return idx === 0 ? '/' : p.substring(0, idx);
+}
+
+function getCurrentDirName(path) {
+  if (path === '/') return 'Root';
+  return path.replace(/\/$/,'').split('/').pop();
+}
+
+function getBreadcrumbs(path) {
+  const parts = path === '/' ? [] : path.replace(/\/$/,'').split('/').filter(Boolean);
+  const crumbs = [{label:'Home', path:'/'}];
+  let accumulated = '';
+  for (const p of parts) {
+    accumulated += '/' + p;
+    crumbs.push({label:p, path:accumulated});
+  }
+  return crumbs;
+}
+
+function renderBreadcrumbs() {
+  const el = document.getElementById('breadcrumb');
+  const crumbs = getBreadcrumbs(currentPath);
+  el.innerHTML = crumbs.map((c, i) => {
+    if (i === crumbs.length - 1) return '<span class="current">' + escHtml(c.label) + '</span>';
+    return '<a href="#" onclick="navigateTo(\'' + c.path + '\');return false">' + escHtml(c.label) + '</a><span class="sep">/</span>';
+  }).join('');
+}
+
+function renderStats() {
+  const el = document.getElementById('stats');
+  const dirs = items.filter(i => i.isDir).length;
+  const files = items.filter(i => !i.isDir).length;
+  const totalSize = items.reduce((s, i) => s + (i.isDir ? 0 : i.size), 0);
+  el.innerHTML = '<span>&#128193; ' + dirs + ' folders</span><span>&#128196; ' + files + ' files</span><span>&#128190; ' + formatSize(totalSize) + '</span>';
+}
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function filterFiles() {
+  const q = document.getElementById('filter').value.toLowerCase();
+  const all = document.querySelectorAll('.file-row, .grid-item');
+  all.forEach(el => {
+    const name = el.getAttribute('data-name') || '';
+    el.style.display = name.includes(q) ? '' : 'none';
+  });
+}
+
+let sortField = 'name';
+let sortAsc = true;
+
+function setSort(field) {
+  if (sortField === field) { sortAsc = !sortAsc; }
+  else { sortField = field; sortAsc = true; }
+  renderContent();
+}
+
+function renderContent() {
+  const el = document.getElementById('content');
+  renderBreadcrumbs();
+  renderStats();
+
+  const sorted = [...items];
+  sorted.sort((a, b) => {
+    if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+    let cmp = 0;
+    if (sortField === 'name') cmp = strcasecmp(a.name, b.name);
+    else if (sortField === 'size') cmp = a.size - b.size;
+    else if (sortField === 'date') cmp = a.modified - b.modified;
+    return sortAsc ? cmp : -cmp;
+  });
+
+  if (viewMode === 'list') {
+    let html = '<div class="file-list">';
+    html += '<div class="list-header">';
+    html += '<span class="col-name" onclick="setSort(\'name\')">Name' + sortIcon('name') + '</span>';
+    html += '<span class="col-size" onclick="setSort(\'size\')">Size' + sortIcon('size') + '</span>';
+    html += '<span class="col-date" onclick="setSort(\'date\')">Modified' + sortIcon('date') + '</span>';
+    html += '</div>';
+    for (const item of sorted) {
+      const type = getFileType(item.ext, item.isDir);
+      const icon = getFileIcon(type);
+      const href = item.isDir ? '#' : item.path;
+      const target = item.isDir ? '' : ' target="_blank"';
+      const click = item.isDir ? ' onclick="navigateTo(\'' + item.path + '\');return false"' : '';
+      html += '<a class="file-row type-' + type + '" href="' + href + '"' + target + click + ' data-name="' + escHtml(item.name.toLowerCase()) + '">';
+      html += '<span class="file-icon">' + icon + '</span>';
+      html += '<span class="file-name">' + escHtml(item.name) + '</span>';
+      html += '<span class="file-size">' + (item.isDir ? '-' : formatSize(item.size)) + '</span>';
+      html += '<span class="file-date">' + formatDate(item.modified) + '</span>';
+      html += '</a>';
+    }
+    html += '</div>';
+    el.innerHTML = html;
+  } else {
+    let html = '<div class="file-grid">';
+    for (const item of sorted) {
+      const type = getFileType(item.ext, item.isDir);
+      const icon = getFileIcon(type);
+      const href = item.isDir ? '#' : item.path;
+      const target = item.isDir ? '' : ' target="_blank"';
+      const click = item.isDir ? ' onclick="navigateTo(\'' + item.path + '\');return false"' : '';
+      html += '<a class="grid-item type-' + type + '" href="' + href + '"' + target + click + ' data-name="' + escHtml(item.name.toLowerCase()) + '">';
+      html += '<span class="file-icon">' + icon + '</span>';
+      html += '<span class="file-name">' + escHtml(item.name) + '</span>';
+      html += '<span class="file-meta">' + (item.isDir ? 'Folder' : formatSize(item.size)) + '</span>';
+      html += '</a>';
+    }
+    html += '</div>';
+    el.innerHTML = html;
+  }
+}
+
+function sortIcon(field) {
+  if (sortField !== field) return '<span class="sort-icon">&#8693;</span>';
+  return '<span class="sort-icon">' + (sortAsc ? '&#9650;' : '&#9660;') + '</span>';
+}
+
+function strcasecmp(a, b) {
+  return a.toLowerCase().localeCompare(b.toLowerCase());
+}
+
+function setView(mode) {
+  viewMode = mode;
+  document.getElementById('listViewBtn').className = mode === 'list' ? 'active' : '';
+  document.getElementById('gridViewBtn').className = mode === 'grid' ? 'active' : '';
+  renderContent();
+}
+
+function navigateTo(path) {
+  currentPath = path;
+  window.location.hash = '#!path=' + path;
+  loadDirectory(path);
+}
+
+async function loadDirectory(path) {
+  const el = document.getElementById('content');
+  el.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading directory...</p></div>';
+  document.getElementById('filter').value = '';
+
+  try {
+    const res = await fetch('api.php?path=' + encodeURIComponent(path));
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    items = data.items || [];
+    renderContent();
+  } catch (e) {
+    el.innerHTML = '<div class="error"><div class="icon">&#9888;</div><p>Failed to load directory: ' + escHtml(e.message) + '</p><button onclick="loadDirectory(\'' + currentPath + '\')">Retry</button></div>';
+  }
+}
+
+function handleHash() {
+  let path = '/';
+  const hash = window.location.hash;
+  if (hash.startsWith('#!path=')) {
+    path = hash.substring(7);
+  }
+  currentPath = path;
+  loadDirectory(path);
+}
+
+window.addEventListener('hashchange', handleHash);
+handleHash();
+</script>
+</body>
+</html>
