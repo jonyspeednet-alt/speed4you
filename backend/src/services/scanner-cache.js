@@ -254,15 +254,15 @@ async function fetchWithRateLimitAndCache(provider, fetchFn, params, cacheTtl) {
   return { data, fromCache: false };
 }
 
-// Clear expired cache periodically (every hour)
-if (!global.cacheCleanupInterval) {
-  global.cacheCleanupInterval = setInterval(() => {
-    clearExpiredCache();
-  }, 60 * 60 * 1000); // Every hour
-  if (typeof global.cacheCleanupInterval.unref === 'function') {
-    global.cacheCleanupInterval.unref();
-  }
-}
+// Auto cache cleanup disabled — only runs on demand
+// if (!global.cacheCleanupInterval) {
+//   global.cacheCleanupInterval = setInterval(() => {
+//     clearExpiredCache();
+//   }, 60 * 60 * 1000);
+//   if (typeof global.cacheCleanupInterval.unref === 'function') {
+//     global.cacheCleanupInterval.unref();
+//   }
+// }
 
 module.exports = {
   CACHE_DIR,
