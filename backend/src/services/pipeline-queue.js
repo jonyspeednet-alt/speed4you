@@ -153,7 +153,7 @@ async function moveScannerItemToNormalizer(id, strategy) {
 
 async function dequeueNormalizerItem() {
   const state = await getQueue();
-  const idx = state.normalizerQueue.findIndex(x => x.status === 'pending' || x.status === 'failed');
+  const idx = state.normalizerQueue.findIndex(x => x.status === 'pending');
   if (idx === -1) return null;
   state.normalizerQueue[idx].status = 'processing';
   state.normalizerQueue[idx].startedAt = now();

@@ -334,11 +334,25 @@ async function runScannerPhase() {
 
 async function runNormalizerPhase() {
   let normalizerBusy = true;
+  let consecutiveFails = 0;
   while (normalizerBusy && !isShuttingDown) {
     normalizerBusy = await processNormalizerQueue();
     if (!normalizerBusy) {
       const status = await queue.getQueueStatus();
-      if (status.normalizer.pending > 0 || status.normalizer.failed > 0) normalizerBusy = true;
+      if (status.normalizer.pending > 0) normalizerBusy = true;
+    } else {
+      // Check if we're stuck on a failing item
+      const q = await queue.getQueue();
+      const processingItems = q.normalizerQueue.filter(x => x.status === 'processing');
+      const failedItems = q.normalizerQueue.filter(x => x.status === 'failed');
+      if (processingItems.length === 0 && failedItems.length > 0) {
+        if (++consecutiveFails >= 3) {
+          await queue.appendLog(`[normalizer] Stopping: ${failedItems.length} failed items — check permissions`);
+          break;
+        }
+      } else {
+        consecutiveFails = 0;
+      }
     }
     if (!normalizerBusy) await sleep(1000);
   }
