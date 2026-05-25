@@ -538,6 +538,7 @@ The backend requires a comprehensive set of environment variables to operate cor
 | `ADMIN_PASSWORD_HASH` | Yes | Bcrypt hash of the admin ***REMOVED***. | — |
 | `TMDB_API_KEY` | No | TMDb API key for metadata enrichment. | — |
 | `PLAYER_CACHE_ROOT` | No | Absolute path for the FFmpeg player cache directory. | `/var/www/html/Extra_Storage/portal-media-cache` (production) |
+| `SCANNER_CACHE_DIR` | No | Absolute path for scanner metadata cache (TMDb/OMDB). Prevents root disk full. | `project_root/.cache/metadata` |
 | `FFMPEG_PATH` | No | Absolute path to the `ffmpeg` binary. | `ffmpeg` (resolved from PATH) |
 | `FFPROBE_PATH` | No | Absolute path to the `ffprobe` binary. | `ffprobe` (resolved from PATH) |
 | `TRUST_PROXY_HOPS` | No | Number of trusted reverse proxy hops. Set to the number of proxies in front of the server. | `1` |
@@ -574,6 +575,7 @@ TMDB_API_KEY=<YOUR_TMDB_API_KEY>
 
 # Media / Player Cache
 PLAYER_CACHE_ROOT=<YOUR_PLAYER_CACHE_PATH>
+SCANNER_CACHE_DIR=/var/www/html/Extra_Storage/scanner-cache
 FFMPEG_PATH=/usr/bin/ffmpeg
 FFPROBE_PATH=/usr/bin/ffprobe
 

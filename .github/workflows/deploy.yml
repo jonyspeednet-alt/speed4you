@@ -186,12 +186,15 @@ jobs:
           DB_PASSWORD: ${{ ***REMOVED***s.DB_PASSWORD }}
           ADMIN_USERNAME: ${{ ***REMOVED***s.ADMIN_USERNAME }}
           ADMIN_PASSWORD_HASH: ${{ ***REMOVED***s.ADMIN_PASSWORD_HASH }}
+          PUBLIC_API_PER_IP_LIMIT: ${{ ***REMOVED***s.PUBLIC_API_PER_IP_LIMIT }}
+          DB_POOL_MAX: ${{ ***REMOVED***s.DB_POOL_MAX }}
+          PLAYER_MAX_CONCURRENT_LIVE_STREAMS: ${{ ***REMOVED***s.PLAYER_MAX_CONCURRENT_LIVE_STREAMS }}
         with:
           host: ${{ ***REMOVED***s.DEPLOY_HOST }}
           username: ${{ ***REMOVED***s.DEPLOY_USER }}
           key: ${{ ***REMOVED***s.DEPLOY_SSH_KEY }}
           port: ${{ ***REMOVED***s.DEPLOY_PORT }}
-          envs: TMDB_API_KEY,OMDB_API_KEY,JWT_SECRET,SUDO_PASSWORD,CORS_ALLOWED_ORIGINS,PLAYER_CACHE_ROOT,DB_HOST,DB_PORT,DB_NAME,DB_USER,DB_PASSWORD,ADMIN_USERNAME,ADMIN_PASSWORD_HASH
+          envs: TMDB_API_KEY,OMDB_API_KEY,JWT_SECRET,SUDO_PASSWORD,CORS_ALLOWED_ORIGINS,PLAYER_CACHE_ROOT,DB_HOST,DB_PORT,DB_NAME,DB_USER,DB_PASSWORD,ADMIN_USERNAME,ADMIN_PASSWORD_HASH,PUBLIC_API_PER_IP_LIMIT,DB_POOL_MAX,PLAYER_MAX_CONCURRENT_LIVE_STREAMS
           script: |
             set -e
             BACKEND=/home/speed4you/portal-app/backend
@@ -221,6 +224,13 @@ jobs:
 
             # Use OMDB_API_KEY from ***REMOVED***, fallback to hardcoded key if not set (remove once ***REMOVED*** is configured)
             OMDB_KEY="${OMDB_API_KEY:-***REMOVED***}"
+            # Ensure Extra_Storage directories exist (for caches, nginx temp, normalizer temp, etc.)
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p /var/www/html/Extra_Storage/nginx-tmp/proxy
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p /var/www/html/Extra_Storage/scanner-cache
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p /var/www/html/Extra_Storage/normalizer-temp
+
+            SCANNER_CACHE_DIR=/var/www/html/Extra_Storage/scanner-cache
+            MEDIA_NORMALIZER_TEMP_DIR=/var/www/html/Extra_Storage/normalizer-temp
             cat > .env <<EOF
             PORT=4100
             JWT_SECRET=${JWT_SECRET}
@@ -228,6 +238,11 @@ jobs:
             OMDB_API_KEY=${OMDB_KEY}
             CORS_ALLOWED_ORIGINS=${CORS}
             PLAYER_CACHE_ROOT=${PLAYER_CACHE_ROOT}
+            SCANNER_CACHE_DIR=${SCANNER_CACHE_DIR}
+            MEDIA_NORMALIZER_TEMP_DIR=${MEDIA_NORMALIZER_TEMP_DIR}
+            PUBLIC_API_PER_IP_LIMIT=${PUBLIC_API_PER_IP_LIMIT:-200}
+            DB_POOL_MAX=${DB_POOL_MAX:-50}
+            PLAYER_MAX_CONCURRENT_LIVE_STREAMS=${PLAYER_MAX_CONCURRENT_LIVE_STREAMS:-10}
             DB_HOST=${DB_HOST}
             DB_PORT=${DB_PORT}
             DB_NAME=${DB_NAME}
@@ -386,6 +401,9 @@ jobs:
             # Write CSS for autoindex styling — polished dark theme (temp file + sudo cp)
             echo 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,sans-serif;background:#0d1117;color:#c9d1d9;max-width:960px;margin:0 auto;padding:24px 20px}h1{font-size:24px;font-weight:600;color:#e6edf3;padding-bottom:12px;margin-bottom:20px;border-bottom:1px solid #30363d}pre{background:#161b22;padding:12px 20px;border-radius:8px;border:1px solid #30363d;font-size:14px;line-height:2;font-family:Consolas,"JetBrains Mono","Fira Code",monospace;overflow-x:auto}pre a{color:#c9d1d9;text-decoration:none;padding:2px 0;display:inline-block;transition:color .15s}pre a:hover{color:#58a6ff;text-decoration:none}hr{display:none}pre a[href*="/"]:not([href*="."]){color:#58a6ff;font-weight:500}pre a[href*="."]{color:#c9d1d9}pre a[href$=".mp4"],pre a[href$=".mkv"],pre a[href$=".avi"]{color:#d2a8ff}pre a[href$=".mp3"],pre a[href$=".flac"]{color:#7ee787}pre a[href$=".zip"],pre a[href$=".rar"]{color:#f0883e}pre a[href$=".jpg"],pre a[href$=".png"],pre a[href$=".webp"]{color:#79c0ff}' > /tmp/data-theme.css
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp /tmp/data-theme.css "$ROOT/.d.css" && rm -f /tmp/data-theme.css
+            # Ensure nginx temp + log dirs on Extra_Storage (prevents root disk full)
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p /var/www/html/Extra_Storage/nginx-tmp/proxy
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p /var/www/html/Extra_Storage/nginx-logs
             # Build nginx config — use native autoindex (instant, C module) instead of routing all dirs through PHP
             echo "server {" > /tmp/dataconf
             echo "    listen 443 ssl http2;" >> /tmp/dataconf
@@ -394,6 +412,9 @@ jobs:
             echo "    ssl_certificate_key $CERT_KEY;" >> /tmp/dataconf
             echo "    root $ROOT;" >> /tmp/dataconf
             echo "    index index.html;" >> /tmp/dataconf
+            echo "    access_log /var/www/html/Extra_Storage/nginx-logs/data-access.log;" >> /tmp/dataconf
+            echo "    error_log /var/www/html/Extra_Storage/nginx-logs/data-error.log;" >> /tmp/dataconf
+            echo "    proxy_temp_path /var/www/html/Extra_Storage/nginx-tmp/proxy 1 2;" >> /tmp/dataconf
             echo "    sendfile on;" >> /tmp/dataconf
             echo "    tcp_nopush on;" >> /tmp/dataconf
             echo "    open_file_cache max=1000 inactive=20s;" >> /tmp/dataconf

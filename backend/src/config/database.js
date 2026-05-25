@@ -12,13 +12,14 @@ if (isProduction) {
   }
 }
 
+const DEFAULT_DB_POOL_MAX = isProduction ? 50 : 20;
 const connectionConfig = {
   host: process.env.DB_HOST || 'localhost',
   port: Number(process.env.DB_PORT) || 5432,
   database: process.env.DB_NAME || 'isp_entertainment',
   user: process.env.DB_USER || 'postgres',
   ***REMOVED***: process.env.DB_PASSWORD || 'postgres',
-  max: Number(process.env.DB_POOL_MAX || 20),
+  max: Number(process.env.DB_POOL_MAX || DEFAULT_DB_POOL_MAX),
   idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS || 30000),
   connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT_MS || 10000),
   allowExitOnIdle: false,

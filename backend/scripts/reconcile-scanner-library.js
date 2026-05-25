@@ -181,20 +181,24 @@ async function reconcileMovieRoot(root, summary) {
     const candidates = buildMovieCandidates(root, folderPath, relativeFolder, files);
     for (const candidate of candidates) {
       seen.add(candidate.scanSignature);
-      const base = createBaseScannerItem(root, {
-        ...candidate,
-        type: 'movie',
-        poster: pickPoster(root, folderPath, files),
-        backdrop: pickBackdrop(root, folderPath, files),
-      });
-      const enriched = await enrichItemWithMetadata(base);
-      const result = await upsertScannedItem({
-        ...enriched,
-        status: 'published',
-      });
-      if (result.created) summary.created += 1;
-      if (result.updated) summary.updated += 1;
-      summary.processed += 1;
+      try {
+        const base = createBaseScannerItem(root, {
+          ...candidate,
+          type: 'movie',
+          poster: pickPoster(root, folderPath, files),
+          backdrop: pickBackdrop(root, folderPath, files),
+        });
+        const enriched = await enrichItemWithMetadata(base);
+        const result = await upsertScannedItem({
+          ...enriched,
+          status: 'published',
+        });
+        if (result.created) summary.created += 1;
+        if (result.updated) summary.updated += 1;
+        summary.processed += 1;
+      } catch (error) {
+        console.log(`[reconcile] skipped ${candidate.scanSignature}: ${error.message}`);
+      }
     }
   }
 
@@ -239,28 +243,32 @@ async function reconcileSeriesRoot(root, summary) {
 
     const scanSignature = `${root.id}:${folderName}`;
     seen.add(scanSignature);
-    const base = createBaseScannerItem(root, {
-      title: cleanTitle(folderName),
-      slug: slugify(folderName),
-      type: 'series',
-      year: extractYear(folderName),
-      poster: pickPoster(root, seriesPath, seriesFiles),
-      backdrop: pickBackdrop(root, seriesPath, seriesFiles),
-      seasonCount: seasons.length,
-      episodeCount: seasons.reduce((sum, season) => sum + season.episodes.length, 0),
-      seasons,
-      sourcePath: seriesPath,
-      sourcePublicPath: toPublicUrl(root, seriesPath),
-      scanSignature,
-    });
-    const enriched = await enrichItemWithMetadata(base);
-    const result = await upsertScannedItem({
-      ...enriched,
-      status: 'published',
-    });
-    if (result.created) summary.created += 1;
-    if (result.updated) summary.updated += 1;
-    summary.processed += 1;
+    try {
+      const base = createBaseScannerItem(root, {
+        title: cleanTitle(folderName),
+        slug: slugify(folderName),
+        type: 'series',
+        year: extractYear(folderName),
+        poster: pickPoster(root, seriesPath, seriesFiles),
+        backdrop: pickBackdrop(root, seriesPath, seriesFiles),
+        seasonCount: seasons.length,
+        episodeCount: seasons.reduce((sum, season) => sum + season.episodes.length, 0),
+        seasons,
+        sourcePath: seriesPath,
+        sourcePublicPath: toPublicUrl(root, seriesPath),
+        scanSignature,
+      });
+      const enriched = await enrichItemWithMetadata(base);
+      const result = await upsertScannedItem({
+        ...enriched,
+        status: 'published',
+      });
+      if (result.created) summary.created += 1;
+      if (result.updated) summary.updated += 1;
+      summary.processed += 1;
+    } catch (error) {
+      console.log(`[reconcile] skipped series ${scanSignature}: ${error.message}`);
+    }
   }
 
   summary.deleted += await deleteScannerItemsNotInSignatures(root.id, [...seen]);

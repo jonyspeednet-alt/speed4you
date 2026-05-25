@@ -26,14 +26,17 @@ const TARGET_AUDIO_CODECS = new Set(['aac', 'mp4a']);
 const DEFAULT_SCAN_INTERVAL_MS = Number(process.env.MEDIA_NORMALIZER_SCAN_INTERVAL_MS || 15000);
 const DEFAULT_MIN_FREE_GB = Number(process.env.MEDIA_NORMALIZER_MIN_FREE_GB || 10);
 const DUPLICATE_HOLD_DIR_NAME = process.env.MEDIA_NORMALIZER_DUPLICATE_DIR || '_duplicate_hold';
+const MEDIA_NORMALIZER_TEMP_DIR = process.env.MEDIA_NORMALIZER_TEMP_DIR || '';
 const MAX_CONCURRENCY = Math.min(
   os.cpus().length || 2,
   Number(process.env.MEDIA_NORMALIZER_MAX_CONCURRENCY || 2),
 );
+const FFMPEG_TIMEOUT_MS = Number(process.env.MEDIA_NORMALIZER_FFMPEG_TIMEOUT_MS || 0) || 0;
 let activeFfmpegSet = new Set();
 let isShuttingDown = false;
 let stateMutex = Promise.resolve();
 let currentConcurrency = MAX_CONCURRENCY;
+let candidateCache = null;
 
 const CONFIG_STATE_KEY = 'media_normalizer_config';
 
@@ -68,12 +71,15 @@ async function logError(message) {
 }
 
 async function persistState(state, extra = {}) {
+  const existing = await getMediaNormalizerState().catch(() => ({}));
   await saveMediaNormalizerState({
+    ...existing,
     ...state,
     ...extra,
+    processed: trimMap({ ...(existing?.processed || {}), ...(state.processed || {}) }, 20000),
+    failed: trimMap({ ...(existing?.failed || {}), ...(state.failed || {}) }, 5000),
+    stats: { ...(existing?.stats || {}), ...(state.stats || {}), ...(extra.stats || {}) },
     updatedAt: new Date().toISOString(),
-    processed: trimMap(state.processed, 20000),
-    failed: trimMap(state.failed, 5000),
   });
 }
 
@@ -555,6 +561,16 @@ async function transcodeToTarget(inputPath, outputPath, durationSeconds, onProgr
     const stderr = [];
     let progressBuffer = '';
     let lastEmitAt = 0;
+    let ffmpegTimedOut = false;
+
+    let ffmpegTimer = null;
+    if (FFMPEG_TIMEOUT_MS > 0) {
+      ffmpegTimer = setTimeout(() => {
+        ffmpegTimedOut = true;
+        try { ffmpeg.kill('SIGKILL'); } catch {}
+        reject(new Error(`ffmpeg timed out after ${FFMPEG_TIMEOUT_MS}ms`));
+      }, FFMPEG_TIMEOUT_MS);
+    }
 
     ffmpeg.stdout.on('data', (chunk) => {
       progressBuffer += chunk.toString('utf8');
@@ -595,10 +611,20 @@ async function transcodeToTarget(inputPath, outputPath, durationSeconds, onProgr
       }
     });
 
-    ffmpeg.stderr.on('data', (chunk) => stderr.push(chunk));
-    ffmpeg.on('error', reject);
+    ffmpeg.stderr.on('data', (chunk) => {
+      stderr.push(chunk);
+      const totalBytes = stderr.reduce((sum, buf) => sum + buf.length, 0);
+      while (totalBytes > 65536 && stderr.length > 1) {
+        stderr.shift();
+      }
+    });
+    ffmpeg.on('error', (err) => {
+      if (!ffmpegTimedOut) reject(err);
+    });
     ffmpeg.on('close', (code) => {
+      if (ffmpegTimer) clearTimeout(ffmpegTimer);
       activeFfmpegSet.delete(ffmpeg);
+      if (ffmpegTimedOut) return;
       if (code !== 0) {
         reject(new Error(Buffer.concat(stderr).toString('utf8') || `ffmpeg exited with code ${code}`));
         return;
@@ -648,9 +674,16 @@ async function acquireLockOrExit() {
   if (existingPid > 0) {
     try {
       process.kill(existingPid, 0);
-      await logError(`[media-normalizer] another worker seems active. pid=${existingPid}`);
-      process.exit(1);
-    } catch {}
+      const lockAge = Date.now() - new Date(state.lock.startedAt || Date.now()).getTime();
+      if (lockAge > 24 * 60 * 60 * 1000) {
+        await logInfo(`[media-normalizer] stale lock from pid=${existingPid} (${Math.round(lockAge / 3600000)}h old) — overriding`);
+      } else {
+        await logError(`[media-normalizer] another worker seems active. pid=${existingPid}`);
+        process.exit(1);
+      }
+    } catch {
+      await logInfo(`[media-normalizer] stale lock from dead pid=${existingPid} — acquiring`);
+    }
   }
 
   await saveMediaNormalizerState({
@@ -658,6 +691,7 @@ async function acquireLockOrExit() {
     lock: {
       pid: process.pid,
       startedAt: new Date().toISOString(),
+      hostname: os.hostname(),
     },
   });
 }
@@ -725,10 +759,28 @@ async function withStateLock(fn) {
 }
 
 function findProcessingCandidates(state, roots, maxCount) {
+  if (candidateCache && candidateCache.length >= maxCount) {
+    const nextBatch = [];
+    for (const c of candidateCache) {
+      if (nextBatch.length >= maxCount) break;
+      const isProcessed = state.processed[c.filePath]?.signature === c.sig;
+      const isFailed = state.failed[c.filePath]?.signature === c.sig;
+      if (!isProcessed && !isFailed) {
+        nextBatch.push(c);
+      }
+    }
+    if (nextBatch.length >= maxCount) {
+      return nextBatch;
+    }
+  }
   const candidates = [];
+  const seen = new Set();
   for (const root of roots) {
     for (const filePath of walkVideoFiles(root)) {
-      if (candidates.length >= maxCount) break;
+      if (candidates.length >= maxCount * 3) break;
+      if (candidateCache && candidateCache.some((c) => c.filePath === filePath)) continue;
+      if (seen.has(filePath)) continue;
+      seen.add(filePath);
       let stat;
       try { stat = fs.statSync(filePath); } catch { continue; }
       const sig = buildSignature(filePath, stat);
@@ -736,9 +788,10 @@ function findProcessingCandidates(state, roots, maxCount) {
       if (state.failed[filePath]?.signature === sig) continue;
       candidates.push({ filePath, root, stat, sig });
     }
-    if (candidates.length >= maxCount) break;
+    if (candidates.length >= maxCount * 3) break;
   }
-  return candidates;
+  candidateCache = candidates;
+  return candidates.slice(0, maxCount);
 }
 
 async function processFileCandidate(state, candidate) {
@@ -777,10 +830,11 @@ async function processFileCandidate(state, candidate) {
   }
 
   const dir = path.dirname(filePath);
+  const tempDir = MEDIA_NORMALIZER_TEMP_DIR || dir;
   const finalBaseName = await resolveFinalBaseName(filePath);
   const finalOutputPath = path.join(dir, `${finalBaseName}.mp4`);
   const randomPart = crypto.randomBytes(4).toString('hex');
-  const tempOutput = path.join(dir, `${finalBaseName}.normalizing.${process.pid}.${randomPart}.mp4`);
+  const tempOutput = path.join(tempDir, `${finalBaseName}.normalizing.${process.pid}.${randomPart}.mp4`);
   const backupPath = path.join(dir, `${path.basename(filePath)}.pre-normalize.${Date.now()}.bak`);
 
   const availableBytes = Math.max(0, getFreeDiskGb(dir) * (1024 ** 3));

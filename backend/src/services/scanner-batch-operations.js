@@ -4,15 +4,16 @@ async function runLimited(items, worker, concurrency = 5) {
   const results = [];
   let index = 0;
 
-  async function next() {
-    const currentIndex = index;
-    index += 1;
-    if (currentIndex >= items.length) return;
-    results[currentIndex] = await worker(items[currentIndex], currentIndex);
-    await next();
+  async function workerLoop() {
+    while (true) {
+      const currentIndex = index;
+      index += 1;
+      if (currentIndex >= items.length) break;
+      results[currentIndex] = await worker(items[currentIndex], currentIndex);
+    }
   }
 
-  const workers = Array.from({ length: Math.min(concurrency, items.length) }, next);
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, () => workerLoop());
   await Promise.all(workers);
   return results;
 }

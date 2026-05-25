@@ -47,6 +47,8 @@ chmod 600 ~/.ssh/authorized_keys
 mkdir -p /home/speed4you/portal-deploy-staging
 mkdir -p /home/speed4you/backups
 mkdir -p /var/www/html/Extra_Storage/portal-media-cache
+mkdir -p /var/www/html/Extra_Storage/nginx-tmp/proxy
+mkdir -p /var/www/html/Extra_Storage/scanner-cache
 
 ```
 

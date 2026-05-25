@@ -5,6 +5,7 @@ const https = require('https');
 const router = express.Router();
 
 const TV_PORTAL_BASE = process.env.TV_PORTAL_BASE_URL || 'http://10.45.45.254/';
+const TV_REQUEST_TIMEOUT_MS = Number(process.env.TV_REQUEST_TIMEOUT_MS || 15000);
 const ALLOWED_HOSTS = new Set(
   String(process.env.TV_ALLOWED_HOSTS || '10.45.45.254,103.79.182.170')
     .split(',')
@@ -37,7 +38,7 @@ function requestUrl(targetUrl, redirectCount = 0, method = 'GET') {
   const transport = safeUrl.protocol === 'https:' ? https : http;
 
   return new Promise((resolve, reject) => {
-    const request = transport.request(safeUrl, { headers: DEFAULT_HEADERS, method }, (response) => {
+    const request = transport.request(safeUrl, { headers: DEFAULT_HEADERS, method, timeout: TV_REQUEST_TIMEOUT_MS }, (response) => {
       const location = response.headers.location;
 
       if (location && response.statusCode >= 300 && response.statusCode < 400 && redirectCount < 5) {
@@ -59,6 +60,10 @@ function requestUrl(targetUrl, redirectCount = 0, method = 'GET') {
     });
 
     request.on('error', reject);
+    request.on('timeout', () => {
+      request.destroy();
+      reject(new Error(`TV request timed out after ${TV_REQUEST_TIMEOUT_MS}ms`));
+    });
     request.end();
   });
 }

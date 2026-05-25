@@ -114,19 +114,10 @@ app.use(helmet({
 // Global rate limiter — broad protection against abuse on all API routes
 const GLOBAL_API_LIMIT = Number(process.env.GLOBAL_API_RATE_LIMIT_MAX || 5000);
 const PUBLIC_API_LIMIT = Number(process.env.PUBLIC_API_RATE_LIMIT_MAX || 20000);
+const PUBLIC_API_PER_IP_LIMIT = Number(process.env.PUBLIC_API_PER_IP_LIMIT || 200);
 
-function isReadOnlyPublicApiRequest(req) {
-  if (!['GET', 'HEAD'].includes(String(req.method || '').toUpperCase())) {
-    return false;
-  }
-
-  return [
-    '/api/content',
-    '/api/movies',
-    '/api/series',
-    '/api/search',
-    '/api/tv',
-  ].some((prefix) => req.path.startsWith(prefix));
+function isLocalRequest(req) {
+  return req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1';
 }
 
 const globalApiLimiter = rateLimit({
@@ -137,19 +128,29 @@ const globalApiLimiter = rateLimit({
   message: { error: 'Too many requests. Please slow down.' },
   skip: (req) =>
     !req.path.startsWith('/api/')
-    || isReadOnlyPublicApiRequest(req)
     || (!isProduction && isLocalRequest(req)),
 });
 
 
-// Stricter limiter for public content endpoints (unauthenticated)
+// Stricter per-IP limiter for public content endpoints (prevents a single user from overloading)
 const publicContentLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
   max: PUBLIC_API_LIMIT,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests. Please slow down.' },
-  skip: (req) => req.ip === '127.0.0.1' || req.ip === '::1',
+  skip: isLocalRequest,
+});
+
+// Per-IP limiter for public read endpoints (100 req/min per IP)
+const publicPerIpLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: PUBLIC_API_PER_IP_LIMIT,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip,
+  message: { error: 'Too many requests from your IP. Please slow down.' },
+  skip: isLocalRequest,
 });
 
 app.use(compressionMiddleware);
@@ -192,10 +193,10 @@ app.get('/health/scanner', async (req, res) => {
 // Group API routes to allow mounting at multiple points
 const apiRouter = express.Router();
 apiRouter.use('/auth', require('./routes/auth'));
-apiRouter.use('/content', publicContentLimiter, require('./routes/content'));
-apiRouter.use('/movies', publicContentLimiter, require('./routes/movies'));
-apiRouter.use('/series', publicContentLimiter, require('./routes/series'));
-apiRouter.use('/search', publicContentLimiter, require('./routes/search'));
+apiRouter.use('/content', publicContentLimiter, publicPerIpLimiter, require('./routes/content'));
+apiRouter.use('/movies', publicContentLimiter, publicPerIpLimiter, require('./routes/movies'));
+apiRouter.use('/series', publicContentLimiter, publicPerIpLimiter, require('./routes/series'));
+apiRouter.use('/search', publicContentLimiter, publicPerIpLimiter, require('./routes/search'));
 apiRouter.use('/watchlist', require('./routes/watchlist'));
 apiRouter.use('/progress', require('./routes/progress'));
 apiRouter.use('/player', require('./routes/player'));

@@ -135,10 +135,20 @@ function buildCatalogFilterClauses(filters = {}, params = []) {
   return clauses;
 }
 
+const duplicateGroupCache = new Map();
+const DUPLICATE_GROUP_CACHE_TTL = 60 * 1000; // 60 seconds
+
 async function getDuplicateGroupsForItems(items = []) {
   if (!items.length) return new Map();
   await ensureContentStore();
   const keys = [...new Set(items.map((item) => `${item.type}:${item.titleKey || normalizeTitleKey(item.title)}`))];
+  const sortedKeys = [...keys].sort();
+  const cacheKey = sortedKeys.join('|');
+  const cached = duplicateGroupCache.get(cacheKey);
+  if (cached && Date.now() - cached.ts < DUPLICATE_GROUP_CACHE_TTL) {
+    return cached.groups;
+  }
+
   const conditions = [];
   const params = [];
 
@@ -161,6 +171,14 @@ async function getDuplicateGroupsForItems(items = []) {
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(item);
   });
+
+  // Keep cache bounded to 100 entries
+  duplicateGroupCache.set(cacheKey, { groups, ts: Date.now() });
+  if (duplicateGroupCache.size > 100) {
+    const oldest = duplicateGroupCache.keys().next().value;
+    duplicateGroupCache.delete(oldest);
+  }
+
   return groups;
 }
 

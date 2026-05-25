@@ -697,8 +697,15 @@ function hasAllCandidatesInCatalog(candidates = [], existingSignatureSet = null)
     return Promise.resolve(candidates.every((candidate) => existingSignatureSet.has(candidate.scanSignature)));
   }
 
-  return Promise.all(candidates.map((candidate) => getItemByScanSignature(candidate.scanSignature)))
-    .then((items) => items.every(Boolean));
+  if (!candidates.length) {
+    return Promise.resolve(false);
+  }
+
+  return Promise.all(
+    candidates.map((candidate) =>
+      getItemByScanSignature(candidate.scanSignature).catch(() => null),
+    ),
+  ).then((items) => items.every(Boolean));
 }
 
 
@@ -996,19 +1003,16 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
         });
         seenSignatures.add(item.scanSignature);
 
-        // Save fingerprint BEFORE enrichment so re-runs skip unchanged folders
-        nextRootState.folders[relativeFolder] = {
-          fingerprint,
-          scanSignature: item.scanSignature,
-          title: item.title,
-          updatedAt: new Date().toISOString(),
-        };
-
         const enrichedItem = assignScannerTaxonomy(await enrichItemWithMetadata(item));
         const result = await retryAsync(() => upsertScannedItem(enrichedItem));
 
-        // Update cache title after enrichment
-        nextRootState.folders[relativeFolder].title = enrichedItem.title;
+        // Save fingerprint AFTER enrichment so crash doesn't permanently skip this item
+        nextRootState.folders[relativeFolder] = {
+          fingerprint,
+          scanSignature: item.scanSignature,
+          title: enrichedItem.title,
+          updatedAt: new Date().toISOString(),
+        };
 
         if (result.created) {
           summary.created += 1;
