@@ -1,6 +1,14 @@
 require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 const fs = require('fs');
 const path = require('path');
+
+// Capture all crashes to a temp file for debugging
+function dumpError(tag, err) {
+  try { fs.writeFileSync('/tmp/pipeline-crash.log', new Date().toISOString() + ' ' + tag + ': ' + (err?.stack || err) + '\n', { flag: 'a' }); } catch(e) {}
+}
+process.on('uncaughtException', (err) => { dumpError('UNCAUGHT', err); console.error('UNCAUGHT:', err); process.exit(1); });
+process.on('unhandledRejection', (r) => { dumpError('UNHANDLED', r); console.error('UNHANDLED:', r); process.exit(1); });
+
 const os = require('os');
 const { spawn } = require('child_process');
 const { loadScannerRoots, upsertScannedItem, refreshCatalogReferencesForNormalizedFile, db } = require('../src/data/store');
@@ -379,9 +387,12 @@ async function main() {
 
 if (require.main === module) {
   main().catch(async err => {
+    dumpError('MAIN_ERR', err);
     console.error('Pipeline error:', err.message);
-    await queue.appendLog(`[${RUN_MODE}] Error: ${err.message}`);
-    await lock.release();
+    try {
+      await queue.appendLog(`[${RUN_MODE}] Error: ${err.message}`);
+      await lock.release();
+    } catch(e) {}
     process.exit(1);
   });
 }
