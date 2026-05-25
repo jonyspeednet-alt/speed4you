@@ -106,6 +106,10 @@ export const adminService = {
   retryPipelineScannerItem: (id) => apiClient(`/admin/pipeline/retry-scanner/${id}`, { method: 'POST' }),
   retryPipelineNormalizerItem: (id) => apiClient(`/admin/pipeline/retry-normalizer/${id}`, { method: 'POST' }),
   retryAllPipelineFailed: () => apiClient('/admin/pipeline/retry-all-failed', { method: 'POST' }),
+  startScanner: () => apiClient('/admin/pipeline/scanner/start', { method: 'POST' }),
+  stopScanner: () => apiClient('/admin/pipeline/scanner/stop', { method: 'POST' }),
+  startNormalizer: () => apiClient('/admin/pipeline/normalizer/start', { method: 'POST' }),
+  stopNormalizer: () => apiClient('/admin/pipeline/normalizer/stop', { method: 'POST' }),
 };
 
 export default adminService;

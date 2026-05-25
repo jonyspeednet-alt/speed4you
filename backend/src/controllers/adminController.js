@@ -443,9 +443,13 @@ exports.getSearchAnalytics = async (req, res) => {
 const pipelineQueue = require('../services/pipeline-queue');
 
 async function getPipelineStatus(req, res) {
-  const status = await pipelineQueue.getQueueStatus();
-  const lock = await pipelineQueue.getPipelineLock();
-  res.json({ ...status, lock });
+  const [status, lock, scannerLock, normalizerLock] = await Promise.all([
+    pipelineQueue.getQueueStatus(),
+    pipelineQueue.getPipelineLock(),
+    pipelineQueue.getScannerLock(),
+    pipelineQueue.getNormalizerLock(),
+  ]);
+  res.json({ ...status, lock, scannerLock, normalizerLock });
 }
 
 async function getPipelineScannerQueue(req, res) {
@@ -466,21 +470,64 @@ async function getPipelineLog(req, res) {
   res.json(log);
 }
 
-async function startPipeline(req, res) {
+function spawnWorker(args) {
   const { spawn } = require('child_process');
   const path = require('path');
   const scriptPath = path.resolve(__dirname, '../../scripts/pipeline-runner.js');
-  const child = spawn('node', [scriptPath], {
+  const child = spawn('node', [scriptPath, ...args], {
     cwd: path.dirname(scriptPath),
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: true,
   });
   child.unref();
-  let stderr = '';
-  child.stderr.on('data', chunk => { stderr += chunk; });
-  setTimeout(() => {
-    res.json({ started: true, pid: child.pid });
-  }, 1000);
+  return child;
+}
+
+async function startPipeline(req, res) {
+  const child = spawnWorker([]);
+  setTimeout(() => res.json({ started: true, pid: child.pid }), 1000);
+}
+
+async function startScannerWorker(req, res) {
+  const lock = await pipelineQueue.getScannerLock();
+  if (lock) {
+    try { process.kill(lock.pid, 0); return res.json({ started: false, reason: 'already running', pid: lock.pid }); } catch {}
+  }
+  const child = spawnWorker(['--scanner']);
+  setTimeout(() => res.json({ started: true, pid: child.pid }), 500);
+}
+
+async function stopScannerWorker(req, res) {
+  const lock = await pipelineQueue.getScannerLock();
+  if (!lock || !lock.pid) return res.json({ stopped: false, reason: 'not running' });
+  try {
+    process.kill(lock.pid, 'SIGTERM');
+    res.json({ stopped: true, pid: lock.pid });
+  } catch {
+    await pipelineQueue.releaseScannerLock();
+    res.json({ stopped: true, reason: 'stale' });
+  }
+}
+
+async function startNormalizerWorker(req, res) {
+  const lock = await pipelineQueue.getNormalizerLock();
+  if (lock) {
+    try { process.kill(lock.pid, 0); return res.json({ started: false, reason: 'already running', pid: lock.pid }); } catch {}
+  }
+  const child = spawnWorker(['--normalizer']);
+  setTimeout(() => res.json({ started: true, pid: child.pid }), 500);
+}
+
+async function stopNormalizerWorker(req, res) {
+  const lock = await pipelineQueue.getNormalizerLock();
+  if (!lock || !lock.pid) return res.json({ stopped: false, reason: 'not running' });
+  try {
+    process.kill(lock.pid, 'SIGTERM');
+    res.json({ stopped: true, pid: lock.pid });
+  } catch {
+    await pipelineQueue.releaseNormalizerLock();
+    res.json({ stopped: true, reason: 'stale' });
+  }
 }
 
 async function clearPipeline(req, res) {
@@ -512,3 +559,7 @@ module.exports.clearPipeline = clearPipeline;
 module.exports.retryPipelineScannerItem = retryPipelineScannerItem;
 module.exports.retryPipelineNormalizerItem = retryPipelineNormalizerItem;
 module.exports.retryAllPipelineFailed = retryAllPipelineFailed;
+module.exports.startScannerWorker = startScannerWorker;
+module.exports.stopScannerWorker = stopScannerWorker;
+module.exports.startNormalizerWorker = startNormalizerWorker;
+module.exports.stopNormalizerWorker = stopNormalizerWorker;

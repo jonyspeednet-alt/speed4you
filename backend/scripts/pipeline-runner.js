@@ -251,31 +251,20 @@ async function processNormalizerQueue() {
   return true;
 }
 
-async function main() {
-  const lock = await queue.getPipelineLock();
-  if (lock) {
-    try {
-      process.kill(lock.pid, 0);
-      console.error(`Pipeline already running (pid=${lock.pid})`);
-      process.exit(1);
-    } catch {
-      await queue.appendLog(`Stale lock from pid=${lock.pid}, overriding`);
-    }
-  }
+const RUN_MODE = process.argv.slice(2).includes('--normalizer') ? 'normalizer' : process.argv.slice(2).includes('--scanner') ? 'scanner' : 'full';
 
-  await queue.setPipelineLock({ pid: process.pid, startedAt: new Date().toISOString(), hostname: os.hostname() });
+function lockApi() {
+  if (RUN_MODE === 'scanner') return { get: queue.getScannerLock, set: queue.setScannerLock, release: queue.releaseScannerLock };
+  if (RUN_MODE === 'normalizer') return { get: queue.getNormalizerLock, set: queue.setNormalizerLock, release: queue.releaseNormalizerLock };
+  return { get: queue.getPipelineLock, set: queue.setPipelineLock, release: queue.releasePipelineLock };
+}
 
-  process.on('SIGINT', async () => { isShuttingDown = true; await queue.releasePipelineLock(); process.exit(0); });
-  process.on('SIGTERM', async () => { isShuttingDown = true; await queue.releasePipelineLock(); process.exit(0); });
+const lock = lockApi();
 
-  console.log('Pipeline runner started');
-  await queue.appendLog('Pipeline runner started');
-
-  // Phase 1: Discover and queue files
+async function runScannerPhase() {
   const discovered = await scanAndEnqueue();
   console.log(`Discovered ${discovered} new files`);
 
-  // Phase 2: Process scanner queue (probe → direct-enrich or pass to normalizer)
   let scannerBusy = true;
   while (scannerBusy && !isShuttingDown) {
     scannerBusy = await processScannerQueue();
@@ -284,11 +273,9 @@ async function main() {
       if (status.scanner.pending > 0 || status.scanner.failed > 0) scannerBusy = true;
     }
   }
+}
 
-  console.log('Scanner queue complete, starting normalizer...');
-  await queue.appendLog('Scanner queue complete, starting normalizer...');
-
-  // Phase 3: Process normalizer queue
+async function runNormalizerPhase() {
   let normalizerBusy = true;
   while (normalizerBusy && !isShuttingDown) {
     normalizerBusy = await processNormalizerQueue();
@@ -298,17 +285,52 @@ async function main() {
     }
     if (!normalizerBusy) await sleep(1000);
   }
+}
 
-  await queue.appendLog('Pipeline complete');
-  await queue.releasePipelineLock();
-  console.log('Pipeline complete');
+async function main() {
+  const existingLock = await lock.get();
+  if (existingLock) {
+    try {
+      process.kill(existingLock.pid, 0);
+      console.error(`Pipeline ${RUN_MODE} already running (pid=${existingLock.pid})`);
+      process.exit(1);
+    } catch {
+      await queue.appendLog(`[${RUN_MODE}] Stale lock from pid=${existingLock.pid}, overriding`);
+    }
+  }
+
+  await lock.set({ pid: process.pid, startedAt: new Date().toISOString(), hostname: os.hostname(), mode: RUN_MODE });
+
+  const shutdown = async () => { isShuttingDown = true; await lock.release(); process.exit(0); };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+
+  console.log(`Pipeline ${RUN_MODE} started`);
+  await queue.appendLog(`[${RUN_MODE}] Worker started`);
+
+  if (RUN_MODE === 'full' || RUN_MODE === 'scanner') {
+    await runScannerPhase();
+  }
+
+  if (RUN_MODE === 'full') {
+    console.log('Scanner queue complete, starting normalizer...');
+    await queue.appendLog('[pipeline] Scanner queue complete, starting normalizer...');
+  }
+
+  if (RUN_MODE === 'full' || RUN_MODE === 'normalizer') {
+    await runNormalizerPhase();
+  }
+
+  await queue.appendLog(`[${RUN_MODE}] Complete`);
+  await lock.release();
+  console.log(`Pipeline ${RUN_MODE} complete`);
 }
 
 if (require.main === module) {
   main().catch(async err => {
     console.error('Pipeline error:', err.message);
-    await queue.appendLog(`Pipeline error: ${err.message}`);
-    await queue.releasePipelineLock();
+    await queue.appendLog(`[${RUN_MODE}] Error: ${err.message}`);
+    await lock.release();
     process.exit(1);
   });
 }
