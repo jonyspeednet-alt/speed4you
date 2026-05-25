@@ -1717,9 +1717,10 @@ function bootstrapAutoScanScheduler() {
   scheduleNext();
 }
 
-bootstrapScannerRuntime();
-registerScannerSignalHandlers();
-bootstrapAutoScanScheduler();
+// Auto background jobs disabled — scanner only runs when triggered manually via admin API
+// bootstrapScannerRuntime();
+// registerScannerSignalHandlers();
+// bootstrapAutoScanScheduler();
 
 
 module.exports = {
