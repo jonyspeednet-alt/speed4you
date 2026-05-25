@@ -115,4 +115,15 @@ router.post('/duplicates/cleanup', adminController.runDuplicatesCleanup);
 // Metadata
 router.post('/metadata/tmdb', asyncRoute(adminController.fetchTmdbMetadata));
 
+// Debug — read pipeline crash log
+router.get('/pipeline/debug-crash', asyncRoute(async (req, res) => {
+  const fs = require('fs');
+  try {
+    const log = fs.readFileSync('/tmp/pipeline-crash.log', 'utf8');
+    res.json({ exists: true, log: log.split('\n').filter(Boolean).slice(-20) });
+  } catch(e) {
+    res.json({ exists: false, error: e.message });
+  }
+}));
+
 module.exports = router;
