@@ -249,6 +249,8 @@ jobs:
             fi
 
             echo "Restarting service..."
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' systemctl daemon-reload
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' systemctl enable isp-portal.service 2>/dev/null || true
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' systemctl restart isp-portal.service
 
             echo "Health check..."
