@@ -386,7 +386,7 @@ function transcodeToMp4(resolvedPath, res) {
     '-sn',
     '-dn',
     ...getUniversalTranscodeArgs([
-      '-movflags', 'frag_keyframe+empty_moov+faststart',
+      '-movflags', '+frag_keyframe',
       '-f', 'mp4',
       'pipe:1',
     ]),
