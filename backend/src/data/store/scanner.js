@@ -132,7 +132,7 @@ async function upsertScannedItem(payload) {
 
   // ── NEW ITEM ──────────────────────────────────────────────────────────────
   if (!current) {
-    const shouldAutoPublish = payload.metadataStatus === 'matched';
+    const shouldAutoPublish = payload.metadataStatus === 'matched' || payload.metadataStatus === 'skipped';
     const nextStatus = payload.status
       || (shouldAutoPublish ? (process.env.SCANNER_DEFAULT_STATUS || 'published') : 'draft');
     const nextPublishedAt = nextStatus === 'published' ? (payload.publishedAt || now) : '';
