@@ -23,7 +23,7 @@ async function saveQueue(state) {
 }
 
 async function getPipelineLock() {
-  return getAppState(LOCK_KEY);
+  return getAppState(LOCK_KEY, null, true);
 }
 
 async function setPipelineLock(lock) {
@@ -48,11 +48,11 @@ async function getLog(limit) {
   return limit ? lines.slice(-limit) : lines;
 }
 
-async function getScannerLock() { return getAppState('scanner_lock'); }
+async function getScannerLock() { return getAppState('scanner_lock', null, true); }
 async function setScannerLock(lock) { await setAppState('scanner_lock', lock); }
 async function releaseScannerLock() { await setAppState('scanner_lock', null); }
 
-async function getNormalizerLock() { return getAppState('normalizer_lock'); }
+async function getNormalizerLock() { return getAppState('normalizer_lock', null, true); }
 async function setNormalizerLock(lock) { await setAppState('normalizer_lock', lock); }
 async function releaseNormalizerLock() { await setAppState('normalizer_lock', null); }
 
