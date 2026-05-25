@@ -172,9 +172,32 @@ async function enrichAndCatalog(filePath, root, profile) {
     scanSignature,
   };
 
+  // Ensure scanSignature matches for items from old scanner (which had extension in sig)
   try {
-    const enriched = await enrichItemWithMetadata(item);
-    const itemToUpsert = {
+    const existingByPath = await db.query("SELECT id, payload FROM content_catalog WHERE payload->>'sourcePath' = $1 LIMIT 1", [filePath]);
+    if (existingByPath.rows.length > 0 && existingByPath.rows[0].payload.scanSignature !== scanSignature) {
+      await db.query("UPDATE content_catalog SET payload = jsonb_set(payload, '{scanSignature}', $2::jsonb) WHERE id = $1",
+        [existingByPath.rows[0].id, JSON.stringify(scanSignature)]);
+    }
+  } catch {}
+
+  // Skip metadata enrichment if item already published with good metadata
+  let skipEnrich = false;
+  try {
+    const existingMeta = await db.query("SELECT payload->>'metadataStatus' AS ms, status FROM content_catalog WHERE payload->>'scanSignature' = $1 LIMIT 1", [scanSignature]);
+    if (existingMeta.rows.length > 0 && existingMeta.rows[0].status === 'published' && existingMeta.rows[0].ms === 'matched') skipEnrich = true;
+  } catch {}
+
+  let enriched;
+  if (skipEnrich) {
+    enriched = {
+      metadataStatus: 'matched', metadataConfidence: 90, metadataProvider: 'cached',
+      title: null, year: null, description: null, genres: null, language: null, poster: null, backdrop: null, tmdbId: null, imdbId: null,
+    };
+  } else {
+    enriched = await enrichItemWithMetadata(item);
+  }
+  const itemToUpsert = {
       ...item,
       title: enriched.title || item.title,
       year: enriched.year || null,
