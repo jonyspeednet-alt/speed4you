@@ -78,6 +78,26 @@ function resolveFilePathFromVideoUrl(videoUrl) {
   return fs.existsSync(absolutePath) ? absolutePath : '';
 }
 
+const VIDEO_EXTENSIONS = new Set(['.mp4', '.m4v', '.webm', '.mkv', '.avi', '.mov', '.wmv', '.mpg', '.mpeg', '.ts', '.m2ts']);
+
+function findFirstVideoFile(directoryPath) {
+  const entries = fs.readdirSync(directoryPath, { withFileTypes: true });
+  const files = entries
+    .filter((entry) => entry.isFile() && VIDEO_EXTENSIONS.has(path.extname(entry.name).toLowerCase()))
+    .map((entry) => entry.name)
+    .sort((left, right) => left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' }));
+  if (files.length > 0) return path.join(directoryPath, files[0]);
+  const directories = entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort((left, right) => left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' }));
+  for (const directory of directories) {
+    const nested = findFirstVideoFile(path.join(directoryPath, directory));
+    if (nested) return nested;
+  }
+  return '';
+}
+
 function resolvePlayableFilePath(sourcePath, videoUrl) {
   const directVideoPath = resolveFilePathFromVideoUrl(videoUrl);
   if (directVideoPath) {
@@ -88,7 +108,15 @@ function resolvePlayableFilePath(sourcePath, videoUrl) {
   const stat = safeStat(sourcePath);
   if (!stat) return '';
   if (stat.isFile()) return sourcePath;
-  return '';
+  if (!stat.isDirectory()) return '';
+  const decodedVideoUrl = decodePublicPath(videoUrl);
+  const preferredName = path.basename(decodedVideoUrl);
+  if (preferredName) {
+    const preferredPath = path.join(sourcePath, preferredName);
+    const preferredStat = fs.existsSync(preferredPath) ? safeStat(preferredPath) : null;
+    if (preferredStat?.isFile()) return preferredPath;
+  }
+  return findFirstVideoFile(sourcePath);
 }
 
 router.get('/download/:contentType/:id', async (req, res, next) => {
