@@ -3,10 +3,9 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { spawn } = require('child_process');
-const { loadScannerRoots } = require('../src/data/store');
+const { loadScannerRoots, upsertScannedItem, refreshCatalogReferencesForNormalizedFile, db } = require('../src/data/store');
 const { probeMedia, collectPlaybackProfile, getFfmpegFileArgs } = require('../src/services/player-media');
 const { enrichItemWithMetadata } = require('../src/services/metadata-enricher');
-const { upsertScannedItem, refreshCatalogReferencesForNormalizedFile } = require('../src/data/store');
 const queue = require('../src/services/pipeline-queue');
 const logger = require('../src/utils/logger');
 
@@ -50,7 +49,14 @@ function getFreeDiskGb(targetPath) {
   return (s.bavail * s.bsize) / (1024 ** 3);
 }
 
-async function scanAndEnqueue() {
+async function getPublishedPaths() {
+  try {
+    const result = await db.query("SELECT DISTINCT payload->>'sourcePath' AS path FROM content_catalog WHERE status IN ('published','archived') AND payload->>'sourcePath' IS NOT NULL AND payload->>'sourcePath' != ''");
+    return new Set(result.rows.map(r => r.path));
+  } catch { return new Set(); }
+}
+
+async function scanAndEnqueue(publishedPaths) {
   const roots = loadScannerRoots();
   if (!Array.isArray(roots) || roots.length === 0) {
     await queue.appendLog('No scanner roots configured');
@@ -60,6 +66,7 @@ async function scanAndEnqueue() {
   await queue.appendLog(`Scanning ${roots.length} roots for media files...`);
   let totalFiles = 0;
   let newFiles = 0;
+  let skippedFiles = 0;
 
   for (const root of roots) {
     if (!root.scanPath || !fs.existsSync(root.scanPath)) continue;
@@ -67,8 +74,12 @@ async function scanAndEnqueue() {
     const batch = [];
     try {
       for (const file of walkVideoFiles(root.scanPath)) {
-        batch.push({ filePath: file.filePath, root, extension: file.extension, size: file.size });
         count++;
+        if (publishedPaths && publishedPaths.has(file.filePath)) {
+          skippedFiles++;
+          continue;
+        }
+        batch.push({ filePath: file.filePath, root, extension: file.extension, size: file.size });
         if (batch.length >= 100) {
           const added = await queue.enqueueScannerItems(batch);
           newFiles += added;
@@ -84,10 +95,10 @@ async function scanAndEnqueue() {
       newFiles += added;
     }
     totalFiles += count;
-    await queue.appendLog(`Root ${root.label || root.scanPath}: ${count} files, ${newFiles} new`);
+    await queue.appendLog(`Root ${root.label || root.scanPath}: ${count} files (${skippedFiles} already published, ${newFiles} new)`);
   }
 
-  await queue.appendLog(`Discovery complete: ${totalFiles} total, ${newFiles} newly queued`);
+  await queue.appendLog(`Discovery complete: ${totalFiles} total, ${skippedFiles} skipped (published), ${newFiles} newly queued`);
   return newFiles;
 }
 
@@ -134,9 +145,9 @@ async function enrichAndCatalog(filePath, root, profile) {
   const baseName = path.basename(fileName, path.extname(fileName));
   const contentType = root.type === 'series' ? 'series' : 'movie';
 
-  const publicUrl = root.publicBaseUrl
-    ? `${root.publicBaseUrl}/${path.relative(root.scanPath, filePath).split(path.sep).join('/')}`
-    : '';
+  const relativePath = path.relative(root.scanPath, filePath).split(path.sep).join('/');
+  const publicUrl = root.publicBaseUrl ? `${root.publicBaseUrl}/${relativePath}` : '';
+  const scanSignature = `${root.id}:${relativePath}`;
 
   const item = {
     title: baseName,
@@ -150,6 +161,7 @@ async function enrichAndCatalog(filePath, root, profile) {
     runtime: profile?.duration ? Math.round(Number(profile.duration)) : 0,
     durationSeconds: profile?.duration ? Math.round(Number(profile.duration)) : 0,
     quality: profile?.videoCodec || '',
+    scanSignature,
   };
 
   try {
@@ -225,6 +237,7 @@ async function processNormalizerQueue() {
     fs.renameSync(item.filePath, backupPath);
     fs.renameSync(tempPath, outputPath);
 
+    const root = item.root;
     if (root?.scanPath && root?.publicBaseUrl) {
       refreshCatalogReferencesForNormalizedFile({
         previousSourcePath: item.filePath,
@@ -237,7 +250,6 @@ async function processNormalizerQueue() {
     await queue.appendLog(`[normalizer] converted ${path.basename(item.filePath)} → ${baseName}.mp4 (backup: ${path.basename(backupPath)})`);
 
     await queue.appendLog(`[normalizer] enriching metadata for ${baseName}.mp4...`);
-    const root = item.root;
     const result = await enrichAndCatalog(outputPath, root, item.probeResult);
     await queue.completeNormalizerItem(item.id, { status: 'completed', ...result });
 
@@ -262,7 +274,9 @@ function lockApi() {
 const lock = lockApi();
 
 async function runScannerPhase() {
-  const discovered = await scanAndEnqueue();
+  const publishedPaths = await getPublishedPaths();
+  await queue.appendLog(`Loaded ${publishedPaths.size} published source paths — already-published files will be skipped`);
+  const discovered = await scanAndEnqueue(publishedPaths);
   console.log(`Discovered ${discovered} new files`);
 
   let scannerBusy = true;
