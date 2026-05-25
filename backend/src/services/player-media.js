@@ -243,6 +243,7 @@ function getFfmpegFileArgs(resolvedPath, outputPath, strategyMode) {
     '-v', 'error',
     '-fflags', '+discardcorrupt+genpts',
     '-err_detect', 'ignore_err',
+    '-readrate', '50M',
     '-i', resolvedPath,
     '-map', '0:v:0',
     '-map', '0:a:0?',
