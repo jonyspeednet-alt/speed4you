@@ -26,12 +26,6 @@ function Badge({ children, variant = 'default', size = 'medium' }) {
       color: '#f87171',
       border: '1px solid rgba(239,68,68,0.28)',
     },
-    live: {
-      background: 'rgba(239,68,68,0.18)',
-      color: '#f87171',
-      border: '1px solid rgba(239,68,68,0.38)',
-      animation: 'livePulse 1.6s ease-in-out infinite',
-    },
     new: {
       background: 'linear-gradient(135deg, rgba(255,90,95,0.22), rgba(255,122,69,0.22))',
       color: '#ff8a6a',
@@ -63,7 +57,6 @@ function Badge({ children, variant = 'default', size = 'medium' }) {
         ...sizes[size] || sizes.medium,
       }}
     >
-      {variant === 'live' && <span style={styles.liveDot} aria-hidden="true" />}
       {children}
     </span>
   );
@@ -80,14 +73,6 @@ const styles = {
     letterSpacing: '0.06em',
     lineHeight: 1,
     whiteSpace: 'nowrap',
-  },
-  liveDot: {
-    width: '6px',
-    height: '6px',
-    borderRadius: '50%',
-    background: '#f87171',
-    flexShrink: 0,
-    animation: 'livePulse 1.2s ease-in-out infinite',
   },
 };
 

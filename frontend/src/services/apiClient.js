@@ -170,15 +170,6 @@ export const seriesService = {
   getEpisodes: (id, seasonId) => apiClient(`/series/${id}/seasons/${seasonId}/episodes`),
 };
 
-export const playerService = {
-  getStream: (contentType, id, params = {}) => apiClient(`/player/${contentType}/${id}?${new URLSearchParams(params)}`, {
-    headers: getAuthHeader(),
-  }),
-  prepareStream: (contentType, id, params = {}) => apiClient(`/player/prepare/${contentType}/${id}?${new URLSearchParams(params)}`, {
-    headers: getAuthHeader(),
-  }),
-};
-
 export const progressService = {
   get: () => apiClient('/progress', { headers: getAuthHeader(), bustCache: true }),
   update: (contentType, contentId, position, duration) => apiClient('/progress', {

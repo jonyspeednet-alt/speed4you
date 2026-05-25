@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { seriesService } from '../services/seriesService';
 import { useBreakpoint } from '../hooks';
 import { useRecentlyViewed } from '../hooks';
-import WatchlistButton from '../components/ui/WatchlistButton';
 import ShareButton from '../components/ui/ShareButton';
 import StarRating from '../components/ui/StarRating';
 import { DETAIL_STYLES, DETAIL_SKELETON, posterFallbackUrl } from '../styles/detailPage';
@@ -71,10 +70,6 @@ function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMo
   const [downloadHovered, setDownloadHovered] = useState(false);
   const navigate = useNavigate();
 
-  const handleCardClick = () => {
-    navigate(`/watch/${seriesId}?season=${seasonParam}&episode=${episodeParam}`);
-  };
-
   const apiBase = (import.meta.env.VITE_API_URL || '/portal-api').replace(/\/$/, '');
   const downloadUrl = `${apiBase}/api/player/download/series/${seriesId}?season=${seasonParam}&episode=${episodeParam}`;
 
@@ -96,12 +91,10 @@ function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMo
 
   return (
     <div
-      onClick={handleCardClick}
       style={{
         ...s.episodeCard,
         ...(isMobile ? s.episodeCardMobile : {}),
         ...(hovered ? s.episodeCardHover : {}),
-        cursor: 'pointer',
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -140,15 +133,6 @@ function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMo
           </svg>
         </a>
 
-        {/* Play icon */}
-        <div 
-          onClick={handleCardClick}
-          style={{ ...s.epPlay, ...(hovered ? s.epPlayHover : {}), width: '44px', height: '44px', borderRadius: '14px' }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M8 5v14l11-7z" />
-          </svg>
-        </div>
       </div>
     </div>
   );
@@ -311,27 +295,7 @@ export default function SeriesDetailsPage() {
 
             {/* Actions */}
             <div style={{ ...s.actions, ...(isMobile ? s.actionsMobile : {}) }}>
-              <div style={s.primaryActions}>
-                <Link
-                  to={`/watch/${series.id}?season=${firstSeasonNum}&episode=${firstEpNum}`}
-                  style={{ ...s.playBtn, ...(isMobile ? s.btnFull : {}) }}
-                >
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                  Start from S1
-                </Link>
-                {showContinueLatest ? (
-                  <Link
-                    to={`/watch/${series.id}?season=${lastSeasonNum}&episode=${lastEpNum}`}
-                    style={{ ...s.secondaryBtn, ...(isMobile ? s.btnFull : {}) }}
-                  >
-                    Continue latest
-                  </Link>
-                ) : null}
-              </div>
               <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
-                <WatchlistButton contentType="series" contentId={series.id} title={series.title} />
                 <ShareButton title={series.title} url={`${window.location.origin}/series/${series.id}`} />
               </div>
             </div>

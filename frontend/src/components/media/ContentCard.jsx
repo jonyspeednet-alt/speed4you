@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import WatchlistButton from "../ui/WatchlistButton";
+
 
 /**
  * Convert TMDB poster URL to appropriate size
@@ -214,15 +214,6 @@ function ContentCard({
         </div>
       </button>
 
-      <div style={styles.watchlistSlot}>
-        <WatchlistButton
-          contentType={isSeries ? "series" : "movie"}
-          contentId={item.id}
-          title={item.title}
-          compact
-          checkOnMount={false}
-        />
-      </div>
     </article>
   );
 }
@@ -442,12 +433,6 @@ const styles = {
     fontWeight: "900",
     textTransform: "uppercase",
     letterSpacing: "0.1em",
-  },
-  watchlistSlot: {
-    position: "absolute",
-    top: "46px",
-    right: "10px",
-    zIndex: 3,
   },
 };
 

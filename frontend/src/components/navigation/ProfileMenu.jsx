@@ -70,25 +70,6 @@ function ProfileMenu({ user, compact = false }) {
 
           <div style={styles.divider} />
 
-          <Link
-            to="/watchlist"
-            role="menuitem"
-            style={{
-              ...styles.item,
-              ...(hoveredItem === 'watchlist' ? styles.itemHover : {}),
-            }}
-            onMouseEnter={() => setHoveredItem('watchlist')}
-            onMouseLeave={() => setHoveredItem(null)}
-            onClick={() => setIsOpen(false)}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" />
-              <line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" />
-              <line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
-            </svg>
-            My List
-          </Link>
-
           {(user.role === 'admin' || user.role === 'super_admin') && (
             <Link
               to="/admin"

@@ -197,8 +197,6 @@ apiRouter.use('/content', publicContentLimiter, publicPerIpLimiter, require('./r
 apiRouter.use('/movies', publicContentLimiter, publicPerIpLimiter, require('./routes/movies'));
 apiRouter.use('/series', publicContentLimiter, publicPerIpLimiter, require('./routes/series'));
 apiRouter.use('/search', publicContentLimiter, publicPerIpLimiter, require('./routes/search'));
-apiRouter.use('/watchlist', require('./routes/watchlist'));
-apiRouter.use('/progress', require('./routes/progress'));
 apiRouter.use('/player', require('./routes/player'));
 apiRouter.use('/tv', publicContentLimiter, require('./routes/tv'));
 apiRouter.use('/admin', require('./routes/admin'));

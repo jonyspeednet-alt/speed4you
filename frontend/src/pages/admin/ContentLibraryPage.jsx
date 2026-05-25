@@ -640,7 +640,7 @@ function ContentLibraryPage() {
                 {visibleColumns.actions && (
                   <td style={styles.tdActions}>
                     <div style={styles.actionGroup}>
-                      {item.videoUrl && <Link to={`/watch/${item.id}`} style={styles.miniBtn}>Play</Link>}
+                      {item.videoUrl && <span style={styles.miniBtn}>Has Video</span>}
                       <Link to={`/admin/content/${item.id}/edit`} style={styles.miniBtn}>Edit</Link>
                       {item.status === 'published' ? (
                         <button type="button" onClick={() => handleUnpublish(item.id)} style={styles.miniBtn}>Unpub</button>
