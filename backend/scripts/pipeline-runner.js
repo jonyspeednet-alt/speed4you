@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -64,9 +64,14 @@ function scanSigOf(root, filePath) {
 
 async function scanAndEnqueue() {
   const roots = loadScannerRoots();
+  console.log(`[pipeline] scanAndEnqueue: found ${Array.isArray(roots) ? roots.length : 'invalid'} roots`);
   if (!Array.isArray(roots) || roots.length === 0) {
     await queue.appendLog('No scanner roots configured');
+    console.log('[pipeline] ERROR: No scanner roots found in cache');
     return 0;
+  }
+  for (const r of roots) {
+    console.log(`[pipeline] root: ${r.label || 'unnamed'} path=${r.scanPath || 'N/A'} exists=${r.scanPath ? require('fs').existsSync(r.scanPath) : false}`);
   }
 
   await queue.appendLog(`Scanning ${roots.length} roots for media files...`);
@@ -181,23 +186,24 @@ async function enrichAndCatalog(filePath, root, profile) {
     }
   } catch {}
 
-  // Skip metadata enrichment if item already published with good metadata
-  let skipEnrich = false;
   try {
-    const existingMeta = await db.query("SELECT payload->>'metadataStatus' AS ms, status FROM content_catalog WHERE payload->>'scanSignature' = $1 LIMIT 1", [scanSignature]);
-    if (existingMeta.rows.length > 0 && existingMeta.rows[0].status === 'published' && existingMeta.rows[0].ms === 'matched') skipEnrich = true;
-  } catch {}
+    // Skip metadata enrichment if already published with good metadata
+    let skipEnrich = false;
+    try {
+      const existingMeta = await db.query("SELECT payload->>'metadataStatus' AS ms, status FROM content_catalog WHERE payload->>'scanSignature' = $1 LIMIT 1", [scanSignature]);
+      if (existingMeta.rows.length > 0 && existingMeta.rows[0].status === 'published' && existingMeta.rows[0].ms === 'matched') skipEnrich = true;
+    } catch {}
 
-  let enriched;
-  if (skipEnrich) {
-    enriched = {
-      metadataStatus: 'matched', metadataConfidence: 90, metadataProvider: 'cached',
-      title: null, year: null, description: null, genres: null, language: null, poster: null, backdrop: null, tmdbId: null, imdbId: null,
-    };
-  } else {
-    enriched = await enrichItemWithMetadata(item);
-  }
-  const itemToUpsert = {
+    let enriched;
+    if (skipEnrich) {
+      enriched = {
+        metadataStatus: 'matched', metadataConfidence: 90, metadataProvider: 'cached',
+        title: null, year: null, description: null, genres: null, language: null, poster: null, backdrop: null, tmdbId: null, imdbId: null,
+      };
+    } else {
+      enriched = await enrichItemWithMetadata(item);
+    }
+    const itemToUpsert = {
       ...item,
       title: enriched.title || item.title,
       year: enriched.year || null,
@@ -331,6 +337,8 @@ async function runNormalizerPhase() {
 }
 
 async function main() {
+  console.log(`[pipeline] Starting ${RUN_MODE} worker, pid=${process.pid}, cwd=${process.cwd()}`);
+  console.log(`[pipeline] DB_HOST=${process.env.DB_HOST || 'NOT SET'}, DB_NAME=${process.env.DB_NAME || 'NOT SET'}`);
   const existingLock = await lock.get();
   if (existingLock) {
     try {

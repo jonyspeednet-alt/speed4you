@@ -474,10 +474,12 @@ function spawnWorker(args) {
   const { spawn } = require('child_process');
   const path = require('path');
   const scriptPath = path.resolve(__dirname, '../../scripts/pipeline-runner.js');
-  const child = spawn('node', [scriptPath, ...args], {
+  const nodeBin = process.execPath;
+  const child = spawn(nodeBin, [scriptPath, ...args], {
     cwd: path.dirname(scriptPath),
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: ['ignore', 'inherit', 'inherit'],
     detached: true,
+    env: { ...process.env },
   });
   child.unref();
   return child;
