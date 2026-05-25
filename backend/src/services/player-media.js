@@ -226,8 +226,8 @@ async function determineStreamingStrategy(resolvedPath, extension, options = {})
 function getUniversalTranscodeArgs(outputTarget) {
   return [
     '-c:v', 'libx264',
-    '-preset', process.env.PLAYER_TRANSCODE_PRESET || 'veryfast',
-    '-crf', process.env.PLAYER_TRANSCODE_CRF || '23',
+    '-preset', process.env.PLAYER_TRANSCODE_PRESET || 'ultrafast',
+    '-crf', process.env.PLAYER_TRANSCODE_CRF || '28',
     '-pix_fmt', 'yuv420p',
     '-profile:v', 'high',
     '-level', '4.1',

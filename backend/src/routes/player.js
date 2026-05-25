@@ -27,8 +27,8 @@ const {
 
 const router = express.Router();
 const activeCacheJobs = new Map();
-const MAX_CONCURRENT_CACHE_JOBS = Math.max(1, Number(process.env.PLAYER_MAX_CONCURRENT_CACHE_JOBS || 4));
-const MAX_CONCURRENT_LIVE_STREAMS = Math.max(1, Number(process.env.PLAYER_MAX_CONCURRENT_LIVE_STREAMS || 10));
+const MAX_CONCURRENT_CACHE_JOBS = Math.max(1, Number(process.env.PLAYER_MAX_CONCURRENT_CACHE_JOBS || 2));
+const MAX_CONCURRENT_LIVE_STREAMS = Math.max(1, Number(process.env.PLAYER_MAX_CONCURRENT_LIVE_STREAMS || 3));
 let activeCacheJobCount = 0;
 let activeLiveStreamCount = 0;
 ensurePlayerCacheRoot();
