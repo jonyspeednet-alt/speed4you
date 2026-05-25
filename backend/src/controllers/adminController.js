@@ -438,3 +438,77 @@ exports.getSearchAnalytics = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Pipeline Queue Controllers
+const pipelineQueue = require('../services/pipeline-queue');
+
+async function getPipelineStatus(req, res) {
+  const status = await pipelineQueue.getQueueStatus();
+  const lock = await pipelineQueue.getPipelineLock();
+  res.json({ ...status, lock });
+}
+
+async function getPipelineScannerQueue(req, res) {
+  const limit = Math.min(Number(req.query.limit) || 200, 500);
+  const items = await pipelineQueue.getScannerQueue(limit);
+  res.json(items);
+}
+
+async function getPipelineNormalizerQueue(req, res) {
+  const limit = Math.min(Number(req.query.limit) || 200, 500);
+  const items = await pipelineQueue.getNormalizerQueue(limit);
+  res.json(items);
+}
+
+async function getPipelineLog(req, res) {
+  const limit = Math.min(Number(req.query.limit) || 200, 500);
+  const log = await pipelineQueue.getLog(limit);
+  res.json(log);
+}
+
+async function startPipeline(req, res) {
+  const { spawn } = require('child_process');
+  const path = require('path');
+  const scriptPath = path.resolve(__dirname, '../../scripts/pipeline-runner.js');
+  const child = spawn('node', [scriptPath], {
+    cwd: path.dirname(scriptPath),
+    stdio: ['ignore', 'pipe', 'pipe'],
+    detached: true,
+  });
+  child.unref();
+  let stderr = '';
+  child.stderr.on('data', chunk => { stderr += chunk; });
+  setTimeout(() => {
+    res.json({ started: true, pid: child.pid });
+  }, 1000);
+}
+
+async function clearPipeline(req, res) {
+  await pipelineQueue.clearAll();
+  res.json({ cleared: true });
+}
+
+async function retryPipelineScannerItem(req, res) {
+  const ok = await pipelineQueue.retryScannerItem(req.params.id);
+  res.json({ ok });
+}
+
+async function retryPipelineNormalizerItem(req, res) {
+  const ok = await pipelineQueue.retryNormalizerItem(req.params.id);
+  res.json({ ok });
+}
+
+async function retryAllPipelineFailed(req, res) {
+  await pipelineQueue.retryAllFailed();
+  res.json({ ok: true });
+}
+
+module.exports.getPipelineStatus = getPipelineStatus;
+module.exports.getPipelineScannerQueue = getPipelineScannerQueue;
+module.exports.getPipelineNormalizerQueue = getPipelineNormalizerQueue;
+module.exports.getPipelineLog = getPipelineLog;
+module.exports.startPipeline = startPipeline;
+module.exports.clearPipeline = clearPipeline;
+module.exports.retryPipelineScannerItem = retryPipelineScannerItem;
+module.exports.retryPipelineNormalizerItem = retryPipelineNormalizerItem;
+module.exports.retryAllPipelineFailed = retryAllPipelineFailed;

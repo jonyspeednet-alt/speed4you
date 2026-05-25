@@ -95,6 +95,17 @@ export const adminService = {
   createAdminUser: (data) => apiClient('/admin/users', { method: 'POST', body: JSON.stringify(data) }),
   updateAdminUser: (id, data) => apiClient(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteAdminUser: (id) => apiClient(`/admin/users/${id}`, { method: 'DELETE' }),
+
+  // Pipeline Queue
+  getPipelineStatus: () => apiClient('/admin/pipeline/status'),
+  getPipelineScannerQueue: (limit) => cachedGet('/admin/pipeline/scanner-queue', { limit }),
+  getPipelineNormalizerQueue: (limit) => cachedGet('/admin/pipeline/normalizer-queue', { limit }),
+  getPipelineLog: (limit) => cachedGet('/admin/pipeline/log', { limit }),
+  startPipeline: () => apiClient('/admin/pipeline/start', { method: 'POST' }),
+  clearPipeline: () => apiClient('/admin/pipeline/clear', { method: 'POST' }),
+  retryPipelineScannerItem: (id) => apiClient(`/admin/pipeline/retry-scanner/${id}`, { method: 'POST' }),
+  retryPipelineNormalizerItem: (id) => apiClient(`/admin/pipeline/retry-normalizer/${id}`, { method: 'POST' }),
+  retryAllPipelineFailed: () => apiClient('/admin/pipeline/retry-all-failed', { method: 'POST' }),
 };
 
 export default adminService;

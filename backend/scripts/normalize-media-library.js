@@ -490,21 +490,35 @@ async function needsNormalization(filePath) {
   const primaryAudioIndex = pickPrimaryStreamIndex(streams, 'audio');
   const video = primaryVideoIndex >= 0 ? streams[primaryVideoIndex] : null;
   if (!video) {
-    return { normalize: false, reason: 'no-video-stream' };
+    return { normalize: false, reason: 'no-video-stream', recommendedMode: null };
   }
   const audio = primaryAudioIndex >= 0 ? streams[primaryAudioIndex] : null;
   const videoCodec = String(video.codec_name || '').toLowerCase();
   const audioCodec = String(audio?.codec_name || '').toLowerCase();
+  const pixelFormat = String(video.pix_fmt || '').toLowerCase();
+  const isTenBit = Number(video.bits_per_raw_sample || video.bits_per_sample || 8) > 8 || pixelFormat.includes('10');
   const formatNames = String(format.format_name || '').toLowerCase().split(',');
   const isMp4Container = formatNames.some((item) => item.trim() === 'mov' || item.trim() === 'mp4');
   const hasH264 = TARGET_VIDEO_CODECS.has(videoCodec);
   const hasAacOrNoAudio = !audio || TARGET_AUDIO_CODECS.has(audioCodec);
   const hasFaststart = isMp4Container ? isFaststartMp4(filePath) : false;
 
-  const normalize = !(isMp4Container && hasH264 && hasAacOrNoAudio && hasFaststart);
+  const isAlreadyTarget = isMp4Container && hasH264 && hasAacOrNoAudio && hasFaststart;
+
+  let recommendedMode = 'transcode';
+  if (isAlreadyTarget) {
+    recommendedMode = null;
+  } else if (hasH264 && !isTenBit) {
+    if (hasAacOrNoAudio) {
+      recommendedMode = 'remux-copy';
+    } else {
+      recommendedMode = 'copy-video-transcode-audio';
+    }
+  }
 
   return {
-    normalize,
+    normalize: !isAlreadyTarget,
+    recommendedMode,
     meta: {
       primaryVideoIndex,
       primaryAudioIndex,
@@ -525,19 +539,49 @@ function buildEncodeArgs(inputPath, outputPath, streamMap, encodeOpts = {}) {
   const audioMap = Number.isFinite(streamMap?.audioIndex) && streamMap.audioIndex >= 0
     ? `0:${streamMap.audioIndex}`
     : '0:a:0?';
-  const crf = encodeOpts.crf || Number(process.env.MEDIA_NORMALIZER_CRF || 19);
-  const preset = encodeOpts.preset || process.env.MEDIA_NORMALIZER_PRESET || 'medium';
+  const strategy = encodeOpts.strategy || 'transcode';
 
-  const args = [
+  const common = [
     '-y',
     '-v', 'error',
     '-progress', 'pipe:1',
     '-nostats',
+    '-fflags', '+discardcorrupt+genpts',
+    '-err_detect', 'ignore_err',
+    '-readrate', '50M',
     '-i', inputPath,
     '-map', videoMap,
     '-map', audioMap,
     '-sn',
     '-dn',
+  ];
+
+  if (strategy === 'remux-copy') {
+    return [
+      ...common,
+      '-c:v', 'copy',
+      '-c:a', 'copy',
+      '-movflags', '+faststart',
+      outputPath,
+    ];
+  }
+
+  if (strategy === 'copy-video-transcode-audio') {
+    return [
+      ...common,
+      '-c:v', 'copy',
+      '-c:a', 'aac',
+      '-b:a', '192k',
+      '-movflags', '+faststart',
+      outputPath,
+    ];
+  }
+
+  const crf = encodeOpts.crf || Number(process.env.MEDIA_NORMALIZER_CRF || 19);
+  const preset = encodeOpts.preset || process.env.MEDIA_NORMALIZER_PRESET || 'medium';
+
+  return [
+    ...common,
     '-c:v', 'libx264',
     '-preset', preset,
     '-crf', String(crf),
@@ -548,15 +592,22 @@ function buildEncodeArgs(inputPath, outputPath, streamMap, encodeOpts = {}) {
     '-movflags', '+faststart',
     outputPath,
   ];
-
-  return args;
 }
 
 async function transcodeToTarget(inputPath, outputPath, durationSeconds, onProgress, streamMap, encodeOpts = {}) {
   const ffmpegBin = resolveFfTool('ffmpeg');
   const args = buildEncodeArgs(inputPath, outputPath, streamMap, encodeOpts);
+  const useIonice = process.env.MEDIA_NORMALIZER_NO_IONICE !== '1';
   await new Promise((resolve, reject) => {
-    const ffmpeg = spawn(ffmpegBin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    let ffmpeg;
+    if (useIonice) {
+      const ioniceBin = resolveFfTool('ionice') || '/usr/bin/ionice';
+      const niceBin = resolveFfTool('nice') || '/usr/bin/nice';
+      const ioniceArgs = ['-c', '3', niceBin, '-n', '19', ffmpegBin, ...args];
+      ffmpeg = spawn(ioniceBin, ioniceArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
+    } else {
+      ffmpeg = spawn(ffmpegBin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    }
     activeFfmpegSet.add(ffmpeg);
     const stderr = [];
     let progressBuffer = '';
@@ -844,8 +895,11 @@ async function processFileCandidate(state, candidate) {
     return { worked: false, reason: 'low-disk-for-file' };
   }
 
+  const strategy = status.recommendedMode || 'transcode';
+  const isRemux = strategy === 'remux-copy' || strategy === 'copy-video-transcode-audio';
+
   try {
-    await logInfo(`[media-normalizer] start ${filePath} strategy=full-transcode`);
+    await logInfo(`[media-normalizer] start ${filePath} strategy=${strategy}`);
     state.currentOperation = {
       inputPath: filePath,
       finalOutputPath,
@@ -862,12 +916,13 @@ async function processFileCandidate(state, candidate) {
       durationSeconds: Number(status.meta?.duration || 0),
       speed: '',
       fps: '',
-      strategy: 'full-transcode',
+      strategy,
       startedAt: new Date().toISOString(),
     };
     await persistState(state);
 
     const encodeOpts = await getDynamicConfig();
+    encodeOpts.strategy = strategy;
     await transcodeToTarget(
       filePath,
       tempOutput,
@@ -877,7 +932,7 @@ async function processFileCandidate(state, candidate) {
           ...state.currentFileProgress,
           ...progress,
           filePath,
-          strategy: 'full-transcode',
+          strategy,
           updatedAt: new Date().toISOString(),
         };
         void persistState(state);
@@ -910,17 +965,19 @@ async function processFileCandidate(state, candidate) {
     fs.renameSync(filePath, backupPath);
     fs.renameSync(tempOutput, finalOutputPath);
 
-    if (fs.existsSync(backupPath)) {
+    const keepBackup = process.env.MEDIA_NORMALIZER_KEEP_BACKUP !== '0';
+    if (fs.existsSync(backupPath) && !keepBackup) {
       fs.unlinkSync(backupPath);
     }
 
     const finalStat = fs.statSync(finalOutputPath);
     const inputSize = stat.size;
     const outputSize = finalStat.size;
+    const backupKept = fs.existsSync(backupPath);
     state.processed[finalOutputPath] = {
       signature: buildSignature(finalOutputPath, fs.statSync(finalOutputPath)),
       normalized: true,
-      note: 'converted-and-replaced (full-transcode)',
+      note: `converted-and-replaced (${strategy})${backupKept ? ' backup-kept' : ''}`,
       timestamp: Date.now(),
       inputSize,
       outputSize,
@@ -933,7 +990,7 @@ async function processFileCandidate(state, candidate) {
     const refreshResult = refreshCatalogAfterNormalization(filePath, finalOutputPath);
     await persistState(state, { currentFileProgress: null, currentOperation: null });
     await logInfo(
-      `[media-normalizer] done ${filePath} catalogItemsUpdated=${refreshResult.updatedItems} catalogEpisodesUpdated=${refreshResult.updatedEpisodes}`,
+      `[media-normalizer] done ${filePath} strategy=${strategy} backupKept=${backupKept} catalogItemsUpdated=${refreshResult.updatedItems} catalogEpisodesUpdated=${refreshResult.updatedEpisodes}`,
     );
     return { worked: true, reason: 'converted' };
   } catch (error) {

@@ -119,6 +119,10 @@ const NAV = [
     ),
   },
   {
+    path: "/admin/pipeline",
+    label: "Pipeline",
+  },
+  {
     path: "/admin/normalizer",
     label: "Media Normalizer",
     icon: (
@@ -216,6 +220,7 @@ function AdminLayout() {
     if (p.includes("/edit")) return "Edit Content";
     if (p.startsWith("/admin/movies")) return "Movies";
     if (p.startsWith("/admin/series")) return "Series";
+    if (p.startsWith("/admin/pipeline")) return "Pipeline";
     if (p.startsWith("/admin/normalizer")) return "Media Normalizer";
     if (p.startsWith("/admin/scanner")) return "Scanner";
     if (p.startsWith("/admin/users")) return "Users";
