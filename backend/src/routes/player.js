@@ -621,7 +621,7 @@ router.get('/stream/:contentType/:id', async (req, res, next) => {
     const inputStat = safeStat(resolvedPath);
     const inputSize = inputStat ? inputStat.size : 0;
 
-    if (inputSize > 0 && (strategy.mode === 'remux-copy' || strategy.mode === 'copy-video-transcode-audio')) {
+    if (inputSize > 0 && strategy.mode !== 'transcode') {
       ensureOptimizedCache(selection, resolvedPath, strategy).catch(() => {});
       try {
         await waitForFileSize(tempPath, 4096, 15000);
@@ -790,11 +790,13 @@ router.get('/prepare/:contentType/:id', async (req, res, next) => {
       return res.json({ ready: true, strategy: strategy.mode, cachePath: tempPath });
     }
 
-    ensureOptimizedCache(selection, resolvedPath, strategy).catch((error) => {
-      logger.error('Player error: ' + (error?.message || error));
-    });
+    if (strategy.mode !== 'transcode') {
+      ensureOptimizedCache(selection, resolvedPath, strategy).catch((error) => {
+        logger.error('Player error: ' + (error?.message || error));
+      });
+    }
 
-    res.json({ ready: false, strategy: strategy.mode });
+    res.json({ ready: strategy.mode === 'transcode', strategy: strategy.mode });
   } catch (error) {
     next(error);
   }
