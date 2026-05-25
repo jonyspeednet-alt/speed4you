@@ -49,14 +49,20 @@ function getFreeDiskGb(targetPath) {
   return (s.bavail * s.bsize) / (1024 ** 3);
 }
 
-async function getPublishedPaths() {
+async function isScanSignaturePublished(scanSig) {
+  if (!scanSig) return false;
   try {
-    const result = await db.query("SELECT DISTINCT payload->>'sourcePath' AS path FROM content_catalog WHERE status IN ('published','archived') AND payload->>'sourcePath' IS NOT NULL AND payload->>'sourcePath' != ''");
-    return new Set(result.rows.map(r => r.path));
-  } catch { return new Set(); }
+    const result = await db.query("SELECT 1 FROM content_catalog WHERE payload->>'scanSignature' = $1 AND status = 'published' LIMIT 1", [scanSig]);
+    return result.rows.length > 0;
+  } catch { return false; }
 }
 
-async function scanAndEnqueue(publishedPaths) {
+function scanSigOf(root, filePath) {
+  const relativePath = path.relative(root.scanPath, filePath).split(path.sep).join('/');
+  return `${root.id}:${relativePath}`.replace(/\.[^.]+$/, '');
+}
+
+async function scanAndEnqueue() {
   const roots = loadScannerRoots();
   if (!Array.isArray(roots) || roots.length === 0) {
     await queue.appendLog('No scanner roots configured');
@@ -66,7 +72,6 @@ async function scanAndEnqueue(publishedPaths) {
   await queue.appendLog(`Scanning ${roots.length} roots for media files...`);
   let totalFiles = 0;
   let newFiles = 0;
-  let skippedFiles = 0;
 
   for (const root of roots) {
     if (!root.scanPath || !fs.existsSync(root.scanPath)) continue;
@@ -74,12 +79,8 @@ async function scanAndEnqueue(publishedPaths) {
     const batch = [];
     try {
       for (const file of walkVideoFiles(root.scanPath)) {
-        count++;
-        if (publishedPaths && publishedPaths.has(file.filePath)) {
-          skippedFiles++;
-          continue;
-        }
         batch.push({ filePath: file.filePath, root, extension: file.extension, size: file.size });
+        count++;
         if (batch.length >= 100) {
           const added = await queue.enqueueScannerItems(batch);
           newFiles += added;
@@ -95,10 +96,10 @@ async function scanAndEnqueue(publishedPaths) {
       newFiles += added;
     }
     totalFiles += count;
-    await queue.appendLog(`Root ${root.label || root.scanPath}: ${count} files (${skippedFiles} already published, ${newFiles} new)`);
+    await queue.appendLog(`Root ${root.label || root.scanPath}: ${count} files, ${newFiles} new`);
   }
 
-  await queue.appendLog(`Discovery complete: ${totalFiles} total, ${skippedFiles} skipped (published), ${newFiles} newly queued`);
+  await queue.appendLog(`Discovery complete: ${totalFiles} total, ${newFiles} newly queued`);
   return newFiles;
 }
 
@@ -122,9 +123,16 @@ async function processScannerQueue() {
     const strategy = determineStrategy(probeData, item.extension);
 
     if (strategy.mode === 'direct') {
-      await queue.appendLog(`[scanner] ${path.basename(item.filePath)} is browser-native, enriching metadata...`);
-      await queue.completeScannerItem(item.id, { status: 'completed', strategy: 'direct', probeResult: strategy.profile });
-      await enrichAndCatalog(item.filePath, item.root, strategy.profile);
+      const sig = item.root ? scanSigOf(item.root, item.filePath) : null;
+      const alreadyPublished = await isScanSignaturePublished(sig);
+      if (alreadyPublished) {
+        await queue.appendLog(`[scanner] ${path.basename(item.filePath)} already published, skipping enrichment`);
+        await queue.completeScannerItem(item.id, { status: 'completed', strategy: 'direct', probeResult: strategy.profile });
+      } else {
+        await queue.appendLog(`[scanner] ${path.basename(item.filePath)} is browser-native, enriching metadata...`);
+        await queue.completeScannerItem(item.id, { status: 'completed', strategy: 'direct', probeResult: strategy.profile });
+        await enrichAndCatalog(item.filePath, item.root, strategy.profile);
+      }
     } else {
       await queue.appendLog(`[scanner] ${path.basename(item.filePath)} needs ${strategy.mode}, moving to normalizer queue`);
       await queue.completeScannerItem(item.id, { status: 'probed', strategy: strategy.mode, probeResult: strategy.profile });
@@ -147,7 +155,7 @@ async function enrichAndCatalog(filePath, root, profile) {
 
   const relativePath = path.relative(root.scanPath, filePath).split(path.sep).join('/');
   const publicUrl = root.publicBaseUrl ? `${root.publicBaseUrl}/${relativePath}` : '';
-  const scanSignature = `${root.id}:${relativePath}`;
+  const scanSignature = scanSigOf(root, filePath);
 
   const item = {
     title: baseName,
@@ -274,9 +282,7 @@ function lockApi() {
 const lock = lockApi();
 
 async function runScannerPhase() {
-  const publishedPaths = await getPublishedPaths();
-  await queue.appendLog(`Loaded ${publishedPaths.size} published source paths — already-published files will be skipped`);
-  const discovered = await scanAndEnqueue(publishedPaths);
+  const discovered = await scanAndEnqueue();
   console.log(`Discovered ${discovered} new files`);
 
   let scannerBusy = true;
