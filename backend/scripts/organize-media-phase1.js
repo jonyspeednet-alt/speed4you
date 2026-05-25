@@ -5,8 +5,8 @@ const {
   refreshCatalogReferencesForNormalizedFile,
 } = require('../src/data/store');
 
-const auditPath = path.resolve(__dirname, '../src/data/media-organization-audit.json');
-const logPath = path.resolve(__dirname, '../src/data/media-organization-phase1.json');
+const auditPath = path.resolve(process.env.MEDIA_ORGANIZATION_AUDIT_PATH || path.resolve(__dirname, '../src/data/media-organization-audit.json'));
+const logPath = path.resolve(process.env.MEDIA_ORGANIZATION_LOG_PATH || path.resolve(__dirname, '../src/data/media-organization-phase1.json'));
 const MIN_CONFIDENCE = Number(process.env.MEDIA_ORGANIZATION_MIN_CONFIDENCE || 80);
 
 function readJson(filePath, fallback) {

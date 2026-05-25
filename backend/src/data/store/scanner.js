@@ -37,6 +37,8 @@ async function saveScannerRoots(roots) {
   const incomingIds = rootsArray.map((r) => String(r.id || '')).filter(Boolean);
   if (incomingIds.length) {
     await db.query('DELETE FROM scanner_roots WHERE id <> ALL($1::text[])', [incomingIds]);
+  } else if (rootsArray.length === 0) {
+    // Empty array — don't delete all roots without confirmation
   } else {
     await db.query('DELETE FROM scanner_roots');
   }
@@ -310,12 +312,14 @@ async function deleteScannerItemsNotInSignatures(sourceRootId, scanSignatures = 
       ['scanner', rootId, PROTECTED_STATUSES, signatures],
     );
   } else {
-    // No signatures seen at all — only delete non-protected items
+    // No signatures at all — guard: only delete items with empty/missing signatures
+    // Prevents accidental deletion of all non-protected items
     result = await db.query(
       `DELETE FROM content_catalog
        WHERE source_type = $1
          AND source_root_id = $2
-         AND status <> ALL($3::text[])`,
+         AND status <> ALL($3::text[])
+         AND (COALESCE(payload->>'scanSignature', '') = '' OR payload->>'scanSignature' IS NULL)`,
       ['scanner', rootId, PROTECTED_STATUSES],
     );
   }

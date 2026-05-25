@@ -1,4 +1,5 @@
 const { spawn } = require('child_process');
+const logger = require('../utils/logger');
 const { FFMPEG_BIN, FFPROBE_BIN } = require('../config/player-cache');
 
 const UNIVERSAL_TARGET = 'mp4-h264-aac-faststart';

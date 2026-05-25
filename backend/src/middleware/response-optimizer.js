@@ -33,6 +33,12 @@ function compressionMiddleware(req, res, next) {
     return;
   }
 
+  // Skip compression for video streaming (wasteful CPU, no benefit)
+  if (req.path.startsWith('/api/player') || req.path.startsWith('/portal-api/api/player') || req.path.startsWith('/player')) {
+    next();
+    return;
+  }
+
   const accepted = String(req.headers['accept-encoding'] || '');
   const encoding = accepted.includes('br') ? 'br' : accepted.includes('gzip') ? 'gzip' : '';
 

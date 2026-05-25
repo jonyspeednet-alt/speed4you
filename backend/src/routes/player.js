@@ -27,6 +27,10 @@ const {
 
 const router = express.Router();
 const activeCacheJobs = new Map();
+const MAX_CONCURRENT_CACHE_JOBS = Math.max(1, Number(process.env.PLAYER_MAX_CONCURRENT_CACHE_JOBS || 4));
+const MAX_CONCURRENT_LIVE_STREAMS = Math.max(1, Number(process.env.PLAYER_MAX_CONCURRENT_LIVE_STREAMS || 10));
+let activeCacheJobCount = 0;
+let activeLiveStreamCount = 0;
 ensurePlayerCacheRoot();
 
 
@@ -309,98 +313,29 @@ function waitForFileSize(filePath, minSize, timeoutMs) {
           resolve(stat.size);
           return;
         }
-      } catch {}
-      if (Date.now() - start >= timeoutMs) {
-        reject(new Error(`waitForFileSize timeout ${filePath}`));
+      } catch (err) {
+        logger.warn('waitForFileSize error: ' + (err?.message || err));
+      }
+      if (Date.now() - start > timeoutMs) {
+        reject(new Error(`File did not reach ${minSize} bytes within ${timeoutMs}ms`));
         return;
       }
       setTimeout(check, 200);
     };
-    check();
+    setTimeout(check, 200);
   });
 }
 
-function createTailStream(filePath, maxSize) {
-  let pos = 0;
-  let ended = false;
-  let pollTimer = null;
-
-  const stream = new Readable({
-    read(size) {
-      if (ended) {
-        this.push(null);
-        return;
-      }
+function serveGrowingFile(filePath, totalSize, req, res) {
+  const servePart = () => {
+    if (pollTimer) clearTimeout(pollTimer);
+    pollTimer = null;
+    if (fd) {
       try {
-        const stat = fs.statSync(filePath);
-        const available = Math.max(0, stat.size - pos);
-        if (available > 0) {
-          const toRead = Math.min(size, available, maxSize ? maxSize - pos : Infinity);
-          if (toRead <= 0) {
-            ended = true;
-            this.push(null);
-            return;
-          }
-          const buf = Buffer.alloc(toRead);
-          const fd = fs.openSync(filePath, 'r');
-          const bytesRead = fs.readSync(fd, buf, 0, toRead, pos);
-          fs.closeSync(fd);
-          pos += bytesRead;
-          this.push(bytesRead < toRead ? buf.subarray(0, bytesRead) : buf);
-          return;
-        }
-        if (maxSize && pos >= maxSize) {
-          ended = true;
-          this.push(null);
-          return;
-        }
-        pollTimer = setTimeout(() => stream._read(size), 200);
+        fs.closeSync(fd);
       } catch (err) {
-        if (err.code === 'ENOENT') {
-          pollTimer = setTimeout(() => stream._read(size), 200);
-        } else {
-          stream.destroy(err);
-        }
+        logger.warn('createTailStream close error: ' + (err?.message || err));
       }
-    },
-  });
-
-  stream._tailEnd = () => { ended = true; clearTimeout(pollTimer); };
-  return stream;
-}
-
-function serveGrowingFile(tempPath, totalSize, req, res) {
-  const range = req.headers.range;
-
-  res.setHeader('Accept-Ranges', 'bytes');
-  res.setHeader('Content-Type', 'video/mp4');
-  res.setHeader('Cache-Control', 'private, no-store');
-
-  if (range) {
-    const [startText, endText] = String(range).replace(/bytes=/, '').split('-');
-    const start = Number.parseInt(startText, 10);
-
-    if (!Number.isFinite(start) || start < 0 || start >= totalSize) {
-      res.status(416).setHeader('Content-Range', `bytes */${totalSize}`).end();
-      return;
-    }
-
-    const requestedEnd = endText ? Number.parseInt(endText, 10) : totalSize - 1;
-
-    const tryServe = () => {
-      try {
-        const stat = fs.statSync(tempPath);
-        if (stat.size > start) {
-          const end = Math.min(requestedEnd, stat.size - 1, totalSize - 1);
-          if (start <= end) {
-            res.status(206);
-            res.setHeader('Content-Range', `bytes ${start}-${end}/${totalSize}`);
-            res.setHeader('Content-Length', end - start + 1);
-            fs.createReadStream(tempPath, { start, end }).pipe(res);
-            return true;
-          }
-        }
-      } catch {}
       return false;
     };
 
@@ -428,6 +363,14 @@ function serveGrowingFile(tempPath, totalSize, req, res) {
 }
 
 function transcodeToMp4(resolvedPath, res) {
+  if (activeLiveStreamCount >= MAX_CONCURRENT_LIVE_STREAMS) {
+    if (!res.headersSent) {
+      res.status(503).json({ error: 'Server busy, too many concurrent streams. Please try again.' });
+    }
+    return;
+  }
+  activeLiveStreamCount += 1;
+
   res.status(200);
   res.setHeader('Content-Type', 'video/mp4');
   res.setHeader('Cache-Control', 'private, no-store');
@@ -502,9 +445,15 @@ function ensureOptimizedCache(selection, resolvedPath, strategy) {
     return activeCacheJobs.get(cacheKey);
   }
 
+  if (activeCacheJobCount >= MAX_CONCURRENT_CACHE_JOBS) {
+    return Promise.resolve({ status: 'too-busy', cachePath: null });
+  }
+
   ensurePlayerCacheRoot();
 
   const tempPath = `${cachePath}.part.mp4`;
+  activeCacheJobCount += 1;
+
   const jobPromise = new Promise((resolve, reject) => {
     const ffmpeg = spawn(FFMPEG_BIN, getFfmpegFileArgs(resolvedPath, tempPath, strategy.mode), {
       stdio: ['ignore', 'ignore', 'pipe'],
@@ -514,16 +463,24 @@ function ensureOptimizedCache(selection, resolvedPath, strategy) {
       logger.warn('ffmpeg-cache stderr: ' + chunk.toString('utf8').trim());
     });
 
-    ffmpeg.on('error', reject);
+    ffmpeg.on('error', (err) => {
+      activeCacheJobs.delete(cacheKey);
+      activeCacheJobCount -= 1;
+      reject(err);
+    });
+
     ffmpeg.on('close', (code) => {
       activeCacheJobs.delete(cacheKey);
+      activeCacheJobCount -= 1;
 
       if (code !== 0) {
         try {
           if (fs.existsSync(tempPath)) {
             fs.unlinkSync(tempPath);
           }
-        } catch { }
+        } catch (cleanupErr) {
+          logger.warn('Cache temp cleanup error: ' + (cleanupErr?.message || cleanupErr));
+        }
         reject(new Error(`ffmpeg cache exited with code ${code}`));
         return;
       }
@@ -545,6 +502,14 @@ function ensureOptimizedCache(selection, resolvedPath, strategy) {
 
 
 function streamFfmpegMp4(resolvedPath, res, ffmpegArgs) {
+  if (activeLiveStreamCount >= MAX_CONCURRENT_LIVE_STREAMS) {
+    if (!res.headersSent) {
+      res.status(503).json({ error: 'Server busy, too many concurrent streams. Please try again.' });
+    }
+    return;
+  }
+  activeLiveStreamCount += 1;
+
   res.status(200);
   res.setHeader('Content-Type', 'video/mp4');
   res.setHeader('Cache-Control', 'private, no-store');
@@ -570,6 +535,7 @@ function streamFfmpegMp4(resolvedPath, res, ffmpegArgs) {
   });
 
   ffmpeg.on('close', (code) => {
+    activeLiveStreamCount -= 1;
     if (code !== 0 && !res.writableEnded) {
       res.destroy(new Error(`ffmpeg exited with code ${code}`));
     }

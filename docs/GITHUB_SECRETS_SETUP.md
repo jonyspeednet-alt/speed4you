@@ -55,6 +55,12 @@ https://data.speed4you.net
 
 ```
 
+### DEPLOY_REMOTE_SCANNER_CACHE_DIR (optional - prevents root disk full)
+```
+/var/www/html/Extra_Storage/scanner-cache
+
+```
+
 ## Environment Variables (Workflow file এ set করা আছে):
 - DEPLOY_REMOTE_BACKEND_PATH: /home/speed4you/backend
 - DEPLOY_REMOTE_FRONTEND_PATH: /home/speed4you/frontend

@@ -15,7 +15,39 @@ const {
   DEVELOPMENT_SEED_ITEMS,
 } = require('./constants');
 
-const appStateCache = new Map();
+class BoundedCache {
+  constructor(maxSize = 500, ttlMs = 30 * 60 * 1000) {
+    this._map = new Map();
+    this._maxSize = maxSize;
+    this._ttlMs = ttlMs;
+  }
+
+  has(key) { return this._map.has(key); }
+
+  get(key) {
+    const entry = this._map.get(key);
+    if (!entry) return undefined;
+    if (Date.now() - entry.ts > this._ttlMs) {
+      this._map.delete(key);
+      return undefined;
+    }
+    return entry.value;
+  }
+
+  set(key, value) {
+    if (this._map.size >= this._maxSize && !this._map.has(key)) {
+      const oldest = this._map.keys().next().value;
+      this._map.delete(oldest);
+    }
+    this._map.set(key, { value, ts: Date.now() });
+  }
+
+  delete(key) { this._map.delete(key); }
+  clear() { this._map.clear(); }
+  get size() { return this._map.size; }
+}
+
+const appStateCache = new BoundedCache(500, 30 * 60 * 1000);
 
 function readJson(filePath, fallback) {
   try {

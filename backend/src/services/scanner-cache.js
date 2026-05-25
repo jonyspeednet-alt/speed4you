@@ -9,7 +9,8 @@ const fs = require('fs');
 const path = require('path');
 
 // In-memory cache with TTL
-const CACHE_DIR = path.join(process.cwd(), '.cache', 'metadata');
+const SCANNER_CACHE_DIR = process.env.SCANNER_CACHE_DIR || path.join(process.cwd(), '.cache', 'metadata');
+const CACHE_DIR = path.resolve(SCANNER_CACHE_DIR);
 const MEMORY_CACHE = new Map();
 const DEFAULT_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -264,6 +265,7 @@ if (!global.cacheCleanupInterval) {
 }
 
 module.exports = {
+  CACHE_DIR,
   getCachedMetadata,
   setCachedMetadata,
   clearExpiredCache,
