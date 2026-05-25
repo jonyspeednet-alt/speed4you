@@ -93,6 +93,17 @@ router.post('/users', asyncRoute(adminController.createAdminUser));
 router.put('/users/:id', asyncRoute(adminController.updateAdminUser));
 router.delete('/users/:id', asyncRoute(adminController.deleteAdminUser));
 
+// Pipeline Queue
+router.get('/pipeline/status', asyncRoute(adminController.getPipelineStatus));
+router.get('/pipeline/scanner-queue', asyncRoute(adminController.getPipelineScannerQueue));
+router.get('/pipeline/normalizer-queue', asyncRoute(adminController.getPipelineNormalizerQueue));
+router.get('/pipeline/log', asyncRoute(adminController.getPipelineLog));
+router.post('/pipeline/start', asyncRoute(adminController.startPipeline));
+router.post('/pipeline/clear', asyncRoute(adminController.clearPipeline));
+router.post('/pipeline/retry-scanner/:id', asyncRoute(adminController.retryPipelineScannerItem));
+router.post('/pipeline/retry-normalizer/:id', asyncRoute(adminController.retryPipelineNormalizerItem));
+router.post('/pipeline/retry-all-failed', asyncRoute(adminController.retryAllPipelineFailed));
+
 // Duplicates
 router.get('/duplicates/review', adminController.getDuplicatesReport);
 router.post('/duplicates/cleanup', adminController.runDuplicatesCleanup);
