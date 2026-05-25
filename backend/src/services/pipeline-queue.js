@@ -48,10 +48,27 @@ async function getLog(limit) {
   return limit ? lines.slice(-limit) : lines;
 }
 
+async function getScannerLock() { return getAppState('scanner_lock'); }
+async function setScannerLock(lock) { await setAppState('scanner_lock', lock); }
+async function releaseScannerLock() { await setAppState('scanner_lock', null); }
+
+async function getNormalizerLock() { return getAppState('normalizer_lock'); }
+async function setNormalizerLock(lock) { await setAppState('normalizer_lock', lock); }
+async function releaseNormalizerLock() { await setAppState('normalizer_lock', null); }
+
+async function isScannerPaused() { return getAppState('scanner_paused') || false; }
+async function setScannerPaused(v) { await setAppState('scanner_paused', Boolean(v)); }
+async function isNormalizerPaused() { return getAppState('normalizer_paused') || false; }
+async function setNormalizerPaused(v) { await setAppState('normalizer_paused', Boolean(v)); }
+
 async function clearAll() {
   await setAppState(QUEUE_KEY, null);
   await setAppState(LOCK_KEY, null);
   await setAppState(LOG_KEY, null);
+  await setAppState('scanner_lock', null);
+  await setAppState('normalizer_lock', null);
+  await setAppState('scanner_paused', null);
+  await setAppState('normalizer_paused', null);
 }
 
 async function enqueueScannerItems(files) {
@@ -232,6 +249,10 @@ async function retryAllFailed() {
 module.exports = {
   getQueue, saveQueue, clearAll, appendLog, getLog,
   getPipelineLock, setPipelineLock, releasePipelineLock,
+  getScannerLock, setScannerLock, releaseScannerLock,
+  getNormalizerLock, setNormalizerLock, releaseNormalizerLock,
+  isScannerPaused, setScannerPaused,
+  isNormalizerPaused, setNormalizerPaused,
   enqueueScannerItems, dequeueScannerItem, completeScannerItem,
   moveScannerItemToNormalizer,
   dequeueNormalizerItem, completeNormalizerItem,

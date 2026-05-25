@@ -103,6 +103,10 @@ router.post('/pipeline/clear', asyncRoute(adminController.clearPipeline));
 router.post('/pipeline/retry-scanner/:id', asyncRoute(adminController.retryPipelineScannerItem));
 router.post('/pipeline/retry-normalizer/:id', asyncRoute(adminController.retryPipelineNormalizerItem));
 router.post('/pipeline/retry-all-failed', asyncRoute(adminController.retryAllPipelineFailed));
+router.post('/pipeline/scanner/start', asyncRoute(adminController.startScannerWorker));
+router.post('/pipeline/scanner/stop', asyncRoute(adminController.stopScannerWorker));
+router.post('/pipeline/normalizer/start', asyncRoute(adminController.startNormalizerWorker));
+router.post('/pipeline/normalizer/stop', asyncRoute(adminController.stopNormalizerWorker));
 
 // Duplicates
 router.get('/duplicates/review', adminController.getDuplicatesReport);
