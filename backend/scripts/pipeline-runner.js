@@ -349,13 +349,48 @@ async function main() {
   console.log(`[pipeline] DB_HOST=${process.env.DB_HOST || 'NOT SET'}, DB_NAME=${process.env.DB_NAME || 'NOT SET'}`);
   const existingLock = await lock.get();
   if (existingLock) {
+    let isStale = true;
     try {
       process.kill(existingLock.pid, 0);
+      // PID exists — verify it's actually a pipeline-runner process (not recycled PID)
+      try {
+        const cmdline = require('fs').readFileSync('/proc/' + existingLock.pid + '/cmdline', 'utf8');
+        if (cmdline.includes('pipeline-runner.js')) {
+          isStale = false;
+        } else {
+          console.log(`[pipeline] PID ${existingLock.pid} is not a pipeline worker (recycled), overriding stale lock`);
+        }
+      } catch {
+        // Can't read /proc — fall back to timestamp check
+        const ageMs = Date.now() - new Date(existingLock.startedAt).getTime();
+        if (ageMs < 120000) isStale = false; // less than 2 min old = probably real
+      }
+    } catch {
+      isStale = true;
+    }
+    if (!isStale) {
       console.error(`Pipeline ${RUN_MODE} already running (pid=${existingLock.pid})`);
       process.exit(1);
-    } catch {
-      await queue.appendLog(`[${RUN_MODE}] Stale lock from pid=${existingLock.pid}, overriding`);
     }
+    await queue.appendLog(`[${RUN_MODE}] Stale lock from pid=${existingLock.pid}, overriding`);
+  }
+
+  // Reset stuck 'processing' items from previous crashed workers
+  if (RUN_MODE === 'scanner' || RUN_MODE === 'full') {
+    const q = await queue.getQueue();
+    let resetCount = 0;
+    for (const item of q.scannerQueue) {
+      if (item.status === 'processing') { item.status = 'pending'; item.error = 'reset from stale lock'; resetCount++; }
+    }
+    if (resetCount > 0) { await queue.saveQueue(q); await queue.appendLog(`[${RUN_MODE}] Reset ${resetCount} stuck scanner items`); }
+  }
+  if (RUN_MODE === 'normalizer' || RUN_MODE === 'full') {
+    const q = await queue.getQueue();
+    let resetCount = 0;
+    for (const item of q.normalizerQueue) {
+      if (item.status === 'processing') { item.status = 'pending'; item.error = 'reset from stale lock'; resetCount++; }
+    }
+    if (resetCount > 0) { await queue.saveQueue(q); await queue.appendLog(`[${RUN_MODE}] Reset ${resetCount} stuck normalizer items`); }
   }
 
   await lock.set({ pid: process.pid, startedAt: new Date().toISOString(), hostname: os.hostname(), mode: RUN_MODE });
