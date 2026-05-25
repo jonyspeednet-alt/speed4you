@@ -560,7 +560,7 @@ function remuxToMp4(resolvedPath, res) {
     '-dn',
     '-c:v', 'copy',
     '-c:a', 'copy',
-    '-movflags', 'frag_keyframe+empty_moov+faststart',
+    '-movflags', '+frag_keyframe',
     '-f', 'mp4',
     'pipe:1',
   ]);
@@ -579,7 +579,7 @@ function copyVideoTranscodeAudio(resolvedPath, res) {
     '-c:v', 'copy',
     '-c:a', 'aac',
     '-b:a', '160k',
-    '-movflags', 'frag_keyframe+empty_moov+faststart',
+    '-movflags', '+frag_keyframe',
     '-f', 'mp4',
     'pipe:1',
   ]);
