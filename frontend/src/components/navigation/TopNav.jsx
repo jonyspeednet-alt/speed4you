@@ -10,7 +10,6 @@ const navItems = [
   { path: "/series", label: "Series" },
   { path: "/tv", label: "Live TV" },
   { path: "/browse", label: "Browse" },
-  { path: "/watchlist", label: "Watchlist" },
 ];
 
 function TopNav() {
@@ -114,7 +113,7 @@ function TopNav() {
             <span className="top-nav-logo-title">Entertainment Portal</span>
             {!isSmallMobile && showSubtitle && (
               <span className="top-nav-logo-subtitle">
-                Movies, series and live TV in one place
+                Movies & series in one place
               </span>
             )}
           </div>

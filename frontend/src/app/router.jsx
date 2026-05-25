@@ -11,8 +11,6 @@ const HomePage = lazy(() => import('../pages/HomePage'));
 const BrowsePage = lazy(() => import('../pages/BrowsePage'));
 const MovieDetailsPage = lazy(() => import('../pages/MovieDetailsPage'));
 const SeriesDetailsPage = lazy(() => import('../pages/SeriesDetailsPage'));
-const WatchlistPage = lazy(() => import('../pages/WatchlistPage'));
-const PlayerPage = lazy(() => import('../pages/PlayerPage'));
 const TVPage = lazy(() => import('../pages/TVPage'));
 const AccessPage = lazy(() => import('../pages/AccessPage'));
 const LoginPage = lazy(() => import('../pages/LoginPage'));
@@ -110,19 +108,6 @@ const router = createBrowserRouter([
       {
         path: 'series/:slug',
         element: withRouteFallback(<SeriesDetailsPage />, 'detail'),
-      },
-      {
-        path: 'watchlist',
-        element: withRouteFallback(<WatchlistPage />, 'browse'),
-      },
-      {
-        path: 'watch/:contentId',
-        element: withRouteFallback(<PlayerPage />, 'default'),
-      },
-      {
-        // Alias for episode navigation
-        path: 'play/:contentId',
-        element: withRouteFallback(<PlayerPage />, 'default'),
       },
       {
         path: 'tv',

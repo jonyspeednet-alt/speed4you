@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useBreakpoint, useTVMode } from '../../../hooks';
-import WatchlistButton from '../../../components/ui/WatchlistButton';
+
 
 export default function TrendingBento({ items }) {
   const { isMobile, isTablet } = useBreakpoint();
@@ -99,13 +99,6 @@ function BentoItem({ item, index, isLarge, tv }) {
               >
                 View Details
               </button>
-              <WatchlistButton 
-                contentType={item.type} 
-                contentId={item.id} 
-                title={item.title}
-                compact
-                checkOnMount={false}
-              />
             </div>
           )}
         </div>

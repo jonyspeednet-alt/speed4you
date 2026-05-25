@@ -2,7 +2,6 @@ import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useBreakpoint } from '../../../hooks';
 import StarRating from '../../../components/ui/StarRating';
-import WatchlistButton from '../../../components/ui/WatchlistButton';
 
 function HeroBanner({ content: contentItems }) {
   const { isMobile, isTablet } = useBreakpoint();
@@ -120,33 +119,20 @@ function HeroBanner({ content: contentItems }) {
           </div>
 
           <div style={{ ...styles.actions, ...(isMobile ? styles.actionsMobile : {}) }}>
-            <Link to={isPlaceholder ? '/browse?sort=latest' : `/watch/${content.id}`} style={{ ...styles.playBtn, ...(isMobile ? styles.playBtnMobile : {}) }}>
+            <Link to={isPlaceholder ? '/browse?sort=latest' : isSeries ? `/series/${content.id}` : `/movies/${content.id}`} style={{ ...styles.playBtn, ...(isMobile ? styles.playBtnMobile : {}) }}>
               {isPlaceholder ? (
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style={styles.buttonIcon} aria-hidden="true">
                   <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z" />
                 </svg>
               ) : (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style={styles.buttonIcon} aria-hidden="true">
-                  <path d="M8 5v14l11-7z" />
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={styles.buttonIcon} aria-hidden="true">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="16" x2="12" y2="12" />
+                  <line x1="9" y1="10" x2="12" y2="10" />
                 </svg>
               )}
-              <span>{isPlaceholder ? 'Browse Latest' : isSeries ? 'Start Watching' : 'Play Now'}</span>
+              <span>{isPlaceholder ? 'Browse Latest' : 'View Details'}</span>
             </Link>
-
-            <Link to={isPlaceholder ? '/search' : isSeries ? `/series/${content.id}` : `/movies/${content.id}`} style={{ ...styles.infoBtn, ...(isMobile ? styles.infoBtnMobile : {}) }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style={styles.buttonIcon} aria-hidden="true">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
-              </svg>
-              <span>{isPlaceholder ? 'Search Portal' : 'Details'}</span>
-            </Link>
-
-            {!isPlaceholder && (
-              <WatchlistButton
-                contentType={isSeries ? 'series' : 'movie'}
-                contentId={content.id}
-                title={content.title}
-              />
-            )}
           </div>
         </div>
       </div>

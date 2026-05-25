@@ -2,7 +2,7 @@ import { useDeferredValue, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import searchService from '../services/searchService';
 import { useBreakpoint, useRecentlyViewed } from '../hooks';
-import WatchlistButton from '../components/ui/WatchlistButton';
+
 
 const posterFallback = '/portal/assets/poster-placeholder.svg';
 const languageOptions = ['All', 'English', 'Hindi', 'Bengali', 'Korean', 'Japanese'];
@@ -206,9 +206,6 @@ function SearchPage() {
                           <div style={styles.overlay} />
                           <span style={styles.rank}>{String(index + 1).padStart(2, '0')}</span>
                           <span style={styles.badge}>{item.type === 'series' ? 'Series' : 'Movie'}</span>
-                          <div style={styles.cardWatchlistBtn}>
-                            <WatchlistButton contentType={item.type} contentId={item.id} title={item.title} compact />
-                          </div>
                         </div>
                         <div style={styles.info}>
                           <div style={styles.infoTop}>
@@ -247,7 +244,7 @@ function SearchPage() {
           </div>
         )}
 
-        {loading && <p style={styles.resultCount}>Searching the live catalog...</p>}
+        {loading && <p style={styles.resultCount}>Searching catalog...</p>}
         {!loading && error && <div style={styles.noResults}><p>{error}</p></div>}
         {!loading && !error && query.trim() && results.length === 0 && (
           <div style={styles.noResults}>
@@ -271,14 +268,6 @@ function SearchPage() {
                       <div style={styles.overlay} />
                       <span style={styles.rank}>{String(index + 1).padStart(2, '0')}</span>
                       <span style={styles.badge}>{item.type === 'series' ? 'Series' : 'Movie'}</span>
-                      <div style={styles.cardWatchlistBtn}>
-                        <WatchlistButton
-                          contentType={item.type === 'series' ? 'series' : 'movie'}
-                          contentId={item.id}
-                          title={item.title}
-                          compact
-                        />
-                      </div>
                     </div>
                     <div style={styles.info}>
                       <div style={styles.infoTop}>
@@ -376,7 +365,7 @@ const styles = {
     boxShadow: '0 8px 28px rgba(0,0,0,0.3)',
     transition: 'transform 380ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 360ms ease, border-color 300ms ease',
   },
-  cardWatchlistBtn: { position: 'absolute', top: '8px', right: '8px', zIndex: 3 },
+
   poster: { width: '100%', height: '100%', objectFit: 'cover' },
   overlay: {
     position: 'absolute',

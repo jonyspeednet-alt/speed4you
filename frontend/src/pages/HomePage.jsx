@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import HeroCarousel from '../features/home/components/HeroCarousel';
 import ContentRail from '../features/home/components/ContentRail';
-import ContinueWatchingRail from '../features/continueWatching/components/ContinueWatchingRail';
 import TrendingBento from '../features/home/components/TrendingBento';
-import { contentService, progressService } from '../services';
+import { contentService } from '../services';
 import { useBreakpoint, useRecentlyViewed, useTVMode } from '../hooks';
 
 const posterFallback = '/portal/assets/poster-placeholder.svg';
@@ -110,7 +109,7 @@ function pickFeatured(explicitFeatured, latestItems, popularItems, trendingItems
 
 
 function buildHomepageContent({
-  featured, latest, popular, trending, series, continueWatching,
+  featured, latest, popular, trending, series,
   recommendations, localTrending
 }) {
   const latestItems = (latest || []).map(normalizeItem);
@@ -137,27 +136,14 @@ function buildHomepageContent({
     popularItems.filter(item => item.language === 'Bengali'),
   );
 
-  const continueWatchingItems = (continueWatching || []).map(item => {
-    const normalized = normalizeItem(item);
-    if (normalized.duration > 0 && normalized.last_position > 0) {
-      normalized.progress = Math.min(99, (normalized.last_position / normalized.duration) * 100);
-    } else {
-      normalized.progress = 0;
-    }
-    return normalized;
-  }).slice(0, 10);
-
-  const continueIds = continueWatchingItems.map(item => item.id);
-
   const featuredPool = mergePools(latestItems, trendingItems, popularItems, homepageSeriesItems);
   const featuredItems = pickFeatured(featured, featuredPool, [], []);
   const featuredIds = featuredItems.slice(0, 5).map(item => item.id);
 
-  const excludeIds = [...continueIds, ...featuredIds];
+  const excludeIds = [...featuredIds];
 
   return {
     featured: featuredItems,
-    continueWatching: continueWatchingItems,
     recommendations: buildRail(recommendationsItems, { seed: createRotationSeed('recommendations'), size: RAIL_SIZE, excludeIds }),
     localTrending: buildRail(localTrendingItems, { seed: createRotationSeed('local-trending'), size: RAIL_SIZE, excludeIds, pinnedCount: 2 }),
     trending: buildRail(trendingItems, { seed: createRotationSeed('trending'), size: RAIL_SIZE, excludeIds, pinnedCount: 3 }),
@@ -212,8 +198,7 @@ function HomePage() {
       try {
         const seedContentId = recentlyViewed?.[0]?.id || '';
 
-        const [continueWatchingResponse, homepageResponse, recommendations, localTrending] = await Promise.all([
-          progressService.getContinueWatching().catch(() => ({ items: [] })),
+        const [homepageResponse, recommendations, localTrending] = await Promise.all([
           contentService.getHomepage(HOMEPAGE_POOL_LIMIT).catch(() => ({})),
           seedContentId ? contentService.getRecommendations(seedContentId).catch(() => ({ items: [] })) : Promise.resolve({ items: [] }),
           contentService.getLocalTrending().catch(() => ({ items: [] })),
@@ -221,7 +206,6 @@ function HomePage() {
 
         const nextContent = buildHomepageContent({
           ...homepageResponse,
-          continueWatching: continueWatchingResponse?.items,
           recommendations: recommendations?.items,
           localTrending: localTrending?.items,
         });
@@ -253,10 +237,6 @@ function HomePage() {
       <div style={{ ...styles.content, ...(isTVMode ? styles.contentTV : {}), ...(isMobile ? styles.contentMobile : {}) }}>
         {loading && Object.keys(content).length === 0 ? (
           <div style={styles.loadingNote}>Building your portal...</div>
-        ) : null}
-
-        {content.continueWatching?.length > 0 ? (
-          <ContinueWatchingRail items={content.continueWatching} isLoading={loading && !content.continueWatching} />
         ) : null}
 
         {content.movies?.length >= 3 ? (

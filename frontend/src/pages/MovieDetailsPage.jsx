@@ -3,7 +3,6 @@ import { Link, useParams } from 'react-router-dom';
 import { moviesService } from '../services/moviesService';
 import { useBreakpoint } from '../hooks';
 import { useRecentlyViewed } from '../hooks';
-import WatchlistButton from '../components/ui/WatchlistButton';
 import ShareButton from '../components/ui/ShareButton';
 import StarRating from '../components/ui/StarRating';
 import { DETAIL_STYLES, DETAIL_SKELETON, posterFallbackUrl } from '../styles/detailPage';
@@ -234,12 +233,6 @@ export default function MovieDetailsPage() {
               return (
                 <div style={{ ...s.actions, ...(isMobile ? s.actionsMobile : {}) }}>
                   <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto', alignItems: 'center' }}>
-                    <Link to={`/watch/${movie.id}`} style={{ ...s.playBtn, ...(isMobile ? s.btnFull : {}) }}>
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                      Watch Now
-                    </Link>
                     <a
                       href={downloadUrl}
                       download
@@ -256,7 +249,6 @@ export default function MovieDetailsPage() {
                     </a>
                   </div>
                   <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center', ...(isMobile ? { width: '100%', justifyContent: 'flex-start' } : {}) }}>
-                    <WatchlistButton contentType="movie" contentId={movie.id} title={movie.title} />
                     <ShareButton title={movie.title} url={`${window.location.origin}/movies/${movie.id}`} />
                   </div>
                 </div>

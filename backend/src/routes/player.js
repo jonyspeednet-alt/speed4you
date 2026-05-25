@@ -1,39 +1,11 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const { spawn } = require('child_process');
-const os = require('os');
-const { Readable } = require('stream');
-const { getItemById } = require('../data/store');
-const { loadScannerRoots } = require('../data/store');
+const { getItemById, loadScannerRoots } = require('../data/store');
 const { AppError } = require('../utils/error');
 const logger = require('../utils/logger');
-const {
-  PLAYER_CACHE_READY_MIN_BYTES,
-  buildPlayerCacheKey,
-  buildPlayerCachePath,
-  ensurePlayerCacheRoot,
-  isCacheReadyPath,
-} = require('../config/player-cache');
-const {
-  CONTENT_TYPES,
-  SUPPORTED_VIDEO_EXTENSIONS,
-  FFMPEG_BIN,
-  collectPlaybackProfile,
-  pickStreamingStrategy,
-  determineStreamingStrategy,
-  getFfmpegFileArgs,
-  getUniversalTranscodeArgs,
-} = require('../services/player-media');
 
 const router = express.Router();
-const activeCacheJobs = new Map();
-const MAX_CONCURRENT_CACHE_JOBS = Math.max(1, Number(process.env.PLAYER_MAX_CONCURRENT_CACHE_JOBS || 2));
-const MAX_CONCURRENT_LIVE_STREAMS = Math.max(1, Number(process.env.PLAYER_MAX_CONCURRENT_LIVE_STREAMS || 3));
-let activeCacheJobCount = 0;
-let activeLiveStreamCount = 0;
-ensurePlayerCacheRoot();
-
 
 function safeStat(targetPath) {
   try {
@@ -48,15 +20,11 @@ function toPositiveInt(value, fallback) {
   if (Number.isFinite(asNumber) && asNumber > 0) {
     return Math.floor(asNumber);
   }
-
   const match = String(value || '').match(/(\d+)/);
   if (match) {
     const parsed = Number(match[1]);
-    if (Number.isFinite(parsed) && parsed > 0) {
-      return Math.floor(parsed);
-    }
+    if (Number.isFinite(parsed) && parsed > 0) return Math.floor(parsed);
   }
-
   return fallback;
 }
 
@@ -66,94 +34,21 @@ async function findSelectedMedia(req) {
   const seasonNumber = toPositiveInt(req.query.season, 1);
   const episodeNumber = toPositiveInt(req.query.episode, 1);
   const item = await getItemById(id);
-
-  if (!item) {
-    return { error: { status: 404, message: 'Content not found' } };
-  }
-
-  if (requestedType && item.type !== requestedType) {
-    return { error: { status: 404, message: 'Content not found' } };
-  }
+  if (!item) return { error: { status: 404, message: 'Content not found' } };
+  if (requestedType && item.type !== requestedType) return { error: { status: 404, message: 'Content not found' } };
 
   const selectedSeason = item.type === 'series'
     ? (item.seasons || []).find((season, index) => toPositiveInt(season?.number ?? season?.id, index + 1) === seasonNumber)
-    || item.seasons?.[0]
-    : null;
+    || item.seasons?.[0] : null;
   const selectedEpisode = item.type === 'series'
     ? (selectedSeason?.episodes || []).find((episode, index) => toPositiveInt(episode?.number ?? episode?.id, index + 1) === episodeNumber)
-    || selectedSeason?.episodes?.[episodeNumber - 1]
-    || selectedSeason?.episodes?.[0]
-    : null;
+    || selectedSeason?.episodes?.[episodeNumber - 1] || selectedSeason?.episodes?.[0] : null;
 
   const videoUrl = item.type === 'movie' ? item.videoUrl : selectedEpisode?.videoUrl;
-  const sourcePath = item.type === 'movie'
-    ? item.sourcePath
-    : selectedEpisode?.sourcePath || selectedSeason?.sourcePath || item.sourcePath;
+  const sourcePath = item.type === 'movie' ? item.sourcePath : selectedEpisode?.sourcePath || selectedSeason?.sourcePath || item.sourcePath;
+  if (!videoUrl && !sourcePath) return { error: { status: 404, message: 'No playable source found' } };
 
-  if (!videoUrl && !sourcePath) {
-    return { error: { status: 404, message: 'No playable source found' } };
-  }
-
-  return {
-    item,
-    selectedSeason,
-    selectedEpisode,
-    videoUrl,
-    sourcePath,
-    seasonNumber,
-    episodeNumber,
-  };
-}
-
-function buildMetadata(selection) {
-  const {
-    item,
-    selectedSeason,
-    selectedEpisode,
-    seasonNumber,
-    episodeNumber,
-  } = selection;
-
-  return {
-    title: item.title,
-    type: item.type,
-    contentId: item.id,
-    durationSeconds: item.durationSeconds || 0,
-    runtimeMinutes: item.runtimeMinutes || item.runtime || null,
-    season: selectedSeason ? {
-      id: selectedSeason.id || seasonNumber,
-      number: selectedSeason.number || seasonNumber,
-      title: selectedSeason.title || `Season ${seasonNumber}`,
-    } : null,
-    episode: selectedEpisode ? {
-      id: selectedEpisode.id || episodeNumber,
-      number: selectedEpisode.number || episodeNumber,
-      title: selectedEpisode.title || `Episode ${episodeNumber}`,
-      description: selectedEpisode.description || '',
-      duration: selectedEpisode.duration || item.runtime || null,
-      durationSeconds: selectedEpisode.durationSeconds || item.durationSeconds || 0,
-      runtimeMinutes: selectedEpisode.runtimeMinutes || item.runtimeMinutes || item.runtime || null,
-    } : null,
-  };
-}
-
-function getCacheKey(selection) {
-  const season = selection.selectedSeason?.number || selection.seasonNumber || 1;
-  const episode = selection.selectedEpisode?.number || selection.episodeNumber || 1;
-
-  return buildPlayerCacheKey({
-    contentType: selection.item.type,
-    contentId: selection.item.id,
-    seasonNumber: season,
-    episodeNumber: episode,
-  });
-}
-
-
-function getSourceExtension(sourcePath, videoUrl) {
-  const candidate = sourcePath || videoUrl || '';
-  const normalized = candidate.split('?')[0];
-  return path.extname(normalized).toLowerCase();
+  return { item, selectedSeason, selectedEpisode, videoUrl, sourcePath, seasonNumber, episodeNumber };
 }
 
 function decodePublicPath(value) {
@@ -168,578 +63,52 @@ function isPathSafe(resolvedPath, allowedRoot) {
 
 function resolveFilePathFromVideoUrl(videoUrl) {
   const decodedVideoUrl = decodePublicPath(videoUrl);
-  if (!decodedVideoUrl) {
-    return '';
-  }
-
+  if (!decodedVideoUrl) return '';
   const matchingRoot = loadScannerRoots()
     .filter((root) => root?.scanPath && root?.publicBaseUrl)
     .sort((left, right) => String(right.publicBaseUrl).length - String(left.publicBaseUrl).length)
     .find((root) => decodedVideoUrl === root.publicBaseUrl || decodedVideoUrl.startsWith(`${root.publicBaseUrl}/`));
-
-  if (!matchingRoot) {
-    return '';
-  }
-
+  if (!matchingRoot) return '';
   const relativePath = decodedVideoUrl.slice(matchingRoot.publicBaseUrl.length).replace(/^\/+/, '');
-  if (!relativePath) {
-    return '';
-  }
-
+  if (!relativePath) return '';
   const segments = relativePath.split('/').filter(Boolean).map((segment) => decodeURIComponent(segment));
-  if (segments.some((seg) => seg === '..' || seg === '.')) {
-    return '';
-  }
-
+  if (segments.some((seg) => seg === '..' || seg === '.')) return '';
   const absolutePath = path.join(matchingRoot.scanPath, ...segments);
-
-  if (!isPathSafe(absolutePath, matchingRoot.scanPath)) {
-    return '';
-  }
-
+  if (!isPathSafe(absolutePath, matchingRoot.scanPath)) return '';
   return fs.existsSync(absolutePath) ? absolutePath : '';
-}
-
-function findFirstVideoFile(directoryPath) {
-  const entries = fs.readdirSync(directoryPath, { withFileTypes: true });
-  const files = entries
-    .filter((entry) => entry.isFile() && SUPPORTED_VIDEO_EXTENSIONS.has(path.extname(entry.name).toLowerCase()))
-    .map((entry) => entry.name)
-    .sort((left, right) => left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' }));
-
-  if (files.length > 0) {
-    return path.join(directoryPath, files[0]);
-  }
-
-  const directories = entries
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort((left, right) => left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' }));
-
-  for (const directory of directories) {
-    const nested = findFirstVideoFile(path.join(directoryPath, directory));
-    if (nested) {
-      return nested;
-    }
-  }
-
-  return '';
 }
 
 function resolvePlayableFilePath(sourcePath, videoUrl) {
   const directVideoPath = resolveFilePathFromVideoUrl(videoUrl);
   if (directVideoPath) {
     const directStat = safeStat(directVideoPath);
-    if (directStat?.isFile()) {
-      return directVideoPath;
-    }
+    if (directStat?.isFile()) return directVideoPath;
   }
-
-  if (!sourcePath) {
-    return '';
-  }
-
-  if (!fs.existsSync(sourcePath)) {
-    return '';
-  }
-
+  if (!sourcePath || !fs.existsSync(sourcePath)) return '';
   const stat = safeStat(sourcePath);
-  if (!stat) {
-    return '';
-  }
-
-  if (stat.isFile()) {
-    return sourcePath;
-  }
-
-  if (!stat.isDirectory()) {
-    return '';
-  }
-
-  const decodedVideoUrl = decodePublicPath(videoUrl);
-  const preferredName = path.basename(decodedVideoUrl);
-  if (preferredName) {
-    const preferredPath = path.join(sourcePath, preferredName);
-    const preferredStat = fs.existsSync(preferredPath) ? safeStat(preferredPath) : null;
-    if (preferredStat?.isFile()) {
-      return preferredPath;
-    }
-  }
-
-  return findFirstVideoFile(sourcePath);
+  if (!stat) return '';
+  if (stat.isFile()) return sourcePath;
+  return '';
 }
-
-function streamFileDirect(resolvedPath, req, res) {
-  const stat = safeStat(resolvedPath);
-  if (!stat?.isFile()) {
-    throw new AppError('Source file is not available on the server', 404, 'NOT_FOUND');
-  }
-
-  const ext = path.extname(resolvedPath).toLowerCase();
-  const contentType = CONTENT_TYPES[ext] || 'application/octet-stream';
-  const range = req.headers.range;
-
-  res.setHeader('Accept-Ranges', 'bytes');
-  res.setHeader('Content-Type', contentType);
-  res.setHeader('Cache-Control', 'private, no-store');
-
-  if (!range) {
-    res.setHeader('Content-Length', stat.size);
-    fs.createReadStream(resolvedPath).pipe(res);
-    return;
-  }
-
-  const [startText, endText] = String(range).replace(/bytes=/, '').split('-');
-  const start = Number.parseInt(startText, 10);
-  const end = endText ? Number.parseInt(endText, 10) : stat.size - 1;
-
-  if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end >= stat.size || start > end) {
-    res.status(416).setHeader('Content-Range', `bytes */${stat.size}`).end();
-    return;
-  }
-
-  res.status(206);
-  res.setHeader('Content-Range', `bytes ${start}-${end}/${stat.size}`);
-  res.setHeader('Content-Length', end - start + 1);
-  fs.createReadStream(resolvedPath, { start, end }).pipe(res);
-}
-
-function waitForFileSize(filePath, minSize, timeoutMs) {
-  return new Promise((resolve, reject) => {
-    const start = Date.now();
-    const check = () => {
-      try {
-        const stat = fs.statSync(filePath);
-        if (stat.size >= minSize) {
-          resolve(stat.size);
-          return;
-        }
-      } catch (err) {
-        logger.warn('waitForFileSize error: ' + (err?.message || err));
-      }
-      if (Date.now() - start > timeoutMs) {
-        reject(new Error(`File did not reach ${minSize} bytes within ${timeoutMs}ms`));
-        return;
-      }
-      setTimeout(check, 200);
-    };
-    setTimeout(check, 200);
-  });
-}
-
-function serveGrowingFile(filePath, totalSize, req, res) {
-  const servePart = () => {
-    if (pollTimer) clearTimeout(pollTimer);
-    pollTimer = null;
-    if (fd) {
-      try {
-        fs.closeSync(fd);
-      } catch (err) {
-        logger.warn('createTailStream close error: ' + (err?.message || err));
-      }
-      return false;
-    };
-
-    if (tryServe()) return;
-
-    const timeout = setTimeout(() => {
-      clearInterval(poll);
-      res.status(416).setHeader('Content-Range', `bytes */${totalSize}`).end();
-    }, 30000);
-
-    const poll = setInterval(() => {
-      if (tryServe()) { clearInterval(poll); clearTimeout(timeout); }
-    }, 500);
-
-    res.on('close', () => { clearInterval(poll); clearTimeout(timeout); });
-    return;
-  }
-
-  res.status(200);
-  res.setHeader('Content-Length', totalSize);
-
-  const stream = createTailStream(tempPath, totalSize);
-  stream.pipe(res);
-  res.on('close', () => { stream._tailEnd(); stream.destroy?.(); });
-}
-
-function transcodeToMp4(resolvedPath, res) {
-  if (activeLiveStreamCount >= MAX_CONCURRENT_LIVE_STREAMS) {
-    if (!res.headersSent) {
-      res.status(503).json({ error: 'Server busy, too many concurrent streams. Please try again.' });
-    }
-    return;
-  }
-  activeLiveStreamCount += 1;
-
-  res.status(200);
-  res.setHeader('Content-Type', 'video/mp4');
-  res.setHeader('Cache-Control', 'private, no-store');
-  res.setHeader('Transfer-Encoding', 'chunked');
-
-  const ffmpeg = spawn('ionice', ['-c', '2', '-n', '7', FFMPEG_BIN, ...[
-    '-v', 'error',
-    '-fflags', '+discardcorrupt+genpts',
-    '-err_detect', 'ignore_err',
-    '-i', resolvedPath,
-    '-map', '0:v:0',
-    '-map', '0:a:0?',
-    '-sn',
-    '-dn',
-    ...getUniversalTranscodeArgs([
-      '-movflags', '+frag_keyframe',
-      '-f', 'mp4',
-      'pipe:1',
-    ]),
-  ]], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-
-  ffmpeg.stdout.pipe(res);
-
-  ffmpeg.stderr.on('data', (chunk) => {
-    logger.warn('ffmpeg stderr: ' + chunk.toString('utf8').trim());
-  });
-
-  ffmpeg.on('error', (error) => {
-    if (!res.headersSent) {
-      res.status(500).json({ error: `Transcoding failed: ${error.message}` });
-      return;
-    }
-
-    res.destroy(error);
-  });
-
-  ffmpeg.on('close', (code) => {
-    if (code !== 0 && !res.writableEnded) {
-      res.destroy(new Error(`ffmpeg exited with code ${code}`));
-    }
-  });
-
-  res.on('close', () => {
-    if (!ffmpeg.killed) {
-      ffmpeg.kill('SIGKILL');
-    }
-  });
-}
-
-function buildCacheOutputPath(selection) {
-  const season = selection.selectedSeason?.number || selection.seasonNumber || 1;
-  const episode = selection.selectedEpisode?.number || selection.episodeNumber || 1;
-
-  return buildPlayerCachePath({
-    contentType: selection.item.type,
-    contentId: selection.item.id,
-    seasonNumber: season,
-    episodeNumber: episode,
-  });
-}
-
-function ensureOptimizedCache(selection, resolvedPath, strategy) {
-  const cachePath = buildCacheOutputPath(selection);
-  if (isCacheReadyPath(cachePath)) {
-    return Promise.resolve({ status: 'ready', cachePath });
-  }
-
-  const freeMem = os.freemem();
-  if (freeMem < 1.5 * 1024 ** 3) {
-    logger.warn('ensureOptimizedCache: low memory (' + Math.round(freeMem / 1024 / 1024) + 'MB), skipping');
-    return Promise.resolve({ status: 'too-busy', cachePath: null });
-  }
-
-  const cacheKey = getCacheKey(selection);
-  if (activeCacheJobs.has(cacheKey)) {
-    return activeCacheJobs.get(cacheKey);
-  }
-
-  if (activeCacheJobCount >= MAX_CONCURRENT_CACHE_JOBS) {
-    return Promise.resolve({ status: 'too-busy', cachePath: null });
-  }
-
-  ensurePlayerCacheRoot();
-
-  const tempPath = `${cachePath}.part.mp4`;
-  activeCacheJobCount += 1;
-
-  const jobPromise = new Promise((resolve, reject) => {
-    const ffmpeg = spawn('ionice', ['-c', '3', FFMPEG_BIN, ...getFfmpegFileArgs(resolvedPath, tempPath, strategy.mode)], {
-      stdio: ['ignore', 'ignore', 'pipe'],
-    });
-
-    ffmpeg.stderr.on('data', (chunk) => {
-      logger.warn('ffmpeg-cache stderr: ' + chunk.toString('utf8').trim());
-    });
-
-    ffmpeg.on('error', (err) => {
-      activeCacheJobs.delete(cacheKey);
-      activeCacheJobCount -= 1;
-      reject(err);
-    });
-
-    ffmpeg.on('close', (code) => {
-      activeCacheJobs.delete(cacheKey);
-      activeCacheJobCount -= 1;
-
-      if (code !== 0) {
-        try {
-          if (fs.existsSync(tempPath)) {
-            fs.unlinkSync(tempPath);
-          }
-        } catch (cleanupErr) {
-          logger.warn('Cache temp cleanup error: ' + (cleanupErr?.message || cleanupErr));
-        }
-        reject(new Error(`ffmpeg cache exited with code ${code}`));
-        return;
-      }
-
-      try {
-        fs.renameSync(tempPath, cachePath);
-      } catch (renameError) {
-        logger.warn('Cache rename failed (file may be in use): ' + renameError.message);
-        resolve({ status: 'ready', cachePath: tempPath });
-        return;
-      }
-      resolve({ status: 'ready', cachePath });
-    });
-  });
-
-  activeCacheJobs.set(cacheKey, jobPromise);
-  return jobPromise;
-}
-
-
-function streamFfmpegMp4(resolvedPath, res, ffmpegArgs) {
-  if (activeLiveStreamCount >= MAX_CONCURRENT_LIVE_STREAMS) {
-    if (!res.headersSent) {
-      res.status(503).json({ error: 'Server busy, too many concurrent streams. Please try again.' });
-    }
-    return;
-  }
-  activeLiveStreamCount += 1;
-
-  res.status(200);
-  res.setHeader('Content-Type', 'video/mp4');
-  res.setHeader('Cache-Control', 'private, no-store');
-  res.setHeader('Transfer-Encoding', 'chunked');
-
-  const ffmpeg = spawn('ionice', ['-c', '2', '-n', '7', FFMPEG_BIN, ...ffmpegArgs], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-
-  ffmpeg.stdout.pipe(res);
-
-  ffmpeg.stderr.on('data', (chunk) => {
-    logger.warn('ffmpeg stderr: ' + chunk.toString('utf8').trim());
-  });
-
-  ffmpeg.on('error', (error) => {
-    if (!res.headersSent) {
-      res.status(500).json({ error: `Streaming failed: ${error.message}` });
-      return;
-    }
-
-    res.destroy(error);
-  });
-
-  ffmpeg.on('close', (code) => {
-    activeLiveStreamCount -= 1;
-    if (code !== 0 && !res.writableEnded) {
-      res.destroy(new Error(`ffmpeg exited with code ${code}`));
-    }
-  });
-
-  res.on('close', () => {
-    if (!ffmpeg.killed) {
-      ffmpeg.kill('SIGKILL');
-    }
-  });
-}
-
-function remuxToMp4(resolvedPath, res) {
-  streamFfmpegMp4(resolvedPath, res, [
-    '-v', 'error',
-    '-fflags', '+discardcorrupt+genpts',
-    '-err_detect', 'ignore_err',
-    '-i', resolvedPath,
-    '-map', '0:v:0',
-    '-map', '0:a:0?',
-    '-sn',
-    '-dn',
-    '-c:v', 'copy',
-    '-c:a', 'copy',
-    '-movflags', '+frag_keyframe',
-    '-f', 'mp4',
-    'pipe:1',
-  ]);
-}
-
-function copyVideoTranscodeAudio(resolvedPath, res) {
-  streamFfmpegMp4(resolvedPath, res, [
-    '-v', 'error',
-    '-fflags', '+discardcorrupt+genpts',
-    '-err_detect', 'ignore_err',
-    '-i', resolvedPath,
-    '-map', '0:v:0',
-    '-map', '0:a:0?',
-    '-sn',
-    '-dn',
-    '-c:v', 'copy',
-    '-c:a', 'aac',
-    '-b:a', '160k',
-    '-movflags', '+frag_keyframe',
-    '-f', 'mp4',
-    'pipe:1',
-  ]);
-}
-
-router.get('/stream/:contentType/:id', async (req, res, next) => {
-  try {
-    const selection = await findSelectedMedia(req);
-
-    if (selection.error) {
-      throw new AppError(selection.error.message, selection.error.status, 'MEDIA_SELECTION_ERROR');
-    }
-
-    const { sourcePath, videoUrl } = selection;
-    const resolvedPath = resolvePlayableFilePath(sourcePath, videoUrl);
-    const ext = getSourceExtension(resolvedPath, videoUrl);
-
-    if (!resolvedPath) {
-      if (process.env.REMOTE_MEDIA_BASE_URL && videoUrl) {
-        return res.redirect(`${process.env.REMOTE_MEDIA_BASE_URL}${videoUrl}`);
-      }
-      throw new AppError('Source file is not available on the server', 404, 'NOT_FOUND');
-    }
-    const strategy = await determineStreamingStrategy(resolvedPath, ext);
-
-    if (strategy.mode === 'direct') {
-      streamFileDirect(resolvedPath, req, res);
-      return;
-    }
-
-    const cachePath = buildCacheOutputPath(selection);
-    if (isCacheReadyPath(cachePath)) {
-      streamFileDirect(cachePath, req, res);
-      return;
-    }
-
-
-    const tempPath = `${cachePath}.part.mp4`;
-    const inputStat = safeStat(resolvedPath);
-    const inputSize = inputStat ? inputStat.size : 0;
-
-    if (inputSize > 0 && strategy.mode !== 'transcode') {
-      ensureOptimizedCache(selection, resolvedPath, strategy).catch(() => {});
-      try {
-        await waitForFileSize(tempPath, 4096, 15000);
-        serveGrowingFile(tempPath, inputSize, req, res);
-        return;
-      } catch {
-        logger.warn('Growing file not ready in time, falling back to pipe');
-      }
-    }
-
-    if (req.query.requireOptimized === '1') {
-      const optTempStat = safeStat(tempPath);
-      if (optTempStat && optTempStat.size >= PLAYER_CACHE_READY_MIN_BYTES && inputSize > 0 && (strategy.mode === 'remux-copy' || strategy.mode === 'copy-video-transcode-audio')) {
-        serveGrowingFile(tempPath, inputSize, req, res);
-        return;
-      }
-      throw new AppError('Optimized stream is still preparing', 425, 'TOO_EARLY');
-    }
-
-    if (strategy.mode === 'remux-copy') {
-      remuxToMp4(resolvedPath, res);
-      return;
-    }
-
-    if (strategy.mode === 'copy-video-transcode-audio') {
-      copyVideoTranscodeAudio(resolvedPath, res);
-      return;
-    }
-
-    transcodeToMp4(resolvedPath, res);
-  } catch (error) {
-    if (!res.headersSent) {
-      next(error);
-    }
-  }
-});
-
-router.get('/:contentType/:id', async (req, res, next) => {
-  try {
-    const selection = await findSelectedMedia(req);
-
-    if (selection.error) {
-      throw new AppError(selection.error.message, selection.error.status, 'MEDIA_SELECTION_ERROR');
-    }
-
-    const { videoUrl, sourcePath } = selection;
-    const resolvedPath = resolvePlayableFilePath(sourcePath, videoUrl);
-    const ext = getSourceExtension(resolvedPath, videoUrl);
-    const strategy = resolvedPath
-      ? await determineStreamingStrategy(resolvedPath, ext)
-      : { mode: 'transcode' };
-
-    const cachePath = resolvedPath && strategy.mode !== 'direct'
-      ? buildCacheOutputPath(selection)
-      : '';
-    const optimizedReady = cachePath
-      ? isCacheReadyPath(cachePath)
-      : true;
-
-    const streamUrl = `/api/player/stream/${encodeURIComponent(req.params.contentType)}/${encodeURIComponent(req.params.id)}?${new URLSearchParams({
-      season: String(req.query.season || 1),
-      episode: String(req.query.episode || 1),
-    }).toString()}`;
-
-    res.json({
-      sources: [
-        {
-          url: streamUrl,
-          quality: selection.item.quality || 'auto',
-          label: selection.item.quality || 'Auto',
-          delivery: strategy.mode,
-          originalExtension: ext || 'unknown',
-          available: Boolean(resolvedPath),
-          optimizedReady,
-        },
-      ],
-      subtitles: [],
-      preparePath: `/api/player/prepare/${encodeURIComponent(req.params.contentType)}/${encodeURIComponent(req.params.id)}?${new URLSearchParams({
-        season: String(req.query.season || 1),
-        episode: String(req.query.episode || 1),
-      }).toString()}`,
-      ...buildMetadata(selection),
-    });
-  } catch (error) {
-    next(error);
-  }
-});
 
 router.get('/download/:contentType/:id', async (req, res, next) => {
   try {
     const selection = await findSelectedMedia(req);
-
     if (selection.error) {
       throw new AppError(selection.error.message, selection.error.status, 'MEDIA_SELECTION_ERROR');
     }
-
     const { sourcePath, videoUrl, item, seasonNumber, episodeNumber } = selection;
     const resolvedPath = resolvePlayableFilePath(sourcePath, videoUrl);
-
     if (!resolvedPath) {
       if (process.env.REMOTE_MEDIA_BASE_URL && videoUrl) {
         return res.redirect(`${process.env.REMOTE_MEDIA_BASE_URL}${videoUrl}`);
       }
       throw new AppError('Source file is not available on the server for download', 404, 'NOT_FOUND');
     }
-
     const stat = safeStat(resolvedPath);
     if (!stat?.isFile()) {
       throw new AppError('Source file is not available on the server for download', 404, 'NOT_FOUND');
     }
-
     const ext = path.extname(resolvedPath).toLowerCase() || '.mp4';
     let filename = item.title;
     if (item.type === 'series') {
@@ -749,69 +118,14 @@ router.get('/download/:contentType/:id', async (req, res, next) => {
     }
     filename = filename.replace(/[\\/:*?"<>|]/g, '_');
     const cleanFilename = `${filename}${ext}`;
-
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(cleanFilename)}"; filename*=UTF-8''${encodeURIComponent(cleanFilename)}`);
     res.setHeader('Content-Type', 'application/octet-stream');
     res.setHeader('Content-Length', stat.size);
     res.setHeader('Cache-Control', 'no-cache');
-
     fs.createReadStream(resolvedPath).pipe(res);
   } catch (error) {
-    if (!res.headersSent) {
-      next(error);
-    }
-  }
-});
-
-router.get('/prepare/:contentType/:id', async (req, res, next) => {
-  try {
-    const selection = await findSelectedMedia(req);
-
-    if (selection.error) {
-      throw new AppError(selection.error.message, selection.error.status, 'MEDIA_SELECTION_ERROR');
-    }
-
-    const { sourcePath, videoUrl } = selection;
-    const resolvedPath = resolvePlayableFilePath(sourcePath, videoUrl);
-    const ext = getSourceExtension(resolvedPath, videoUrl);
-
-    if (!resolvedPath) {
-      throw new AppError('Source file is not available on the server', 404, 'NOT_FOUND');
-    }
-
-    const strategy = await determineStreamingStrategy(resolvedPath, ext);
-
-    if (strategy.mode === 'direct') {
-      return res.json({ ready: true, strategy: 'direct' });
-    }
-
-    const cachePath = buildCacheOutputPath(selection);
-    const cacheStat = fs.existsSync(cachePath) ? safeStat(cachePath) : null;
-    if (cacheStat?.size > 1024 * 1024) {
-      return res.json({ ready: true, strategy: strategy.mode, cachePath });
-    }
-
-    const tempPath = `${cachePath}.part.mp4`;
-    const tempStat = fs.existsSync(tempPath) ? safeStat(tempPath) : null;
-    if (tempStat?.size > 1024 * 1024 && strategy.mode !== 'transcode') {
-      return res.json({ ready: true, strategy: strategy.mode, cachePath: tempPath });
-    }
-
-    if (strategy.mode !== 'transcode') {
-      ensureOptimizedCache(selection, resolvedPath, strategy).catch((error) => {
-        logger.error('Player error: ' + (error?.message || error));
-      });
-    }
-
-    res.json({ ready: strategy.mode === 'transcode', strategy: strategy.mode });
-  } catch (error) {
-    next(error);
+    if (!res.headersSent) next(error);
   }
 });
 
 module.exports = router;
-module.exports.__test__ = {
-  collectPlaybackProfile,
-  pickStreamingStrategy,
-  determineStreamingStrategy,
-};

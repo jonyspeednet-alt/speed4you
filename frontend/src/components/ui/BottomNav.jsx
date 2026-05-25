@@ -32,16 +32,6 @@ const NAV_ITEMS = [
     ),
   },
   {
-    path: '/tv',
-    label: 'Live',
-    icon: (active) => (
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-        <circle cx="12" cy="12" r="2" fill="currentColor" />
-        <path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19 5a10 10 0 0 1 0 14M5 19A10 10 0 0 1 5 5" opacity={active ? '1' : '0.9'} />
-      </svg>
-    ),
-  },
-  {
     path: '/browse',
     label: 'Browse',
     icon: (active) => (
@@ -57,7 +47,7 @@ function BottomNav() {
   const location = useLocation();
   const [pressedItem, setPressedItem] = useState(null);
 
-  if (location.pathname.startsWith('/watch/')) return null;
+  if (location.pathname.startsWith('/tv')) return null;
 
   return (
     <nav className="bottom-nav" aria-label="Bottom navigation">

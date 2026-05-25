@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useBreakpoint, useTVMode } from '../../../hooks';
 import StarRating from '../../../components/ui/StarRating';
-import WatchlistButton from '../../../components/ui/WatchlistButton';
 import styles from './HeroCarousel.module.css'; // Import CSS module
 
 const AUTO_PLAY_DURATION = 3200;
