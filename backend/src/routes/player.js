@@ -2,6 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const os = require('os');
 const { Readable } = require('stream');
 const { getItemById } = require('../data/store');
 const { loadScannerRoots } = require('../data/store');
@@ -376,7 +377,7 @@ function transcodeToMp4(resolvedPath, res) {
   res.setHeader('Cache-Control', 'private, no-store');
   res.setHeader('Transfer-Encoding', 'chunked');
 
-  const ffmpeg = spawn(FFMPEG_BIN, [
+  const ffmpeg = spawn('ionice', ['-c', '2', '-n', '7', FFMPEG_BIN, ...[
     '-v', 'error',
     '-fflags', '+discardcorrupt+genpts',
     '-err_detect', 'ignore_err',
@@ -390,7 +391,7 @@ function transcodeToMp4(resolvedPath, res) {
       '-f', 'mp4',
       'pipe:1',
     ]),
-  ], {
+  ]], {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
@@ -440,6 +441,12 @@ function ensureOptimizedCache(selection, resolvedPath, strategy) {
     return Promise.resolve({ status: 'ready', cachePath });
   }
 
+  const freeMem = os.freemem();
+  if (freeMem < 1.5 * 1024 ** 3) {
+    logger.warn('ensureOptimizedCache: low memory (' + Math.round(freeMem / 1024 / 1024) + 'MB), skipping');
+    return Promise.resolve({ status: 'too-busy', cachePath: null });
+  }
+
   const cacheKey = getCacheKey(selection);
   if (activeCacheJobs.has(cacheKey)) {
     return activeCacheJobs.get(cacheKey);
@@ -455,7 +462,7 @@ function ensureOptimizedCache(selection, resolvedPath, strategy) {
   activeCacheJobCount += 1;
 
   const jobPromise = new Promise((resolve, reject) => {
-    const ffmpeg = spawn(FFMPEG_BIN, getFfmpegFileArgs(resolvedPath, tempPath, strategy.mode), {
+    const ffmpeg = spawn('ionice', ['-c', '3', FFMPEG_BIN, ...getFfmpegFileArgs(resolvedPath, tempPath, strategy.mode)], {
       stdio: ['ignore', 'ignore', 'pipe'],
     });
 
@@ -515,7 +522,7 @@ function streamFfmpegMp4(resolvedPath, res, ffmpegArgs) {
   res.setHeader('Cache-Control', 'private, no-store');
   res.setHeader('Transfer-Encoding', 'chunked');
 
-  const ffmpeg = spawn(FFMPEG_BIN, ffmpegArgs, {
+  const ffmpeg = spawn('ionice', ['-c', '2', '-n', '7', FFMPEG_BIN, ...ffmpegArgs], {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
