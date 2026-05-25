@@ -35,7 +35,11 @@ function* walkVideoFiles(rootPath) {
       }
       if (!entry.isFile()) continue;
       const ext = path.extname(entry.name).toLowerCase();
-      if (VIDEO_EXTENSIONS.has(ext)) yield { filePath: absPath, extension: ext, size: (fs.statSync(absPath)).size };
+      if (VIDEO_EXTENSIONS.has(ext)) {
+        let stat;
+        try { stat = fs.statSync(absPath); } catch { continue; }
+        yield { filePath: absPath, extension: ext, size: stat.size };
+      }
     }
   }
 }
@@ -61,15 +65,19 @@ async function scanAndEnqueue() {
     if (!root.scanPath || !fs.existsSync(root.scanPath)) continue;
     let count = 0;
     const batch = [];
-    for (const file of walkVideoFiles(root.scanPath)) {
-      batch.push({ filePath: file.filePath, root, extension: file.extension, size: file.size });
-      count++;
-      if (batch.length >= 100) {
-        const added = await queue.enqueueScannerItems(batch);
-        newFiles += added;
-        batch.length = 0;
+    try {
+      for (const file of walkVideoFiles(root.scanPath)) {
+        batch.push({ filePath: file.filePath, root, extension: file.extension, size: file.size });
+        count++;
+        if (batch.length >= 100) {
+          const added = await queue.enqueueScannerItems(batch);
+          newFiles += added;
+          batch.length = 0;
+        }
+        if (isShuttingDown) break;
       }
-      if (isShuttingDown) break;
+    } catch (err) {
+      await queue.appendLog(`Root ${root.label || root.scanPath}: error at file ${count} — ${err.message.split('\n')[0]}`);
     }
     if (batch.length > 0) {
       const added = await queue.enqueueScannerItems(batch);
