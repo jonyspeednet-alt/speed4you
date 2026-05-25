@@ -192,7 +192,8 @@ async function upsertScannedItem(payload) {
   // For metadata: only update if scan found a better match or current is pending
   const shouldUpdateMetadata = !isUserManaged
     || current.metadataStatus === 'pending'
-    || current.metadataStatus === 'not_found';
+    || current.metadataStatus === 'not_found'
+    || current.metadataStatus === 'skipped';
   const metaFields = shouldUpdateMetadata
     ? {
         tmdbId:              payload.tmdbId              || current.tmdbId,
