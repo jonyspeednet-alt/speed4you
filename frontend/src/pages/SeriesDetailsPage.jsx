@@ -68,7 +68,6 @@ function SeriesDetailsSkeleton() {
 function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMobile }) {
   const [hovered, setHovered] = useState(false);
   const [downloadHovered, setDownloadHovered] = useState(false);
-  const navigate = useNavigate();
 
   const apiBase = (import.meta.env.VITE_API_URL || '/portal-api').replace(/\/$/, '');
   const downloadUrl = `${apiBase}/api/player/download/series/${seriesId}?season=${seasonParam}&episode=${episodeParam}`;
