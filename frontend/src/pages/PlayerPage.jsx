@@ -11,7 +11,7 @@ import {
   progressService,
   seriesService,
 } from "../services";
-import { useBreakpoint } from "../hooks";
+import { useBreakpoint, useClientRemux } from "../hooks";
 
 const PLAYBACK_RATES = [0.75, 1, 1.25, 1.5, 2];
 const CONTROLS_HIDE_DELAY = 3200;
@@ -162,6 +162,7 @@ function PlayerPage() {
   const [streamUrl, setStreamUrl] = useState("");
   const [streamStatus, setStreamStatus] = useState("");
   const [streamMode, setStreamMode] = useState("direct");
+  const clientRemux = useClientRemux();
   const [qualityLabel, setQualityLabel] = useState("Auto");
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isPictureInPicture, setIsPictureInPicture] = useState(false);
@@ -496,11 +497,28 @@ function PlayerPage() {
             ),
           );
 
-          if (
-            primarySource.delivery &&
-            primarySource.delivery !== "direct" &&
-            !primarySource.optimizedReady
-          ) {
+          const delivery = primarySource.delivery;
+
+          const tryClientRemux = async () => {
+            if (delivery !== "remux-copy") return false;
+            setStreamStatus("Preparing video...");
+            const downloadUrl = `${PLAYER_API_BASE}/api/player/download/${item.type}/${contentId}?season=${seasonNumber}&episode=${episodeNumber}`;
+            const result = await clientRemux.remux(downloadUrl);
+            if (result.ok) {
+              setStreamUrl(result.blobUrl);
+              setStreamMode("direct");
+              setStreamStatus("");
+              return true;
+            }
+            if (result.reason === 'too-large') {
+              setStreamStatus("Server optimizing...");
+            }
+            return false;
+          };
+
+          const handled = await tryClientRemux();
+
+          if (!handled && delivery && delivery !== "direct" && !primarySource.optimizedReady) {
             setStreamStatus("Optimizing stream...");
 
             (async () => {
@@ -2253,8 +2271,13 @@ function PlayerPage() {
                   {content.episodeTitle ? ` · ${content.episodeTitle}` : ""}
                 </span>
               )}
-              {streamStatus ? (
-                <span style={styles.mobileStreamStatus}>{streamStatus}</span>
+              {streamStatus || clientRemux.status !== 'idle' ? (
+                <span style={styles.mobileStreamStatus}>
+                  {streamStatus || 'Preparing...'}
+                  {(clientRemux.status === 'downloading' || clientRemux.status === 'remuxing') && clientRemux.progress > 0
+                    ? ` (${clientRemux.progress}%)` : ''}
+                  {clientRemux.status === 'loading-ffmpeg' ? ' (loading engine...)' : ''}
+                </span>
               ) : null}
             </div>
           </div>
