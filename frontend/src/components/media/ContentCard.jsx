@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 
 
 /**
@@ -52,6 +52,7 @@ function ContentCard({
     .trim();
   const itemRating = item.rating || null;
   const displayDate = formatReleaseDate(item.releasedAt) || item.year || null;
+  const isAdmin = typeof localStorage !== 'undefined' && localStorage.getItem('token');
 
   return (
     <article
@@ -130,20 +131,34 @@ function ContentCard({
             <span style={styles.typeBadge}>
               {isSeries ? "Series" : "Movie"}
             </span>
-            {itemRating ? (
-              <span style={styles.ratingBadge}>
-                <svg
-                  width="10"
-                  height="10"
-                  viewBox="0 0 24 24"
-                  fill="var(--accent-tertiary)"
-                  aria-hidden="true"
+            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+              {isAdmin ? (
+                <Link
+                  to={`/admin/content/${item.id}/edit`}
+                  onClick={(e) => e.stopPropagation()}
+                  style={styles.editBadge}
+                  title="Edit"
                 >
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                </svg>
-                {itemRating}
-              </span>
-            ) : null}
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                  </svg>
+                </Link>
+              ) : null}
+              {itemRating ? (
+                <span style={styles.ratingBadge}>
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="var(--accent-tertiary)"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                  </svg>
+                  {itemRating}
+                </span>
+              ) : null}
+            </div>
           </div>
 
           <div style={styles.posterBottom}>
@@ -296,6 +311,25 @@ const styles = {
     textTransform: "uppercase",
     letterSpacing: "0.12em",
     border: "1px solid rgba(255, 255, 255, 0.1)",
+  },
+  editBadge: {
+    padding: "5px 7px",
+    borderRadius: "6px",
+    background: "rgba(5, 12, 22, 0.6)",
+    backdropFilter: "blur(12px)",
+    WebkitBackdropFilter: "blur(12px)",
+    color: "var(--accent-cyan)",
+    fontSize: "0.7rem",
+    fontWeight: "900",
+    display: "flex",
+    alignItems: "center",
+    gap: "4px",
+    border: "1px solid rgba(255, 255, 255, 0.1)",
+    cursor: "pointer",
+    textDecoration: "none",
+    pointerEvents: "auto",
+    transition: "opacity 200ms",
+    opacity: 0.7,
   },
   ratingBadge: {
     flexShrink: 0,
