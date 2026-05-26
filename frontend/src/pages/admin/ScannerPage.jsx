@@ -167,10 +167,13 @@ export default function ScannerPage() {
 
       {/* Roots */}
       <div style={{ background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: '16px', padding: '20px' }}>
-        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem', fontWeight: '700', color: TEXT, margin: '0 0 16px 0' }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>
-          Scan Roots ({roots.length})
-        </h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem', fontWeight: '700', color: TEXT, margin: 0 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>
+            Scan Roots ({roots.length})
+          </h3>
+          <FixRootsButton />
+        </div>
         {healthLoading ? (
           <div style={{ color: TEXT3, padding: '20px', textAlign: 'center' }}>Loading...</div>
         ) : roots.length === 0 ? (
@@ -243,6 +246,91 @@ export default function ScannerPage() {
             <div ref={logEndRef} />
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+function FixRootsButton() {
+  const [fixing, setFixing] = useState(false);
+  const [dryResult, setDryResult] = useState(null);
+  const [applied, setApplied] = useState(false);
+
+  const preview = async () => {
+    setDryResult(null);
+    setApplied(false);
+    try {
+      const res = await adminService.fixMisconfiguredRoots(true);
+      setDryResult(res);
+    } catch { setDryResult({ error: 'Failed to check roots' }); }
+  };
+
+  const apply = async () => {
+    setFixing(true);
+    try {
+      const res = await adminService.fixMisconfiguredRoots(false);
+      setApplied(true);
+      setDryResult({ ...res, applied: true });
+    } catch { setDryResult({ ...dryResult, error: 'Failed to fix roots' }); }
+    setFixing(false);
+  };
+
+  return (
+    <div>
+      {!dryResult && !applied && (
+        <button type="button" onClick={preview}
+          style={{
+            padding: '8px 16px', borderRadius: '10px', fontSize: '0.78rem', fontWeight: '600',
+            cursor: 'pointer', border: 'none', background: 'rgba(245,158,11,0.1)', color: '#f59e0b',
+            border: '1px solid rgba(245,158,11,0.25)',
+          }}>
+          Fix Misconfigured Roots
+        </button>
+      )}
+      {dryResult && !dryResult.applied && !dryResult.error && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          {dryResult.roots?.length > 0 ? (
+            <>
+              <span style={{ fontSize: '0.78rem', color: TEXT2 }}>
+                {dryResult.roots.map(r => r.label).join(', ')} ({dryResult.roots.reduce((s, r) => s + r.entriesToDelete, 0)} entries)
+              </span>
+              <button type="button" onClick={apply} disabled={fixing}
+                style={{
+                  padding: '8px 16px', borderRadius: '10px', fontSize: '0.78rem', fontWeight: '700',
+                  cursor: fixing ? 'not-allowed' : 'pointer', border: 'none',
+                  background: 'rgba(239,68,68,0.12)', color: '#f87171',
+                  border: '1px solid rgba(239,68,68,0.25)',
+                  opacity: fixing ? 0.5 : 1,
+                }}>
+                {fixing ? 'Applying...' : 'Apply Fix'}
+              </button>
+              <button type="button" onClick={() => setDryResult(null)}
+                style={{
+                  padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem',
+                  cursor: 'pointer', border: 'none', background: SURFACE2, color: TEXT3, border: `1px solid ${BORDER}`,
+                }}>
+                Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              <span style={{ fontSize: '0.78rem', color: '#4ade80' }}>All roots configured correctly</span>
+              <button type="button" onClick={() => setDryResult(null)}
+                style={{
+                  padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem',
+                  cursor: 'pointer', border: 'none', background: SURFACE2, color: TEXT3, border: `1px solid ${BORDER}`,
+                }}>
+                Dismiss
+              </button>
+            </>
+          )}
+        </div>
+      )}
+      {dryResult?.error && (
+        <span style={{ fontSize: '0.78rem', color: '#f87171' }}>{dryResult.error}</span>
+      )}
+      {applied && (
+        <span style={{ fontSize: '0.78rem', color: '#4ade80' }}>Roots fixed. Run a scan to re-index.</span>
       )}
     </div>
   );

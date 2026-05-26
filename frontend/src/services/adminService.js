@@ -85,6 +85,9 @@ export const adminService = {
 
   // Series cleanup — remove episode-level entries incorrectly indexed as standalone series
   cleanupOrphanSeriesEpisodes: () => apiClient('/admin/series/cleanup-episodes', { method: 'POST' }),
+
+  // Fix misconfigured scanner roots (movie roots set as type 'series')
+  fixMisconfiguredRoots: (dry = true) => apiClient(`/admin/maintenance/fix-roots?dry=${dry}`, { method: 'POST' }),
 };
 
 export default adminService;
