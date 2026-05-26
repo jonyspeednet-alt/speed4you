@@ -21,7 +21,6 @@ const NAV_LINKS = [
   { path: '/admin/content/new', label: 'New Content', icon: '+' },
   { path: '/admin/content', label: 'Content Library', icon: '\u2630' },
   { path: '/admin/scanner', label: 'Scanner', icon: '\u25B6' },
-  { path: '/admin/normalizer', label: 'Media Normalizer', icon: '\u25B6' },
   { path: '/admin/users', label: 'Users', icon: '\u263C' },
   { path: '/admin/analytics', label: 'Analytics', icon: '\u2261' },
 ];
@@ -35,17 +34,10 @@ export default function AdminDashboard() {
     refetchInterval: 15000,
   });
 
-  const { data: normalizer = {} } = useQuery({
-    queryKey: ['admin', 'normalizer', 'status'],
-    queryFn: () => adminService.getMediaNormalizerStatus(),
-    refetchInterval: 5000,
-  });
-
   const stats = dash?.stats || {};
   const health = dash?.scannerHealth || {};
   const scannerJob = health.currentJob;
   const isScanning = scannerJob?.status === 'running';
-  const failedCount = normalizer.state?.stats?.failed || 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -59,7 +51,6 @@ export default function AdminDashboard() {
           { label: 'Backend', ok: true },
           { label: 'Database', ok: true },
           { label: 'Scanner', ok: !isScanning, running: isScanning, detail: isScanning ? 'Scanning...' : `${health.healthyRoots || 0}/${health.totalRoots || 0} roots` },
-          { label: 'Normalizer', ok: !normalizer.error, running: normalizer.running, paused: normalizer.paused, detail: normalizer.paused ? 'Paused' : normalizer.running ? 'Running' : 'Idle' },
           { label: 'Disk', ok: true, warn: false, detail: '\u2014' },
         ].map(item => (
           <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -83,7 +74,6 @@ export default function AdminDashboard() {
         <StatCard label="Published" value={isLoading ? '\u2014' : stats.publishedContent || 0} sub="live on portal" accent />
         <StatCard label="Drafts" value={isLoading ? '\u2014' : stats.draftContent || 0} sub="pending review" />
         <StatCard label="Admin Users" value={stats.totalAdminUsers || 1} sub="with access" />
-        <StatCard label="Failed" value={failedCount} sub="normalizer failures" />
       </div>
 
       {/* Main Grid */}
@@ -192,10 +182,8 @@ export default function AdminDashboard() {
             <h3 style={{ fontSize: '0.9rem', fontWeight: '700', color: TEXT, margin: '0 0 12px 0' }}>System</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <InfoRow label="Scanner" value={isScanning ? 'Running' : 'Idle'} color={isScanning ? '#4ade80' : TEXT3} />
-              <InfoRow label="Normalizer" value={normalizer.paused ? 'Paused' : normalizer.running ? 'Running' : 'Idle'} color={normalizer.paused ? '#facc15' : normalizer.running ? '#4ade80' : TEXT3} />
               <InfoRow label="Content" value={`${stats.publishedContent || 0} published`} />
               <InfoRow label="Drafts" value={`${stats.draftContent || 0} pending`} />
-              <InfoRow label="Failed" value={`${failedCount} file${failedCount !== 1 ? 's' : ''}`} color={failedCount > 0 ? '#f87171' : TEXT3} />
             </div>
           </div>
         </div>

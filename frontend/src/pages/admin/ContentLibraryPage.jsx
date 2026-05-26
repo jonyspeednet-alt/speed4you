@@ -320,6 +320,17 @@ function ContentLibraryPage() {
   const removePreset = (id) => setSavedPresets((c) => c.filter((p) => p.id !== id));
   const toggleColumn = (key) => setVisibleColumns((c) => ({ ...c, [key]: !c[key] }));
 
+  const handleCleanupSeriesEps = async () => {
+    if (!window.confirm('Remove orphan episode entries (series-type items without seasons)? This cannot be undone.')) return;
+    try {
+      const result = await adminService.cleanupOrphanSeriesEpisodes();
+      toast?.({ type: 'success', message: `Cleaned up ${result.deletedCount} orphan episode entries` });
+      loadContent();
+    } catch (err) {
+      toast?.({ type: 'error', message: `Cleanup failed: ${err.message}` });
+    }
+  };
+
   const exportCsv = () => {
     if (!allContent.length) { setError('No content to export.'); return; }
     const h = ['id', 'title', 'type', 'status', 'sourceType', 'language', 'category', 'collection', 'year', 'metadataStatus', 'metadataConfidence', 'duplicateCount'];
@@ -426,6 +437,9 @@ function ContentLibraryPage() {
         </div>
         <div style={styles.toolbarRight}>
           <button type="button" onClick={exportCsv} style={styles.chip}>Export CSV</button>
+          <button type="button" onClick={handleCleanupSeriesEps} style={{ ...styles.chip, color: '#f59e0b' }}>
+            Cleanup Orphan Episodes
+          </button>
         </div>
       </div>
 

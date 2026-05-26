@@ -224,16 +224,14 @@ jobs:
 
             # Use OMDB_API_KEY from ***REMOVED***, fallback to hardcoded key if not set (remove once ***REMOVED*** is configured)
             OMDB_KEY="${OMDB_API_KEY:-***REMOVED***}"
-            # Ensure Extra_Storage directories exist (for caches, nginx temp, normalizer temp, etc.)
+            # Ensure Extra_Storage directories exist (for caches, nginx temp, etc.)
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p /var/www/html/Extra_Storage/nginx-tmp/proxy
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p /var/www/html/Extra_Storage/scanner-cache
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p /var/www/html/Extra_Storage/normalizer-temp
             # Ensure player cache dir exists and is writable by speed4you user (backend runs as speed4you)
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p /var/www/html/Extra_Storage/portal-media-cache
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown speed4you:speed4you /var/www/html/Extra_Storage/portal-media-cache
 
             SCANNER_CACHE_DIR=/var/www/html/Extra_Storage/scanner-cache
-            MEDIA_NORMALIZER_TEMP_DIR=/var/www/html/Extra_Storage/normalizer-temp
             cat > .env <<EOF
             PORT=4100
             JWT_SECRET=${JWT_SECRET}

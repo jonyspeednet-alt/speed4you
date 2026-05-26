@@ -76,54 +76,20 @@ router.post('/scanner/stop', adminController.stopScanner);
 // Database
 router.get('/db/health', asyncRoute(adminController.getDbHealth));
 
-// Media Normalizer
-router.get('/media-normalizer/status', asyncRoute(adminController.getMediaNormalizerStatus));
-router.post('/media-normalizer/start', asyncRoute(adminController.startMediaNormalizer));
-router.post('/media-normalizer/stop', asyncRoute(adminController.stopMediaNormalizer));
-router.post('/media-normalizer/retry', asyncRoute(adminController.retryMediaNormalizerFile));
-router.get('/media-normalizer/config', asyncRoute(adminController.getNormalizerConfig));
-router.post('/media-normalizer/config', asyncRoute(adminController.setNormalizerConfig));
-router.post('/media-normalizer/pause', asyncRoute(adminController.pauseMediaNormalizer));
-router.post('/media-normalizer/resume', asyncRoute(adminController.resumeMediaNormalizer));
-router.post('/media-normalizer/retry-all', asyncRoute(adminController.retryAllMediaNormalizerFailed));
-
 // User Management
 router.get('/users', asyncRoute(adminController.listAdminUsers));
 router.post('/users', asyncRoute(adminController.createAdminUser));
 router.put('/users/:id', asyncRoute(adminController.updateAdminUser));
 router.delete('/users/:id', asyncRoute(adminController.deleteAdminUser));
 
-// Pipeline Queue
-router.get('/pipeline/status', asyncRoute(adminController.getPipelineStatus));
-router.get('/pipeline/scanner-queue', asyncRoute(adminController.getPipelineScannerQueue));
-router.get('/pipeline/normalizer-queue', asyncRoute(adminController.getPipelineNormalizerQueue));
-router.get('/pipeline/log', asyncRoute(adminController.getPipelineLog));
-router.post('/pipeline/start', asyncRoute(adminController.startPipeline));
-router.post('/pipeline/clear', asyncRoute(adminController.clearPipeline));
-router.post('/pipeline/retry-scanner/:id', asyncRoute(adminController.retryPipelineScannerItem));
-router.post('/pipeline/retry-normalizer/:id', asyncRoute(adminController.retryPipelineNormalizerItem));
-router.post('/pipeline/retry-all-failed', asyncRoute(adminController.retryAllPipelineFailed));
-router.post('/pipeline/scanner/start', asyncRoute(adminController.startScannerWorker));
-router.post('/pipeline/scanner/stop', asyncRoute(adminController.stopScannerWorker));
-router.post('/pipeline/normalizer/start', asyncRoute(adminController.startNormalizerWorker));
-router.post('/pipeline/normalizer/stop', asyncRoute(adminController.stopNormalizerWorker));
-
 // Duplicates
 router.get('/duplicates/review', adminController.getDuplicatesReport);
 router.post('/duplicates/cleanup', adminController.runDuplicatesCleanup);
 
+// Series cleanup — remove episode-level entries incorrectly indexed as standalone series
+router.post('/series/cleanup-episodes', asyncRoute(adminController.cleanupOrphanSeriesEpisodes));
+
 // Metadata
 router.post('/metadata/tmdb', asyncRoute(adminController.fetchTmdbMetadata));
-
-// Debug — read pipeline crash log
-router.get('/pipeline/debug-crash', asyncRoute(async (req, res) => {
-  const fs = require('fs');
-  try {
-    const log = fs.readFileSync('/tmp/pipeline-crash.log', 'utf8');
-    res.json({ exists: true, log: log.split('\n').filter(Boolean).slice(-20) });
-  } catch(e) {
-    res.json({ exists: false, error: e.message });
-  }
-}));
 
 module.exports = router;

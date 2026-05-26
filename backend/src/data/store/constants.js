@@ -20,8 +20,6 @@ const APP_STATE_DEFAULTS = {
   scanner_log: { runs: [] },
   scanner_state: { roots: {} },
   scanner_runtime: { currentJob: null, queue: [] },
-  media_normalizer_state: null,
-  media_normalizer_log: { lines: [] },
 };
 
 const DEVELOPMENT_SEED_ITEMS = [

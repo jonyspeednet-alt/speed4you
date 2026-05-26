@@ -17,9 +17,7 @@ const LoginPage = lazy(() => import('../pages/LoginPage'));
 const AdminDashboard = lazy(() => import('../pages/admin/AdminDashboard'));
 const AddContentPage = lazy(() => import('../pages/admin/AddContentPage'));
 const ContentLibraryPage = lazy(() => import('../pages/admin/ContentLibraryPage'));
-const MediaNormalizerPage = lazy(() => import('../pages/admin/MediaNormalizerPage'));
 const ScannerPage = lazy(() => import('../pages/admin/ScannerPage'));
-const PipelinePage = lazy(() => import('../pages/admin/PipelinePage'));
 const UsersPage = lazy(() => import('../pages/admin/UsersPage'));
 const SearchAnalyticsPage = lazy(() => import('../pages/admin/SearchAnalyticsPage'));
 
@@ -153,16 +151,8 @@ const router = createBrowserRouter([
         element: withRouteFallback(<ContentLibraryPage />, 'browse'),
       },
       {
-        path: 'normalizer',
-        element: withRouteFallback(<MediaNormalizerPage />, 'default'),
-      },
-      {
         path: 'scanner',
         element: withRouteFallback(<ScannerPage />, 'default'),
-      },
-      {
-        path: 'pipeline',
-        element: withRouteFallback(<PipelinePage />, 'default'),
       },
       {
         path: 'users',

@@ -22,8 +22,6 @@ journalctl --vacuum-time=7d --quiet 2>/dev/null || true
 
 find /var/www/html -maxdepth 4 -name '.Trash*' -type d -exec rm -rf {} + 2>/dev/null || true
 
-find /var/www/html -name '*.normalizing.*' -type f -mtime +1 -delete 2>/dev/null || true
-find /var/www/html -name '*.pre-normalize.*' -type f -mtime +1 -delete 2>/dev/null || true
 find /var/www/html -name '*.bak' -type f -mtime +1 -delete 2>/dev/null || true
 
 if command -v snap &>/dev/null; then

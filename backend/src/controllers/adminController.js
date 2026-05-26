@@ -14,7 +14,6 @@ const {
 const { getCurrentScanJob, getScannerHealth, listScannerRoots, startScanJob, stopScanJob } = require('../services/scanner');
 const { fetchMetadataByTmdbId, fetchMetadataByImdbId } = require('../services/metadata-enricher');
 const { clearMetadataCache, getEnhancedCacheStats } = require('../services/scanner-enhanced-metadata');
-const { getMediaNormalizerStatus, startMediaNormalizer, stopMediaNormalizer, retryMediaNormalizerFile, retryAllFailedMediaNormalizerFiles, pauseMediaNormalizer, resumeMediaNormalizer, getNormalizerConfig, setNormalizerConfig } = require('../services/media-normalizer');
 const { getDuplicateReviewReport, runDuplicateCleanup } = require('../services/duplicate-review');
 const { listUsers, createUser, updateUser, deleteUser } = require('../services/admin-user');
 const { AppError } = require('../utils/error');
@@ -323,50 +322,6 @@ exports.getDbHealth = async (req, res) => {
   });
 };
 
-exports.getMediaNormalizerStatus = async (req, res) => {
-  const status = await getMediaNormalizerStatus();
-  // Strip internal lock (contains PID) before sending to client
-  const { lock: _lock, ...safeStatus } = status;
-  res.json(safeStatus);
-};
-
-exports.startMediaNormalizer = async (req, res) => {
-  res.status(202).json(await startMediaNormalizer());
-};
-
-exports.stopMediaNormalizer = async (req, res) => {
-  res.status(202).json(await stopMediaNormalizer());
-};
-
-exports.retryMediaNormalizerFile = async (req, res) => {
-  const filePath = String(req.body?.filePath || '').trim();
-  if (!filePath) {
-    return res.status(400).json({ error: 'filePath is required' });
-  }
-  res.json(await retryMediaNormalizerFile(filePath));
-};
-
-exports.getNormalizerConfig = async (req, res) => {
-  res.json(await getNormalizerConfig());
-};
-
-exports.setNormalizerConfig = async (req, res) => {
-  const updates = req.body || {};
-  res.json(await setNormalizerConfig(updates));
-};
-
-exports.pauseMediaNormalizer = async (req, res) => {
-  res.json(await pauseMediaNormalizer());
-};
-
-exports.resumeMediaNormalizer = async (req, res) => {
-  res.json(await resumeMediaNormalizer());
-};
-
-exports.retryAllMediaNormalizerFailed = async (req, res) => {
-  res.json(await retryAllFailedMediaNormalizerFiles());
-};
-
 // User management
 exports.listAdminUsers = async (req, res) => {
   res.json(await listUsers());
@@ -439,129 +394,14 @@ exports.getSearchAnalytics = async (req, res) => {
   }
 };
 
-// Pipeline Queue Controllers
-const pipelineQueue = require('../services/pipeline-queue');
-
-async function getPipelineStatus(req, res) {
-  const [status, lock, scannerLock, normalizerLock] = await Promise.all([
-    pipelineQueue.getQueueStatus(),
-    pipelineQueue.getPipelineLock(),
-    pipelineQueue.getScannerLock(),
-    pipelineQueue.getNormalizerLock(),
-  ]);
-  res.json({ ...status, lock, scannerLock, normalizerLock });
-}
-
-async function getPipelineScannerQueue(req, res) {
-  const limit = Math.min(Number(req.query.limit) || 200, 500);
-  const items = await pipelineQueue.getScannerQueue(limit);
-  res.json(items);
-}
-
-async function getPipelineNormalizerQueue(req, res) {
-  const limit = Math.min(Number(req.query.limit) || 200, 500);
-  const items = await pipelineQueue.getNormalizerQueue(limit);
-  res.json(items);
-}
-
-async function getPipelineLog(req, res) {
-  const limit = Math.min(Number(req.query.limit) || 200, 500);
-  const log = await pipelineQueue.getLog(limit);
-  res.json(log);
-}
-
-function spawnWorker(args) {
-  const { spawn } = require('child_process');
-  const path = require('path');
-  const scriptPath = path.resolve(__dirname, '../../scripts/pipeline-runner.js');
-  const nodeBin = process.execPath;
-  const child = spawn(nodeBin, [scriptPath, ...args], {
-    cwd: path.dirname(scriptPath),
-    stdio: ['ignore', 'inherit', 'inherit'],
-    detached: true,
-    env: { ...process.env },
-  });
-  child.unref();
-  return child;
-}
-
-async function startPipeline(req, res) {
-  const child = spawnWorker([]);
-  setTimeout(() => res.json({ started: true, pid: child.pid }), 1000);
-}
-
-async function startScannerWorker(req, res) {
-  const lock = await pipelineQueue.getScannerLock();
-  if (lock) {
-    try { process.kill(lock.pid, 0); return res.json({ started: false, reason: 'already running', pid: lock.pid }); } catch {}
-  }
-  const child = spawnWorker(['--scanner']);
-  setTimeout(() => res.json({ started: true, pid: child.pid }), 500);
-}
-
-async function stopScannerWorker(req, res) {
-  const lock = await pipelineQueue.getScannerLock();
-  if (!lock || !lock.pid) return res.json({ stopped: false, reason: 'not running' });
+async function cleanupOrphanSeriesEpisodes(req, res) {
+  const { cleanupOrphanEpisodeEntries } = require('../data/store/content');
   try {
-    process.kill(lock.pid, 'SIGTERM');
-    res.json({ stopped: true, pid: lock.pid });
-  } catch {
-    await pipelineQueue.releaseScannerLock();
-    res.json({ stopped: true, reason: 'stale' });
+    const deletedCount = await cleanupOrphanEpisodeEntries();
+    res.json({ ok: true, deletedCount });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
   }
 }
 
-async function startNormalizerWorker(req, res) {
-  const lock = await pipelineQueue.getNormalizerLock();
-  if (lock) {
-    try { process.kill(lock.pid, 0); return res.json({ started: false, reason: 'already running', pid: lock.pid }); } catch {}
-  }
-  const child = spawnWorker(['--normalizer']);
-  setTimeout(() => res.json({ started: true, pid: child.pid }), 500);
-}
-
-async function stopNormalizerWorker(req, res) {
-  const lock = await pipelineQueue.getNormalizerLock();
-  if (!lock || !lock.pid) return res.json({ stopped: false, reason: 'not running' });
-  try {
-    process.kill(lock.pid, 'SIGTERM');
-    res.json({ stopped: true, pid: lock.pid });
-  } catch {
-    await pipelineQueue.releaseNormalizerLock();
-    res.json({ stopped: true, reason: 'stale' });
-  }
-}
-
-async function clearPipeline(req, res) {
-  await pipelineQueue.clearAll();
-  res.json({ cleared: true });
-}
-
-async function retryPipelineScannerItem(req, res) {
-  const ok = await pipelineQueue.retryScannerItem(req.params.id);
-  res.json({ ok });
-}
-
-async function retryPipelineNormalizerItem(req, res) {
-  const ok = await pipelineQueue.retryNormalizerItem(req.params.id);
-  res.json({ ok });
-}
-
-async function retryAllPipelineFailed(req, res) {
-  await pipelineQueue.retryAllFailed();
-  res.json({ ok: true });
-}
-
-module.exports.getPipelineStatus = getPipelineStatus;
-module.exports.getPipelineScannerQueue = getPipelineScannerQueue;
-module.exports.getPipelineNormalizerQueue = getPipelineNormalizerQueue;
-module.exports.getPipelineLog = getPipelineLog;
-module.exports.startPipeline = startPipeline;
-module.exports.clearPipeline = clearPipeline;
-module.exports.retryPipelineScannerItem = retryPipelineScannerItem;
-module.exports.retryPipelineNormalizerItem = retryPipelineNormalizerItem;
-module.exports.retryAllPipelineFailed = retryAllPipelineFailed;
-module.exports.startScannerWorker = startScannerWorker;
-module.exports.stopScannerWorker = stopScannerWorker;
-module.exports.startNormalizerWorker = startNormalizerWorker;
-module.exports.stopNormalizerWorker = stopNormalizerWorker;
+module.exports.cleanupOrphanSeriesEpisodes = cleanupOrphanSeriesEpisodes;

@@ -24,26 +24,6 @@ async function touchAdminLogin(id) {
   await db.query('UPDATE admin_users SET last_login = NOW(), updated_at = NOW() WHERE id = $1', [Number(id)]);
 }
 
-async function getMediaNormalizerState() {
-  return getAppState('media_normalizer_state', null, true);
-}
-
-async function saveMediaNormalizerState(payload) {
-  return setAppState('media_normalizer_state', payload);
-}
-
-async function getMediaNormalizerLog(limit = 25) {
-  const state = await getAppState('media_normalizer_log', null, true);
-  const lines = state?.lines || [];
-  return lines.slice(-Math.max(1, limit));
-}
-
-async function appendMediaNormalizerLog(lines = []) {
-  const current = appStateCache.get('media_normalizer_log')?.lines || [];
-  const next = [...current, ...lines.map((line) => String(line))].slice(-500);
-  return setAppState('media_normalizer_log', { lines: next });
-}
-
 // Admin user CRUD
 async function listAdminUsers() {
   await ensureContentStore();
@@ -96,10 +76,6 @@ module.exports = {
   getRecentItems,
   findAdminByUsername,
   touchAdminLogin,
-  getMediaNormalizerState,
-  saveMediaNormalizerState,
-  getMediaNormalizerLog,
-  appendMediaNormalizerLog,
   listAdminUsers,
   createAdminUser,
   updateAdminUser,
