@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => {
   const isProd = mode === 'production'
 
   return {
-    base: env.VITE_APP_BASE || (isProd ? '/portal/' : '/'),
+    base: env.VITE_APP_BASE || '/',
     plugins: [
       react({
         // Faster JSX transform
