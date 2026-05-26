@@ -405,3 +405,52 @@ async function cleanupOrphanSeriesEpisodes(req, res) {
 }
 
 module.exports.cleanupOrphanSeriesEpisodes = cleanupOrphanSeriesEpisodes;
+
+const MOVIE_ROOT_PATTERNS = [
+  /movie/i, /cartoon/i, /anim(e|ation)/i, /3d/i,
+  /bollywood/i, /hollywood/i, /hindi/i, /tamil/i,
+  /telugu/i, /malayalam/i, /kannada/i, /bengali/i,
+  /marathi/i, /punjabi/i, /gujarati/i, /odia/i,
+];
+
+exports.fixMisconfiguredRoots = async (req, res) => {
+  const { refreshScannerCaches } = require('../data/store');
+  const dryRun = req.query.dry !== 'false' && req.query.dry !== '0';
+  const results = { roots: [], deletedCount: 0 };
+  try {
+    const rootsResult = await db.query(
+      `SELECT id, label, type, category, language, scan_path FROM scanner_roots ORDER BY label`
+    );
+    for (const row of rootsResult.rows) {
+      if (row.type !== 'series') continue;
+      if (!MOVIE_ROOT_PATTERNS.some((p) => p.test(row.label))) continue;
+
+      const countResult = await db.query(
+        `SELECT COUNT(*)::int AS count FROM content_catalog
+         WHERE source_root_id = $1 AND content_type = 'series'`,
+        [row.id]
+      );
+      const entryCount = countResult.rows[0]?.count || 0;
+      results.roots.push({ id: row.id, label: row.label, category: row.category, language: row.language, entriesToDelete: entryCount });
+
+      if (!dryRun) {
+        await db.query(
+          `UPDATE scanner_roots SET type = 'movie', updated_at = NOW() WHERE id = $1`,
+          [row.id]
+        );
+        const delResult = await db.query(
+          `DELETE FROM content_catalog WHERE source_root_id = $1 AND content_type = 'series'`,
+          [row.id]
+        );
+        results.deletedCount += delResult.rowCount || 0;
+        results.roots[results.roots.length - 1].fixed = true;
+      }
+    }
+    if (!dryRun) {
+      await refreshScannerCaches().catch(() => {});
+    }
+    res.json({ ok: true, dryRun, ...results });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+};

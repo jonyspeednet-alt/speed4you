@@ -58,6 +58,7 @@ router.get('/series', asyncRoute(adminController.getSeries));
 // Maintenance
 router.post('/maintenance/prune', asyncRoute(adminController.pruneCatalog));
 router.post('/maintenance/vacuum', asyncRoute(adminController.vacuumDatabase));
+router.post('/maintenance/fix-roots', asyncRoute(adminController.fixMisconfiguredRoots));
 
 // Uploads
 router.post('/upload/poster', upload.single('file'), adminController.uploadPoster);
