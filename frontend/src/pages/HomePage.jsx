@@ -137,7 +137,9 @@ function buildHomepageContent({
   );
 
   const featuredPool = mergePools(latestItems, trendingItems, popularItems, homepageSeriesItems);
-  const featuredItems = pickFeatured(featured, featuredPool, [], []);
+  const featuredItems = Array.isArray(featured) && featured.length
+    ? shuffleArray(featured.map(normalizeItem))
+    : pickFeatured(featured, featuredPool, [], []);
   const featuredIds = featuredItems.slice(0, 5).map(item => item.id);
 
   const excludeIds = [...featuredIds];

@@ -200,6 +200,8 @@ async function listItems(filters = {}, offset = 0, limit = null, sort = 'latest'
     orderClause = 'ORDER BY trending_score DESC, id DESC';
   } else if (sort === 'featured') {
     orderClause = 'ORDER BY featured_order DESC NULLS LAST, CASE WHEN featured THEN 1 ELSE 0 END DESC, id DESC';
+  } else if (sort === 'released') {
+    orderClause = 'ORDER BY released_at DESC NULLS LAST, trending_score DESC, id DESC';
   } else {
     orderClause = 'ORDER BY COALESCE(released_at, published_at, updated_at) DESC NULLS LAST, id DESC';
   }
