@@ -64,7 +64,6 @@ function looksSafe(item) {
 
   const suggestedName = path.basename(item.suggestedPath);
   if (!suggestedName || /-\.[^.]+$/i.test(suggestedName)) return false;
-  if (/\.normalizing\./i.test(item.currentPath)) return false;
   if (/[<>:"|?*\x00-\x1F]/.test(suggestedName)) return false;
   return true;
 }

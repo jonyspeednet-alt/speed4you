@@ -384,6 +384,26 @@ async function getLibraryOrganization(filters = {}) {
   return { totals: { items: totalsRes.rows[0]?.items || 0, collections: totalsRes.rows[0]?.collections || 0, tags: tagsRes.rows.length }, collections: collectionsRes.rows, tags: tagsRes.rows, categories: categoriesRes.rows, languages: languagesRes.rows, roots: rootsRes.rows.filter((r) => r.label !== null) };
 }
 
+/**
+ * Remove episode-level entries that were incorrectly indexed as separate series items.
+ * These are items with content_type='series' but without a nested seasons array.
+ * Returns the number of deleted items.
+ */
+async function cleanupOrphanEpisodeEntries() {
+  await ensureContentStore();
+  const result = await db.query(`
+    DELETE FROM content_catalog
+    WHERE content_type = 'series'
+      AND (
+        payload->>'seasons' IS NULL
+        OR payload->>'seasons' = '[]'
+        OR jsonb_array_length(COALESCE(payload->'seasons', '[]'::jsonb)) = 0
+      )
+      AND status <> 'archived'
+  `);
+  return result.rowCount || 0;
+}
+
 module.exports = {
   getCatalogMeta,
   setCatalogMeta,
@@ -401,4 +421,5 @@ module.exports = {
   vacuumDatabase,
   getLibraryOrganization,
   getDuplicateGroupsForItems,
+  cleanupOrphanEpisodeEntries,
 };

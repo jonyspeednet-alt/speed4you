@@ -22,13 +22,7 @@ export const adminService = {
   }).finally(clearAdminCache),
   stopScanner: () => apiClient('/admin/scanner/stop', { method: 'POST' }).finally(clearAdminCache),
   clearScannerMetadataCache: () => apiClient('/admin/scanner/cache/clear', { method: 'POST' }).finally(clearAdminCache),
-  getMediaNormalizerStatus: () => apiClient('/admin/media-normalizer/status'),
-  startMediaNormalizer: () => apiClient('/admin/media-normalizer/start', { method: 'POST' }).finally(clearAdminCache),
-  stopMediaNormalizer: () => apiClient('/admin/media-normalizer/stop', { method: 'POST' }).finally(clearAdminCache),
-  retryMediaNormalizerFile: (filePath) => apiClient('/admin/media-normalizer/retry', {
-    method: 'POST',
-    body: JSON.stringify({ filePath }),
-  }).finally(clearAdminCache),
+
   getDuplicateReview: () => cachedGet('/admin/duplicates/review'),
   runDuplicateCleanup: () => apiClient('/admin/duplicates/cleanup', { method: 'POST' }).finally(clearAdminCache),
   pruneCatalog: () => apiClient('/admin/maintenance/prune', { method: 'POST' }).finally(clearAdminCache),
@@ -83,33 +77,14 @@ export const adminService = {
     method: 'POST',
     body: JSON.stringify({ tmdbId, type }),
   }).finally(clearAdminCache),
-  getNormalizerConfig: () => apiClient('/admin/media-normalizer/config'),
-  setNormalizerConfig: (config) => apiClient('/admin/media-normalizer/config', {
-    method: 'POST',
-    body: JSON.stringify(config),
-  }),
-  pauseMediaNormalizer: () => apiClient('/admin/media-normalizer/pause', { method: 'POST' }),
-  resumeMediaNormalizer: () => apiClient('/admin/media-normalizer/resume', { method: 'POST' }),
-  retryAllFailedFiles: () => apiClient('/admin/media-normalizer/retry-all', { method: 'POST' }),
+
   listAdminUsers: () => apiClient('/admin/users'),
   createAdminUser: (data) => apiClient('/admin/users', { method: 'POST', body: JSON.stringify(data) }),
   updateAdminUser: (id, data) => apiClient(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteAdminUser: (id) => apiClient(`/admin/users/${id}`, { method: 'DELETE' }),
 
-  // Pipeline Queue
-  getPipelineStatus: () => apiClient('/admin/pipeline/status'),
-  getPipelineScannerQueue: (limit) => cachedGet('/admin/pipeline/scanner-queue', { limit }),
-  getPipelineNormalizerQueue: (limit) => cachedGet('/admin/pipeline/normalizer-queue', { limit }),
-  getPipelineLog: (limit) => cachedGet('/admin/pipeline/log', { limit }),
-  startPipeline: () => apiClient('/admin/pipeline/start', { method: 'POST' }),
-  clearPipeline: () => apiClient('/admin/pipeline/clear', { method: 'POST' }),
-  retryPipelineScannerItem: (id) => apiClient(`/admin/pipeline/retry-scanner/${id}`, { method: 'POST' }),
-  retryPipelineNormalizerItem: (id) => apiClient(`/admin/pipeline/retry-normalizer/${id}`, { method: 'POST' }),
-  retryAllPipelineFailed: () => apiClient('/admin/pipeline/retry-all-failed', { method: 'POST' }),
-  startScanner: () => apiClient('/admin/pipeline/scanner/start', { method: 'POST' }),
-  stopScanner: () => apiClient('/admin/pipeline/scanner/stop', { method: 'POST' }),
-  startNormalizer: () => apiClient('/admin/pipeline/normalizer/start', { method: 'POST' }),
-  stopNormalizer: () => apiClient('/admin/pipeline/normalizer/stop', { method: 'POST' }),
+  // Series cleanup — remove episode-level entries incorrectly indexed as standalone series
+  cleanupOrphanSeriesEpisodes: () => apiClient('/admin/series/cleanup-episodes', { method: 'POST' }),
 };
 
 export default adminService;

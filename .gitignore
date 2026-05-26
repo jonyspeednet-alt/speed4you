@@ -15,8 +15,6 @@ temp/
 tmp-list-roots.js
 *.sqlite
 *.db
-backend/src/data/media-normalizer-state.json
-backend/src/data/media-normalizer.lock
 backend/src/data/scanner-roots.json
 backend/src/data/uploads/*
 coverage/
