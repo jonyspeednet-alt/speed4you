@@ -257,6 +257,18 @@ function AddContentPage() {
 
       const submissionData = {
         ...formData,
+        ...(itemMeta ? {
+          tmdbId: itemMeta.tmdbId || null,
+          imdbId: itemMeta.imdbId || '',
+          originalTitle: itemMeta.originalTitle || '',
+          originalLanguage: itemMeta.originalLanguage || '',
+          metadataStatus: itemMeta.metadataStatus || 'matched',
+          metadataConfidence: itemMeta.metadataConfidence ?? 100,
+          metadataProvider: itemMeta.metadataProvider || 'tmdb',
+          metadataUpdatedAt: itemMeta.metadataUpdatedAt || new Date().toISOString(),
+          metadataError: itemMeta.metadataError || '',
+          parsedTitle: itemMeta.parsedTitle || '',
+        } : {}),
         tags: typeof formData.tags === 'string'
           ? formData.tags.split(',').map(tag => tag.trim()).filter(Boolean)
           : formData.tags
@@ -285,6 +297,18 @@ function AddContentPage() {
       const submissionData = {
         ...formData,
         status: 'published',
+        ...(itemMeta ? {
+          tmdbId: itemMeta.tmdbId || null,
+          imdbId: itemMeta.imdbId || '',
+          originalTitle: itemMeta.originalTitle || '',
+          originalLanguage: itemMeta.originalLanguage || '',
+          metadataStatus: itemMeta.metadataStatus || 'matched',
+          metadataConfidence: itemMeta.metadataConfidence ?? 100,
+          metadataProvider: itemMeta.metadataProvider || 'tmdb',
+          metadataUpdatedAt: itemMeta.metadataUpdatedAt || new Date().toISOString(),
+          metadataError: itemMeta.metadataError || '',
+          parsedTitle: itemMeta.parsedTitle || '',
+        } : {}),
         tags: typeof formData.tags === 'string'
           ? formData.tags.split(',').map(tag => tag.trim()).filter(Boolean)
           : formData.tags
