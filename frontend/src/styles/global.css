@@ -740,7 +740,8 @@ main,
   flex: 0 1 auto;
   justify-content: flex-start;
   min-width: 0;
-  overflow: hidden;
+  overflow-x: visible;
+  overflow-y: hidden;
 }
 
 .top-nav-links-tablet {
@@ -751,7 +752,6 @@ main,
 .top-nav-links-compact {
   gap: 2px;
   flex: 0 1 auto;
-  overflow: hidden;
 }
 
 .top-nav-link {

@@ -105,7 +105,6 @@ jobs:
           SRC_USER=/home/speed4you/portal-frontend
           DEST=/var/www/speed4you.net
           printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p "$DEST"
-          printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' find "$DEST" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
           printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -r "$SRC_USER/." "$DEST/"
           printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$DEST"
           printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chmod -R o+rX "$DEST"
