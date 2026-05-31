@@ -119,12 +119,10 @@ function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMo
       <div style={{ ...s.epActions, ...(isMobile ? s.epActionsMobile : {}) }} onClick={(e) => e.stopPropagation()}>
         {/* Play button */}
         {episode.videoUrl && (() => {
-          const playUrl = `/media${episode.videoUrl}`;
+          const playUrl = `/play/series/${seriesId}?season=${seasonParam}&episode=${episodeParam}`;
           return (
             <a
               href={playUrl}
-              target="_blank"
-              rel="noopener noreferrer"
               style={{
                 ...downloadBtnStyle,
                 background: playHovered ? 'rgba(0, 255, 255, 0.12)' : 'rgba(0, 200, 255, 0.08)',

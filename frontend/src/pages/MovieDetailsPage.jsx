@@ -240,12 +240,10 @@ export default function MovieDetailsPage() {
                 <div style={{ ...s.actions, ...(isMobile ? s.actionsMobile : {}) }}>
                   <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto', alignItems: 'center' }}>
                     {videoUrl && (() => {
-                      const playUrl = `/media${videoUrl}`;
+                      const playUrl = `/play/movie/${movie.id}`;
                       return (
                         <a
                           href={playUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
                           style={{ ...getPlayBtnStyle(playHovered), ...(isMobile ? s.btnFull : {}) }}
                           onMouseEnter={() => setPlayHovered(true)}
                           onMouseLeave={() => setPlayHovered(false)}

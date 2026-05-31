@@ -11,6 +11,7 @@ const HomePage = lazy(() => import('../pages/HomePage'));
 const BrowsePage = lazy(() => import('../pages/BrowsePage'));
 const MovieDetailsPage = lazy(() => import('../pages/MovieDetailsPage'));
 const SeriesDetailsPage = lazy(() => import('../pages/SeriesDetailsPage'));
+const VideoPlayerPage = lazy(() => import('../pages/VideoPlayerPage'));
 const TVPage = lazy(() => import('../pages/TVPage'));
 const AccessPage = lazy(() => import('../pages/AccessPage'));
 const LoginPage = lazy(() => import('../pages/LoginPage'));
@@ -171,6 +172,10 @@ const router = createBrowserRouter([
   {
     path: '/login',
     element: withRouteFallback(<LoginPage />, 'default'),
+  },
+  {
+    path: '/play/:type/:id',
+    element: withRouteFallback(<VideoPlayerPage />, 'default'),
   },
 ], {
   basename: appBasePath,
