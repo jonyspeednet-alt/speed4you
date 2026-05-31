@@ -146,6 +146,7 @@ jobs:
           printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' find "$DEST" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
           printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -r "$SRC_USER/." "$DEST/"
           printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$DEST"
+          printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chmod -R o+rX "$DEST"
           echo "Frontend deployed to $DEST"
         env:
           SUDO_PASSWORD: ${{ ***REMOVED***s.SUDO_PASSWORD }}
@@ -503,8 +504,11 @@ jobs:
           EXPECTED_BUNDLE: ${{ steps.frontend_bundle.outputs.bundle }}
         run: |
           set -e
-          echo "Expected bundle: $EXPECTED_BUNDLE"
+          echo "Expected bundle: '$EXPECTED_BUNDLE'"
           DEST=/var/www/speed4you.net
+          echo "whoami: $(whoami)"
+          echo "ls -la $DEST:"
+          ls -la "$DEST" 2>&1 || echo "CANNOT LIST $DEST"
 
           if [ ! -f "$DEST/index.html" ]; then
             echo "FAIL: $DEST/index.html not found" >&2
@@ -512,15 +516,17 @@ jobs:
           fi
 
           bundle=$(grep -oE 'index-[a-z0-9]+\.js' "$DEST/index.html" | head -n 1 || true)
-          echo "Deployed bundle: $bundle"
+          echo "Deployed bundle: '$bundle'"
 
           if [ "$bundle" != "$EXPECTED_BUNDLE" ]; then
-            echo "FAIL: HTML references $bundle, expected $EXPECTED_BUNDLE" >&2
+            echo "FAIL: HTML references '$bundle', expected '$EXPECTED_BUNDLE'" >&2
             exit 1
           fi
 
           if [ ! -f "$DEST/assets/$bundle" ]; then
             echo "FAIL: $DEST/assets/$bundle missing" >&2
+            echo "ls -la $DEST/assets/:"
+            ls -la "$DEST/assets/" 2>&1 || echo "CANNOT LIST $DEST/assets/"
             exit 1
           fi
           echo "OK — $bundle verified on disk"
