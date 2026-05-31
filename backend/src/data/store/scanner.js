@@ -238,6 +238,7 @@ async function upsertScannedItem(payload) {
     seasons:          payload.seasons          || current.seasons || [],
     seasonCount:      payload.seasonCount      ?? current.seasonCount ?? 0,
     episodeCount:     payload.episodeCount     ?? current.episodeCount ?? 0,
+    scanSignature:    payload.scanSignature    || current.scanSignature || '',
     sourceRootId:     payload.sourceRootId     || current.sourceRootId || '',
     sourceRootLabel:  payload.sourceRootLabel  || current.sourceRootLabel || '',
     language:         current.language         || payload.language || '',
@@ -262,6 +263,7 @@ async function upsertScannedItem(payload) {
     || item.poster       !== (current.poster || '')
     || item.videoUrl     !== (current.videoUrl || '')
     || item.sourcePath   !== (current.sourcePath || '')
+    || item.scanSignature !== (current.scanSignature || '')
     || item.seasonCount  !== (current.seasonCount ?? 0)
     || item.episodeCount !== (current.episodeCount ?? 0)
     || item.lastScanRunId !== (current.lastScanRunId || '')
