@@ -393,7 +393,7 @@ jobs:
             echo "        root /var/www/html;" >> /tmp/dataconf
             echo "    }" >> /tmp/dataconf
             echo "    location / {" >> /tmp/dataconf
-            echo '        try_files $uri $uri/ /_h5ai/public/index.php?$args;' >> /tmp/dataconf
+            echo '        try_files $uri /_h5ai/public/index.php?$args;' >> /tmp/dataconf
             echo "    }" >> /tmp/dataconf
             if $PHP_AVAIL; then
               echo "    location ~ \\.php$ {" >> /tmp/dataconf
