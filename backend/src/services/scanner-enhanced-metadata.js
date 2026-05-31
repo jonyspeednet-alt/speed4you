@@ -24,6 +24,7 @@ const { retryAsync } = require('./scanner-error-handler');
 
 const DEFAULT_METADATA_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days for metadata
 const METADATA_PATCH_FIELDS = [
+  'title',
   'description',
   'genre',
   'genres',
@@ -57,6 +58,7 @@ function extractMetadataPatch(enrichedItem, sourceItem) {
 function applyMetadataPatch(item, patch, parsedTitle) {
   return {
     ...item,
+    title: patch.title || item.title || '',
     description: item.description || patch.description || '',
     poster: item.poster || patch.poster || '',
     backdrop: item.backdrop || patch.backdrop || item.poster || patch.poster || '',
@@ -114,6 +116,7 @@ async function enrichItemWithMetadata(item) {
         rating: item.rating || omdbData.rating,
         runtime: item.runtime || omdbData.runtime,
         imdbId: omdbData.imdbId,
+        title: omdbData.title,
         originalTitle: omdbData.originalTitle,
         originalLanguage: omdbData.originalLanguage,
         releasedAt: omdbData.releasedAt || '',

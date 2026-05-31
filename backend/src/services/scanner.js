@@ -12,6 +12,7 @@ const {
   loadScannerState,
   normalizeTitleKey,
   recordScannerRun,
+  refreshCatalogReferencesForNormalizedFile,
   refreshScannerCaches,
   saveScannerRuntime,
   saveScannerState,
@@ -205,6 +206,66 @@ function assignScannerTaxonomy(item) {
     collection: item.collection || (item.type === 'series' ? 'Series' : 'Movies'),
     tags: Array.isArray(item.tags) && item.tags.length ? item.tags : genres,
   };
+}
+
+function sanitizeForFilename(value) {
+  return String(value || '')
+    .replace(/[<>:"/\\|?*]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function renameMediaForItem(item) {
+  if (item.metadataStatus !== 'matched') return item;
+  if (!item.originalTitle && !item.title) return item;
+
+  const tmdbTitle = item.originalTitle || item.title;
+  const year = item.year ? ` (${item.year})` : '';
+  const baseName = sanitizeForFilename(`${tmdbTitle}${year}`);
+  if (!baseName) return item;
+
+  const sourcePath = item.sourcePath || '';
+  if (!sourcePath || !fs.existsSync(sourcePath)) return item;
+
+  try {
+    const dirName = path.dirname(sourcePath);
+    const ext = path.extname(sourcePath);
+    const isFile = ext !== '' && fs.statSync(sourcePath).isFile();
+    const newName = isFile ? `${baseName}${ext}` : baseName;
+    const newPath = path.join(dirName, newName);
+
+    if (normalizePathForCompare(newPath) === normalizePathForCompare(sourcePath)) return item;
+    if (fs.existsSync(newPath)) return item;
+
+    const oldPublicUrl = item.videoUrl || item.sourcePublicPath || '';
+
+    fs.renameSync(sourcePath, newPath);
+    logScannerEvent('file_renamed', { from: sourcePath, to: newPath });
+
+    const nextItem = { ...item, sourcePath: newPath };
+
+    if (isFile) {
+      const newPublicUrl = oldPublicUrl
+        ? oldPublicUrl.replace(/[^/]+$/, encodeURIComponent(newName))
+        : '';
+      nextItem.videoUrl = newPublicUrl;
+      nextItem.sourcePublicPath = newPublicUrl;
+
+      if (oldPublicUrl && newPublicUrl) {
+        await refreshCatalogReferencesForNormalizedFile({
+          previousSourcePath: sourcePath,
+          nextSourcePath: newPath,
+          previousVideoUrl: oldPublicUrl,
+          nextVideoUrl: newPublicUrl,
+        }).catch((err) => logScannerEvent('rename_refresh_error', { error: err.message }));
+      }
+    }
+
+    return nextItem;
+  } catch (error) {
+    logScannerEvent('file_rename_error', { sourcePath, error: error.message });
+    return item;
+  }
 }
 
 function listDirectoryEntries(dirPath) {
@@ -1001,7 +1062,7 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
         });
         seenSignatures.add(item.scanSignature);
 
-        const enrichedItem = assignScannerTaxonomy(await enrichItemWithMetadata(item));
+        const enrichedItem = await renameMediaForItem(assignScannerTaxonomy(await enrichItemWithMetadata(item)));
         const result = await retryAsync(() => upsertScannedItem(enrichedItem));
 
         // Save fingerprint AFTER enrichment so crash doesn't permanently skip this item
@@ -1064,7 +1125,7 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
           lastScanRunAt: scanContext.startedAt,
         });
 
-        const enrichedItem = assignScannerTaxonomy(await enrichItemWithMetadata(item));
+        const enrichedItem = await renameMediaForItem(assignScannerTaxonomy(await enrichItemWithMetadata(item)));
         const result = await retryAsync(() => upsertScannedItem(enrichedItem));
         nextRootState.folders[relativeFolder] = {
           fingerprint,
@@ -1202,7 +1263,7 @@ async function processSeriesRoot(root, summary, progressCallback, scanContext, e
       });
       seenSignatures.add(item.scanSignature);
 
-      const enrichedItem = assignScannerTaxonomy(await enrichItemWithMetadata(item));
+      const enrichedItem = await renameMediaForItem(assignScannerTaxonomy(await enrichItemWithMetadata(item)));
       const result = await retryAsync(() => upsertScannedItem(enrichedItem));
       nextRootState.folders[relativeFolder] = {
         fingerprint,
