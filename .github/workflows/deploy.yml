@@ -474,6 +474,10 @@ jobs:
                 printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i '/^server {/a\    gzip on;\n    gzip_types text/plain text/css application/json application/javascript image/svg+xml;\n    gzip_min_length 1000;\n    gzip_vary on;' "$CONF"
                 echo "gzip enabled"
               fi
+              if ! grep -q 'location /media/' "$CONF"; then
+                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i '/^    location \/ {/i\    location /media/ {\n        alias /var/www/html/;\n        add_header Accept-Ranges bytes;\n        expires 7d;\n        add_header Cache-Control "public, immutable";\n    }\n' "$CONF"
+                echo "/media/ location added"
+              fi
               printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' nginx -t
               printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' systemctl reload nginx
               echo "speed4you.net nginx reloaded"

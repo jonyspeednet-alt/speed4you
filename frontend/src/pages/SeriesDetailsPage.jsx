@@ -68,6 +68,7 @@ function SeriesDetailsSkeleton() {
 function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMobile }) {
   const [hovered, setHovered] = useState(false);
   const [downloadHovered, setDownloadHovered] = useState(false);
+  const [playHovered, setPlayHovered] = useState(false);
 
   const apiBase = (import.meta.env.VITE_API_URL || '/portal-api').replace(/\/$/, '');
   const downloadUrl = `${apiBase}/api/player/download/series/${seriesId}?season=${seasonParam}&episode=${episodeParam}`;
@@ -116,6 +117,29 @@ function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMo
 
       {/* Action buttons */}
       <div style={{ ...s.epActions, ...(isMobile ? s.epActionsMobile : {}) }} onClick={(e) => e.stopPropagation()}>
+        {/* Play button */}
+        {episode.videoUrl && (() => {
+          const playUrl = `/media${episode.videoUrl}`;
+          return (
+            <a
+              href={playUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                ...downloadBtnStyle,
+                background: playHovered ? 'rgba(0, 255, 255, 0.12)' : 'rgba(0, 200, 255, 0.08)',
+                borderColor: playHovered ? 'var(--accent-cyan)' : 'rgba(0, 200, 255, 0.25)',
+              }}
+              onMouseEnter={() => setPlayHovered(true)}
+              onMouseLeave={() => setPlayHovered(false)}
+              title="Play Episode"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true">
+                <polygon points="8,5 19,12 8,19" />
+              </svg>
+            </a>
+          );
+        })()}
         {/* Download button */}
         <a
           href={downloadUrl}
