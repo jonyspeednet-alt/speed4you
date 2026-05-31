@@ -92,6 +92,7 @@ function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMo
   };
 
   return (
+    <>
     <div
       style={{
         ...s.episodeCard,
@@ -163,6 +164,7 @@ function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMo
       {playerSrc && (
         <VideoPlayerModal src={playerSrc} title={episode.name || `Episode ${episode.episode_number || index + 1}`} onClose={() => setPlayerSrc(null)} />
       )}
+    </>
   );
 }
 

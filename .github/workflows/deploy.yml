@@ -484,7 +484,9 @@ jobs:
               # Add rate limiting for /media/ downloads
               printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p /etc/nginx/conf.d
               if ! grep -q 'media_download' /etc/nginx/conf.d/rate-limit.conf 2>/dev/null; then
-                echo 'limit_conn_zone $binary_remote_addr zone=media_download:10m;' | printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' tee /etc/nginx/conf.d/rate-limit.conf >/dev/null
+                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' tee /etc/nginx/conf.d/rate-limit.conf >/dev/null <<'LIMIT_CONF'
+limit_conn_zone $binary_remote_addr zone=media_download:10m;
+LIMIT_CONF
                 echo "rate-limit.conf created"
               fi
               if ! grep -q 'limit_conn media_download' "$CONF"; then

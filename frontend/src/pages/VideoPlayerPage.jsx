@@ -209,7 +209,7 @@ export default function VideoPlayerPage() {
             defaultValue={0}
             onInput={e => { const v = videoRef.current; if (v && v.duration) v.currentTime = v.duration * parseFloat(e.target.value); }}
             onMouseDown={e => { const v = videoRef.current; if (v) v.pause(); }}
-            onMouseUp={e => { const v = videoRef.current; if (v && v.duration) { v.currentTime = v.duration * parseFloat(e.target.value); v.play().catch(() => {}); }}
+            onMouseUp={e => { const v = videoRef.current; if (v && v.duration) { v.currentTime = v.duration * parseFloat(e.target.value); v.play().catch(() => {}); }}}
             style={{ width:'100%', height:4, cursor:'pointer', accentColor:'var(--accent-cyan,#00ffff)' }}
           />
         </div>
