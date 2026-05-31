@@ -72,6 +72,7 @@ export default function MovieDetailsPage() {
   const [posterError, setPosterError] = useState(false);
   const [backdropError, setBackdropError] = useState(false);
   const [downloadHovered, setDownloadHovered] = useState(false);
+  const [playHovered, setPlayHovered] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -203,40 +204,63 @@ export default function MovieDetailsPage() {
             {/* Actions */}
             {(() => {
               const apiBase = (import.meta.env.VITE_API_URL || '/portal-api').replace(/\/$/, '');
+              const videoUrl = movie.videoUrl;
               const downloadUrl = `${apiBase}/api/player/download/movie/${movie.id}`;
-              const downloadBtnStyle = {
+              const btnBase = {
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '12px',
                 padding: '18px 40px',
                 borderRadius: '14px',
-                background: downloadHovered 
-                  ? 'rgba(0, 255, 255, 0.12)' 
-                  : 'rgba(255, 255, 255, 0.05)',
-                border: downloadHovered 
-                  ? '1px solid var(--accent-cyan)' 
-                  : '1px solid rgba(255, 255, 255, 0.12)',
-                color: downloadHovered ? 'var(--accent-cyan)' : '#ffffff',
                 fontWeight: '900',
                 fontSize: '1.05rem',
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
                 textDecoration: 'none',
-                boxShadow: downloadHovered 
-                  ? '0 0 20px rgba(0, 255, 255, 0.15)' 
-                  : 'none',
                 cursor: 'pointer',
                 transition: 'all 180ms ease',
               };
+              const getPlayBtnStyle = (h) => ({
+                ...btnBase,
+                background: h ? 'rgba(0, 255, 255, 0.12)' : 'rgba(0, 200, 255, 0.08)',
+                border: h ? '1px solid var(--accent-cyan)' : '1px solid rgba(0, 200, 255, 0.25)',
+                color: h ? 'var(--accent-cyan)' : '#ffffff',
+                boxShadow: h ? '0 0 20px rgba(0, 255, 255, 0.15)' : 'none',
+              });
+              const getDlBtnStyle = (h) => ({
+                ...btnBase,
+                background: h ? 'rgba(0, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.05)',
+                border: h ? '1px solid var(--accent-cyan)' : '1px solid rgba(255, 255, 255, 0.12)',
+                color: h ? 'var(--accent-cyan)' : '#ffffff',
+                boxShadow: h ? '0 0 20px rgba(0, 255, 255, 0.15)' : 'none',
+              });
 
               return (
                 <div style={{ ...s.actions, ...(isMobile ? s.actionsMobile : {}) }}>
                   <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto', alignItems: 'center' }}>
+                    {videoUrl && (() => {
+                      const playUrl = `/media${videoUrl}`;
+                      return (
+                        <a
+                          href={playUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ ...getPlayBtnStyle(playHovered), ...(isMobile ? s.btnFull : {}) }}
+                          onMouseEnter={() => setPlayHovered(true)}
+                          onMouseLeave={() => setPlayHovered(false)}
+                        >
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true">
+                            <polygon points="8,5 19,12 8,19" />
+                          </svg>
+                          Play Movie
+                        </a>
+                      );
+                    })()}
                     <a
                       href={downloadUrl}
                       download
-                      style={{ ...downloadBtnStyle, ...(isMobile ? s.btnFull : {}) }}
+                      style={{ ...getDlBtnStyle(downloadHovered), ...(isMobile ? s.btnFull : {}) }}
                       onMouseEnter={() => setDownloadHovered(true)}
                       onMouseLeave={() => setDownloadHovered(false)}
                     >
