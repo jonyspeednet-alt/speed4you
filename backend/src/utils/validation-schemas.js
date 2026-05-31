@@ -41,6 +41,14 @@ const contentSchema = Joi.object({
   imdbId: Joi.string().allow('', null),
   editorialScore: Joi.number().integer().min(0).max(100).allow(null),
   seasons: Joi.array().items(seasonSchema).default([]),
+  originalTitle: Joi.string().allow('', null),
+  originalLanguage: Joi.string().allow('', null),
+  metadataStatus: Joi.string().allow('', null),
+  metadataConfidence: Joi.number().min(0).max(100).allow(null),
+  metadataProvider: Joi.string().allow('', null),
+  metadataUpdatedAt: Joi.string().allow('', null),
+  metadataError: Joi.string().allow('', null),
+  parsedTitle: Joi.string().allow('', null),
 });
 
 const bulkUpdateSchema = Joi.object({
