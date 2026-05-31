@@ -505,31 +505,19 @@ jobs:
         run: |
           set -e
           echo "Expected bundle: '$EXPECTED_BUNDLE'"
-          DEST=/var/www/speed4you.net
-          echo "whoami: $(whoami)"
-          echo "ls -la $DEST:"
-          ls -la "$DEST" 2>&1 || echo "CANNOT LIST $DEST"
+          LIVE_BUNDLE=$(curl -fsS "https://speed4you.net/" | grep -oE 'index-[a-z0-9]+\.js' | head -1)
+          echo "Live site bundle: '$LIVE_BUNDLE'"
 
-          if [ ! -f "$DEST/index.html" ]; then
-            echo "FAIL: $DEST/index.html not found" >&2
+          if [ "$LIVE_BUNDLE" != "$EXPECTED_BUNDLE" ]; then
+            echo "FAIL: live site references '$LIVE_BUNDLE', expected '$EXPECTED_BUNDLE'" >&2
             exit 1
           fi
 
-          bundle=$(grep -oE 'index-[a-z0-9]+\.js' "$DEST/index.html" | head -n 1 || true)
-          echo "Deployed bundle: '$bundle'"
-
-          if [ "$bundle" != "$EXPECTED_BUNDLE" ]; then
-            echo "FAIL: HTML references '$bundle', expected '$EXPECTED_BUNDLE'" >&2
+          if ! curl -fsS -o /dev/null "https://speed4you.net/assets/$LIVE_BUNDLE"; then
+            echo "FAIL: https://speed4you.net/assets/$LIVE_BUNDLE not reachable" >&2
             exit 1
           fi
-
-          if [ ! -f "$DEST/assets/$bundle" ]; then
-            echo "FAIL: $DEST/assets/$bundle missing" >&2
-            echo "ls -la $DEST/assets/:"
-            ls -la "$DEST/assets/" 2>&1 || echo "CANNOT LIST $DEST/assets/"
-            exit 1
-          fi
-          echo "OK — $bundle verified on disk"
+          echo "OK — $LIVE_BUNDLE verified via HTTPS"
 
       - name: Deployment summary
         run: |
