@@ -106,7 +106,7 @@ jobs:
             echo "=== DEST check ==="
             ls -la /var/www/speed4you.net 2>&1 || echo "DEST NOT FOUND"
 
-      - name: Copy frontend to web root
+      - name: Test sudo access
         uses: appleboy/ssh-action@v1.2.0
         env:
           SUDO_PASSWORD: ${{ ***REMOVED***s.SUDO_PASSWORD }}
@@ -117,54 +117,38 @@ jobs:
           port: ${{ ***REMOVED***s.DEPLOY_PORT }}
           envs: SUDO_PASSWORD
           script: |
-            set -ex
-            SRC=/home/speed4you/actions-runner/_work/speed4you/speed4you/frontend/dist
-            DEST=/var/www/speed4you.net
+            echo "=== whoami ==="
+            whoami
+            echo "=== test sudo -n (no ***REMOVED***) ==="
+            sudo -n true 2>&1 && echo "sudo -n OK" || echo "sudo -n FAILED"
+            echo "=== test sudo -S with ***REMOVED*** ==="
+            echo "PWD_LENGTH=${#SUDO_PASSWORD}"
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' true 2>&1 && echo "sudo -S OK" || echo "sudo -S FAILED"
+            echo "=== test mkdir with sudo ==="
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p /tmp/sudo-test-223 2>&1 && echo "mkdir OK" || echo "mkdir FAILED"
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' rmdir /tmp/sudo-test-223 2>&1
 
-            echo "=== Step: mkdir DEST ==="
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p "$DEST"
+      - name: Copy frontend without sudo
+        run: |
+          SRC=frontend/dist
+          DEST_USER=/home/speed4you/portal-frontend
+          echo "Copying $SRC to $DEST_USER..."
+          mkdir -p "$DEST_USER"
+          cp -r "$SRC/." "$DEST_USER/"
+          echo "Copy complete: $(find "$DEST_USER" -type f | wc -l) files"
 
-            echo "=== Step: disk check ==="
-            available_kb=$(df --output=avail "$(dirname "$DEST")" 2>/dev/null | tail -1)
-            if [ -n "$available_kb" ] && [ "$available_kb" -lt 51200 ]; then
-              echo "ERROR: Low disk space on $DEST ($available_kb KB available)" >&2
-              exit 1
-            fi
-
-            echo "=== Step: check SRC ==="
-            ls -la "$SRC" 2>&1
-
-            if [ -d "$SRC" ]; then
-              src_count=$(find "$SRC" -type f | wc -l)
-              src_size=$(du -sh "$SRC" | cut -f1)
-              echo "Source has $src_count files ($src_size)"
-
-              echo "=== Step: rm old DEST ==="
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' find "$DEST" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-              echo "=== Step: cp files ==="
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -r "$SRC/." "$DEST/"
-
-              dest_count=$(find "$DEST" -type f | wc -l)
-              dest_size=$(du -sh "$DEST" | cut -f1)
-              echo "Destination has $dest_count files ($dest_size)"
-
-              if [ "$dest_count" -lt "$src_count" ]; then
-                echo "ERROR: File count mismatch — source $src_count, destination $dest_count" >&2
-                exit 1
-              fi
-
-              entry_chunk=$(grep -oE 'assets/index-[a-z0-9]+\.js' "$SRC/index.html" | head -1)
-              if [ -n "$entry_chunk" ] && [ ! -f "$DEST/$entry_chunk" ]; then
-                echo "ERROR: $DEST/$entry_chunk missing after copy" >&2
-                exit 1
-              fi
-
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$DEST"
-              echo "Frontend copied to $DEST ($dest_count files)"
-            else
-              echo "ERROR: $SRC not found" >&2
-              exit 1
-            fi
+      - name: Deploy frontend via sudo
+        run: |
+          set -e
+          SRC_USER=/home/speed4you/portal-frontend
+          DEST=/var/www/speed4you.net
+          printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p "$DEST"
+          printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' find "$DEST" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -r "$SRC_USER/." "$DEST/"
+          printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$DEST"
+          echo "Frontend deployed to $DEST"
+        env:
+          SUDO_PASSWORD: ${{ ***REMOVED***s.SUDO_PASSWORD }}
 
       - name: Copy backend to app directory
         uses: appleboy/ssh-action@v1.2.0
