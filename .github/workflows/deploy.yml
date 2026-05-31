@@ -90,6 +90,22 @@ jobs:
             fi
             echo "Backup complete"
 
+      - name: Check SRC exists
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ ***REMOVED***s.DEPLOY_HOST }}
+          username: ${{ ***REMOVED***s.DEPLOY_USER }}
+          key: ${{ ***REMOVED***s.DEPLOY_SSH_KEY }}
+          port: ${{ ***REMOVED***s.DEPLOY_PORT }}
+          script: |
+            SRC=/home/speed4you/actions-runner/_work/speed4you/speed4you/frontend/dist
+            echo "=== SRC check ==="
+            ls -la "$SRC" 2>&1 || echo "SRC NOT FOUND"
+            echo "=== SRC parent ==="
+            ls -la "$(dirname "$SRC")" 2>&1 || echo "PARENT NOT FOUND"
+            echo "=== DEST check ==="
+            ls -la /var/www/speed4you.net 2>&1 || echo "DEST NOT FOUND"
+
       - name: Copy frontend to web root
         uses: appleboy/ssh-action@v1.2.0
         env:
@@ -101,24 +117,31 @@ jobs:
           port: ${{ ***REMOVED***s.DEPLOY_PORT }}
           envs: SUDO_PASSWORD
           script: |
-            set -e
+            set -ex
             SRC=/home/speed4you/actions-runner/_work/speed4you/speed4you/frontend/dist
             DEST=/var/www/speed4you.net
 
+            echo "=== Step: mkdir DEST ==="
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p "$DEST"
 
+            echo "=== Step: disk check ==="
             available_kb=$(df --output=avail "$(dirname "$DEST")" 2>/dev/null | tail -1)
             if [ -n "$available_kb" ] && [ "$available_kb" -lt 51200 ]; then
               echo "ERROR: Low disk space on $DEST ($available_kb KB available)" >&2
               exit 1
             fi
 
+            echo "=== Step: check SRC ==="
+            ls -la "$SRC" 2>&1
+
             if [ -d "$SRC" ]; then
               src_count=$(find "$SRC" -type f | wc -l)
               src_size=$(du -sh "$SRC" | cut -f1)
               echo "Source has $src_count files ($src_size)"
 
+              echo "=== Step: rm old DEST ==="
               printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' find "$DEST" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+              echo "=== Step: cp files ==="
               printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -r "$SRC/." "$DEST/"
 
               dest_count=$(find "$DEST" -type f | wc -l)
