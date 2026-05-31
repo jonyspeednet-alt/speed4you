@@ -362,6 +362,22 @@ jobs:
                 rm -rf "$TMPD" "$TMPZ"
               fi
             fi
+            # Optimize h5ai config: fallback mode (no AJAX loading text), disable foldersize (slow)
+            H5AI_OPT="$ROOT/_h5ai/private/conf/options.json"
+            if [ -f "$H5AI_OPT" ]; then
+              php -r '
+                $json = file_get_contents("'"$H5AI_OPT"'");
+                // strip JS-style comments
+                $json = preg_replace("/\/\*[\s\S]*?\*\//", "", $json);
+                $opt = json_decode($json, true);
+                if ($opt) {
+                  $opt["view"]["fallbackMode"] = true;
+                  $opt["foldersize"]["enabled"] = false;
+                  file_put_contents("'"$H5AI_OPT"'", json_encode($opt, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+                  echo "h5ai config optimized\n";
+                } else { echo "h5ai config parse FAILED\n"; }
+              ' 2>&1
+            fi
             # Remove old custom file browser files if they exist
             rm -f "$ROOT/index.html" "$ROOT/api.php" "$ROOT/.d.css"
             # Ensure nginx temp + log dirs on Extra_Storage (prevents root disk full)
@@ -415,8 +431,8 @@ jobs:
               echo "        fastcgi_buffers 256 16k;" >> /tmp/dataconf
               echo "        fastcgi_busy_buffers_size 256k;" >> /tmp/dataconf
               echo "        fastcgi_cache H5AI_CACHE;" >> /tmp/dataconf
-              echo '        fastcgi_cache_key "$scheme$request_method$host$uri";' >> /tmp/dataconf
-              echo "        fastcgi_cache_valid 200 2m;" >> /tmp/dataconf
+              echo '        fastcgi_cache_key "$scheme$request_method$host$request_uri";' >> /tmp/dataconf
+              echo "        fastcgi_cache_valid 200 5m;" >> /tmp/dataconf
               echo "        fastcgi_cache_use_stale updating error timeout invalid_header;" >> /tmp/dataconf
               echo "        fastcgi_cache_lock on;" >> /tmp/dataconf
               echo '        add_header X-FastCGI-Cache $upstream_cache_status;' >> /tmp/dataconf
