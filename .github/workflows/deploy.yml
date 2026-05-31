@@ -90,44 +90,6 @@ jobs:
             fi
             echo "Backup complete"
 
-      - name: Check SRC exists
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ ***REMOVED***s.DEPLOY_HOST }}
-          username: ${{ ***REMOVED***s.DEPLOY_USER }}
-          key: ${{ ***REMOVED***s.DEPLOY_SSH_KEY }}
-          port: ${{ ***REMOVED***s.DEPLOY_PORT }}
-          script: |
-            SRC=/home/speed4you/actions-runner/_work/speed4you/speed4you/frontend/dist
-            echo "=== SRC check ==="
-            ls -la "$SRC" 2>&1 || echo "SRC NOT FOUND"
-            echo "=== SRC parent ==="
-            ls -la "$(dirname "$SRC")" 2>&1 || echo "PARENT NOT FOUND"
-            echo "=== DEST check ==="
-            ls -la /var/www/speed4you.net 2>&1 || echo "DEST NOT FOUND"
-
-      - name: Test sudo access
-        uses: appleboy/ssh-action@v1.2.0
-        env:
-          SUDO_PASSWORD: ${{ ***REMOVED***s.SUDO_PASSWORD }}
-        with:
-          host: ${{ ***REMOVED***s.DEPLOY_HOST }}
-          username: ${{ ***REMOVED***s.DEPLOY_USER }}
-          key: ${{ ***REMOVED***s.DEPLOY_SSH_KEY }}
-          port: ${{ ***REMOVED***s.DEPLOY_PORT }}
-          envs: SUDO_PASSWORD
-          script: |
-            echo "=== whoami ==="
-            whoami
-            echo "=== test sudo -n (no ***REMOVED***) ==="
-            sudo -n true 2>&1 && echo "sudo -n OK" || echo "sudo -n FAILED"
-            echo "=== test sudo -S with ***REMOVED*** ==="
-            echo "PWD_LENGTH=${#SUDO_PASSWORD}"
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' true 2>&1 && echo "sudo -S OK" || echo "sudo -S FAILED"
-            echo "=== test mkdir with sudo ==="
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p /tmp/sudo-test-223 2>&1 && echo "mkdir OK" || echo "mkdir FAILED"
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' rmdir /tmp/sudo-test-223 2>&1
-
       - name: Copy frontend without sudo
         run: |
           SRC=frontend/dist
