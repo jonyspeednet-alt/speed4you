@@ -244,6 +244,23 @@ async function renameMediaForItem(item) {
 
     const nextItem = { ...item, sourcePath: newPath };
 
+    // Update scanSignature to match new path so next scan doesn't create duplicates
+    const oldSig = item.scanSignature || '';
+    const sigSep = oldSig.indexOf(':');
+    if (sigSep !== -1) {
+      const rootId = oldSig.slice(0, sigSep);
+      const oldRel = oldSig.slice(sigSep + 1);
+      const oldSrcN = (item.sourcePath || '').replace(/\\/g, '/');
+      const oldRelN = oldRel.replace(/\\/g, '/');
+      if (oldSrcN.endsWith(oldRelN)) {
+        const rootPath = oldSrcN.slice(0, -oldRelN.length);
+        const newSrcN = newPath.replace(/\\/g, '/');
+        if (newSrcN.startsWith(rootPath)) {
+          nextItem.scanSignature = `${rootId}:${newSrcN.slice(rootPath.length)}`;
+        }
+      }
+    }
+
     if (isFile) {
       const newPublicUrl = oldPublicUrl
         ? oldPublicUrl.replace(/[^/]+$/, encodeURIComponent(newName))
