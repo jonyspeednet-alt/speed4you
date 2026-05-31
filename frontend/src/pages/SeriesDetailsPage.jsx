@@ -296,6 +296,21 @@ export default function SeriesDetailsPage() {
             <div style={{ ...s.actions, ...(isMobile ? s.actionsMobile : {}) }}>
               <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <ShareButton title={series.title} url={`${window.location.origin}/series/${series.id}`} />
+                {typeof localStorage !== 'undefined' && localStorage.getItem('token') && (
+                  <Link to={`/admin/content/${series.id}/edit`} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '8px',
+                    padding: '10px 20px', borderRadius: '10px',
+                    background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.12)',
+                    color: '#fff', fontWeight: '700', fontSize: '0.85rem',
+                    textDecoration: 'none', transition: 'all 180ms ease',
+                  }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(0, 255, 255, 0.12)'; e.currentTarget.style.borderColor = 'var(--accent-cyan)'; e.currentTarget.style.color = 'var(--accent-cyan)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)'; e.currentTarget.style.color = '#fff'; }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
+                    Edit
+                  </Link>
+                )}
               </div>
             </div>
           </div>
