@@ -121,6 +121,7 @@ export default function MovieDetailsPage() {
   const descLong = (movie.description || '').length > 180;
 
   return (
+    <>
     <div style={s.page}>
       <div style={{ ...s.auroraOrb, top: '-10%', left: '-10%', background: 'radial-gradient(circle, var(--accent-cyan), transparent 70%)' }} />
       <div style={{ ...s.auroraOrb, bottom: '20%', right: '-10%', background: 'radial-gradient(circle, var(--accent-pink), transparent 70%)' }} />
@@ -351,6 +352,7 @@ export default function MovieDetailsPage() {
       {playerSrc && (
         <VideoPlayerModal src={playerSrc} title={movie?.title || ''} onClose={() => setPlayerSrc(null)} />
       )}
+    </>
   );
 }
 
