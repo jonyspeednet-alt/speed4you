@@ -5,6 +5,7 @@ import { useBreakpoint } from '../hooks';
 import { useRecentlyViewed } from '../hooks';
 import ShareButton from '../components/ui/ShareButton';
 import StarRating from '../components/ui/StarRating';
+import VideoPlayerModal from '../components/player/VideoPlayerModal';
 import { DETAIL_STYLES, DETAIL_SKELETON, posterFallbackUrl } from '../styles/detailPage';
 
 const posterFallback = posterFallbackUrl;
@@ -69,6 +70,7 @@ function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMo
   const [hovered, setHovered] = useState(false);
   const [downloadHovered, setDownloadHovered] = useState(false);
   const [playHovered, setPlayHovered] = useState(false);
+  const [playerSrc, setPlayerSrc] = useState(null);
 
   const apiBase = (import.meta.env.VITE_API_URL || '/portal-api').replace(/\/$/, '');
   const downloadUrl = `${apiBase}/api/player/download/series/${seriesId}?season=${seasonParam}&episode=${episodeParam}`;
@@ -119,10 +121,9 @@ function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMo
       <div style={{ ...s.epActions, ...(isMobile ? s.epActionsMobile : {}) }} onClick={(e) => e.stopPropagation()}>
         {/* Play button */}
         {episode.videoUrl && (() => {
-          const playUrl = `/play/series/${seriesId}?season=${seasonParam}&episode=${episodeParam}`;
           return (
-            <a
-              href={playUrl}
+            <button
+              onClick={() => setPlayerSrc(`/media${episode.videoUrl}`)}
               style={{
                 ...downloadBtnStyle,
                 background: playHovered ? 'rgba(0, 255, 255, 0.12)' : 'rgba(0, 200, 255, 0.08)',
@@ -135,14 +136,17 @@ function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMo
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true">
                 <polygon points="8,5 19,12 8,19" />
               </svg>
-            </a>
+            </button>
           );
         })()}
         {/* Download button */}
-        <a
-          href={downloadUrl}
-          download
-          style={downloadBtnStyle}
+        <button
+          onClick={() => {
+            if (window.confirm('Download this episode?')) {
+              window.location.href = downloadUrl;
+            }
+          }}
+          style={{ ...downloadBtnStyle, border:'none', cursor:'pointer' }}
           onMouseEnter={() => setDownloadHovered(true)}
           onMouseLeave={() => setDownloadHovered(false)}
           title="Download Episode"
@@ -152,10 +156,13 @@ function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMo
             <polyline points="7 10 12 15 17 10" />
             <line x1="12" y1="15" x2="12" y2="3" />
           </svg>
-        </a>
+        </button>
 
       </div>
     </div>
+      {playerSrc && (
+        <VideoPlayerModal src={playerSrc} title={episode.name || `Episode ${episode.episode_number || index + 1}`} onClose={() => setPlayerSrc(null)} />
+      )}
   );
 }
 

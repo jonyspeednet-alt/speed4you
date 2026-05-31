@@ -5,6 +5,7 @@ import { useBreakpoint } from '../hooks';
 import { useRecentlyViewed } from '../hooks';
 import ShareButton from '../components/ui/ShareButton';
 import StarRating from '../components/ui/StarRating';
+import VideoPlayerModal from '../components/player/VideoPlayerModal';
 import { DETAIL_STYLES, DETAIL_SKELETON, posterFallbackUrl } from '../styles/detailPage';
 
 const posterFallback = posterFallbackUrl;
@@ -73,6 +74,7 @@ export default function MovieDetailsPage() {
   const [backdropError, setBackdropError] = useState(false);
   const [downloadHovered, setDownloadHovered] = useState(false);
   const [playHovered, setPlayHovered] = useState(false);
+  const [playerSrc, setPlayerSrc] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -240,11 +242,10 @@ export default function MovieDetailsPage() {
                 <div style={{ ...s.actions, ...(isMobile ? s.actionsMobile : {}) }}>
                   <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto', alignItems: 'center' }}>
                     {videoUrl && (() => {
-                      const playUrl = `/play/movie/${movie.id}`;
                       return (
-                        <a
-                          href={playUrl}
-                          style={{ ...getPlayBtnStyle(playHovered), ...(isMobile ? s.btnFull : {}) }}
+                        <button
+                          onClick={() => setPlayerSrc(`/media${videoUrl}`)}
+                          style={{ ...getPlayBtnStyle(playHovered), ...(isMobile ? s.btnFull : {}), border:'none', fontFamily:'inherit' }}
                           onMouseEnter={() => setPlayHovered(true)}
                           onMouseLeave={() => setPlayHovered(false)}
                         >
@@ -252,13 +253,16 @@ export default function MovieDetailsPage() {
                             <polygon points="8,5 19,12 8,19" />
                           </svg>
                           Play Movie
-                        </a>
+                        </button>
                       );
                     })()}
-                    <a
-                      href={downloadUrl}
-                      download
-                      style={{ ...getDlBtnStyle(downloadHovered), ...(isMobile ? s.btnFull : {}) }}
+                    <button
+                      onClick={() => {
+                        if (window.confirm('Start downloading this movie?')) {
+                          window.location.href = downloadUrl;
+                        }
+                      }}
+                      style={{ ...getDlBtnStyle(downloadHovered), ...(isMobile ? s.btnFull : {}), border:'none', fontFamily:'inherit', fontSize:'1.05rem' }}
                       onMouseEnter={() => setDownloadHovered(true)}
                       onMouseLeave={() => setDownloadHovered(false)}
                     >
@@ -267,8 +271,8 @@ export default function MovieDetailsPage() {
                         <polyline points="7 10 12 15 17 10" />
                         <line x1="12" y1="15" x2="12" y2="3" />
                       </svg>
-                      Download Movie
-                    </a>
+                      Download
+                    </button>
                   </div>
                   <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center', ...(isMobile ? { width: '100%', justifyContent: 'flex-start' } : {}) }}>
                     <ShareButton title={movie.title} url={`${window.location.origin}/movies/${movie.id}`} />
@@ -344,6 +348,9 @@ export default function MovieDetailsPage() {
         </div>
       </div>
     </div>
+      {playerSrc && (
+        <VideoPlayerModal src={playerSrc} title={movie?.title || ''} onClose={() => setPlayerSrc(null)} />
+      )}
   );
 }
 
