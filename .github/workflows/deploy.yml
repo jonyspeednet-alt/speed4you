@@ -105,7 +105,9 @@ jobs:
             SRC=/home/speed4you/actions-runner/_work/speed4you/speed4you/frontend/dist
             DEST=/var/www/speed4you.net
 
-            available_kb=$(df --output=avail "$DEST" 2>/dev/null | tail -1)
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p "$DEST"
+
+            available_kb=$(df --output=avail "$(dirname "$DEST")" 2>/dev/null | tail -1)
             if [ -n "$available_kb" ] && [ "$available_kb" -lt 51200 ]; then
               echo "ERROR: Low disk space on $DEST ($available_kb KB available)" >&2
               exit 1
@@ -116,7 +118,6 @@ jobs:
               src_size=$(du -sh "$SRC" | cut -f1)
               echo "Source has $src_count files ($src_size)"
 
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p "$DEST"
               printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' find "$DEST" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
               printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -r "$SRC/." "$DEST/"
 
