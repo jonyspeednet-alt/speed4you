@@ -12,6 +12,11 @@ const navItems = [
   { path: "/browse", label: "Browse" },
 ];
 
+const partnerSites = [
+  { url: "http://bokasoka.net", label: "Bokasoka", icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15l-5-5 1.41-1.41L11 14.17l7.59-7.59L20 8l-9 9z" },
+  { url: "http://cinemabazar.net", label: "Cinemabazar", icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15l-5-5 1.41-1.41L11 14.17l7.59-7.59L20 8l-9 9z" },
+];
+
 function TopNav() {
   const location = useLocation();
   const [isScrolled, setIsScrolled] = useState(false);
@@ -149,6 +154,26 @@ function TopNav() {
                 </li>
               );
             })}
+            <li className="top-nav-partner-divider" role="separator" />
+            {partnerSites.map((site) => (
+              <li key={site.url}>
+                <a
+                  href={site.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="top-nav-link top-nav-partner-link"
+                  onMouseEnter={() => setHoveredLink(site.url)}
+                  onMouseLeave={() => setHoveredLink(null)}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+                    <polyline points="15 3 21 3 21 9" />
+                    <line x1="10" y1="14" x2="21" y2="3" />
+                  </svg>
+                  {site.label}
+                </a>
+              </li>
+            ))}
           </ul>
         )}
 

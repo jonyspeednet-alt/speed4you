@@ -297,7 +297,29 @@ function MobileNav() {
           })}
         </ul>
 
+        {/* Partner FTP */}
+        <div style={styles.sectionLabel} aria-hidden="true">Partner FTP</div>
+        <div style={styles.quickActions}>
+          <a href="http://bokasoka.net" target="_blank" rel="noopener noreferrer" style={styles.partnerChip} onClick={closeMenu}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+              <polyline points="15 3 21 3 21 9" />
+              <line x1="10" y1="14" x2="21" y2="3" />
+            </svg>
+            Bokasoka
+          </a>
+          <a href="http://cinemabazar.net" target="_blank" rel="noopener noreferrer" style={styles.partnerChip} onClick={closeMenu}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+              <polyline points="15 3 21 3 21 9" />
+              <line x1="10" y1="14" x2="21" y2="3" />
+            </svg>
+            Cinemabazar
+          </a>
+        </div>
+
         {/* Quick actions */}
+        <div style={styles.sectionLabel} aria-hidden="true">Quick Links</div>
         <div style={styles.quickActions}>
           <Link to="/browse?sort=trending" style={styles.quickChip} onClick={closeMenu}>
             🔥 Trending
@@ -555,6 +577,25 @@ const styles = {
     transition: 'background 150ms ease, transform 150ms ease',
     cursor: 'pointer',
     WebkitTapHighlightColor: 'transparent',
+  },
+  partnerChip: {
+    padding: '10px 14px',
+    borderRadius: '999px',
+    background: 'rgba(0, 255, 255, 0.06)',
+    border: '1px solid rgba(0, 255, 255, 0.2)',
+    color: 'var(--accent-secondary)',
+    fontSize: '0.82rem',
+    fontWeight: '700',
+    minHeight: '44px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
+    transition: 'background 150ms ease, transform 150ms ease',
+    cursor: 'pointer',
+    WebkitTapHighlightColor: 'transparent',
+    textDecoration: 'none',
   },
 };
 

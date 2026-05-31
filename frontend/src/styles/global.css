@@ -804,6 +804,38 @@ main,
   background: rgba(255, 255, 255, 0.06);
 }
 
+/* Partner FTP Links */
+.top-nav-partner-divider {
+  width: 1px;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0 6px;
+  flex-shrink: 0;
+}
+
+.top-nav-partner-link {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 12px !important;
+  font-size: 0.78rem !important;
+  color: var(--accent-secondary) !important;
+  opacity: 0.85;
+  border: 1px solid rgba(0, 255, 255, 0.15);
+  border-radius: 999px;
+  background: rgba(0, 255, 255, 0.04);
+  transition: all var(--transition-fast);
+}
+
+.top-nav-partner-link:hover {
+  opacity: 1;
+  color: var(--accent-secondary) !important;
+  background: rgba(0, 255, 255, 0.1);
+  border-color: rgba(0, 255, 255, 0.35);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 255, 255, 0.2);
+}
+
 .top-nav-actions {
   display: flex;
   align-items: center;
