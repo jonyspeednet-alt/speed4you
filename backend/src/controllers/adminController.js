@@ -71,6 +71,7 @@ function toSummaryItem(item) {
   return {
     id: item.id,
     title: item.title,
+    titleKey: item.titleKey || '',
     type: item.type,
     status: item.status,
     sourceType: item.sourceType,
@@ -95,6 +96,13 @@ function toSummaryItem(item) {
     backdrop: item.backdrop || item.poster || '',
     videoUrl: item.videoUrl || '',
     updatedAt: item.updatedAt || '',
+    seasonCount: Number(item.seasonCount || 0),
+    episodeCount: Number(item.episodeCount || 0),
+    seasonsMeta: (item.seasons || []).map((s) => ({
+      number: Number(s.number || 0),
+      title: s.title || '',
+      episodeCount: (s.episodes || []).length,
+    })),
   };
 }
 
