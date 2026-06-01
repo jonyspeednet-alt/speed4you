@@ -97,6 +97,8 @@ function ContentLibraryPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [roots, setRoots] = useState([]);
   const [organization, setOrganization] = useState(null);
+  const [groupBySeries, setGroupBySeries] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState(() => new Set());
 
   useEffect(() => {
     setFilters((c) => ({ ...c, status: '' }));
@@ -201,6 +203,28 @@ function ContentLibraryPage() {
     needsReview: allContent.filter((i) => i.metadataStatus === 'needs_review').length,
     duplicateRisk: allContent.filter((i) => Number(i.duplicateCount || 0) > 0).length,
   }), [allContent, pagination.total]);
+
+  const seriesGroups = useMemo(() => {
+    if (!groupBySeries) return null;
+    const groups = [];
+    const map = new Map();
+    for (const item of allContent) {
+      if (item.type !== 'series') { groups.push({ kind: 'item', item }); continue; }
+      const key = item.titleKey || item.title?.toLowerCase().replace(/[^a-z0-9]/g, ' ').trim() || '';
+      if (!key) { groups.push({ kind: 'item', item }); continue; }
+      if (map.has(key)) { map.get(key).items.push(item); }
+      else { const g = { kind: 'group', key, title: item.title, items: [item] }; map.set(key, g); groups.push(g); }
+    }
+    return groups;
+  }, [allContent, groupBySeries]);
+
+  const toggleGroup = useCallback((key) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }, []);
 
   const updateFilter = (key, value) => setFilters((c) => ({ ...c, [key]: value }));
   const resetFilters = () => setFilters({ search: '', status: '', source: '', language: '', category: '', collection: '', tag: '', sourceRootId: '', duplicatesOnly: false });
@@ -430,6 +454,8 @@ function ContentLibraryPage() {
           </button>
           <button type="button" onClick={() => updateFilter('duplicatesOnly', !filters.duplicatesOnly)}
             style={{ ...styles.chip, ...(filters.duplicatesOnly ? styles.chipActive : {}) }}>Duplicates</button>
+          <button type="button" onClick={() => setGroupBySeries((c) => !c)}
+            style={{ ...styles.chip, ...(groupBySeries ? styles.chipActive : {}) }}>Group by Series</button>
           <button type="button" onClick={() => updateFilter('status', filters.status === 'draft' ? '' : 'draft')}
             style={{ ...styles.chip, ...(filters.status === 'draft' ? styles.chipActive : {}) }}>Drafts</button>
           <button type="button" onClick={() => updateFilter('status', filters.status === 'published' ? '' : 'published')}
@@ -596,7 +622,182 @@ function ContentLibraryPage() {
                   </div>
                 </td>
               </tr>
-            ) : allContent.map((item) => (
+            ) : groupBySeries && seriesGroups ? seriesGroups.flatMap((entry) => {
+              if (entry.kind === 'item') {
+                const item = entry.item;
+                return [(
+                  <tr key={item.id} style={styles.row}>
+                    <td style={styles.tdCheck}>
+                      <input type="checkbox" checked={selectedContentIds.includes(item.id)}
+                        onChange={() => toggleContentSelection(item.id)} />
+                    </td>
+                    <td style={styles.td}>
+                      <div style={styles.titleCell}>
+                        <ContentPoster src={resolvePoster(item)} alt={item.title}
+                          style={styles.poster} fallbackText="" />
+                        <div style={{ minWidth: 0 }}>
+                          <div style={styles.titleRow}>
+                            <strong style={styles.titleText}>{item.title}</strong>
+                            <TypeBadge type={item.type} />
+                            {Number(item.duplicateCount || 0) > 0 && (
+                              <span style={styles.dupBadge}>{item.duplicateCount} dup</span>
+                            )}
+                            {item.featured && <span style={styles.featBadge}>Featured</span>}
+                            {item.collection && <span style={styles.colBadge}>{item.collection}</span>}
+                          </div>
+                          <div style={styles.metaLine}>
+                            {item.category || '-'} · {item.year || 'N/A'} · {item.language || 'Unknown'}
+                          </div>
+                          {item.tags?.length > 0 && (
+                            <div style={styles.metaLine}>Tags: {item.tags.join(', ')}</div>
+                          )}
+                          {item.sourcePath && <div style={styles.pathLine}>{item.sourcePath}</div>}
+                        </div>
+                      </div>
+                    </td>
+                    {visibleColumns.status && (
+                      <td style={styles.td}>
+                        <span style={{ ...styles.statusPill, ...(item.status === 'published' ? styles.statusPub : styles.statusDraft) }}>
+                          {item.status}
+                        </span>
+                      </td>
+                    )}
+                    {visibleColumns.metadata && (
+                      <td style={styles.td}>
+                        <div style={{ ...styles.signalPill, ...getMetadataTone(item) }}>
+                          {item.metadataStatus || 'pending'}
+                        </div>
+                        <div style={styles.metaLine}>{item.metadataConfidence || 0}% confidence</div>
+                        <div style={styles.metaLine}>Updated: {formatWhen(item.metadataUpdatedAt || item.updatedAt)}</div>
+                      </td>
+                    )}
+                    {visibleColumns.source && (
+                      <td style={styles.td}>
+                        <div style={styles.metaLine}>{item.sourceType || '-'}</div>
+                        <div style={styles.metaLine}>Trend: {item.trendingScore || 0}</div>
+                        <div style={styles.metaLine}>Dup: {item.duplicateCount || 0}</div>
+                        {item.featuredOrder && <div style={styles.metaLine}>Slot: {item.featuredOrder}</div>}
+                        {item.adminNotes && <div style={styles.metaLine}>Note: {item.adminNotes}</div>}
+                      </td>
+                    )}
+                    {visibleColumns.actions && (
+                      <td style={styles.tdActions}>
+                        <div style={styles.actionGroup}>
+                          {item.videoUrl && <span style={styles.miniBtn}>Has Video</span>}
+                          <Link to={`/admin/content/${item.id}/edit`} style={styles.miniBtn}>Edit</Link>
+                          {item.status === 'published' ? (
+                            <button type="button" onClick={() => handleUnpublish(item.id)} style={styles.miniBtn}>Unpub</button>
+                          ) : (
+                            <button type="button" onClick={() => handlePublish(item.id)} style={styles.greenMiniBtn}>Publish</button>
+                          )}
+                          <button type="button" onClick={() => setDeleteTarget({ mode: 'single', id: item.id, title: item.title })}
+                            style={styles.dangerMiniBtn}>Del</button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                )];
+              }
+
+              const isExpanded = expandedGroups.has(entry.key);
+              const totalEpisodes = entry.items.reduce((s, i) => s + (i.episodeCount || 0), 0);
+              const rows = [];
+
+              rows.push(
+                <tr key={`g-${entry.key}`} style={styles.groupRow}>
+                  <td style={styles.tdCheck}>
+                    <button type="button" onClick={() => toggleGroup(entry.key)} style={styles.expandBtn}
+                      title={isExpanded ? 'Collapse' : 'Expand'}>
+                      {isExpanded ? '▾' : '▸'}
+                    </button>
+                  </td>
+                  <td style={styles.td} colSpan={colSpan - 1}>
+                    <div style={styles.titleCell}>
+                      <ContentPoster src={resolvePoster(entry.items[0])} alt={entry.title}
+                        style={styles.poster} fallbackText="" />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={styles.titleRow}>
+                          <strong style={styles.titleText}>{entry.title}</strong>
+                          <TypeBadge type="series" />
+                          <span style={styles.groupMeta}>{entry.items.length} seasons · {totalEpisodes} episodes</span>
+                        </div>
+                        <div style={styles.metaLine}>
+                          {entry.items[0]?.category || '-'} · {entry.items[0]?.year || 'N/A'} · {entry.items[0]?.language || 'Unknown'}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              );
+
+              if (isExpanded) {
+                for (const seasonItem of entry.items) {
+                  const seasons = seasonItem.seasonsMeta?.length > 0
+                    ? seasonItem.seasonsMeta
+                    : [{ number: 1, title: seasonItem.title, episodeCount: 0 }];
+
+                  for (const season of seasons) {
+                    const seasonKey = `${seasonItem.id}-s${season.number}`;
+                    rows.push(
+                      <tr key={seasonKey} style={styles.seasonRow}>
+                        <td style={styles.tdCheck}>
+                          <input type="checkbox" checked={selectedContentIds.includes(seasonItem.id)}
+                            onChange={() => toggleContentSelection(seasonItem.id)} />
+                        </td>
+                        <td style={styles.td}>
+                          <div style={styles.seasonCell}>
+                            <div style={styles.titleRow}>
+                              <span style={styles.seasonBadge}>S{season.number}</span>
+                              <span style={{ ...styles.titleText, fontSize: '0.8rem' }}>{season.title || seasonItem.title}</span>
+                              <span style={styles.groupMeta}>{season.episodeCount} eps</span>
+                            </div>
+                            {seasonItem.sourcePath && <div style={styles.pathLine}>{seasonItem.sourcePath}</div>}
+                          </div>
+                        </td>
+                        {visibleColumns.status && (
+                          <td style={styles.td}>
+                            <span style={{ ...styles.statusPill, ...(seasonItem.status === 'published' ? styles.statusPub : styles.statusDraft) }}>
+                              {seasonItem.status}
+                            </span>
+                          </td>
+                        )}
+                        {visibleColumns.metadata && (
+                          <td style={styles.td}>
+                            <div style={{ ...styles.signalPill, ...getMetadataTone(seasonItem) }}>
+                              {seasonItem.metadataStatus || 'pending'}
+                            </div>
+                            <div style={styles.metaLine}>{seasonItem.metadataConfidence || 0}% confidence</div>
+                            <div style={styles.metaLine}>Updated: {formatWhen(seasonItem.metadataUpdatedAt || seasonItem.updatedAt)}</div>
+                          </td>
+                        )}
+                        {visibleColumns.source && (
+                          <td style={styles.td}>
+                            <div style={styles.metaLine}>{seasonItem.sourceType || '-'}</div>
+                            <div style={styles.metaLine}>Dup: {seasonItem.duplicateCount || 0}</div>
+                          </td>
+                        )}
+                        {visibleColumns.actions && (
+                          <td style={styles.tdActions}>
+                            <div style={styles.actionGroup}>
+                              <Link to={`/admin/content/${seasonItem.id}/edit`} style={styles.miniBtn}>Edit</Link>
+                              {seasonItem.status === 'published' ? (
+                                <button type="button" onClick={() => handleUnpublish(seasonItem.id)} style={styles.miniBtn}>Unpub</button>
+                              ) : (
+                                <button type="button" onClick={() => handlePublish(seasonItem.id)} style={styles.greenMiniBtn}>Publish</button>
+                              )}
+                              <button type="button" onClick={() => setDeleteTarget({ mode: 'single', id: seasonItem.id, title: seasonItem.title })}
+                                style={styles.dangerMiniBtn}>Del</button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  }
+                }
+              }
+
+              return rows;
+            }) : allContent.map((item) => (
               <tr key={item.id} style={styles.row}>
                 <td style={styles.tdCheck}>
                   <input type="checkbox" checked={selectedContentIds.includes(item.id)}
@@ -816,6 +1017,14 @@ const styles = {
   pageInput: { width: '56px', padding: '6px 8px', background: surface2, border: `1px solid ${border}`, borderRadius: '6px', color: text, fontSize: '0.82rem', textAlign: 'center' },
   presetChip: { display: 'inline-flex', alignItems: 'center', gap: '2px', background: surface2, borderRadius: '5px', paddingRight: '2px', border: `1px solid ${border}` },
   presetDel: { width: '18px', height: '18px', borderRadius: '3px', background: 'rgba(239,68,68,0.1)', color: '#f87171', fontWeight: '700', fontSize: '0.68rem', lineHeight: 1, cursor: 'pointer', border: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
+  groupRow: { background: 'rgba(99,102,241,0.04)', transition: 'background 120ms', cursor: 'pointer' },
+  groupRowHover: { background: 'rgba(99,102,241,0.08)' },
+  seasonRow: { background: 'transparent', transition: 'background 120ms' },
+  seasonRowHover: { background: 'rgba(255,255,255,0.02)' },
+  seasonCell: { display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '16px' },
+  seasonBadge: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '28px', padding: '2px 8px', borderRadius: '4px', background: 'rgba(99,102,241,0.1)', color: '#818cf8', fontSize: '0.7rem', fontWeight: '700' },
+  groupMeta: { color: text3, fontSize: '0.72rem', fontWeight: '500', marginLeft: '4px' },
+  expandBtn: { width: '24px', height: '24px', borderRadius: '4px', background: 'transparent', border: 'none', color: text2, fontSize: '0.82rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
 };
 
 export default ContentLibraryPage;
