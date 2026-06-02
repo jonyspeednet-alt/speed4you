@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useContext } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminService } from '../../services';
+import { ToastContext } from '../../components/ui/ToastContext';
 
 const SURFACE = 'var(--surface, #111318)';
 const SURFACE2 = 'var(--surface-2, #181b22)';
@@ -23,6 +24,8 @@ const STATUS_COLORS = {
 export default function ScannerPage() {
   const queryClient = useQueryClient();
   const logEndRef = useRef(null);
+  const toast = useContext(ToastContext);
+  const [prevJobStatus, setPrevJobStatus] = useState(null);
 
   const { data: health, isLoading: healthLoading } = useQuery({
     queryKey: ['admin', 'scanner', 'health'],
@@ -65,6 +68,19 @@ export default function ScannerPage() {
   useEffect(() => {
     if (logEndRef.current) logEndRef.current.scrollIntoView({ behavior: 'smooth' });
   }, [recentRuns]);
+
+  useEffect(() => {
+    if (!job) return;
+    if (prevJobStatus === 'running' && job.status !== 'running') {
+      const summary = job.summary;
+      const errCount = summary?.errors?.length || 0;
+      const msg = errCount > 0
+        ? `Scan completed with ${errCount} error(s). ${summary?.created || 0} created, ${summary?.updated || 0} updated, ${summary?.unchanged || 0} unchanged.`
+        : `Scan completed successfully. ${summary?.created || 0} created, ${summary?.updated || 0} updated, ${summary?.unchanged || 0} unchanged, ${summary?.duplicateDrafts || 0} duplicates.`;
+      toast?.({ type: errCount > 0 ? 'error' : 'success', message: msg, duration: 6000 });
+    }
+    setPrevJobStatus(job.status);
+  }, [job?.status]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1200px' }}>

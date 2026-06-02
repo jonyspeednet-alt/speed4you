@@ -3,19 +3,19 @@ const Joi = require('joi');
 const episodeSchema = Joi.object({
   id: Joi.alternatives().try(Joi.number(), Joi.string()).allow(null),
   number: Joi.number().integer().min(1).allow(null),
-  title: Joi.string().allow('', null),
-  description: Joi.string().allow('', null),
-  videoUrl: Joi.string().allow('', null),
-  sourcePath: Joi.string().allow('', null),
+  title: Joi.string().allow('', null).max(500),
+  description: Joi.string().allow('', null).max(2000),
+  videoUrl: Joi.string().allow('', null).max(2000),
+  sourcePath: Joi.string().allow('', null).max(2000),
   duration: Joi.alternatives().try(Joi.number().integer().min(0), Joi.string().allow('', null)).allow(null),
 });
 
 const seasonSchema = Joi.object({
   id: Joi.alternatives().try(Joi.number(), Joi.string()).allow(null),
   number: Joi.number().integer().min(1).allow(null),
-  title: Joi.string().allow('', null),
-  sourcePath: Joi.string().allow('', null),
-  episodes: Joi.array().items(episodeSchema).default([]),
+  title: Joi.string().allow('', null).max(500),
+  sourcePath: Joi.string().allow('', null).max(2000),
+  episodes: Joi.array().items(episodeSchema).default([]).max(200),
 });
 
 const contentSchema = Joi.object({

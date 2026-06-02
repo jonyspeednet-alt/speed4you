@@ -3,7 +3,8 @@ const path = require('path');
 function cleanTitle(name) {
   return String(name || '')
     .replace(/\.[a-z0-9]{2,5}$/i, '')
-    .replace(/[._]/g, ' ')
+    .replace(/_/g, ' ')
+    .replace(/\.(?=\s|[0-9]|[A-Z])/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }

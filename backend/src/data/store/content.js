@@ -3,22 +3,7 @@ const { db, ensureContentStore } = require('./base');
 const { JUNK_REGEX, MIN_EPISODE_SIZE, MIN_MOVIE_SIZE } = require('./constants');
 const { normalizeItem, normalizeTitleKey, extractTypedColumns, attachDuplicateMetadata } = require('./helpers');
 const { scoreSearchResult } = require('./helpers-search');
-
-async function getCatalogMeta() {
-  await ensureContentStore();
-  const result = await db.query(`SELECT value FROM app_state WHERE key = 'catalog_meta' LIMIT 1`);
-  return result.rows[0]?.value || { nextId: 1 };
-}
-
-async function setCatalogMeta(value) {
-  await ensureContentStore();
-  await db.query(
-    `INSERT INTO app_state (key, value, updated_at)
-     VALUES ('catalog_meta', $1::jsonb, NOW())
-     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-    [JSON.stringify(value)],
-  );
-}
+const { loadScannerRoots } = require('./scanner');
 
 async function allocateNextCatalogId() {
   await ensureContentStore();
@@ -339,17 +324,24 @@ async function getSuggestions(query, limit = 8) {
 async function pruneCatalog() {
   await ensureContentStore();
   const { items } = await listItems({}, 0, null, 'latest', false);
+  const scannerRoots = loadScannerRoots();
+  const scannerPaths = scannerRoots.map(r => r.scanPath).filter(Boolean);
   const toDelete = [];
   for (const item of items) {
     const isJunk = JUNK_REGEX.test(item.title) || (item.sourcePath && JUNK_REGEX.test(item.sourcePath));
     if (isJunk) { toDelete.push(item.id); continue; }
-    if (item.sourcePath && fs.existsSync(item.sourcePath)) {
-      try {
+    if (!item.sourcePath) continue;
+    const withinScannedPath = scannerPaths.some(rootPath => item.sourcePath.startsWith(rootPath));
+    if (!withinScannedPath) continue;
+    try {
+      if (fs.existsSync(item.sourcePath)) {
         const stats = fs.statSync(item.sourcePath);
         const minSize = item.type === 'series' ? MIN_EPISODE_SIZE : MIN_MOVIE_SIZE;
         if (stats.size < minSize) toDelete.push(item.id);
-      } catch {}
-    } else if (item.sourcePath) { toDelete.push(item.id); }
+      } else {
+        toDelete.push(item.id);
+      }
+    } catch {}
   }
   if (toDelete.length) await db.query('DELETE FROM content_catalog WHERE id = ANY($1)', [toDelete]);
   return { deletedCount: toDelete.length };
@@ -407,8 +399,6 @@ async function cleanupOrphanEpisodeEntries() {
 }
 
 module.exports = {
-  getCatalogMeta,
-  setCatalogMeta,
   allocateNextCatalogId,
   getItems,
   listItems,

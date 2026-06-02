@@ -61,11 +61,13 @@ router.post('/maintenance/vacuum', asyncRoute(adminController.vacuumDatabase));
 router.post('/maintenance/fix-roots', asyncRoute(adminController.fixMisconfiguredRoots));
 
 // Uploads
-router.post('/upload/poster', upload.single('file'), adminController.uploadPoster);
-router.post('/upload/banner', upload.single('file'), adminController.uploadBanner);
+router.post('/upload/poster', upload.single('file'), asyncRoute(adminController.uploadPoster));
+router.post('/upload/banner', upload.single('file'), asyncRoute(adminController.uploadBanner));
 
 // Scanner
 router.get('/scanner/roots', adminController.getScannerRoots);
+router.delete('/scanner/roots/:id', asyncRoute(adminController.deleteScannerRoot));
+router.post('/scanner/roots/cleanup', asyncRoute(adminController.cleanupStaleScannerRoots));
 router.get('/scanner/drafts', asyncRoute(adminController.getScannerDrafts));
 router.get('/scanner/logs', adminController.getScannerLogs);
 router.get('/scanner/health', asyncRoute(adminController.getScannerHealth));

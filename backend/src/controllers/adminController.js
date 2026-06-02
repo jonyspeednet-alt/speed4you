@@ -12,6 +12,7 @@ const {
   vacuumDatabase,
 } = require('../data/store');
 const { getCurrentScanJob, getScannerHealth, listScannerRoots, startScanJob, stopScanJob } = require('../services/scanner');
+const { loadScannerRoots, saveScannerRoots, refreshScannerCaches, loadScannerState, saveScannerState } = require('../data/store');
 const { fetchMetadataByTmdbId, fetchMetadataByImdbId } = require('../services/metadata-enricher');
 const { clearMetadataCache, getEnhancedCacheStats } = require('../services/scanner-enhanced-metadata');
 const { getDuplicateReviewReport, runDuplicateCleanup } = require('../services/duplicate-review');
@@ -19,6 +20,7 @@ const { listUsers, createUser, updateUser, deleteUser } = require('../services/a
 const { AppError } = require('../utils/error');
 const db = require('../config/database');
 const { saveBufferAsset, saveDataUrlAsset } = require('../utils/assetHelper');
+const fs = require('fs');
 
 function pickMovieVideoUrlFromSeasons(seasons = []) {
   for (const season of seasons || []) {
@@ -461,4 +463,71 @@ exports.fixMisconfiguredRoots = async (req, res) => {
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
+};
+
+exports.deleteScannerRoot = async (req, res) => {
+  const rootId = req.params.id;
+  if (!rootId) {
+    return res.status(400).json({ ok: false, error: 'Root ID is required.' });
+  }
+
+  const currentRoots = loadScannerRoots();
+  const rootToDelete = currentRoots.find((r) => r.id === rootId);
+  if (!rootToDelete) {
+    return res.status(404).json({ ok: false, error: `Root '${rootId}' not found.` });
+  }
+
+  const updatedRoots = currentRoots.filter((r) => r.id !== rootId);
+  await saveScannerRoots(updatedRoots);
+  await refreshScannerCaches();
+
+  await db.query('DELETE FROM content_catalog WHERE source_root_id = $1', [rootId]);
+
+  const scanState = loadScannerState();
+  if (scanState?.roots?.[rootId]) {
+    delete scanState.roots[rootId];
+    await saveScannerState(scanState);
+  }
+
+  res.json({ ok: true, deleted: rootToDelete.label || rootId });
+};
+
+exports.cleanupStaleScannerRoots = async (req, res) => {
+  const dryRun = req.query.dry !== 'false' && req.query.dry !== '0';
+  const currentRoots = loadScannerRoots();
+  const results = { checked: 0, deleted: 0, dryRun, stale: [] };
+
+  for (const root of currentRoots) {
+    results.checked += 1;
+    if (root.discovered) continue;
+
+    let exists = false;
+    try {
+      exists = fs.existsSync(root.scanPath);
+    } catch {
+      exists = false;
+    }
+
+    if (!exists) {
+      results.stale.push({ id: root.id, label: root.label, path: root.scanPath });
+    }
+  }
+
+  if (!dryRun && results.stale.length) {
+    const staleIds = results.stale.map((r) => r.id);
+    const updatedRoots = currentRoots.filter((r) => !staleIds.includes(r.id));
+    await saveScannerRoots(updatedRoots);
+    await refreshScannerCaches();
+    results.deleted = results.stale.length;
+
+    const scanState = loadScannerState();
+    if (scanState?.roots) {
+      for (const id of staleIds) {
+        delete scanState.roots[id];
+      }
+      await saveScannerState(scanState);
+    }
+  }
+
+  res.json({ ok: true, ...results });
 };

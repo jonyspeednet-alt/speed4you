@@ -3,7 +3,7 @@ $plink = '& "C:\Program Files\PuTTY\plink.exe" -ssh speed4you@***REMOVED*** -P 2
 Invoke-Expression ($plink + '"kill 888473 2>/dev/null; sleep 1"')
 Start-Sleep -Seconds 2
 
-Write-Host "=== Check all directories and fix permissions ==="
+Write-Host "=== Check all scanner directories and fix permissions ==="
 $script = @'
 sudo_fix() {
   echo '***REMOVED***' | sudo -S chmod g+w "$1" 2>/dev/null
@@ -16,17 +16,26 @@ fix_dir() {
       drwxrwsr-x*) echo "  OK" ;;
       *) echo "  FIXING..." && sudo_fix "$1" && ls -ld "$1" | awk '{print "  -> "$1}' ;;
     esac
+  else
+    echo "MISSING: $1"
   fi
 }
-fix_dir '/var/www/html/English Movies'
-fix_dir '/var/www/html/English Series'
-fix_dir '/var/www/html/Bangla Movies'
-fix_dir '/var/www/html/Bangla Series'
-fix_dir '/var/www/html/Hindi Movies'
-fix_dir '/var/www/html/Hindi Series'
-fix_dir '/var/www/html/Anime'
-fix_dir '/var/www/html/Kids'
-fix_dir '/var/www/html/Documentaries'
+echo "--- Main media directories ---"
+fix_dir '/var/www/html/English_Movies'
+fix_dir '/var/www/html/Hindi_Movies'
+fix_dir '/var/www/html/Hindi_Dubbed_Movies'
+fix_dir '/var/www/html/New_Movies_1'
+fix_dir '/var/www/html/New_Movies_2'
+fix_dir '/var/www/html/South_Indian_Movies'
+fix_dir '/var/www/html/3D_Movies'
+fix_dir '/var/www/html/Other_Foreign_Movies'
+fix_dir '/var/www/html/Bangla_Movies'
+echo "--- TV Series ---"
+fix_dir '/var/www/html/TV_Series'
+fix_dir '/var/www/html/TV_Series/TV_Web_Series-0-9_A-E'
+fix_dir '/var/www/html/TV_Series/TV_Web_Series-F-M'
+fix_dir '/var/www/html/TV_Series/TV_Web_Series-N-S'
+fix_dir '/var/www/html/TV_Series/TV_Web_Series-U-Z'
 echo "=== Restart normalizer ==="
 export NODE_PATH=/home/speed4you/portal-app/backend/node_modules
 cd /home/speed4you/portal-app/backend
