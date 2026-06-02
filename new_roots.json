@@ -8,5 +8,8 @@
   {"id":"series-u-z","type":"series","label":"TV/Web Series U-Z","category":"TV Series","language":"English","scanPath":"/var/www/html/TV_Series/TV_Web_Series-U-Z","publicBaseUrl":"/TV_Series/TV_Web_Series-U-Z"},
   {"id":"new-movies-1","type":"movie","label":"New Movies 1","category":"New Movies","language":"English","scanPath":"/var/www/html/New_Movies_1","publicBaseUrl":"/New_Movies_1"},
   {"id":"new-movies-2","type":"movie","label":"New Movies 2","category":"New Movies","language":"English","scanPath":"/var/www/html/New_Movies_2","publicBaseUrl":"/New_Movies_2"},
-  {"id":"south-indian-movies","type":"movie","label":"South Indian Movies","category":"South Indian Movies","language":"Tamil, Telugu, Malayalam, Kannada","scanPath":"/var/www/html/South_Indian_Movies","publicBaseUrl":"/South_Indian_Movies"}
+  {"id":"south-indian-movies","type":"movie","label":"South Indian Movies","category":"South Indian Movies","language":"Tamil, Telugu, Malayalam, Kannada","scanPath":"/var/www/html/South_Indian_Movies","publicBaseUrl":"/South_Indian_Movies"},
+  {"id":"extra-storage-bangla-movies","type":"movie","label":"Extra Storage: Bangla Movies","category":"Bangla Movies","language":"Bengali","scanPath":"/var/www/html/Extra_Storage/Bangla_Movies","publicBaseUrl":"/Extra_Storage/Bangla_Movies","maxDepth":1,"batchSize":10},
+  {"id":"3d-movies","type":"movie","label":"3D Movies","category":"3D Movies","language":"English","scanPath":"/var/www/html/3D_Movies","publicBaseUrl":"/3D_Movies"},
+  {"id":"other-foreign-movies","type":"movie","label":"Other Foreign Movies","category":"Other Foreign Movies","language":"English","scanPath":"/var/www/html/Other_Foreign_Movies","publicBaseUrl":"/Other_Foreign_Movies"}
 ]
