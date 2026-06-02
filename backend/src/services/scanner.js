@@ -892,10 +892,12 @@ function compactSummary(summary) {
   return {
     ...normalized,
     drafts: [],
+    totalErrors: normalized.errors.length,
     errors: normalized.errors.slice(0, 10),
     skipped: normalized.skipped.slice(0, 10),
     rootResults: normalized.rootResults.map((root) => ({
       ...root,
+      totalErrors: root.errors.length,
       errors: root.errors.slice(0, 5),
     })),
   };
@@ -1046,7 +1048,7 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
   for (let start = 0; start < candidateFolders.length; start += root.batchSize || DEFAULT_BATCH_SIZE) {
     const batch = candidateFolders.slice(start, start + (root.batchSize || DEFAULT_BATCH_SIZE));
 
-    for (const folderPath of batch) {
+    for (const [offset, folderPath] of batch.entries()) {
       const relativeFolder = path.relative(root.scanPath, folderPath) || '.';
       const files = listFiles(folderPath);
       const nestedDirectories = listDirectories(folderPath);
@@ -1055,9 +1057,13 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
       const isSeriesFolder = relativeFolder !== '.' && detectSeriesFolder(root, folderPath, files, nestedDirectories);
       const movieCandidates = isSeriesFolder ? [] : buildMovieCandidates(root, folderPath, relativeFolder, files);
 
+      const processedCount = Math.min(start + offset + 1, candidateFolders.length);
       updateRootProgress(summary, root.id, {
-        processed: Math.min(start + batch.indexOf(folderPath) + 1, candidateFolders.length),
+        processed: processedCount,
       });
+      if (progressCallback && (processedCount === candidateFolders.length || processedCount % PROGRESS_EMIT_INTERVAL === 0)) {
+        progressCallback(buildProgressPayload(summary, { activeRootId: root.id }));
+      }
 
       if (!movieCandidates.length) {
         if (!isSeriesFolder) {
@@ -1181,9 +1187,6 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
       };
     }
 
-    if (progressCallback) {
-      progressCallback(buildProgressPayload(summary, { activeRootId: root.id }));
-    }
     await waitForImmediate();
   }
 
@@ -1512,8 +1515,10 @@ async function scanSelectedRoots(selectedRootIds = [], progressCallback, options
   const normalizedSummary = normalizeSummary(summary) || createSummary([]);
   await recordScannerRun({
     id: scanContext.runId,
+    status: normalizedSummary.errors.length > 0 ? 'completed' : 'completed',
     startedAt: normalizedSummary.startedAt,
     completedAt: normalizedSummary.completedAt,
+    rootIds: currentScanJob?.rootIds || [],
     rootsRequested: normalizedSummary.rootsRequested,
     rootsScanned: normalizedSummary.rootsScanned,
     created: normalizedSummary.created,
