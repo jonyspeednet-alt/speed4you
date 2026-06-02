@@ -201,21 +201,23 @@ export default function ScannerPage() {
   const job = jobData?.job || null;
   const roots = health?.roots || [];
   const recentRuns = logsData?.items || health?.recentRuns || [];
-  const isRunning = job?.status === 'running';
+  const rootResults = job?.summary?.rootResults || [];
+  const hasInProgressRoot = rootResults.some((r) => r.status === 'running' || r.status === 'pending');
+  const displayStatus = (job?.status === 'running' || (job && hasInProgressRoot)) ? 'running' : (job?.status || null);
+  const isRunning = displayStatus === 'running';
   const elapsed = useElapsed(isRunning ? job?.startedAt : null);
 
   const activeRoot = useMemo(() => {
-    if (!isRunning || !job?.summary?.rootResults) return null;
-    return job.summary.rootResults.find((r) => r.status === 'running') || job.summary.rootResults.find((r) => r.processed < r.totalCandidates);
-  }, [job, isRunning]);
+    if (!isRunning || !rootResults.length) return null;
+    return rootResults.find((r) => r.status === 'running') || rootResults.find((r) => r.processed < r.totalCandidates);
+  }, [rootResults, isRunning]);
 
   const overallProgress = useMemo(() => {
-    const rr = job?.summary?.rootResults || [];
-    if (!rr.length) return 0;
-    const totalProc = rr.reduce((s, r) => s + (r.processed || 0), 0);
-    const totalCand = rr.reduce((s, r) => s + (r.totalCandidates || 0), 0);
+    if (!rootResults.length) return 0;
+    const totalProc = rootResults.reduce((s, r) => s + (r.processed || 0), 0);
+    const totalCand = rootResults.reduce((s, r) => s + (r.totalCandidates || 0), 0);
     return totalCand > 0 ? (totalProc / totalCand) * 100 : 0;
-  }, [job]);
+  }, [rootResults]);
 
   const isNearBottom = useCallback(() => {
     const el = runsContainerRef.current;
@@ -283,7 +285,7 @@ export default function ScannerPage() {
       {/* Hero Status Card */}
       <div style={{
         position: 'relative', overflow: 'hidden',
-        background: STATUS_GRADIENTS[job?.status] || STATUS_GRADIENTS.idle,
+        background: STATUS_GRADIENTS[displayStatus] || STATUS_GRADIENTS.idle,
         border: `1px solid ${isRunning ? 'rgba(34,197,94,0.25)' : BORDER}`,
         borderRadius: '20px', padding: '24px 28px',
       }}>
@@ -300,7 +302,7 @@ export default function ScannerPage() {
               </div>
               <div>
                 <h1 style={{ fontSize: '1.4rem', fontWeight: '800', color: TEXT, margin: 0, letterSpacing: '-0.02em' }}>
-                  {isRunning ? 'Scanner Running' : job ? `Scanner ${job.status}` : 'Scanner'}
+                  {isRunning ? 'Scanner Running' : displayStatus ? `Scanner ${displayStatus}` : 'Scanner'}
                 </h1>
                 <p style={{ fontSize: '0.82rem', color: TEXT2, margin: '2px 0 0 0' }}>
                   {isRunning
@@ -318,7 +320,7 @@ export default function ScannerPage() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            {job?.status && <StatusPill status={job.status} />}
+            {displayStatus && <StatusPill status={displayStatus} />}
 
             <button type="button" onClick={() => runMutation.mutate()}
               disabled={isRunning || runMutation.isPending}
@@ -393,7 +395,7 @@ export default function ScannerPage() {
       </div>
 
       {/* Current Job Details */}
-      {job && job.summary?.rootResults && job.summary.rootResults.length > 0 && (
+      {job && rootResults.length > 0 && (
         <div style={{ background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: '16px', padding: '20px 24px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
             <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem', fontWeight: '700', color: TEXT, margin: 0 }}>
@@ -419,7 +421,7 @@ export default function ScannerPage() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '320px', overflowY: 'auto' }}>
-            {job.summary.rootResults.map((root) => {
+            {rootResults.map((root) => {
               const pct = root.totalCandidates > 0 ? (root.processed / root.totalCandidates) * 100 : 0;
               return (
                 <div key={root.id} className="scn-anim-in" style={{
