@@ -162,6 +162,16 @@ app.use(globalApiLimiter);
 app.use(morgan(isProduction ? 'combined' : 'dev'));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+// Enforce Content-Type on mutation endpoints
+app.use((req, res, next) => {
+  if (['POST', 'PUT', 'PATCH'].includes(req.method) && !req.path.startsWith('/upload/')) {
+    const ct = (req.headers['content-type'] || '').split(';')[0].trim();
+    if (ct && ct !== 'application/json' && ct !== 'multipart/form-data' && ct !== 'application/x-www-form-urlencoded') {
+      return res.status(415).json({ error: 'Unsupported Media Type. Use application/json.' });
+    }
+  }
+  next();
+});
 // Track active connections and in-flight requests for graceful shutdown
 let activeConnections = new Set();
 let activeRequests = 0;

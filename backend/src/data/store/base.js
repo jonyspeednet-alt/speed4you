@@ -130,6 +130,7 @@ async function ensureContentStore() {
       await db.query(`ALTER TABLE content_catalog ADD COLUMN IF NOT EXISTS metadata_status TEXT NOT NULL DEFAULT 'pending'`);
       await db.query(`ALTER TABLE content_catalog ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ`);
       await db.query(`ALTER TABLE content_catalog ADD COLUMN IF NOT EXISTS released_at TIMESTAMPTZ`);
+      await db.query(`ALTER TABLE content_catalog ADD COLUMN IF NOT EXISTS search_vector tsvector`);
       
       if (!db.isInMemory) {
         await db.query('CREATE EXTENSION IF NOT EXISTS pg_trgm');
@@ -211,6 +212,16 @@ async function ensureContentStore() {
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
       `);
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS search_analytics (
+          id BIGSERIAL PRIMARY KEY,
+          query TEXT NOT NULL,
+          results_count INT NOT NULL DEFAULT 0,
+          ip_address TEXT NOT NULL DEFAULT '',
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await db.query("CREATE INDEX IF NOT EXISTS idx_search_analytics_query ON search_analytics (query)");
       await db.query(`
         CREATE TABLE IF NOT EXISTS scanner_runs (
           id TEXT PRIMARY KEY,

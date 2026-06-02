@@ -1,7 +1,6 @@
 const { db, appStateCache, ensureContentStore, setAppState } = require('./base');
 const { MAX_SCANNER_RUNS } = require('./constants');
 const { toSafeInteger, rowToScannerRoot, rowToScannerRun, normalizeItem, normalizeTitleKey, extractTypedColumns } = require('./helpers');
-const { getItemById, getItems, allocateNextCatalogId } = require('./content');
 
 function loadScannerLog() {
   return appStateCache.get('scanner_log') || { runs: [] };
@@ -138,7 +137,7 @@ async function upsertScannedItem(payload) {
     const nextPublishedAt = nextStatus === 'published' ? (payload.publishedAt || now) : '';
 
     const item = normalizeItem({
-      id: await allocateNextCatalogId(),
+      id: await require('./content').allocateNextCatalogId(),
       createdAt: now,
       updatedAt: now,
       sourceType: 'scanner',
@@ -165,7 +164,11 @@ async function upsertScannedItem(payload) {
        insertCols.trending_score, insertCols.duplicate_count, insertCols.metadata_status,
        insertCols.published_at, insertCols.released_at],
     );
-    return { item: await getItemById(item.id), created: true, updated: false };
+    const resultItem = await require('./content').getItemById(item.id);
+    if (resultItem && resultItem.duplicateCount > 0) {
+      await db.query('UPDATE content_catalog SET duplicate_count = $2 WHERE id = $1', [item.id, resultItem.duplicateCount]);
+    }
+    return { item: resultItem, created: true, updated: false };
   }
 
   // ── EXISTING ITEM — preserve user-managed fields ─────────────────────────
@@ -291,7 +294,11 @@ async function upsertScannedItem(payload) {
      updateCols.trending_score, updateCols.duplicate_count, updateCols.metadata_status,
      updateCols.published_at, updateCols.released_at],
   );
-  return { item: await getItemById(item.id), created: false, updated: true };
+  const updateResultItem = await require('./content').getItemById(item.id);
+  if (updateResultItem && updateResultItem.duplicateCount > 0) {
+    await db.query('UPDATE content_catalog SET duplicate_count = $2 WHERE id = $1', [item.id, updateResultItem.duplicateCount]);
+  }
+  return { item: updateResultItem, created: false, updated: true };
 }
 
 async function deleteScannerItemsNotInSignatures(sourceRootId, scanSignatures = []) {
@@ -299,10 +306,10 @@ async function deleteScannerItemsNotInSignatures(sourceRootId, scanSignatures = 
   if (!rootId) return 0;
   const signatures = [...new Set((scanSignatures || []).filter(Boolean))];
 
-  // SAFE DELETE: only remove items that are NOT user-managed (draft/pending).
-  // published, archived items are NEVER auto-deleted — admin must remove manually.
+  // SAFE DELETE: only remove items that are NOT user-managed.
+  // published, archived, and draft items are NEVER auto-deleted — admin must remove manually.
   // This prevents the create/delete loop when media paths fluctuate.
-  const PROTECTED_STATUSES = ['published', 'archived'];
+  const PROTECTED_STATUSES = ['published', 'archived', 'draft'];
 
   let result;
   if (signatures.length) {
@@ -326,7 +333,8 @@ async function deleteScannerItemsNotInSignatures(sourceRootId, scanSignatures = 
       ['scanner', rootId, PROTECTED_STATUSES],
     );
   }
-  return Number(result.rowCount || 0);
+  const count = Number(result?.rowCount ?? 0);
+  return Number.isFinite(count) ? Math.floor(count) : 0;
 }
 
 async function refreshCatalogReferencesForNormalizedFile(payload = {}) {
@@ -335,7 +343,7 @@ async function refreshCatalogReferencesForNormalizedFile(payload = {}) {
   const previousVideoUrl = String(payload.previousVideoUrl || '').trim();
   const nextVideoUrl = String(payload.nextVideoUrl || '').trim();
   if (!previousSourcePath || !nextSourcePath) return { updatedItems: 0, updatedEpisodes: 0 };
-  const items = await getItems();
+  const items = await require('./content').getItems();
   let updatedItems = 0; let updatedEpisodes = 0; let mutated = false; const now = new Date().toISOString();
   const nextItems = items.map((item) => {
     let changed = false; const nextItem = { ...item };
@@ -384,6 +392,7 @@ module.exports = {
   recordScannerRun,
   getScannerRuns,
   getItemByScanSignature,
+  getScanSignaturesByRootId,
   deleteItemsByScanSignatures,
   upsertScannedItem,
   deleteScannerItemsNotInSignatures,

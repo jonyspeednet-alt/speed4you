@@ -22,7 +22,6 @@ const connectionConfig = {
   max: Number(process.env.DB_POOL_MAX || DEFAULT_DB_POOL_MAX),
   idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS || 30000),
   connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT_MS || 10000),
-  allowExitOnIdle: false,
 };
 
 function createInMemoryPool() {

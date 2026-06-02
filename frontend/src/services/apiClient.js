@@ -94,7 +94,7 @@ async function apiClient(endpoint, options = {}) {
   }
 
   const method = (options.method || 'GET').toUpperCase();
-  const endpointUrl = new URL(`${API_BASE}/api${endpoint}`, window.location.origin);
+  const endpointUrl = new URL(`${API_BASE || ''}/api${endpoint}`, window.location.origin);
 
   // Only add cache-busting timestamp for mutations or when explicitly requested
   if ((method !== 'GET' || options.bustCache === true) && options.bustCache !== false) {

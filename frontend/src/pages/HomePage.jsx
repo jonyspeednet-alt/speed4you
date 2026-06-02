@@ -44,7 +44,10 @@ function createRotationSeed(namespace) {
 }
 
 function hashSeed(value) {
-  return Array.from(String(value || '')).reduce((acc, char) => ((acc * 31 + char.charCodeAt(0)) % 2147483647), 7);
+  return Array.from(String(value || '')).reduce((acc, char) => {
+    acc = (acc * 31 + char.charCodeAt(0));
+    return acc % 2147483647;
+  }, 7);
 }
 
 function rotateItems(items, seed, pinnedCount = 0) {

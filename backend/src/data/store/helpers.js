@@ -199,7 +199,7 @@ function normalizeItem(item) {
     titleKey: item.titleKey || normalizeTitleKey(item.title),
     duplicateCandidates: Array.isArray(item.duplicateCandidates) ? item.duplicateCandidates : [],
     duplicateCount: Number(item.duplicateCount || 0),
-    trendingScore,
+    trendingScore: item.trendingScore || trendingScore,
     collection: item.collection || '',
     tags: normalizeStringList(item.tags),
     adminNotes: item.adminNotes || '',
@@ -210,8 +210,10 @@ function normalizeItem(item) {
 
 function attachDuplicateMetadata(item, groups) {
   const key = `${item.type}:${item.titleKey || normalizeTitleKey(item.title)}`;
+  const itemRoot = String(item.sourceRootId || '').trim();
   const matches = (groups.get(key) || [])
     .filter((candidate) => candidate.id !== item.id)
+    .filter((candidate) => !itemRoot || String(candidate.sourceRootId || '').trim() !== itemRoot)
     .map((candidate) => ({
       id: candidate.id,
       title: candidate.title,

@@ -6,6 +6,7 @@ const {
   deleteScannerItemsNotInSignatures,
   getAppState,
   getItemByScanSignature,
+  getScanSignaturesByRootId,
   getScannerRuns,
   loadScannerRoots,
   loadScannerRuntime,
@@ -14,6 +15,7 @@ const {
   recordScannerRun,
   refreshCatalogReferencesForNormalizedFile,
   refreshScannerCaches,
+  saveScannerRoots,
   saveScannerRuntime,
   saveScannerState,
   upsertScannedItem,
@@ -40,7 +42,7 @@ const VIDEO_EXTENSIONS = new Set(
 const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
 const MIN_MOVIE_SIZE = Number(process.env.SCANNER_MIN_MOVIE_SIZE || 104857600); // 100MB
 const MIN_EPISODE_SIZE = Number(process.env.SCANNER_MIN_EPISODE_SIZE || 31457280); // 30MB
-const JUNK_REGEX = /sample|trailer|extras|promo|short|clip|preview|teaser/i;
+const JUNK_REGEX = /\b(sample|trailer|extras|promo|short|clip|preview|teaser)\b/i;
 const DUPLICATE_HOLD_DIR_NAME = process.env.MEDIA_NORMALIZER_DUPLICATE_DIR || '_duplicate_hold';
 const PREFERRED_POSTER_PATTERNS = [
   /^(poster|cover|folder|front)$/i,
@@ -56,6 +58,7 @@ const AUTO_DISCOVER_MAX_DEPTH = Math.max(1, Number(process.env.SCANNER_AUTO_DISC
 const AUTO_SCAN_INTERVAL_MINUTES = Math.max(0, Number(process.env.SCANNER_AUTO_SCAN_INTERVAL_MINUTES || 0));
 const SCANNER_AUTO_RESUME_ON_RESTART = process.env.SCANNER_AUTO_RESUME_ON_RESTART !== 'false';
 const SCANNER_AUTO_RESUME_DELAY_MS = Math.max(1000, Number(process.env.SCANNER_AUTO_RESUME_DELAY_MS || 5000));
+const SCANNER_CLEANUP_MISSING_ROOTS = process.env.SCANNER_CLEANUP_MISSING_ROOTS !== 'false';
 const SKIP_DISCOVERY_NAMES = new Set(['portal', 'uploads', 'assets', 'css', 'js', 'api']);
 const SKIP_DISCOVERY_PATTERNS = [
   /\bcache\b/i,
@@ -821,6 +824,11 @@ function toNonNegativeInteger(value) {
   return Math.floor(parsed);
 }
 
+function addToSummary(summary, field, delta) {
+  const safeDelta = typeof delta === 'number' && Number.isFinite(delta) ? Math.floor(delta) : 0;
+  summary[field] = toNonNegativeInteger(summary[field]) + safeDelta;
+}
+
 function toIsoOrEmpty(value) {
   return typeof value === 'string' ? value : '';
 }
@@ -1144,12 +1152,6 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
 
         const enrichedItem = await renameMediaForItem(assignScannerTaxonomy(await enrichItemWithMetadata(item)));
         const result = await retryAsync(() => upsertScannedItem(enrichedItem));
-        nextRootState.folders[relativeFolder] = {
-          fingerprint,
-          scanSignature: candidate.scanSignature,
-          title: enrichedItem.title,
-          updatedAt: new Date().toISOString(),
-        };
 
         if (result.created) {
           summary.created += 1;
@@ -1161,6 +1163,7 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
           summary.duplicateDrafts += 1;
         }
         summary.drafts.push(result.item);
+        if (summary.drafts.length > 100) summary.drafts.shift();
 
         const current = summary.rootResults.find((entry) => entry.id === root.id);
         updateRootProgress(summary, root.id, {
@@ -1170,6 +1173,12 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
           duplicateDrafts: (current?.duplicateDrafts || 0) + (result.item.duplicateCount > 0 ? 1 : 0),
         });
       }
+      nextRootState.folders[relativeFolder] = {
+        fingerprint,
+        scanSignature: movieCandidates.map(c => c.scanSignature).join(','),
+        title: movieCandidates[0]?.titleSource || folderName,
+        updatedAt: new Date().toISOString(),
+      };
     }
 
     if (progressCallback) {
@@ -1186,11 +1195,13 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
     progressCallback(buildProgressPayload(summary, { activeRootId: root.id }));
   }
 
-  const deletedCount = coerceDeletedCount(
-    await retryAsync(() => deleteScannerItemsNotInSignatures(root.id, [...seenSignatures])),
-    `movie:${root.id}`,
+  const deletedCount = Number(
+    coerceDeletedCount(
+      await retryAsync(() => deleteScannerItemsNotInSignatures(root.id, [...seenSignatures])),
+      `movie:${root.id}`,
+    ),
   );
-  summary.deleted = toNonNegativeInteger(summary.deleted) + deletedCount;
+  addToSummary(summary, 'deleted', deletedCount);
   const current = summary.rootResults.find((entry) => entry.id === root.id);
   updateRootProgress(summary, root.id, {
     deleted: toNonNegativeInteger(current?.deleted) + deletedCount,
@@ -1298,14 +1309,14 @@ async function processSeriesRoot(root, summary, progressCallback, scanContext, e
       if (result.item.duplicateCount > 0) {
         summary.duplicateDrafts += 1;
       }
-      summary.drafts.push(result.item);
-
-      const current = summary.rootResults.find((entry) => entry.id === root.id);
+        summary.drafts.push(result.item);
+        if (summary.drafts.length > 100) summary.drafts.shift();
+      const currentSer = summary.rootResults.find((entry) => entry.id === root.id);
       updateRootProgress(summary, root.id, {
-        discovered: (current?.discovered || 0) + 1,
-        created: (current?.created || 0) + (result.created ? 1 : 0),
-        updated: (current?.updated || 0) + (result.updated ? 1 : 0),
-        duplicateDrafts: (current?.duplicateDrafts || 0) + (result.item.duplicateCount > 0 ? 1 : 0),
+        discovered: (currentSer?.discovered || 0) + 1,
+        created: (currentSer?.created || 0) + (result.created ? 1 : 0),
+        updated: (currentSer?.updated || 0) + (result.updated ? 1 : 0),
+        duplicateDrafts: (currentSer?.duplicateDrafts || 0) + (result.item.duplicateCount > 0 ? 1 : 0),
       });
     }
 
@@ -1323,11 +1334,13 @@ async function processSeriesRoot(root, summary, progressCallback, scanContext, e
     progressCallback(buildProgressPayload(summary, { activeRootId: root.id }));
   }
 
-  const deletedCount = coerceDeletedCount(
-    await retryAsync(() => deleteScannerItemsNotInSignatures(root.id, [...seenSignatures])),
-    `series:${root.id}`,
+  const deletedCount = Number(
+    coerceDeletedCount(
+      await retryAsync(() => deleteScannerItemsNotInSignatures(root.id, [...seenSignatures])),
+      `series:${root.id}`,
+    ),
   );
-  summary.deleted = toNonNegativeInteger(summary.deleted) + deletedCount;
+  addToSummary(summary, 'deleted', deletedCount);
   const current = summary.rootResults.find((entry) => entry.id === root.id);
   updateRootProgress(summary, root.id, {
     deleted: toNonNegativeInteger(current?.deleted) + deletedCount,
@@ -1439,6 +1452,18 @@ async function scanSelectedRoots(selectedRootIds = [], progressCallback, options
         skipped: 1,
         errors: [errorMsg],
       });
+      if (SCANNER_CLEANUP_MISSING_ROOTS && !root.discovered) {
+        try {
+          const allRoots = loadScannerRoots();
+          const cleaned = allRoots.filter((r) => r.id !== root.id);
+          if (cleaned.length < allRoots.length) {
+            await saveScannerRoots(cleaned);
+            await refreshScannerCaches();
+          }
+        } catch (cleanupError) {
+          logScannerEvent('root_cleanup_failed', { rootId: root.id, error: cleanupError.message });
+        }
+      }
       if (progressCallback) {
         progressCallback(buildProgressPayload(summary, { activeRootId: root.id }));
       }
