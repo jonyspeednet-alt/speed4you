@@ -7,6 +7,7 @@ const {
   getAppState,
   getItemByScanSignature,
   getScanSignaturesByRootId,
+  getScannerRunById,
   getScannerRuns,
   loadScannerRoots,
   loadScannerRuntime,
@@ -1708,7 +1709,48 @@ function stopScanJob() {
   return serializeJob(currentScanJob);
 }
 
-function getCurrentScanJob() {
+async function getCurrentScanJob() {
+  if (!currentScanJob) {
+    return null;
+  }
+
+  if (currentScanJob.status === 'running') {
+    return serializeJob(currentScanJob);
+  }
+
+  try {
+    const dbRun = await getScannerRunById(currentScanJob.id);
+    if (dbRun) {
+      const dbSummary = dbRun.rootResults && dbRun.rootResults.length
+        ? {
+            startedAt: dbRun.startedAt,
+            completedAt: dbRun.completedAt,
+            rootsRequested: dbRun.rootsRequested,
+            rootsScanned: dbRun.rootsScanned,
+            created: dbRun.created,
+            updated: dbRun.updated,
+            unchanged: dbRun.unchanged,
+            deleted: dbRun.deleted,
+            duplicateDrafts: dbRun.duplicateDrafts,
+            skipped: dbRun.skipped || [],
+            errors: dbRun.errors || [],
+            drafts: [],
+            rootResults: dbRun.rootResults,
+          }
+        : null;
+      currentScanJob = {
+        ...currentScanJob,
+        status: dbRun.status,
+        completedAt: dbRun.completedAt || currentScanJob.completedAt,
+        error: dbRun.error || currentScanJob.error,
+        summary: dbSummary || currentScanJob.summary,
+      };
+      return serializeJob(currentScanJob);
+    }
+  } catch (dbError) {
+    logScannerEvent('get_current_job_db_fallback', { error: dbError.message });
+  }
+
   return serializeJob(currentScanJob);
 }
 
@@ -1743,8 +1785,16 @@ function scheduleResumeScan(rootIds = []) {
   });
 }
 
-function bootstrapScannerRuntime() {
-  const runtime = loadScannerRuntime();
+async function bootstrapScannerRuntime() {
+  let runtime = loadScannerRuntime();
+  if (!runtime || !runtime.currentJob) {
+    try {
+      const dbRuntime = await getAppState('scanner_runtime', { currentJob: null, queue: [] });
+      runtime = dbRuntime || runtime;
+    } catch (bootstrapReadError) {
+      logScannerEvent('bootstrap_runtime_db_read_failed', { error: bootstrapReadError.message });
+    }
+  }
   const runtimeJob = normalizeRuntimeJob(runtime.currentJob);
   if (runtimeJob && runtimeJob.status === 'running') {
     currentScanJob = {
@@ -1764,8 +1814,39 @@ function bootstrapScannerRuntime() {
   }
 
   currentScanJob = serializeJob(runtimeJob) || null;
-  if (currentScanJob) {
-    void updateRuntimeJob(currentScanJob);
+  if (currentScanJob && currentScanJob.id) {
+    try {
+      const dbRun = await getScannerRunById(currentScanJob.id);
+      if (dbRun) {
+        const dbSummary = dbRun.rootResults && dbRun.rootResults.length
+          ? {
+              startedAt: dbRun.startedAt,
+              completedAt: dbRun.completedAt,
+              rootsRequested: dbRun.rootsRequested,
+              rootsScanned: dbRun.rootsScanned,
+              created: dbRun.created,
+              updated: dbRun.updated,
+              unchanged: dbRun.unchanged,
+              deleted: dbRun.deleted,
+              duplicateDrafts: dbRun.duplicateDrafts,
+              skipped: dbRun.skipped || [],
+              errors: dbRun.errors || [],
+              drafts: [],
+              rootResults: dbRun.rootResults,
+            }
+          : null;
+        currentScanJob = {
+          ...currentScanJob,
+          status: dbRun.status,
+          completedAt: dbRun.completedAt || currentScanJob.completedAt,
+          error: dbRun.error || currentScanJob.error,
+          summary: dbSummary || currentScanJob.summary,
+        };
+        await updateRuntimeJob(currentScanJob);
+      }
+    } catch (bootstrapDbError) {
+      logScannerEvent('bootstrap_db_sync_failed', { error: bootstrapDbError.message });
+    }
   }
 }
 
@@ -1824,8 +1905,8 @@ function bootstrapAutoScanScheduler() {
 }
 
 // Auto background jobs disabled — scanner only runs when triggered manually via admin API
-// bootstrapScannerRuntime();
-// registerScannerSignalHandlers();
+bootstrapScannerRuntime();
+registerScannerSignalHandlers();
 // bootstrapAutoScanScheduler();
 
 

@@ -300,8 +300,13 @@ exports.clearScannerMetadataCache = async (req, res) => {
   res.json({ ok: true, metadataCache: getEnhancedCacheStats() });
 };
 
-exports.getCurrentScannerJob = (req, res) => {
-  res.json({ job: getCurrentScanJob() });
+exports.getCurrentScannerJob = async (req, res) => {
+  try {
+    const job = await getCurrentScanJob();
+    res.json({ job });
+  } catch (error) {
+    res.status(500).json({ error: error.message || 'Failed to load current scanner job.' });
+  }
 };
 
 exports.runScanner = (req, res) => {
