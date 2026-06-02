@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useContext } from 'react';
+import { useState, useRef, useEffect, useContext, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminService } from '../../services';
 import { ToastContext } from '../../components/ui/ToastContext';
@@ -16,6 +16,7 @@ const STATUS_COLORS = {
   completed: '#60a5fa',
   failed: '#f87171',
   stopped: '#facc15',
+  interrupted: '#f59e0b',
   idle: TEXT3,
   pending: TEXT3,
   finalizing: '#60a5fa',
@@ -24,8 +25,12 @@ const STATUS_COLORS = {
 export default function ScannerPage() {
   const queryClient = useQueryClient();
   const logEndRef = useRef(null);
+  const runsContainerRef = useRef(null);
   const toast = useContext(ToastContext);
   const [prevJobStatus, setPrevJobStatus] = useState(null);
+  const [selectedRoots, setSelectedRoots] = useState([]);
+  const [confirmStop, setConfirmStop] = useState(false);
+  const [confirmClearCache, setConfirmClearCache] = useState(false);
 
   const { data: health, isLoading: healthLoading } = useQuery({
     queryKey: ['admin', 'scanner', 'health'],
@@ -46,18 +51,36 @@ export default function ScannerPage() {
   });
 
   const runMutation = useMutation({
-    mutationFn: () => adminService.runScanner(),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['admin', 'scanner'] }); },
+    mutationFn: () => adminService.runScanner(selectedRoots),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'scanner'] });
+      toast?.({ type: 'success', message: selectedRoots.length ? `Starting scan of ${selectedRoots.length} root(s)...` : 'Starting full scan...' });
+    },
+    onError: (err) => {
+      toast?.({ type: 'error', message: err?.message || 'Failed to start scan' });
+    },
   });
 
   const stopMutation = useMutation({
     mutationFn: () => adminService.stopScanner(),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['admin', 'scanner'] }); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'scanner'] });
+      toast?.({ type: 'success', message: 'Scan stopped.' });
+    },
+    onError: (err) => {
+      toast?.({ type: 'error', message: err?.message || 'Failed to stop scan' });
+    },
   });
 
   const clearCacheMutation = useMutation({
     mutationFn: () => adminService.clearScannerMetadataCache(),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['admin', 'scanner'] }); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'scanner'] });
+      toast?.({ type: 'success', message: 'Metadata cache cleared.' });
+    },
+    onError: (err) => {
+      toast?.({ type: 'error', message: err?.message || 'Failed to clear cache' });
+    },
   });
 
   const job = jobData?.job || null;
@@ -65,22 +88,51 @@ export default function ScannerPage() {
   const recentRuns = logsData?.items || health?.recentRuns || [];
   const isRunning = job?.status === 'running';
 
+  const isNearBottom = useCallback(() => {
+    const el = runsContainerRef.current;
+    if (!el) return true;
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  }, []);
+
+  const shouldAutoScrollRef = useRef(true);
+
   useEffect(() => {
-    if (logEndRef.current) logEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (shouldAutoScrollRef.current && logEndRef.current) {
+      logEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [recentRuns]);
+
+  useEffect(() => {
+    const el = runsContainerRef.current;
+    if (!el) return;
+    const onScroll = () => { shouldAutoScrollRef.current = isNearBottom(); };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [isNearBottom]);
 
   useEffect(() => {
     if (!job) return;
     if (prevJobStatus === 'running' && job.status !== 'running') {
       const summary = job.summary;
-      const errCount = summary?.errors?.length || 0;
-      const msg = errCount > 0
-        ? `Scan completed with ${errCount} error(s). ${summary?.created || 0} created, ${summary?.updated || 0} updated, ${summary?.unchanged || 0} unchanged.`
+      const totalCount = summary?.totalErrors ?? summary?.errors?.length ?? 0;
+      const msg = totalCount > 0
+        ? `Scan finished with ${totalCount} error(s). ${summary?.created || 0} created, ${summary?.updated || 0} updated, ${summary?.unchanged || 0} unchanged.`
         : `Scan completed successfully. ${summary?.created || 0} created, ${summary?.updated || 0} updated, ${summary?.unchanged || 0} unchanged, ${summary?.duplicateDrafts || 0} duplicates.`;
-      toast?.({ type: errCount > 0 ? 'error' : 'success', message: msg, duration: 6000 });
+      toast?.({ type: totalCount > 0 ? 'error' : 'success', message: msg, duration: 6000 });
     }
     setPrevJobStatus(job.status);
   }, [job?.status]);
+
+  useEffect(() => {
+    setConfirmStop(false);
+    setConfirmClearCache(false);
+  }, [isRunning]);
+
+  const toggleRoot = (rootId) => {
+    setSelectedRoots(prev =>
+      prev.includes(rootId) ? prev.filter(id => id !== rootId) : [...prev, rootId]
+    );
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1200px' }}>
@@ -98,7 +150,7 @@ export default function ScannerPage() {
             fontSize: '0.82rem', fontWeight: '700',
             background: isRunning ? 'rgba(34,197,94,0.12)' : SURFACE2,
             color: isRunning ? '#4ade80' : TEXT3,
-            border: isRunning ? '1px solid rgba(34,197,94,0.25)' : `1px solid ${BORDER}`,
+            border: `1px solid ${isRunning ? 'rgba(34,197,94,0.25)' : BORDER}`,
           }}>
             <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: isRunning ? '#4ade80' : TEXT3, animation: isRunning ? 'pulse 1.5s ease-in-out infinite' : 'none' }} />
             {isRunning ? 'Scanning...' : 'Idle'}
@@ -109,30 +161,75 @@ export default function ScannerPage() {
               padding: '10px 24px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: '700',
               cursor: isRunning ? 'not-allowed' : 'pointer', border: 'none',
               background: isRunning ? SURFACE2 : 'rgba(34,197,94,0.12)', color: isRunning ? TEXT3 : '#4ade80',
-              border: isRunning ? `1px solid ${BORDER}` : '1px solid rgba(34,197,94,0.25)',
+              border: `1px solid ${isRunning ? BORDER : 'rgba(34,197,94,0.25)'}`,
               opacity: isRunning ? 0.5 : 1,
             }}>
-            {runMutation.isPending ? 'Starting...' : 'Run Scan'}
+            {runMutation.isPending ? 'Starting...' : selectedRoots.length ? `Scan ${selectedRoots.length} Root(s)` : 'Run Scan'}
           </button>
-          <button type="button" onClick={() => stopMutation.mutate()}
-            disabled={!isRunning || stopMutation.isPending}
-            style={{
-              padding: '10px 24px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: '700',
-              cursor: !isRunning ? 'not-allowed' : 'pointer', border: 'none',
-              background: !isRunning ? SURFACE2 : 'rgba(239,68,68,0.1)', color: !isRunning ? TEXT3 : '#f87171',
-              border: !isRunning ? `1px solid ${BORDER}` : '1px solid rgba(239,68,68,0.2)',
-              opacity: !isRunning ? 0.5 : 1,
-            }}>
-            Stop
-          </button>
-          <button type="button" onClick={() => clearCacheMutation.mutate()}
-            disabled={clearCacheMutation.isPending}
-            style={{
-              padding: '10px 16px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: '600',
-              cursor: 'pointer', border: 'none', background: SURFACE2, color: TEXT2, border: `1px solid ${BORDER}`,
-            }}>
-            Clear Cache
-          </button>
+          {!confirmStop ? (
+            <button type="button" onClick={() => setConfirmStop(true)}
+              disabled={!isRunning || stopMutation.isPending}
+              style={{
+                padding: '10px 24px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: '700',
+                cursor: !isRunning ? 'not-allowed' : 'pointer', border: 'none',
+                background: !isRunning ? SURFACE2 : 'rgba(239,68,68,0.1)', color: !isRunning ? TEXT3 : '#f87171',
+                border: `1px solid ${!isRunning ? BORDER : 'rgba(239,68,68,0.2)'}`,
+                opacity: !isRunning ? 0.5 : 1,
+              }}>
+              Stop
+            </button>
+          ) : (
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <button type="button" onClick={() => { stopMutation.mutate(); setConfirmStop(false); }}
+                style={{
+                  padding: '10px 16px', borderRadius: '10px', fontSize: '0.82rem', fontWeight: '700',
+                  cursor: 'pointer', border: 'none',
+                  background: 'rgba(239,68,68,0.15)', color: '#f87171',
+                  border: '1px solid rgba(239,68,68,0.3)',
+                }}>
+                Confirm Stop
+              </button>
+              <button type="button" onClick={() => setConfirmStop(false)}
+                style={{
+                  padding: '10px 12px', borderRadius: '10px', fontSize: '0.82rem', fontWeight: '600',
+                  cursor: 'pointer', border: 'none', background: SURFACE2, color: TEXT3,
+                  border: `1px solid ${BORDER}`,
+                }}>
+                Cancel
+              </button>
+            </div>
+          )}
+          {!confirmClearCache ? (
+            <button type="button" onClick={() => setConfirmClearCache(true)}
+              disabled={clearCacheMutation.isPending}
+              style={{
+                padding: '10px 16px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: '600',
+                cursor: 'pointer', border: 'none', background: SURFACE2, color: TEXT2,
+                border: `1px solid ${BORDER}`,
+              }}>
+              Clear Cache
+            </button>
+          ) : (
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <button type="button" onClick={() => { clearCacheMutation.mutate(); setConfirmClearCache(false); }}
+                style={{
+                  padding: '10px 16px', borderRadius: '10px', fontSize: '0.82rem', fontWeight: '700',
+                  cursor: 'pointer', border: 'none',
+                  background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
+                  border: '1px solid rgba(245,158,11,0.25)',
+                }}>
+                Confirm Clear
+              </button>
+              <button type="button" onClick={() => setConfirmClearCache(false)}
+                style={{
+                  padding: '10px 12px', borderRadius: '10px', fontSize: '0.82rem', fontWeight: '600',
+                  cursor: 'pointer', border: 'none', background: SURFACE2, color: TEXT3,
+                  border: `1px solid ${BORDER}`,
+                }}>
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -143,6 +240,11 @@ export default function ScannerPage() {
             <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem', fontWeight: '700', color: TEXT, margin: 0 }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={STATUS_COLORS[job.status] || TEXT2} strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
               Current Job
+              <span style={{
+                fontSize: '0.72rem', fontWeight: '700', padding: '2px 8px', borderRadius: '6px',
+                background: `${STATUS_COLORS[job.status] || TEXT3}20`, color: STATUS_COLORS[job.status] || TEXT3,
+                textTransform: 'uppercase', letterSpacing: '0.05em',
+              }}>{job.status}</span>
             </h3>
             <span style={{ fontSize: '0.78rem', color: TEXT3, fontWeight: '500' }}>Started: {job.startedAt ? new Date(job.startedAt).toLocaleTimeString() : '\u2014'}</span>
           </div>
@@ -174,7 +276,9 @@ export default function ScannerPage() {
                 <span>{root.discovered || 0} folders</span>
                 <span>{root.processed || 0} / {root.totalCandidates || 0} processed</span>
                 <span style={{ color: '#4ade80', fontWeight: '600' }}>+{root.created || 0}</span>
-                {root.errors?.length > 0 && <span style={{ color: '#f87171' }}>{root.errors.length} errors</span>}
+                {(root.totalErrors ?? root.errors?.length ?? 0) > 0 && (
+                  <span style={{ color: '#f87171' }}>{root.totalErrors ?? root.errors.length} errors</span>
+                )}
               </div>
             </div>
           ))}
@@ -188,7 +292,18 @@ export default function ScannerPage() {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>
             Scan Roots ({roots.length})
           </h3>
-          <FixRootsButton />
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {selectedRoots.length > 0 && (
+              <button type="button" onClick={() => setSelectedRoots([])}
+                style={{
+                  padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '600',
+                  cursor: 'pointer', border: 'none', background: SURFACE2, color: TEXT3, border: `1px solid ${BORDER}`,
+                }}>
+                Clear Selection
+              </button>
+            )}
+            <FixRootsButton />
+          </div>
         </div>
         {healthLoading ? (
           <div style={{ color: TEXT3, padding: '20px', textAlign: 'center' }}>Loading...</div>
@@ -196,29 +311,40 @@ export default function ScannerPage() {
           <div style={{ color: TEXT3, padding: '20px', textAlign: 'center' }}>No scan roots configured.</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {roots.map(root => (
-              <div key={root.id} style={{
-                padding: '14px 16px', borderRadius: '10px', background: SURFACE2, border: `1px solid ${BORDER}`,
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
-                  <span style={{
-                    width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0,
-                    background: root.exists ? (root.error ? '#facc15' : '#4ade80') : '#f87171',
-                  }} />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: '600', color: TEXT, fontSize: '0.88rem' }}>{root.label}</div>
-                    <div style={{ fontSize: '0.75rem', color: TEXT3 }}>{root.scanPath}</div>
+            {roots.map(root => {
+              const isSelected = selectedRoots.includes(root.id);
+              const isCheckable = root.checkable !== false;
+              const statusColor = !isCheckable ? '#60a5fa' : root.exists ? (root.error ? '#facc15' : '#4ade80') : '#f87171';
+              return (
+                <div key={root.id} onClick={() => toggleRoot(root.id)}
+                  style={{
+                    padding: '14px 16px', borderRadius: '10px', background: isSelected ? 'rgba(99,102,241,0.08)' : SURFACE2,
+                    border: `1px solid ${isSelected ? 'rgba(99,102,241,0.3)' : BORDER}`,
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap',
+                    cursor: 'pointer', transition: 'all 0.15s ease',
+                  }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+                    <input type="checkbox" checked={isSelected} readOnly
+                      style={{ width: '16px', height: '16px', accentColor: ACCENT, cursor: 'pointer', flexShrink: 0 }} />
+                    <span style={{
+                      width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0,
+                      background: statusColor,
+                    }} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: '600', color: TEXT, fontSize: '0.88rem' }}>{root.label}</div>
+                      <div style={{ fontSize: '0.75rem', color: TEXT3 }}>{root.scanPath}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', fontSize: '0.72rem', color: TEXT2, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={tagStyle}>{root.type}</span>
+                    {!isCheckable && <span style={{ ...tagStyle, background: 'rgba(96,165,250,0.1)', color: '#60a5fa' }}>remote</span>}
+                    <span style={tagStyle}>{root.videoCount || 0} videos</span>
+                    {root.lastCompletedAt && <span style={tagStyle}>Last scan: {new Date(root.lastCompletedAt).toLocaleDateString()}</span>}
+                    {root.error && <span style={{ ...tagStyle, background: 'rgba(239,68,68,0.1)', color: '#f87171' }}>{root.error}</span>}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: '8px', fontSize: '0.72rem', color: TEXT2, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <span style={tagStyle}>{root.type}</span>
-                  <span style={tagStyle}>{root.videoCount || 0} videos</span>
-                  {root.lastCompletedAt && <span style={tagStyle}>Last scan: {new Date(root.lastCompletedAt).toLocaleDateString()}</span>}
-                  {root.error && <span style={{ ...tagStyle, background: 'rgba(239,68,68,0.1)', color: '#f87171' }}>{root.error}</span>}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -230,7 +356,7 @@ export default function ScannerPage() {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
             Recent Runs ({recentRuns.length})
           </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '400px', overflowY: 'auto' }}>
+          <div ref={runsContainerRef} style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '400px', overflowY: 'auto' }}>
             {recentRuns.map((run, i) => (
               <div key={run.id || i} style={{
                 padding: '12px 16px', borderRadius: '10px', background: SURFACE2, border: `1px solid ${BORDER}`,
@@ -255,7 +381,9 @@ export default function ScannerPage() {
                 <div style={{ display: 'flex', gap: '8px', fontSize: '0.72rem', color: TEXT2, flexWrap: 'wrap' }}>
                   <span style={tagStyle}>+{run.created || 0} created</span>
                   <span style={tagStyle}>{run.updated || 0} updated</span>
-                  {run.errors?.length > 0 && <span style={{ ...tagStyle, background: 'rgba(239,68,68,0.1)', color: '#f87171' }}>{run.errors.length} errors</span>}
+                  {(run.totalErrors ?? run.errors?.length ?? 0) > 0 && (
+                    <span style={{ ...tagStyle, background: 'rgba(239,68,68,0.1)', color: '#f87171' }}>{run.totalErrors ?? run.errors.length} errors</span>
+                  )}
                 </div>
               </div>
             ))}
@@ -271,6 +399,7 @@ function FixRootsButton() {
   const [fixing, setFixing] = useState(false);
   const [dryResult, setDryResult] = useState(null);
   const [applied, setApplied] = useState(false);
+  const toast = useContext(ToastContext);
 
   const preview = async () => {
     setDryResult(null);
@@ -278,7 +407,11 @@ function FixRootsButton() {
     try {
       const res = await adminService.fixMisconfiguredRoots(true);
       setDryResult(res);
-    } catch { setDryResult({ error: 'Failed to check roots' }); }
+    } catch (err) {
+      const msg = err?.message || 'Failed to check roots';
+      setDryResult({ error: msg });
+      toast?.({ type: 'error', message: msg });
+    }
   };
 
   const apply = async () => {
@@ -287,7 +420,12 @@ function FixRootsButton() {
       const res = await adminService.fixMisconfiguredRoots(false);
       setApplied(true);
       setDryResult({ ...res, applied: true });
-    } catch { setDryResult({ ...dryResult, error: 'Failed to fix roots' }); }
+      toast?.({ type: 'success', message: `Fixed ${res.deletedCount || 0} misconfigured entries.` });
+    } catch (err) {
+      const msg = err?.message || 'Failed to fix roots';
+      setDryResult({ error: msg });
+      toast?.({ type: 'error', message: msg });
+    }
     setFixing(false);
   };
 
@@ -343,10 +481,28 @@ function FixRootsButton() {
         </div>
       )}
       {dryResult?.error && (
-        <span style={{ fontSize: '0.78rem', color: '#f87171' }}>{dryResult.error}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '0.78rem', color: '#f87171' }}>{dryResult.error}</span>
+          <button type="button" onClick={() => setDryResult(null)}
+            style={{
+              padding: '4px 10px', borderRadius: '6px', fontSize: '0.72rem',
+              cursor: 'pointer', border: 'none', background: SURFACE2, color: TEXT3, border: `1px solid ${BORDER}`,
+            }}>
+            Dismiss
+          </button>
+        </div>
       )}
       {applied && (
-        <span style={{ fontSize: '0.78rem', color: '#4ade80' }}>Roots fixed. Run a scan to re-index.</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '0.78rem', color: '#4ade80' }}>Roots fixed. Run a scan to re-index.</span>
+          <button type="button" onClick={() => { setDryResult(null); setApplied(false); }}
+            style={{
+              padding: '4px 10px', borderRadius: '6px', fontSize: '0.72rem',
+              cursor: 'pointer', border: 'none', background: SURFACE2, color: TEXT3, border: `1px solid ${BORDER}`,
+            }}>
+            Dismiss
+          </button>
+        </div>
       )}
     </div>
   );
