@@ -74,13 +74,29 @@ async function recordScannerRun(entry) {
     [String(entry.id || ''), String(entry.status || 'completed'), entry.startedAt || null, entry.completedAt || null, JSON.stringify(entry.rootIds || []), toSafeInteger(entry.rootsRequested), toSafeInteger(entry.rootsScanned), toSafeInteger(entry.created), toSafeInteger(entry.updated), toSafeInteger(entry.deleted), toSafeInteger(entry.unchanged), toSafeInteger(entry.duplicateDrafts), JSON.stringify(entry.skipped || []), JSON.stringify(entry.errors || []), JSON.stringify(entry.rootResults || []), entry.error || null, entry.startedAt || new Date().toISOString()]
   );
   const current = appStateCache.get('scanner_log') || { runs: [] };
-  const runs = [entry, ...(current.runs || []).filter((r) => r.id !== entry.id)].slice(0, MAX_SCANNER_RUNS);
+  const cacheEntry = {
+    ...entry,
+    totalErrors: Array.isArray(entry.errors) ? entry.errors.length : 0,
+    rootResults: Array.isArray(entry.rootResults)
+      ? entry.rootResults.map((r) => ({ ...r, totalErrors: Array.isArray(r.errors) ? r.errors.length : 0 }))
+      : entry.rootResults || [],
+  };
+  const runs = [cacheEntry, ...(current.runs || []).filter((r) => r.id !== entry.id)].slice(0, MAX_SCANNER_RUNS);
   appStateCache.set('scanner_log', { runs });
   return entry;
 }
 
 function getScannerRuns(limit = 10) {
   return (loadScannerLog().runs || []).slice(0, limit);
+}
+
+async function getScannerRunById(id) {
+  await ensureContentStore();
+  const runId = String(id || '').trim();
+  if (!runId) return null;
+  const result = await db.query('SELECT * FROM scanner_runs WHERE id = $1 LIMIT 1', [runId]);
+  const row = result.rows[0];
+  return row ? rowToScannerRun(row) : null;
 }
 
 async function getItemByScanSignature(scanSignature) {
@@ -391,6 +407,7 @@ module.exports = {
   refreshScannerCaches,
   recordScannerRun,
   getScannerRuns,
+  getScannerRunById,
   getItemByScanSignature,
   getScanSignaturesByRootId,
   deleteItemsByScanSignatures,
