@@ -21,6 +21,7 @@ const NAV_LINKS = [
   { path: '/admin/content/new', label: 'New Content', icon: '+' },
   { path: '/admin/content', label: 'Content Library', icon: '\u2630' },
   { path: '/admin/scanner', label: 'Scanner', icon: '\u25B6' },
+  { path: '/admin/duplicates', label: 'Duplicates', icon: '\u29C9' },
   { path: '/admin/users', label: 'Users', icon: '\u263C' },
   { path: '/admin/analytics', label: 'Analytics', icon: '\u2261' },
 ];

@@ -15,7 +15,7 @@ const { getCurrentScanJob, getScannerHealth, listScannerRoots, startScanJob, sto
 const { loadScannerRoots, saveScannerRoots, refreshScannerCaches, loadScannerState, saveScannerState } = require('../data/store');
 const { fetchMetadataByTmdbId, fetchMetadataByImdbId } = require('../services/metadata-enricher');
 const { clearMetadataCache, getEnhancedCacheStats } = require('../services/scanner-enhanced-metadata');
-const { getDuplicateReviewReport, runDuplicateCleanup } = require('../services/duplicate-review');
+const { getDuplicateReviewReport, runDuplicateCleanup, getCatalogDuplicateGroups } = require('../services/duplicate-review');
 const { listUsers, createUser, updateUser, deleteUser } = require('../services/admin-user');
 const { AppError } = require('../utils/error');
 const db = require('../config/database');
@@ -361,8 +361,74 @@ exports.getDuplicatesReport = (req, res) => {
   res.json(getDuplicateReviewReport());
 };
 
+exports.getCatalogDuplicates = async (req, res) => {
+  const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 100));
+  const minGroupSize = Math.max(1, Number(req.query.minGroupSize) || 2);
+  const report = await getCatalogDuplicateGroups({ db, limit, minGroupSize });
+  res.json(report);
+};
+
 exports.runDuplicatesCleanup = (req, res) => {
-  res.status(202).json(runDuplicateCleanup());
+  const body = req.body || {};
+  const result = runDuplicateCleanup({
+    dryRun: body.dryRun === true || req.query.dry === 'true' || req.query.dry === '1',
+    onlyPaths: Array.isArray(body.onlyPaths) ? body.onlyPaths : [],
+  });
+  res.status(202).json(result);
+};
+
+exports.mergeCatalogDuplicates = async (req, res) => {
+  const body = req.body || {};
+  const keepId = Number(body.keepId);
+  const removeIds = (Array.isArray(body.removeIds) ? body.removeIds : [])
+    .map(Number)
+    .filter((id) => Number.isFinite(id) && id > 0 && id !== keepId);
+  if (!keepId || !removeIds.length) {
+    return res.status(400).json({ ok: false, error: 'keepId and at least one removeId are required' });
+  }
+  const placeholders = removeIds.map((_, idx) => `$${idx + 2}`).join(',');
+  const delResult = await db.query(
+    `DELETE FROM content_catalog WHERE id <> $1 AND id IN (${placeholders})`,
+    [keepId, ...removeIds],
+  );
+  res.json({ ok: true, keepId, removedCount: delResult.rowCount || 0 });
+};
+
+exports.checkDuplicateTitle = async (req, res) => {
+  const { normalizeTitleKey } = require('../data/store/helpers');
+  const title = String(req.query.title || '').trim();
+  const type = String(req.query.type || 'movie').toLowerCase();
+  const excludeId = Number(req.query.excludeId) || 0;
+  if (!title) return res.json({ candidates: [], normalizedKey: '' });
+  const titleKey = normalizeTitleKey(title);
+  if (!titleKey) return res.json({ candidates: [], normalizedKey: '' });
+  const params = [type, titleKey];
+  let excludeClause = '';
+  if (excludeId > 0) {
+    params.push(excludeId);
+    excludeClause = `AND id <> $${params.length}`;
+  }
+  params.push(20);
+  const result = await db.query(
+    `SELECT id, title, status, source_type, source_root_id, year, payload
+     FROM content_catalog
+     WHERE content_type = $1 AND title_key = $2 ${excludeClause}
+     ORDER BY id ASC
+     LIMIT $${params.length}`,
+    params,
+  );
+  res.json({
+    normalizedKey: titleKey,
+    candidates: result.rows.map((row) => ({
+      id: Number(row.id),
+      title: row.title,
+      status: row.status,
+      sourceType: row.source_type,
+      sourceRootId: row.source_root_id || '',
+      year: row.year,
+      sourcePath: row.payload?.sourcePath || '',
+    })),
+  });
 };
 
 exports.fetchTmdbMetadata = async (req, res) => {

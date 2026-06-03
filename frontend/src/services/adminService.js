@@ -24,7 +24,16 @@ export const adminService = {
   clearScannerMetadataCache: () => apiClient('/admin/scanner/cache/clear', { method: 'POST' }).finally(clearAdminCache),
 
   getDuplicateReview: () => cachedGet('/admin/duplicates/review'),
-  runDuplicateCleanup: () => apiClient('/admin/duplicates/cleanup', { method: 'POST' }).finally(clearAdminCache),
+  getCatalogDuplicates: (params = {}) => cachedGet('/admin/duplicates/catalog', params),
+  checkDuplicateTitle: (params = {}) => cachedGet('/admin/duplicates/check', params),
+  runDuplicateCleanup: (body = {}) => apiClient('/admin/duplicates/cleanup', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  }).finally(clearAdminCache),
+  mergeCatalogDuplicates: (keepId, removeIds) => apiClient('/admin/duplicates/merge', {
+    method: 'POST',
+    body: JSON.stringify({ keepId, removeIds }),
+  }).finally(clearAdminCache),
   pruneCatalog: () => apiClient('/admin/maintenance/prune', { method: 'POST' }).finally(clearAdminCache),
   runVacuum: () => apiClient('/admin/maintenance/vacuum', { method: 'POST' }).finally(clearAdminCache),
   getScannerDrafts: (status = 'draft') => cachedGet('/admin/scanner/drafts', { status }),

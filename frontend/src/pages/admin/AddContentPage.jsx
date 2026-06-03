@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate, Link, useParams } from 'react-router-dom';
 import { adminService } from '../../services';
 import ConfirmDialog from '../../components/overlays/ConfirmDialog';
@@ -105,7 +105,27 @@ function AddContentPage() {
     loadItem();
   }, [id, isEditMode]);
 
-  const duplicateCandidates = itemMeta?.duplicateCandidates || [];
+  const [liveDuplicates, setLiveDuplicates] = useState(null);
+  const dupTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (dupTimerRef.current) clearTimeout(dupTimerRef.current);
+    const title = formData.title?.trim();
+    if (!title || title.length < 2) {
+      setLiveDuplicates(null);
+      return;
+    }
+    dupTimerRef.current = setTimeout(() => {
+      const type = formData.type || 'movie';
+      const excludeId = isEditMode ? id : undefined;
+      adminService.checkDuplicateTitle({ title, type, excludeId })
+        .then((res) => { setLiveDuplicates(res?.candidates || []); })
+        .catch(() => { setLiveDuplicates(null); });
+    }, 500);
+    return () => { if (dupTimerRef.current) clearTimeout(dupTimerRef.current); };
+  }, [formData.title, formData.type, isEditMode, id]);
+
+  const duplicateCandidates = liveDuplicates ?? (itemMeta?.duplicateCandidates || []);
   const completenessScore = useMemo(() => {
     const checks = [
       formData.title,

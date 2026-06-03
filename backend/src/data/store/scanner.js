@@ -1,6 +1,6 @@
 const { db, appStateCache, ensureContentStore, setAppState } = require('./base');
 const { MAX_SCANNER_RUNS } = require('./constants');
-const { toSafeInteger, rowToScannerRoot, rowToScannerRun, normalizeItem, normalizeTitleKey, extractTypedColumns } = require('./helpers');
+const { toSafeInteger, rowToScannerRoot, rowToScannerRun, normalizeItem, normalizeTitleKey, extractTypedColumns, attachDuplicateMetadata } = require('./helpers');
 
 function loadScannerLog() {
   return appStateCache.get('scanner_log') || { runs: [] };
@@ -136,6 +136,28 @@ async function deleteItemsByScanSignatures(scanSignatures = []) {
   return result.rowCount || 0;
 }
 
+async function computeDuplicateMetadataInMemory(item) {
+  if (!item || !item.titleKey) {
+    return { ...item, duplicateCandidates: [], duplicateCount: 0 };
+  }
+  const groupKey = `${item.type}:${item.titleKey}`;
+  const result = await db.query(
+    'SELECT payload FROM content_catalog WHERE content_type = $1 AND title_key = $2',
+    [item.type, item.titleKey],
+  );
+  const candidates = result.rows.map((row) => normalizeItem(row.payload));
+  return attachDuplicateMetadata(item, new Map([[groupKey, candidates]]));
+}
+
+async function syncDuplicateCountColumn(itemId, duplicateCount) {
+  if (!itemId || !Number.isFinite(duplicateCount)) return;
+  if (duplicateCount === 0) {
+    await db.query('UPDATE content_catalog SET duplicate_count = 0 WHERE id = $1 AND duplicate_count <> 0', [itemId]);
+    return;
+  }
+  await db.query('UPDATE content_catalog SET duplicate_count = $2 WHERE id = $1', [itemId, duplicateCount]);
+}
+
 async function upsertScannedItem(payload) {
   const now = new Date().toISOString();
   if (!payload || !['movie', 'series'].includes(String(payload.type || '').toLowerCase())) {
@@ -152,7 +174,7 @@ async function upsertScannedItem(payload) {
       || (shouldAutoPublish ? (process.env.SCANNER_DEFAULT_STATUS || 'published') : 'draft');
     const nextPublishedAt = nextStatus === 'published' ? (payload.publishedAt || now) : '';
 
-    const item = normalizeItem({
+    const baseItem = normalizeItem({
       id: await require('./content').allocateNextCatalogId(),
       createdAt: now,
       updatedAt: now,
@@ -164,7 +186,12 @@ async function upsertScannedItem(payload) {
       lastScanRunId: payload.lastScanRunId || '',
       lastScanRunAt: payload.lastScanRunAt || now,
     });
-    const insertCols = extractTypedColumns(item);
+
+    // Compute duplicate metadata in-memory (1 query) before writing to DB,
+    // so the column is correct on first insert and we avoid a second round-trip.
+    const itemWithDuplicates = await computeDuplicateMetadataInMemory(baseItem);
+
+    const insertCols = extractTypedColumns(itemWithDuplicates);
     await db.query(
       `INSERT INTO content_catalog
         (id, payload, created_at, updated_at, status, content_type, title, title_key,
@@ -172,7 +199,7 @@ async function upsertScannedItem(payload) {
          year, rating, featured, featured_order, trending_score, duplicate_count,
          metadata_status, published_at, released_at)
        VALUES ($1,$2::jsonb,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
-      [item.id, JSON.stringify(item), now, now,
+      [itemWithDuplicates.id, JSON.stringify(itemWithDuplicates), now, now,
        insertCols.status, insertCols.content_type, insertCols.title, insertCols.title_key,
        insertCols.language, insertCols.category, insertCols.collection,
        insertCols.source_type, insertCols.source_root_id, insertCols.last_scan_run_id,
@@ -180,11 +207,10 @@ async function upsertScannedItem(payload) {
        insertCols.trending_score, insertCols.duplicate_count, insertCols.metadata_status,
        insertCols.published_at, insertCols.released_at],
     );
-    const resultItem = await require('./content').getItemById(item.id);
-    if (resultItem && resultItem.duplicateCount > 0) {
-      await db.query('UPDATE content_catalog SET duplicate_count = $2 WHERE id = $1', [item.id, resultItem.duplicateCount]);
-    }
-    return { item: resultItem, created: true, updated: false };
+
+    // Defensive sync: only updates if the column value drifted from in-memory state.
+    await syncDuplicateCountColumn(itemWithDuplicates.id, itemWithDuplicates.duplicateCount);
+    return { item: itemWithDuplicates, created: true, updated: false };
   }
 
   // ── EXISTING ITEM — preserve user-managed fields ─────────────────────────
@@ -292,7 +318,11 @@ async function upsertScannedItem(payload) {
     return { item: normalizeItem(current), created: false, updated: false };
   }
 
-  const updateCols = extractTypedColumns(item);
+  // Compute duplicate metadata in-memory (1 query) so the column is correct
+  // on first update and we avoid re-fetching the row + a second round-trip.
+  const itemWithDuplicates = await computeDuplicateMetadataInMemory(item);
+
+  const updateCols = extractTypedColumns(itemWithDuplicates);
   await db.query(
     `UPDATE content_catalog
      SET payload = $2::jsonb, updated_at = NOW(), status = $3, content_type = $4,
@@ -302,7 +332,7 @@ async function upsertScannedItem(payload) {
          trending_score = $17, duplicate_count = $18, metadata_status = $19,
          published_at = $20, released_at = $21
      WHERE id = $1`,
-    [item.id, JSON.stringify(item),
+    [itemWithDuplicates.id, JSON.stringify(itemWithDuplicates),
      updateCols.status, updateCols.content_type, updateCols.title, updateCols.title_key,
      updateCols.language, updateCols.category, updateCols.collection,
      updateCols.source_type, updateCols.source_root_id, updateCols.last_scan_run_id,
@@ -310,11 +340,10 @@ async function upsertScannedItem(payload) {
      updateCols.trending_score, updateCols.duplicate_count, updateCols.metadata_status,
      updateCols.published_at, updateCols.released_at],
   );
-  const updateResultItem = await require('./content').getItemById(item.id);
-  if (updateResultItem && updateResultItem.duplicateCount > 0) {
-    await db.query('UPDATE content_catalog SET duplicate_count = $2 WHERE id = $1', [item.id, updateResultItem.duplicateCount]);
-  }
-  return { item: updateResultItem, created: false, updated: true };
+
+  // Defensive sync: only updates if the column value drifted from in-memory state.
+  await syncDuplicateCountColumn(itemWithDuplicates.id, itemWithDuplicates.duplicateCount);
+  return { item: itemWithDuplicates, created: false, updated: true };
 }
 
 async function deleteScannerItemsNotInSignatures(sourceRootId, scanSignatures = []) {

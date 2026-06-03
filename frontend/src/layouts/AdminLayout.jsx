@@ -132,6 +132,16 @@ const NAV = [
     ),
   },
   {
+    path: "/admin/duplicates",
+    label: "Duplicates",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+      </svg>
+    ),
+  },
+  {
     path: "/admin/users",
     label: "Users",
     icon: (
@@ -207,6 +217,7 @@ function AdminLayout() {
     if (p.startsWith("/admin/movies")) return "Movies";
     if (p.startsWith("/admin/series")) return "Series";
     if (p.startsWith("/admin/scanner")) return "Scanner";
+    if (p.startsWith("/admin/duplicates")) return "Duplicates";
     if (p.startsWith("/admin/users")) return "Users";
     if (p.startsWith("/admin/analytics")) return "Analytics";
     if (p.startsWith("/admin/content")) return "Content Library";

@@ -148,6 +148,43 @@ function ContentLibraryPage() {
     sortBy, sortDir,
   }), [sectionType, filters, pagination.page, pagination.limit, sortBy, sortDir]);
 
+  // Duplicate count query: only fetch when the duplicates filter is off
+  // (so we know the TOTAL across all matching filters, not just current page).
+  const duplicateCountParams = useMemo(() => {
+    if (filters.duplicatesOnly) return null;
+    return {
+      ...(sectionType === 'movie' ? { type: 'movie' } : {}),
+      ...(sectionType === 'series' ? { type: 'series' } : {}),
+      ...(filters.search ? { search: filters.search } : {}),
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.source ? { source: filters.source } : {}),
+      ...(filters.language ? { language: filters.language } : {}),
+      ...(filters.category ? { category: filters.category } : {}),
+      ...(filters.collection ? { collection: filters.collection } : {}),
+      ...(filters.tag ? { tag: filters.tag } : {}),
+      ...(filters.sourceRootId ? { sourceRootId: filters.sourceRootId } : {}),
+      duplicatesOnly: 'true',
+      page: 1, limit: 1,
+    };
+  }, [sectionType, filters]);
+
+  const [duplicateTotal, setDuplicateTotal] = useState(0);
+
+  useEffect(() => {
+    if (!duplicateCountParams) {
+      setDuplicateTotal(pagination.total || 0);
+      return;
+    }
+    let cancelled = false;
+    const fetcher = sectionType === 'movie'
+      ? adminService.getMovies
+      : sectionType === 'series' ? adminService.getSeries : adminService.getContent;
+    fetcher(duplicateCountParams)
+      .then((res) => { if (!cancelled) setDuplicateTotal(res?.total || 0); })
+      .catch(() => { if (!cancelled) setDuplicateTotal(0); });
+    return () => { cancelled = true; };
+  }, [duplicateCountParams, pagination.total, sectionType]);
+
   const loadContent = useCallback(async () => {
     try {
       setError('');
@@ -201,8 +238,10 @@ function ContentLibraryPage() {
     scanner: allContent.filter((i) => i.sourceType === 'scanner').length,
     manual: allContent.filter((i) => i.sourceType === 'manual').length,
     needsReview: allContent.filter((i) => i.metadataStatus === 'needs_review').length,
-    duplicateRisk: allContent.filter((i) => Number(i.duplicateCount || 0) > 0).length,
-  }), [allContent, pagination.total]);
+    duplicateRisk: filters.duplicatesOnly
+      ? pagination.total
+      : duplicateTotal,
+  }), [allContent, pagination.total, filters.duplicatesOnly, duplicateTotal]);
 
   const seriesGroups = useMemo(() => {
     if (!groupBySeries) return null;
