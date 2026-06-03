@@ -3,7 +3,7 @@
   {"id":"hindi-movies","type":"movie","label":"Hindi Movies","category":"Hindi Movies","language":"Hindi","scanPath":"/var/www/html/Hindi_Movies","publicBaseUrl":"/Hindi_Movies"},
   {"id":"hindi-dubbed-movies","type":"movie","label":"Hindi Dubbed Movies","category":"Hindi Dubbed Movies","language":"Hindi","scanPath":"/var/www/html/Hindi_Dubbed_Movies","publicBaseUrl":"/Hindi_Dubbed_Movies"},
   {"id":"series-a-e","type":"series","label":"TV/Web Series 0-9 A-E","category":"TV Series","language":"English","scanPath":"/var/www/html/TV_Series/TV_Web_Series-0-9_A-E","publicBaseUrl":"/TV_Series/TV_Web_Series-0-9_A-E"},
-  {"id":"series-f-m","type":"series","label":"TV/Web Series F-M","category":"TV Series","language":"English","scanPath":"/var/www/html/TV_Series/TV_Web_Series-F-M","publicBaseUrl":"/TV_Series/TV_Web_Series-F-M"},
+  {"id":"series-f-m","type":"series","label":"TV/Web Series F-M","category":"TV Series","language":"English","scanPath":"/var/www/html/TV_Series/TV_Web_Series-F-M","publicBaseUrl":"/TV_Series/TV_Web_Series-F-M","skipScan":true},
   {"id":"series-n-s","type":"series","label":"TV/Web Series N-S","category":"TV Series","language":"English","scanPath":"/var/www/html/TV_Series/TV_Web_Series-N-S","publicBaseUrl":"/TV_Series/TV_Web_Series-N-S"},
   {"id":"series-u-z","type":"series","label":"TV/Web Series U-Z","category":"TV Series","language":"English","scanPath":"/var/www/html/TV_Series/TV_Web_Series-U-Z","publicBaseUrl":"/TV_Series/TV_Web_Series-U-Z"},
   {"id":"new-movies-1","type":"movie","label":"New Movies 1","category":"New Movies","language":"English","scanPath":"/var/www/html/New_Movies_1","publicBaseUrl":"/New_Movies_1"},
