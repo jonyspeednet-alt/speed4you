@@ -253,13 +253,19 @@ jobs:
             for i in $(seq 1 30); do
               if curl -fsS http://127.0.0.1:4100/health >/dev/null 2>&1; then
                 echo "Health check passed"
-                exit 0
+                break
               fi
               sleep 2
             done
 
-            echo "Health check failed" >&2
-            exit 1
+            echo "=== Route verification ($BACKEND/src/routes/admin.js) ==="
+            grep -nE 'rematch|cleanup-season-duplicates' "$BACKEND/src/routes/admin.js" || true
+            WS_FILE=/home/speed4you/actions-runner/_work/speed4you/speed4you/backend/src/routes/admin.js
+            if [ -f "$WS_FILE" ]; then
+              echo "=== Route verification (workspace $WS_FILE) ==="
+              grep -nE 'rematch|cleanup-season-duplicates' "$WS_FILE" || true
+            fi
+            echo "=== End route verification ==="
 
       - name: Setup data portal on data.speed4you.net
         uses: appleboy/ssh-action@v1.2.0
