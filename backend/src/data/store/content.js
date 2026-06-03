@@ -250,6 +250,59 @@ async function getItemsByIds(ids = [], { includeDuplicates = true } = {}) {
   return itemsMap;
 }
 
+/**
+ * Recalculate duplicate_count for all items sharing the same title key as the given item.
+ * This ensures the DB column stays in sync when items are added/removed from a group.
+ */
+async function syncDuplicateCountsForTitleKey(contentType, titleKey) {
+  const result = await db.query(
+    'SELECT id, payload FROM content_catalog WHERE content_type = $1 AND title_key = $2',
+    [contentType, titleKey],
+  );
+  if (result.rows.length <= 1) {
+    // Single item or none – duplicate_count must be 0 for all
+    const updatePromises = result.rows
+      .map((row) => {
+        const item = normalizeItem(row.payload);
+        if (Number(item.duplicateCount || 0) !== 0) {
+          const fixed = { ...item, duplicateCount: 0 };
+          return db.query(
+            'UPDATE content_catalog SET payload = $2::jsonb, duplicate_count = 0 WHERE id = $1',
+            [item.id, JSON.stringify(fixed)],
+          );
+        }
+        return null;
+      })
+      .filter(Boolean);
+    if (updatePromises.length) await Promise.all(updatePromises);
+    return;
+  }
+
+  const group = result.rows.map((row) => normalizeItem(row.payload));
+
+  // Compute and update each item's duplicate_count
+  const updatePromises = [];
+  for (const item of group) {
+    const itemRoot = String(item.sourceRootId || '').trim();
+    const realCount = group.filter((c) => {
+      if (c.id === item.id) return false;
+      if (itemRoot && String(c.sourceRootId || '').trim() === itemRoot) return false;
+      return true;
+    }).length;
+
+    if (realCount !== Number(item.duplicateCount || 0)) {
+      const fixed = { ...item, duplicateCount: realCount };
+      updatePromises.push(
+        db.query(
+          'UPDATE content_catalog SET payload = $2::jsonb, duplicate_count = $3 WHERE id = $1',
+          [item.id, JSON.stringify(fixed), realCount],
+        ),
+      );
+    }
+  }
+  if (updatePromises.length) await Promise.all(updatePromises);
+}
+
 async function createItem(payload) {
   const now = new Date().toISOString();
   const item = normalizeItem({
@@ -272,12 +325,15 @@ async function createItem(payload) {
     [item.id, JSON.stringify(item), now, now, cols.status, cols.content_type, cols.title, cols.title_key, cols.language, cols.category, cols.collection, cols.source_type, cols.source_root_id, cols.last_scan_run_id, cols.year, cols.rating, cols.featured, cols.featured_order, cols.trending_score, cols.duplicate_count, cols.metadata_status, cols.published_at, cols.released_at]
   );
   invalidateDuplicateCache();
+  // Sync duplicate counts for the whole title-key group
+  await syncDuplicateCountsForTitleKey(cols.content_type, cols.title_key);
   return getItemById(item.id);
 }
 
 async function updateItem(id, payload) {
   const current = await getItemById(id);
   if (!current) return null;
+  const oldTitleKey = current.titleKey || normalizeTitleKey(current.title);
   const updated = normalizeItem({ ...current, ...payload, id: current.id, titleKey: normalizeTitleKey(payload.title || current.title), updatedAt: new Date().toISOString() });
   const cols = extractTypedColumns(updated);
   await db.query(
@@ -285,13 +341,26 @@ async function updateItem(id, payload) {
     [updated.id, JSON.stringify(updated), cols.status, cols.content_type, cols.title, cols.title_key, cols.language, cols.category, cols.collection, cols.source_type, cols.source_root_id, cols.last_scan_run_id, cols.year, cols.rating, cols.featured, cols.featured_order, cols.trending_score, cols.duplicate_count, cols.metadata_status, cols.published_at, cols.released_at]
   );
   invalidateDuplicateCache();
+  // Sync old group (if title key changed) and new group
+  const newTitleKey = cols.title_key;
+  await syncDuplicateCountsForTitleKey(cols.content_type, newTitleKey);
+  if (oldTitleKey !== newTitleKey) {
+    await syncDuplicateCountsForTitleKey(current.type, oldTitleKey);
+  }
   return getItemById(updated.id);
 }
 
 async function deleteItem(id) {
   await ensureContentStore();
+  // Fetch item before deletion so we can sync its title-key group
+  const beforeResult = await db.query('SELECT payload FROM content_catalog WHERE id = $1', [Number(id)]);
+  const beforeItem = beforeResult.rows[0] ? normalizeItem(beforeResult.rows[0].payload) : null;
   const result = await db.query('DELETE FROM content_catalog WHERE id = $1', [Number(id)]);
   invalidateDuplicateCache();
+  // Sync duplicate counts for the deleted item's title-key group
+  if (beforeItem) {
+    await syncDuplicateCountsForTitleKey(beforeItem.type, beforeItem.titleKey || normalizeTitleKey(beforeItem.title));
+  }
   return result.rowCount > 0;
 }
 
@@ -412,6 +481,66 @@ async function cleanupOrphanEpisodeEntries() {
   return result.rowCount || 0;
 }
 
+/**
+ * Recalculate duplicate_count for ALL items in the catalog.
+ * Groups items by content_type + title_key, then for each item
+ * counts how many other items in the same group have a different source_root_id.
+ * Updates both the payload JSON and the duplicate_count column.
+ * Returns { updated, total }.
+ */
+async function recalculateDuplicateCounts() {
+  await ensureContentStore();
+
+  // 1. Fetch all items
+  const allResult = await db.query('SELECT id, payload FROM content_catalog ORDER BY id ASC');
+  const allItems = allResult.rows.map((row) => normalizeItem(row.payload));
+
+  // 2. Group by type:titleKey
+  const groups = new Map();
+  for (const item of allItems) {
+    const key = `${item.type}:${item.titleKey || normalizeTitleKey(item.title)}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  }
+
+  // 3. For each item, compute the real duplicateCount
+  let updated = 0;
+  const updatePromises = [];
+  for (const item of allItems) {
+    const key = `${item.type}:${item.titleKey || normalizeTitleKey(item.title)}`;
+    const group = groups.get(key) || [];
+    const itemRoot = String(item.sourceRootId || '').trim();
+    const realCount = group.filter((c) => {
+      if (c.id === item.id) return false;
+      if (itemRoot && String(c.sourceRootId || '').trim() === itemRoot) return false;
+      return true;
+    }).length;
+
+    if (realCount !== Number(item.duplicateCount || 0)) {
+      updated += 1;
+      const newPayload = { ...item, duplicateCount: realCount };
+      const cols = extractTypedColumns(newPayload);
+      updatePromises.push(
+        db.query(
+          `UPDATE content_catalog
+           SET payload = $2::jsonb, duplicate_count = $3
+           WHERE id = $1`,
+          [item.id, JSON.stringify(newPayload), cols.duplicate_count],
+        ),
+      );
+    }
+  }
+
+  // Batch updates in groups of 200 to avoid huge parameter lists
+  const BATCH = 200;
+  for (let i = 0; i < updatePromises.length; i += BATCH) {
+    await Promise.all(updatePromises.slice(i, i + BATCH));
+  }
+
+  invalidateDuplicateCache();
+  return { updated, total: allItems.length };
+}
+
 module.exports = {
   allocateNextCatalogId,
   getItems,
@@ -429,4 +558,6 @@ module.exports = {
   getDuplicateGroupsForItems,
   invalidateDuplicateCache,
   cleanupOrphanEpisodeEntries,
+  recalculateDuplicateCounts,
+  syncDuplicateCountsForTitleKey,
 };
