@@ -1442,6 +1442,22 @@ async function scanSelectedRoots(selectedRootIds = [], progressCallback, options
   };
 
   for (const root of roots) {
+    if (root.skipScan) {
+      summary.skipped.push({ id: root.id, label: root.label, path: root.scanPath, error: 'Skipped by configuration (skipScan=true)' });
+      updateRootProgress(summary, root.id, {
+        status: 'skipped',
+        exists: true,
+        checkable: true,
+        pathStatus: 'skipped',
+        pathStatusLabel: 'Skipped',
+        skipped: 1,
+        errors: ['Skipped by configuration'],
+      });
+      if (progressCallback) {
+        progressCallback(buildProgressPayload(summary, { activeRootId: root.id }));
+      }
+      continue;
+    }
     const pathAssessment = assessScanPath(root.scanPath);
     if (!pathAssessment.checkable || !pathAssessment.exists) {
       const errorMsg = pathAssessment.error || `Path not found: ${root.scanPath}`;
