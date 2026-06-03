@@ -60,6 +60,7 @@ router.post('/maintenance/prune', asyncRoute(adminController.pruneCatalog));
 router.post('/maintenance/vacuum', asyncRoute(adminController.vacuumDatabase));
 router.post('/maintenance/fix-roots', asyncRoute(adminController.fixMisconfiguredRoots));
 router.post('/maintenance/recalculate-duplicates', asyncRoute(adminController.recalculateDuplicateCounts));
+router.post('/maintenance/cleanup-orphan-roots', asyncRoute(adminController.cleanupOrphanedScannerRoots));
 
 // Uploads
 router.post('/upload/poster', upload.single('file'), asyncRoute(adminController.uploadPoster));
