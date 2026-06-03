@@ -130,7 +130,7 @@ function invalidateDuplicateCache() {
 async function getDuplicateGroupsForItems(items = [], { bypassCache = false } = {}) {
   if (!items.length) return new Map();
   await ensureContentStore();
-  const keys = [...new Set(items.map((item) => `${item.type}:${item.titleKey || normalizeTitleKey(item.title)}`))];
+  const keys = [...new Set(items.map((item) => `${item.type}:${item.titleKey || normalizeTitleKey(item.title, item.year)}`))];
   const sortedKeys = [...keys].sort();
   const cacheKey = sortedKeys.join('|');
   if (!bypassCache) {
@@ -158,7 +158,7 @@ async function getDuplicateGroupsForItems(items = [], { bypassCache = false } = 
   const groups = new Map();
   result.rows.forEach((row) => {
     const item = normalizeItem(row.payload);
-    const key = `${item.type}:${item.titleKey || normalizeTitleKey(item.title)}`;
+    const key = `${item.type}:${item.titleKey || normalizeTitleKey(item.title, item.year)}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(item);
   });
@@ -311,7 +311,7 @@ async function createItem(payload) {
     updatedAt: now,
     sourceType: payload.sourceType || 'manual',
     ...payload,
-    titleKey: normalizeTitleKey(payload.title),
+    titleKey: normalizeTitleKey(payload.title, payload.year),
   });
   const cols = extractTypedColumns(item);
   await db.query(
@@ -333,8 +333,8 @@ async function createItem(payload) {
 async function updateItem(id, payload) {
   const current = await getItemById(id);
   if (!current) return null;
-  const oldTitleKey = current.titleKey || normalizeTitleKey(current.title);
-  const updated = normalizeItem({ ...current, ...payload, id: current.id, titleKey: normalizeTitleKey(payload.title || current.title), updatedAt: new Date().toISOString() });
+  const oldTitleKey = current.titleKey || normalizeTitleKey(current.title, current.year);
+  const updated = normalizeItem({ ...current, ...payload, id: current.id, titleKey: normalizeTitleKey(payload.title || current.title, payload.year || current.year), updatedAt: new Date().toISOString() });
   const cols = extractTypedColumns(updated);
   await db.query(
     `UPDATE content_catalog SET payload = $2::jsonb, updated_at = NOW(), status = $3, content_type = $4, title = $5, title_key = $6, language = $7, category = $8, collection = $9, source_type = $10, source_root_id = $11, last_scan_run_id = $12, year = $13, rating = $14, featured = $15, featured_order = $16, trending_score = $17, duplicate_count = $18, metadata_status = $19, published_at = $20, released_at = $21 WHERE id = $1`,
@@ -359,7 +359,7 @@ async function deleteItem(id) {
   invalidateDuplicateCache();
   // Sync duplicate counts for the deleted item's title-key group
   if (beforeItem) {
-    await syncDuplicateCountsForTitleKey(beforeItem.type, beforeItem.titleKey || normalizeTitleKey(beforeItem.title));
+    await syncDuplicateCountsForTitleKey(beforeItem.type, beforeItem.titleKey || normalizeTitleKey(beforeItem.title, beforeItem.year));
   }
   return result.rowCount > 0;
 }
@@ -498,7 +498,7 @@ async function recalculateDuplicateCounts() {
   // 2. Group by type:titleKey
   const groups = new Map();
   for (const item of allItems) {
-    const key = `${item.type}:${item.titleKey || normalizeTitleKey(item.title)}`;
+    const key = `${item.type}:${item.titleKey || normalizeTitleKey(item.title, item.year)}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(item);
   }
@@ -507,7 +507,7 @@ async function recalculateDuplicateCounts() {
   let updated = 0;
   const updatePromises = [];
   for (const item of allItems) {
-    const key = `${item.type}:${item.titleKey || normalizeTitleKey(item.title)}`;
+    const key = `${item.type}:${item.titleKey || normalizeTitleKey(item.title, item.year)}`;
     const group = groups.get(key) || [];
     const itemRoot = String(item.sourceRootId || '').trim();
     const realCount = group.filter((c) => {

@@ -9,7 +9,6 @@ const SAMPLE_HASH_BYTES = 1024 * 1024;
 function normalizeTitleKey(value) {
   return String(value || '')
     .toLowerCase()
-    .replace(/\b(19|20)\d{2}\b/g, '')
     .replace(/\b(1080p|720p|480p|2160p|web[- ]?dl|bluray|brrip|x264|x265|hdrip|dvdrip|proper|uncut)\b/g, '')
     .replace(/[^a-z0-9]+/g, ' ')
     .replace(/\s+/g, ' ')

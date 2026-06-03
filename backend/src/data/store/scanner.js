@@ -206,7 +206,7 @@ async function upsertScannedItem(payload) {
       updatedAt: now,
       sourceType: 'scanner',
       ...payload,
-      titleKey: normalizeTitleKey(payload.title),
+      titleKey: normalizeTitleKey(payload.title, payload.year),
       status: nextStatus,
       publishedAt: nextPublishedAt,
       lastScanRunId: payload.lastScanRunId || '',
@@ -299,7 +299,7 @@ async function upsertScannedItem(payload) {
     ...current,
     // scan-derived fields (always refreshed)
     title:            payload.title            || current.title,
-    titleKey:         normalizeTitleKey(payload.title || current.title),
+    titleKey:         normalizeTitleKey(payload.title || current.title, payload.year || current.year),
     slug:             payload.slug             || current.slug || '',
     poster:           payload.poster           || current.poster || '',
     backdrop:         payload.backdrop         || current.backdrop || '',

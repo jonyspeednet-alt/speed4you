@@ -616,6 +616,11 @@ function collectDirectoriesIncrementally(rootPath, maxDepth = DEFAULT_MOVIE_DEPT
 
     for (const directory of listDirectories(current.folderPath)) {
       const absolutePath = path.join(current.folderPath, directory);
+      // Skip season-like folders (Season 01, S01, Specials, etc.) to prevent
+      // them being indexed as separate series entries alongside their parent series.
+      if (looksLikeSeasonFolder(directory)) {
+        continue;
+      }
       results.push(absolutePath);
       queue.push({ folderPath: absolutePath, depth: current.depth + 1 });
     }
