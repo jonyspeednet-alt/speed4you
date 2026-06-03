@@ -527,9 +527,6 @@ exports.rematchMetadata = async (req, res) => {
         }
 
         matched++;
-        if (enriched.metadataStatus === 'matched') {
-          // Pass through to caller
-        }
       } catch (err) {
         failed++;
         errors.push({ id: row.id, error: err.message });
