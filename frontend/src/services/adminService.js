@@ -36,6 +36,7 @@ export const adminService = {
   }).finally(clearAdminCache),
   pruneCatalog: () => apiClient('/admin/maintenance/prune', { method: 'POST' }).finally(clearAdminCache),
   runVacuum: () => apiClient('/admin/maintenance/vacuum', { method: 'POST' }).finally(clearAdminCache),
+  recalculateDuplicateCounts: () => apiClient('/admin/maintenance/recalculate-duplicates', { method: 'POST' }).finally(clearAdminCache),
   getScannerDrafts: (status = 'draft') => cachedGet('/admin/scanner/drafts', { status }),
 
   // Content management

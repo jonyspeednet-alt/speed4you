@@ -268,6 +268,17 @@ export default function DuplicatesPage() {
     },
   });
 
+  const recalcMutation = useMutation({
+    mutationFn: () => adminService.recalculateDuplicateCounts(),
+    onSuccess: (result) => {
+      toast?.success?.(`Recalculated counts for ${result.updated} of ${result.total} items.`);
+      queryClient.invalidateQueries({ queryKey: ['catalog-duplicates'] });
+    },
+    onError: (err) => {
+      toast?.error?.(`Recalculation failed: ${err.message}`);
+    },
+  });
+
   const bulkMergeMutation = useMutation({
     mutationFn: async () => {
       const groups = filteredGroups;
@@ -371,6 +382,18 @@ export default function DuplicatesPage() {
             }}
           >
             {isFetching ? 'Refreshing…' : 'Refresh'}
+          </button>
+          <button
+            type="button"
+            onClick={() => recalcMutation.mutate()}
+            disabled={recalcMutation.isPending}
+            style={{
+              padding: '8px 14px', borderRadius: '8px', background: `${WARN}20`, color: WARN,
+              border: `1px solid ${WARN}40`, fontSize: '0.82rem', fontWeight: '600', cursor: 'pointer',
+              opacity: recalcMutation.isPending ? 0.6 : 1,
+            }}
+          >
+            {recalcMutation.isPending ? 'Recalculating…' : 'Recalculate DB Counts'}
           </button>
         </div>
       </div>

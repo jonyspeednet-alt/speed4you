@@ -10,6 +10,7 @@ const {
   pruneCatalog,
   updateItem,
   vacuumDatabase,
+  recalculateDuplicateCounts,
 } = require('../data/store');
 const { getCurrentScanJob, getScannerHealth, listScannerRoots, startScanJob, stopScanJob } = require('../services/scanner');
 const { loadScannerRoots, saveScannerRoots, refreshScannerCaches, loadScannerState, saveScannerState } = require('../data/store');
@@ -243,6 +244,10 @@ exports.vacuumDatabase = async (req, res) => {
   res.json(await vacuumDatabase());
 };
 
+exports.recalculateDuplicateCounts = async (req, res) => {
+  res.json(await recalculateDuplicateCounts());
+};
+
 exports.uploadPoster = async (req, res, next) => {
   try {
     const assetUrl = req.file ? await saveBufferAsset(req.file, 'posters') : await saveDataUrlAsset(req.body?.dataUrl, 'posters');
@@ -378,6 +383,8 @@ exports.runDuplicatesCleanup = (req, res) => {
 };
 
 exports.mergeCatalogDuplicates = async (req, res) => {
+  const { syncDuplicateCountsForTitleKey } = require('../data/store/content');
+  const { normalizeTitleKey } = require('../data/store/helpers');
   const body = req.body || {};
   const keepId = Number(body.keepId);
   const removeIds = (Array.isArray(body.removeIds) ? body.removeIds : [])
@@ -386,11 +393,23 @@ exports.mergeCatalogDuplicates = async (req, res) => {
   if (!keepId || !removeIds.length) {
     return res.status(400).json({ ok: false, error: 'keepId and at least one removeId are required' });
   }
+
+  // Fetch the kept item to know its title key for syncing
+  const keptResult = await db.query('SELECT payload FROM content_catalog WHERE id = $1', [keepId]);
+  const keptItem = keptResult.rows[0]?.payload;
+
   const placeholders = removeIds.map((_, idx) => `$${idx + 2}`).join(',');
   const delResult = await db.query(
     `DELETE FROM content_catalog WHERE id <> $1 AND id IN (${placeholders})`,
     [keepId, ...removeIds],
   );
+
+  // Sync duplicate counts for the title-key group
+  if (keptItem) {
+    const titleKey = keptItem.titleKey || normalizeTitleKey(keptItem.title);
+    await syncDuplicateCountsForTitleKey(keptItem.type || keptItem.content_type, titleKey);
+  }
+
   res.json({ ok: true, keepId, removedCount: delResult.rowCount || 0 });
 };
 
