@@ -190,7 +190,7 @@ app.use((req, res, next) => {
 });
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), deploy: 'v6' });
 });
 
 app.get('/health/scanner', async (req, res) => {
