@@ -378,7 +378,7 @@ jobs:
             BACKEND = '/home/speed4you/portal-app/backend'
             ind = os.path.join(BACKEND, 'src/index.js')
             with open(ind) as f: content = f.read()
-            if 'deploy' not in content:
+            if "deploy: '" not in content:
                 print("Adding deploy field to health endpoint")
                 content = content.replace(
                     "res.json({ status: 'ok', timestamp: new Date().toISOString() });",
