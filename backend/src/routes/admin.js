@@ -99,7 +99,7 @@ router.post('/series/cleanup-episodes', asyncRoute(adminController.cleanupOrphan
 
 // Metadata
 router.post('/metadata/tmdb', asyncRoute(adminController.fetchTmdbMetadata));
-router.post('/metadata/rematch', asyncRoute(adminController.rematchMetadata));
+router.post('/metadata/rematch',      asyncRoute(adminController.rematchMetadata));
 router.post('/metadata/cleanup-season-duplicates', asyncRoute(adminController.cleanupSeasonDuplicates));
 
 module.exports = router;
