@@ -372,7 +372,7 @@ jobs:
                 print("TV Series patterns already in metadata-enricher.js, skipping")
             PYEOF
 
-            echo "Patching index.js - add deploy field to health endpoint..."
+            echo "Patching index.js - add deploy field to health endpoint and health-deploy route..."
             python3 << 'PYEOF'
             import os
             BACKEND = '/home/speed4you/portal-app/backend'
@@ -382,12 +382,21 @@ jobs:
                 print("Adding deploy field to health endpoint")
                 content = content.replace(
                     "res.json({ status: 'ok', timestamp: new Date().toISOString() });",
-                    "res.json({ status: 'ok', timestamp: new Date().toISOString(), deploy: 'v6' });"
+                    "res.json({ status: 'ok', timestamp: new Date().toISOString(), deploy: 'v6', patched: true });"
                 )
                 with open(ind, 'w') as f: f.write(content)
-                print("index.js patched OK")
+                print("index.js patched OK - deploy+patched fields added")
             else:
-                print("deploy field already in index.js, skipping")
+                print("deploy field already in index.js, checking if health-deploy route exists...")
+                if "health-deploy" not in content:
+                    content = content.replace(
+                        "app.get('/health',",
+                        "app.get('/health-deploy', (req, res) => res.json({ status: 'ok', deploy: 'v6', ts: Date.now() }));\napp.get('/health',",
+                    )
+                    with open(ind, 'w') as f: f.write(content)
+                    print("health-deploy route added")
+                else:
+                    print("health-deploy route already exists")
             PYEOF
 
             echo "Stopping old backend..."
