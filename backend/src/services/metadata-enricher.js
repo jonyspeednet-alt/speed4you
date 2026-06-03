@@ -11,6 +11,8 @@ const NOISE_PATTERNS = [
   /\be\d{1,3}\b/gi,
   /\b\d{1,2}x\d{1,3}\b/gi,
   /\bepisode\s*\d{1,3}\b/gi,
+  /\bTV\s*(Mini\s*)?Series\b/gi,
+  /\([^)]*\bTV\s*(Mini\s*)?Series\b[^)]*\)/gi,
   /\[[^\]]+\]/g,
   /\{[^}]+\}/g,
 ];

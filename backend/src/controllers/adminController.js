@@ -499,6 +499,78 @@ exports.getSearchAnalytics = async (req, res) => {
   }
 };
 
+exports.rematchMetadata = async (req, res) => {
+  const { enrichItemWithMetadata } = require('../services/scanner-enhanced-metadata');
+  const dryRun = req.query.dry === 'true' || req.query.dry === '1';
+  const batchSize = Math.min(20, Math.max(1, Number(req.body?.batchSize || 5)));
+
+  const queryResult = await db.query(
+    `SELECT id, payload FROM content_catalog
+     WHERE metadata_status IN ('skipped', 'needs_review', 'not_found', 'failed')
+     ORDER BY id`,
+  );
+
+  const total = queryResult.rows.length;
+  let matched = 0;
+  let failed = 0;
+  const errors = [];
+
+  for (let i = 0; i < queryResult.rows.length; i += batchSize) {
+    const batch = queryResult.rows.slice(i, i + batchSize);
+    await Promise.all(batch.map(async (row) => {
+      try {
+        const item = row.payload;
+        const enriched = await enrichItemWithMetadata(item);
+
+        if (!dryRun) {
+          await updateItem(item.id, enriched);
+        }
+
+        matched++;
+        if (enriched.metadataStatus === 'matched') {
+          // Pass through to caller
+        }
+      } catch (err) {
+        failed++;
+        errors.push({ id: row.id, error: err.message });
+      }
+    }));
+  }
+
+  res.json({ ok: true, dryRun, total, matched, failed, errors: errors.slice(0, 50) });
+};
+
+exports.cleanupSeasonDuplicates = async (req, res) => {
+  const dryRun = req.query.dry === 'true' || req.query.dry === '1';
+  const seasonPattern = '%/Season %';
+
+  const queryResult = await db.query(
+    `SELECT id, title, source_path, payload FROM content_catalog
+     WHERE content_type = 'series'
+       AND (source_path ILIKE $1 OR source_path ~ '/S\d{2}(/|$)')
+     ORDER BY id`,
+    [seasonPattern],
+  );
+
+  const total = queryResult.rows.length;
+  let deleted = 0;
+  const entries = queryResult.rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    sourcePath: row.source_path,
+    payloadTitle: row.payload?.title || '',
+  }));
+
+  if (!dryRun && total > 0) {
+    const ids = entries.map((e) => e.id);
+    const placeholders = ids.map((_, idx) => `$${idx + 1}`).join(',');
+    await db.query(`DELETE FROM content_catalog WHERE id IN (${placeholders})`, ids);
+    deleted = total;
+  }
+
+  res.json({ ok: true, dryRun, total, deleted, entries });
+};
+
 async function cleanupOrphanSeriesEpisodes(req, res) {
   const { cleanupOrphanEpisodeEntries } = require('../data/store/content');
   try {

@@ -1,12 +1,13 @@
-function normalizeTitleKey(value) {
+function normalizeTitleKey(value, year) {
   const normalized = String(value || '')
     .toLowerCase()
-    .replace(/\b(19|20)\d{2}\b/g, '')
     .replace(/\b(1080p|720p|480p|2160p|web[- ]?dl|bluray|brrip|x264|x265|hdrip|dvdrip|proper|uncut)\b/g, '')
     .replace(/[^a-z0-9]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  return normalized || String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const key = normalized || String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (year) return `${key}-${year}`;
+  return key;
 }
 
 function clampNumber(value, min, max) {
@@ -196,7 +197,7 @@ function normalizeItem(item) {
     metadataUpdatedAt: item.metadataUpdatedAt || '',
     metadataError: item.metadataError || '',
     parsedTitle: item.parsedTitle || '',
-    titleKey: item.titleKey || normalizeTitleKey(item.title),
+    titleKey: item.titleKey || normalizeTitleKey(item.title, item.year),
     duplicateCandidates: Array.isArray(item.duplicateCandidates) ? item.duplicateCandidates : [],
     duplicateCount: Number(item.duplicateCount || 0),
     trendingScore: item.trendingScore || trendingScore,
@@ -209,7 +210,7 @@ function normalizeItem(item) {
 }
 
 function attachDuplicateMetadata(item, groups) {
-  const key = `${item.type}:${item.titleKey || normalizeTitleKey(item.title)}`;
+  const key = `${item.type}:${item.titleKey || normalizeTitleKey(item.title, item.year)}`;
   const itemRoot = String(item.sourceRootId || '').trim();
   const matches = (groups.get(key) || [])
     .filter((candidate) => candidate.id !== item.id)
