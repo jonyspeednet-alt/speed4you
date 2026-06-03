@@ -298,7 +298,7 @@ jobs:
             exports.cleanupSeasonDuplicates = async (req, res) => {
               const dryRun = req.query.dry === 'true' || req.query.dry === '1';
               const queryResult = await db.query(
-                `SELECT id, title, source_path, payload FROM content_catalog WHERE content_type = 'series' AND (source_path ILIKE '%/Season %' OR source_path ~ '/S[0-9]{2}(/|$)') ORDER BY id`,
+                `SELECT id, title, payload->>'sourcePath' AS source_path, payload FROM content_catalog WHERE content_type = 'series' AND (payload->>'sourcePath' ILIKE '%/Season %' OR payload->>'sourcePath' ~ '/S[0-9]{2}(/|$)') ORDER BY id`,
               );
               const entries = (queryResult.rows || []).map((row) => ({ id: row.id, title: row.title, sourcePath: row.source_path, payloadTitle: row.payload?.title || '' }));
               let deleted = 0;
