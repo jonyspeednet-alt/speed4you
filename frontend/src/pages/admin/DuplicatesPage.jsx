@@ -279,6 +279,21 @@ export default function DuplicatesPage() {
     },
   });
 
+  const cleanupRootsMutation = useMutation({
+    mutationFn: () => adminService.cleanupOrphanedRoots(),
+    onSuccess: (result) => {
+      if (result.deletedCount > 0) {
+        toast?.success?.(`Cleaned up ${result.deletedCount} orphaned item(s) from roots: ${(result.orphanedRootIds || []).join(', ')}`);
+      } else {
+        toast?.success?.('No orphaned root items found — all clean!');
+      }
+      queryClient.invalidateQueries({ queryKey: ['catalog-duplicates'] });
+    },
+    onError: (err) => {
+      toast?.error?.(`Cleanup failed: ${err.message}`);
+    },
+  });
+
   const bulkMergeMutation = useMutation({
     mutationFn: async () => {
       const groups = filteredGroups;
@@ -394,6 +409,21 @@ export default function DuplicatesPage() {
             }}
           >
             {recalcMutation.isPending ? 'Recalculating…' : 'Recalculate DB Counts'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (!window.confirm('Delete all items from scanner roots that no longer exist? This will remove orphaned catalog entries.')) return;
+              cleanupRootsMutation.mutate();
+            }}
+            disabled={cleanupRootsMutation.isPending}
+            style={{
+              padding: '8px 14px', borderRadius: '8px', background: `${DANGER}20`, color: DANGER,
+              border: `1px solid ${DANGER}40`, fontSize: '0.82rem', fontWeight: '600', cursor: 'pointer',
+              opacity: cleanupRootsMutation.isPending ? 0.6 : 1,
+            }}
+          >
+            {cleanupRootsMutation.isPending ? 'Cleaning…' : 'Cleanup Orphaned Roots'}
           </button>
         </div>
       </div>

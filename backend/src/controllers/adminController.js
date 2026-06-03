@@ -11,6 +11,7 @@ const {
   updateItem,
   vacuumDatabase,
   recalculateDuplicateCounts,
+  cleanupOrphanedRootItems,
 } = require('../data/store');
 const { getCurrentScanJob, getScannerHealth, listScannerRoots, startScanJob, stopScanJob } = require('../services/scanner');
 const { loadScannerRoots, saveScannerRoots, refreshScannerCaches, loadScannerState, saveScannerState } = require('../data/store');
@@ -246,6 +247,10 @@ exports.vacuumDatabase = async (req, res) => {
 
 exports.recalculateDuplicateCounts = async (req, res) => {
   res.json(await recalculateDuplicateCounts());
+};
+
+exports.cleanupOrphanedScannerRoots = async (req, res) => {
+  res.json(await cleanupOrphanedRootItems());
 };
 
 exports.uploadPoster = async (req, res, next) => {

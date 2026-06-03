@@ -541,6 +541,45 @@ async function recalculateDuplicateCounts() {
   return { updated, total: allItems.length };
 }
 
+/**
+ * Delete items from scanner roots that no longer exist in the scanner_roots table.
+ * This cleans up orphaned catalog entries when scanner roots are deleted or renamed.
+ * Only affects items with source_type = 'scanner'.
+ * Returns { deletedCount, orphanedRootIds }.
+ */
+async function cleanupOrphanedRootItems() {
+  await ensureContentStore();
+
+  // Get all current scanner root IDs
+  const rootsResult = await db.query('SELECT id FROM scanner_roots');
+  const activeRootIds = new Set((rootsResult.rows || []).map((r) => String(r.id).trim()).filter(Boolean));
+
+  // Find distinct source_root_id values in content_catalog for scanner items
+  const distinctRootsResult = await db.query(
+    `SELECT DISTINCT source_root_id FROM content_catalog WHERE source_type = 'scanner' AND COALESCE(source_root_id, '') <> ''`
+  );
+  const orphanedRootIds = [];
+  for (const row of distinctRootsResult.rows) {
+    const rootId = String(row.source_root_id || '').trim();
+    if (rootId && !activeRootIds.has(rootId)) {
+      orphanedRootIds.push(rootId);
+    }
+  }
+
+  if (!orphanedRootIds.length) {
+    return { deletedCount: 0, orphanedRootIds: [] };
+  }
+
+  const result = await db.query(
+    `DELETE FROM content_catalog WHERE source_type = 'scanner' AND source_root_id = ANY($1::text[])`,
+    [orphanedRootIds],
+  );
+  const deletedCount = Number(result?.rowCount ?? 0);
+
+  invalidateDuplicateCache();
+  return { deletedCount: Number.isFinite(deletedCount) ? Math.floor(deletedCount) : 0, orphanedRootIds };
+}
+
 module.exports = {
   allocateNextCatalogId,
   getItems,
@@ -558,6 +597,7 @@ module.exports = {
   getDuplicateGroupsForItems,
   invalidateDuplicateCache,
   cleanupOrphanEpisodeEntries,
+  cleanupOrphanedRootItems,
   recalculateDuplicateCounts,
   syncDuplicateCountsForTitleKey,
 };

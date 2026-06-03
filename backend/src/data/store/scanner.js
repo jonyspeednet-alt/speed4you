@@ -164,10 +164,36 @@ async function upsertScannedItem(payload) {
     throw new Error(`Unsupported scanner content type: ${payload?.type || 'unknown'}`);
   }
   await ensureContentStore();
-  const existing = await db.query("SELECT id, payload FROM content_catalog WHERE payload->>'scanSignature' = $1 LIMIT 1", [payload.scanSignature]);
-  const current = existing.rows[0]?.payload || null;
+  let existing = await db.query("SELECT id, payload FROM content_catalog WHERE payload->>'scanSignature' = $1 LIMIT 1", [payload.scanSignature]);
+  let current = existing.rows[0]?.payload || null;
 
-  // ── NEW ITEM ──────────────────────────────────────────────────────────────
+  // ── NEW ITEM (or root rename detected) ───────────────────────────────────
+  if (!current) {
+    // If scanSignature didn't match, try matching by sourcePath.
+    // This handles scanner root renames where the root ID changed but
+    // file paths remain the same, preventing duplicate item creation.
+    if (payload.sourcePath) {
+      const pathMatch = await db.query(
+        "SELECT id, payload FROM content_catalog WHERE payload->>'sourcePath' = $1 AND source_type = 'scanner' LIMIT 1",
+        [payload.sourcePath]
+      );
+      current = pathMatch.rows[0]?.payload || null;
+    }
+
+    if (current) {
+      // Root was renamed — update the existing item's root metadata
+      // and fall through to the existing-item update path below.
+      payload = {
+        ...payload,
+        title: payload.title || current.title,
+        seasons: payload.seasons || current.seasons || [],
+        seasonCount: payload.seasonCount ?? current.seasonCount ?? 0,
+        episodeCount: payload.episodeCount ?? current.episodeCount ?? 0,
+      };
+    }
+  }
+
+  // ── NEW ITEM (truly new) ────────────────────────────────────────────────
   if (!current) {
     const shouldAutoPublish = payload.metadataStatus === 'matched' || payload.metadataStatus === 'skipped';
     const nextStatus = payload.status
@@ -309,6 +335,7 @@ async function upsertScannedItem(payload) {
     || item.videoUrl     !== (current.videoUrl || '')
     || item.sourcePath   !== (current.sourcePath || '')
     || item.scanSignature !== (current.scanSignature || '')
+    || item.sourceRootId  !== (current.sourceRootId || '')
     || item.seasonCount  !== (current.seasonCount ?? 0)
     || item.episodeCount !== (current.episodeCount ?? 0)
     || item.lastScanRunId !== (current.lastScanRunId || '')
