@@ -129,6 +129,16 @@ jobs:
               mkdir -p "$DEST"
               cp -a "$SRC/." "$DEST/"
               echo "Backend copied to $DEST"
+              # Diagnostic: check admin routes file
+              echo "=== Checking admin.js in SRC ==="
+              grep -n 'rematch\b' "$SRC/src/routes/admin.js" || echo "(no 'rematch' in SRC admin.js)"
+              echo "=== Checking admin.js in DEST ==="
+              grep -n 'rematch\b' "$DEST/src/routes/admin.js" || echo "(no 'rematch' in DEST admin.js)"
+              # Check if adminController has rematchMetadata
+              echo "=== Checking adminController.js in SRC ==="
+              grep -c 'rematchMetadata' "$SRC/src/controllers/adminController.js" || echo "(no rematchMetadata in SRC)"
+              echo "=== Checking adminController.js in DEST ==="
+              grep -c 'rematchMetadata' "$DEST/src/controllers/adminController.js" || echo "(no rematchMetadata in DEST)"
             else
               echo "ERROR: $SRC not found" >&2
               exit 1
