@@ -123,15 +123,21 @@ function buildCatalogFilterClauses(filters = {}, params = []) {
 const duplicateGroupCache = new Map();
 const DUPLICATE_GROUP_CACHE_TTL = 60 * 1000; // 60 seconds
 
-async function getDuplicateGroupsForItems(items = []) {
+function invalidateDuplicateCache() {
+  duplicateGroupCache.clear();
+}
+
+async function getDuplicateGroupsForItems(items = [], { bypassCache = false } = {}) {
   if (!items.length) return new Map();
   await ensureContentStore();
   const keys = [...new Set(items.map((item) => `${item.type}:${item.titleKey || normalizeTitleKey(item.title)}`))];
   const sortedKeys = [...keys].sort();
   const cacheKey = sortedKeys.join('|');
-  const cached = duplicateGroupCache.get(cacheKey);
-  if (cached && Date.now() - cached.ts < DUPLICATE_GROUP_CACHE_TTL) {
-    return cached.groups;
+  if (!bypassCache) {
+    const cached = duplicateGroupCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < DUPLICATE_GROUP_CACHE_TTL) {
+      return cached.groups;
+    }
   }
 
   const conditions = [];
@@ -226,7 +232,7 @@ async function getItemById(idOrSlug) {
   return attachDuplicateMetadata(item, duplicateGroups);
 }
 
-async function getItemsByIds(ids = []) {
+async function getItemsByIds(ids = [], { includeDuplicates = true } = {}) {
   const numericIds = [...new Set(ids.map(Number).filter((id) => Number.isFinite(id) && id > 0))];
   if (!numericIds.length) return new Map();
   await ensureContentStore();
@@ -235,6 +241,11 @@ async function getItemsByIds(ids = []) {
   for (const row of result.rows) {
     const item = normalizeItem(row.payload);
     itemsMap.set(Number(item.id), item);
+  }
+  if (!includeDuplicates) return itemsMap;
+  const groups = await getDuplicateGroupsForItems([...itemsMap.values()]);
+  for (const [id, item] of itemsMap.entries()) {
+    itemsMap.set(id, attachDuplicateMetadata(item, groups));
   }
   return itemsMap;
 }
@@ -260,6 +271,7 @@ async function createItem(payload) {
      ) VALUES ($1, $2::jsonb, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)`,
     [item.id, JSON.stringify(item), now, now, cols.status, cols.content_type, cols.title, cols.title_key, cols.language, cols.category, cols.collection, cols.source_type, cols.source_root_id, cols.last_scan_run_id, cols.year, cols.rating, cols.featured, cols.featured_order, cols.trending_score, cols.duplicate_count, cols.metadata_status, cols.published_at, cols.released_at]
   );
+  invalidateDuplicateCache();
   return getItemById(item.id);
 }
 
@@ -272,12 +284,14 @@ async function updateItem(id, payload) {
     `UPDATE content_catalog SET payload = $2::jsonb, updated_at = NOW(), status = $3, content_type = $4, title = $5, title_key = $6, language = $7, category = $8, collection = $9, source_type = $10, source_root_id = $11, last_scan_run_id = $12, year = $13, rating = $14, featured = $15, featured_order = $16, trending_score = $17, duplicate_count = $18, metadata_status = $19, published_at = $20, released_at = $21 WHERE id = $1`,
     [updated.id, JSON.stringify(updated), cols.status, cols.content_type, cols.title, cols.title_key, cols.language, cols.category, cols.collection, cols.source_type, cols.source_root_id, cols.last_scan_run_id, cols.year, cols.rating, cols.featured, cols.featured_order, cols.trending_score, cols.duplicate_count, cols.metadata_status, cols.published_at, cols.released_at]
   );
+  invalidateDuplicateCache();
   return getItemById(updated.id);
 }
 
 async function deleteItem(id) {
   await ensureContentStore();
   const result = await db.query('DELETE FROM content_catalog WHERE id = $1', [Number(id)]);
+  invalidateDuplicateCache();
   return result.rowCount > 0;
 }
 
@@ -413,5 +427,6 @@ module.exports = {
   vacuumDatabase,
   getLibraryOrganization,
   getDuplicateGroupsForItems,
+  invalidateDuplicateCache,
   cleanupOrphanEpisodeEntries,
 };

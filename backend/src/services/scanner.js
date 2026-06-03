@@ -1514,6 +1514,14 @@ async function scanSelectedRoots(selectedRootIds = [], progressCallback, options
 
   summary.completedAt = new Date().toISOString();
   const normalizedSummary = normalizeSummary(summary) || createSummary([]);
+  // Invalidate the duplicate group cache: scan added/updated many items
+  // and stale cached groups will misreport duplicate counts on subsequent reads.
+  try {
+    const { invalidateDuplicateCache } = require('../data/store/content');
+    invalidateDuplicateCache();
+  } catch (e) {
+    // safe to ignore — cache will expire on TTL anyway
+  }
   await recordScannerRun({
     id: scanContext.runId,
     status: normalizedSummary.errors.length > 0 ? 'completed' : 'completed',

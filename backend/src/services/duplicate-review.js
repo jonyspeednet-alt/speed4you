@@ -159,13 +159,28 @@ function getDuplicateReviewReport() {
   };
 }
 
-function runDuplicateCleanup() {
+function runDuplicateCleanup(options = {}) {
   const report = getDuplicateReviewReport();
+  const dryRun = options.dryRun === true;
+  const onlyPaths = new Set(
+    (Array.isArray(options.onlyPaths) ? options.onlyPaths : [])
+      .map((entry) => String(entry || '').trim())
+      .filter(Boolean),
+  );
+
+  const candidates = report.items.filter((item) => {
+    if (!item.exactDuplicate) return false;
+    if (onlyPaths.size && !onlyPaths.has(item.heldPath)) return false;
+    return true;
+  });
+
   const deleted = [];
   const failed = [];
+  const skipped = report.totalItems - candidates.length;
 
-  for (const item of report.items) {
-    if (!item.exactDuplicate) {
+  for (const item of candidates) {
+    if (dryRun) {
+      deleted.push({ ...item, dryRun: true });
       continue;
     }
 
@@ -183,15 +198,86 @@ function runDuplicateCleanup() {
   return {
     completedAt: new Date().toISOString(),
     inspected: report.totalItems,
-    deletedCount: deleted.length,
+    candidates: candidates.length,
+    deletedCount: dryRun ? 0 : deleted.length,
+    dryRunDeletedCount: dryRun ? deleted.length : 0,
     failedCount: failed.length,
+    skipped,
     pendingReview: report.items.filter((item) => !item.exactDuplicate).length,
+    dryRun,
     deleted,
     failed,
+  };
+}
+
+/**
+ * DB-driven duplicate review (cross-root scanner items, manual-vs-scanner conflicts).
+ * Returns duplicate groups sorted by group size then by last updated.
+ */
+async function getCatalogDuplicateGroups({ db, limit = 100, minGroupSize = 2 } = {}) {
+  if (!db) {
+    throw new Error('db handle required for getCatalogDuplicateGroups');
+  }
+  const result = await db.query(
+    `SELECT content_type, title_key, COUNT(*)::int AS group_size,
+            MAX(duplicate_count) AS max_duplicate_count,
+            MAX(updated_at) AS last_updated
+     FROM content_catalog
+     WHERE duplicate_count > 0
+     GROUP BY content_type, title_key
+     HAVING COUNT(*) >= $1
+     ORDER BY group_size DESC, last_updated DESC
+     LIMIT $2`,
+    [Math.max(1, Number(minGroupSize) || 2), Math.max(1, Number(limit) || 100)],
+  );
+  if (!result.rows.length) {
+    return { generatedAt: new Date().toISOString(), totalGroups: 0, groups: [] };
+  }
+  const groups = [];
+  for (const row of result.rows) {
+    const membersResult = await db.query(
+      `SELECT id, payload, duplicate_count, status, source_type, source_root_id
+       FROM content_catalog
+       WHERE content_type = $1 AND title_key = $2
+       ORDER BY id ASC`,
+      [row.content_type, row.title_key],
+    );
+    groups.push({
+      contentType: row.content_type,
+      titleKey: row.title_key,
+      groupSize: Number(row.group_size || 0),
+      maxDuplicateCount: Number(row.max_duplicate_count || 0),
+      lastUpdated: row.last_updated,
+      members: membersResult.rows.map((m) => {
+        const payload = m.payload || {};
+        return {
+          id: Number(m.id),
+          title: payload.title || '',
+          type: m.content_type,
+          status: m.status,
+          sourceType: m.source_type,
+          sourceRootId: m.source_root_id || '',
+          sourceRootLabel: payload.sourceRootLabel || payload.source_root_label || '',
+          sourcePath: payload.sourcePath || '',
+          year: payload.year || null,
+          rating: payload.rating || null,
+          runtime: payload.runtime || payload.runtimeMinutes || null,
+          createdAt: payload.createdAt || '',
+          updatedAt: payload.updatedAt || '',
+          duplicateCount: Number(m.duplicate_count || 0),
+        };
+      }),
+    });
+  }
+  return {
+    generatedAt: new Date().toISOString(),
+    totalGroups: groups.length,
+    groups,
   };
 }
 
 module.exports = {
   getDuplicateReviewReport,
   runDuplicateCleanup,
+  getCatalogDuplicateGroups,
 };

@@ -19,6 +19,7 @@ const AdminDashboard = lazy(() => import('../pages/admin/AdminDashboard'));
 const AddContentPage = lazy(() => import('../pages/admin/AddContentPage'));
 const ContentLibraryPage = lazy(() => import('../pages/admin/ContentLibraryPage'));
 const ScannerPage = lazy(() => import('../pages/admin/ScannerPage'));
+const DuplicatesPage = lazy(() => import('../pages/admin/DuplicatesPage'));
 const UsersPage = lazy(() => import('../pages/admin/UsersPage'));
 const SearchAnalyticsPage = lazy(() => import('../pages/admin/SearchAnalyticsPage'));
 
@@ -154,6 +155,10 @@ const router = createBrowserRouter([
       {
         path: 'scanner',
         element: withRouteFallback(<ScannerPage />, 'default'),
+      },
+      {
+        path: 'duplicates',
+        element: withRouteFallback(<DuplicatesPage />, 'default'),
       },
       {
         path: 'users',

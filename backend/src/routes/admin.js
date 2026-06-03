@@ -87,7 +87,10 @@ router.delete('/users/:id', asyncRoute(adminController.deleteAdminUser));
 
 // Duplicates
 router.get('/duplicates/review', adminController.getDuplicatesReport);
-router.post('/duplicates/cleanup', adminController.runDuplicatesCleanup);
+router.get('/duplicates/catalog', asyncRoute(adminController.getCatalogDuplicates));
+router.get('/duplicates/check', asyncRoute(adminController.checkDuplicateTitle));
+router.post('/duplicates/cleanup', asyncRoute(adminController.runDuplicatesCleanup));
+router.post('/duplicates/merge', asyncRoute(adminController.mergeCatalogDuplicates));
 
 // Series cleanup — remove episode-level entries incorrectly indexed as standalone series
 router.post('/series/cleanup-episodes', asyncRoute(adminController.cleanupOrphanSeriesEpisodes));
