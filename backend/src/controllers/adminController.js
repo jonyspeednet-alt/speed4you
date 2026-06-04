@@ -537,6 +537,98 @@ exports.rematchMetadata = async (req, res) => {
   res.json({ ok: true, dryRun, total, matched, failed, errors: errors.slice(0, 50) });
 };
 
+/**
+ * Fix published items that are missing poster, backdrop, description, or year.
+ * Searches TMDB by title and fills in whatever is missing.
+ * POST /api/admin/metadata/fix-missing-posters
+ */
+exports.fixMissingPosters = async (req, res) => {
+  const { enrichItemWithMetadata } = require('../services/scanner-enhanced-metadata');
+  const dryRun = req.query.dry === 'true' || req.query.dry === '1';
+  const batchSize = Math.min(20, Math.max(1, Number(req.body?.batchSize || 5)));
+  const statusFilter = String(req.body?.status || 'published');
+
+  // Find published items missing key visual/metadata fields
+  const queryResult = await db.query(
+    `SELECT id, payload FROM content_catalog
+     WHERE status = $1
+       AND (
+         payload->>'poster' IS NULL OR payload->>'poster' = '' OR
+         payload->>'backdrop' IS NULL OR payload->>'backdrop' = '' OR
+         payload->>'description' IS NULL OR payload->>'description' = '' OR
+         payload->>'year' IS NULL
+       )
+     ORDER BY id`,
+    [statusFilter],
+  );
+
+  const total = queryResult.rows.length;
+  let fixed = 0;
+  let skipped = 0;
+  let failed = 0;
+  const errors = [];
+  const fixedList = [];
+
+  for (let i = 0; i < queryResult.rows.length; i += batchSize) {
+    const batch = queryResult.rows.slice(i, i + batchSize);
+    await Promise.all(batch.map(async (row) => {
+      try {
+        const item = row.payload;
+        if (!item || !item.title) { skipped++; return; }
+
+        const enriched = await enrichItemWithMetadata(item);
+
+        // Only update if enrichment actually added something useful
+        const gotPoster = enriched.poster && !item.poster;
+        const gotBackdrop = enriched.backdrop && !item.backdrop;
+        const gotDescription = enriched.description && !item.description;
+        const gotYear = enriched.year && !item.year;
+
+        if (!gotPoster && !gotBackdrop && !gotDescription && !gotYear) {
+          skipped++;
+          return;
+        }
+
+        if (!dryRun) {
+          await updateItem(item.id, {
+            ...enriched,
+            // Don't overwrite existing good values
+            poster: item.poster || enriched.poster,
+            backdrop: item.backdrop || enriched.backdrop,
+            description: item.description || enriched.description,
+            year: item.year || enriched.year,
+            rating: item.rating || enriched.rating,
+          });
+        }
+
+        fixedList.push({
+          id: item.id,
+          title: item.title,
+          addedPoster: gotPoster,
+          addedBackdrop: gotBackdrop,
+          addedDescription: gotDescription,
+          addedYear: gotYear,
+        });
+        fixed++;
+      } catch (err) {
+        failed++;
+        errors.push({ id: row.id, error: err.message });
+      }
+    }));
+  }
+
+  res.json({
+    ok: true,
+    dryRun,
+    total,
+    fixed,
+    skipped,
+    failed,
+    fixedList: fixedList.slice(0, 200),
+    errors: errors.slice(0, 50),
+  });
+};
+
 exports.cleanupSeasonDuplicates = async (req, res) => {
   const dryRun = req.query.dry === 'true' || req.query.dry === '1';
   const seasonPattern = '%/Season %';
@@ -579,6 +671,128 @@ async function cleanupOrphanSeriesEpisodes(req, res) {
 }
 
 module.exports.cleanupOrphanSeriesEpisodes = cleanupOrphanSeriesEpisodes;
+
+/**
+ * Extract the actual show title from a sourcePath like:
+ *   /var/www/html/New_Movies_1/Made in Heaven (TV Series 2019)/Season 02
+ * Returns "Made in Heaven" — stripping year, noise, and season folder.
+ */
+function extractShowTitleFromPath(sourcePath, itemTitle) {
+  // If the item title is already meaningful (not a season label), use it
+  if (itemTitle && !/^\s*season\s+\d+/i.test(itemTitle) && itemTitle.length > 4) {
+    // But also clean out "(TV Series YYYY)" etc. from the title
+    return itemTitle
+      .replace(/\s*\(TV\s*(Mini\s*)?Series[^)]*\)\s*/gi, '')
+      .replace(/\s*\(\d{4}(?:[–-]\s*)?\)\s*$/, '')
+      .replace(/\s*\[\w+\]\s*$/, '')
+      .trim();
+  }
+
+  if (!sourcePath) return itemTitle;
+
+  const parts = sourcePath.replace(/\\/g, '/').split('/').filter(Boolean);
+
+  // Walk backwards: skip season-like folders, take first non-season meaningful segment
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const seg = parts[i];
+    // Skip season-like folder names
+    if (/^\s*season\s+\d+/i.test(seg)) continue;
+    if (/^s\d{1,2}$/i.test(seg)) continue;
+    if (/^\d{1,2}$/.test(seg)) continue;
+    // Skip root-like folder names (too short or common catch-alls)
+    if (/^(New_Movies_[0-9]+|html|var|www|media|content|videos?)$/i.test(seg)) continue;
+    if (seg.length < 3) continue;
+
+    // Strip year suffix and TV Series noise
+    const cleaned = seg
+      .replace(/\s*\(TV\s*(Mini\s*)?Series[^)]*\)\s*/gi, '')
+      .replace(/\s*\(\d{4}(?:[–\-]\s*)?\)\s*$/, '')
+      .replace(/\s*\[\w+\]\s*$/, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (cleaned.length > 2) return cleaned;
+  }
+
+  return itemTitle;
+}
+
+exports.fixSeriesMetadata = async (req, res) => {
+  const { enrichItemWithMetadata } = require('../services/scanner-enhanced-metadata');
+  const dryRun = req.query.dry === 'true' || req.query.dry === '1';
+  const batchSize = Math.min(10, Math.max(1, Number(req.body?.batchSize || 5)));
+  const statusFilter = req.body?.statusFilter || ['skipped', 'not_found', 'failed', 'needs_review'];
+
+  const placeholders = statusFilter.map((_, i) => `$${i + 1}`).join(',');
+  const queryResult = await db.query(
+    `SELECT id, payload FROM content_catalog
+     WHERE content_type = 'series'
+       AND metadata_status IN (${placeholders})
+     ORDER BY id`,
+    statusFilter,
+  );
+
+  const total = queryResult.rows.length;
+  let matched = 0;
+  let skipped = 0;
+  let failed = 0;
+  const errors = [];
+  const fixedTitles = [];
+
+  for (let i = 0; i < queryResult.rows.length; i += batchSize) {
+    const batch = queryResult.rows.slice(i, i + batchSize);
+    await Promise.all(batch.map(async (row) => {
+      try {
+        const item = row.payload;
+        if (!item) { skipped++; return; }
+
+        // Extract the real show title from the source path
+        const extractedTitle = extractShowTitleFromPath(item.sourcePath || '', item.title || '');
+        const enrichInput = {
+          ...item,
+          title: extractedTitle,
+        };
+
+        const enriched = await enrichItemWithMetadata(enrichInput);
+
+        if (!dryRun) {
+          await updateItem(item.id, {
+            ...enriched,
+            // Preserve the original seasons (file-based episodes) if TMDB didn't provide better ones
+            seasons: (enriched.seasons && enriched.seasons.length > 0)
+              ? enriched.seasons
+              : (item.seasons || []),
+          });
+        }
+
+        fixedTitles.push({
+          id: item.id,
+          originalTitle: item.title,
+          extractedTitle,
+          tmdbTitle: enriched.title,
+          confidence: enriched.metadataConfidence,
+          status: enriched.metadataStatus,
+        });
+
+        matched++;
+      } catch (err) {
+        failed++;
+        errors.push({ id: row.id, error: err.message });
+      }
+    }));
+  }
+
+  res.json({
+    ok: true,
+    dryRun,
+    total,
+    matched,
+    skipped,
+    failed,
+    fixedTitles: fixedTitles.slice(0, 100),
+    errors: errors.slice(0, 50),
+  });
+};
 
 const MOVIE_ROOT_PATTERNS = [
   /movie/i, /cartoon/i, /anim(e|ation)/i, /3d/i,

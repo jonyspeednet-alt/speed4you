@@ -130,7 +130,9 @@ async function ensureContentStore() {
       await db.query(`ALTER TABLE content_catalog ADD COLUMN IF NOT EXISTS metadata_status TEXT NOT NULL DEFAULT 'pending'`);
       await db.query(`ALTER TABLE content_catalog ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ`);
       await db.query(`ALTER TABLE content_catalog ADD COLUMN IF NOT EXISTS released_at TIMESTAMPTZ`);
-      await db.query(`ALTER TABLE content_catalog ADD COLUMN IF NOT EXISTS search_vector tsvector`);
+      if (!db.isInMemory) {
+  await db.query(`ALTER TABLE content_catalog ADD COLUMN IF NOT EXISTS search_vector tsvector`);
+}
       
       if (!db.isInMemory) {
         await db.query('CREATE EXTENSION IF NOT EXISTS pg_trgm');
