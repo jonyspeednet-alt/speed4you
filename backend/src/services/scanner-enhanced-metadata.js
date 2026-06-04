@@ -61,12 +61,14 @@ function extractMetadataPatch(enrichedItem, sourceItem) {
 }
 
 function applyMetadataPatch(item, patch, parsedTitle) {
+  const finalPoster = isGoodUrl(item.poster) ? item.poster : (patch.poster || '');
+  const finalBackdrop = isGoodUrl(item.backdrop) ? item.backdrop : (patch.backdrop || finalPoster);
   return {
     ...item,
     title: patch.title || item.title || '',
     description: item.description || patch.description || '',
-    poster: item.poster || patch.poster || '',
-    backdrop: item.backdrop || patch.backdrop || item.poster || patch.poster || '',
+    poster: finalPoster,
+    backdrop: finalBackdrop,
     genre: item.genre || patch.genre || '',
     genres: Array.isArray(item.genres) && item.genres.length ? item.genres : (patch.genres || []),
     rating: item.rating || patch.rating || null,
@@ -114,8 +116,8 @@ async function enrichItemWithMetadata(item) {
       return {
         ...item,
         description: item.description || omdbData.description,
-        poster: item.poster || omdbData.poster,
-        backdrop: item.backdrop || omdbData.backdrop,
+        poster: isGoodUrl(item.poster) ? item.poster : omdbData.poster,
+        backdrop: isGoodUrl(item.backdrop) ? item.backdrop : omdbData.backdrop,
         genre: item.genre || omdbData.genre,
         genres: Array.isArray(item.genres) && item.genres.length ? item.genres : omdbData.genres,
         rating: item.rating || omdbData.rating,
