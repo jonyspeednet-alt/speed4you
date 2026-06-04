@@ -97,8 +97,30 @@ export const adminService = {
   // Series cleanup — remove episode-level entries incorrectly indexed as standalone series
   cleanupOrphanSeriesEpisodes: () => apiClient('/admin/series/cleanup-episodes', { method: 'POST' }),
 
+  // Fix series metadata — extract real show title from path and re-enrich via TMDB
+  fixSeriesMetadata: (opts = {}) => apiClient('/admin/series/fix-metadata', {
+    method: 'POST',
+    body: JSON.stringify({ batchSize: opts.batchSize || 5, statusFilter: opts.statusFilter }),
+  }),
+  fixSeriesMetadataDry: () => apiClient('/admin/series/fix-metadata?dry=true', {
+    method: 'POST',
+    body: JSON.stringify({ batchSize: 5 }),
+  }),
+
   // Fix misconfigured scanner roots (movie roots set as type 'series')
   fixMisconfiguredRoots: (dry = true) => apiClient(`/admin/maintenance/fix-roots?dry=${dry}`, { method: 'POST' }),
+
+  // Fix published items with missing poster/backdrop/description/year via TMDB
+  fixMissingPosters: (opts = {}) => apiClient('/admin/metadata/fix-missing-posters', {
+    method: 'POST',
+    body: JSON.stringify({ batchSize: opts.batchSize || 10, status: opts.status || 'published' }),
+  }).finally(clearAdminCache),
+
+  // Rematch metadata for skipped/failed/not_found items
+  rematchMetadata: (opts = {}) => apiClient('/admin/metadata/rematch', {
+    method: 'POST',
+    body: JSON.stringify({ batchSize: opts.batchSize || 5 }),
+  }).finally(clearAdminCache),
 };
 
 export default adminService;
