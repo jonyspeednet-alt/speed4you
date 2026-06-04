@@ -37,3 +37,50 @@ frontend/dist.zip
 
 # Project IDX creates this file; keep it local to avoid leaking dev env.
 .idx/integrations.json
+
+# AI coding agent configs — never commit, agents create these locally.
+# Each tool has its own convention; if a new agent appears, add its pattern here.
+AGENTS.md
+AGENTS.local.md
+AGENTS.override.md
+CLAUDE.md
+GEMINI.md
+codex.md
+.aider.conf.yml
+.aider.model.settings.yml
+.aider.input.history
+.aider.chat.history.md
+.aider.tags.cache.v3
+.cursorrules
+.cursorignore
+.cursor/
+.windsurfrules
+.windsurf/
+.kilocode/
+.kilocode.md
+.kilo.md
+.roo/
+.clinerules
+.cline/
+.continue/
+.continuerules
+.cody/
+.cody_config
+.copilot/
+.github/copilot-instructions.md
+.github/instructions/
+.opencode/
+.opencode.json
+.gemini/
+.replit/
+replit.md
+.claude/
+skills/
+.claude.json
+
+# Raw API payloads / agent state that some agents write to disk.
+**/api_conversation_history.json
+**/raw_api_payload_*.json
+**/task_history.json
+**/ui_messages.json
+**/conversation_*.json
