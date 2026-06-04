@@ -47,7 +47,7 @@ const METADATA_PATCH_FIELDS = [
 
 function isGoodUrl(url) {
   if (!url) return false;
-  return url.startsWith('http') || url.startsWith('/portal/uploads');
+  return url.startsWith('http') || url.startsWith('/portal/uploads') || url.startsWith('/uploads');
 }
 
 function extractMetadataPatch(enrichedItem, sourceItem) {
@@ -187,6 +187,8 @@ async function enrichItemWithMetadata(item) {
       sourceRootLabel: item.sourceRootLabel || '',
     };
 
+    // Skip cache if item has a broken/local poster so we always attempt a fresh lookup
+    const hasBrokenPoster = !isGoodUrl(item.poster) || !isGoodUrl(item.backdrop);
     const { data: metadataPatch, fromCache } = await fetchWithRateLimitAndCache(
       'tmdb',
       async () => {
@@ -194,7 +196,8 @@ async function enrichItemWithMetadata(item) {
         return extractMetadataPatch(enriched, item);
       },
       cacheKey,
-      DEFAULT_METADATA_TTL
+      DEFAULT_METADATA_TTL,
+      hasBrokenPoster // force refresh when poster is broken
     );
 
     if (fromCache) cacheStats.hits++;
