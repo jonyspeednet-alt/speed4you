@@ -84,6 +84,10 @@ If you used any AI tool to write or refine the change, you **must**:
    `backend/src/data/`. The `.gitignore` blocks these — do not force-add them.
 8. **Never edit other agents' worklog entries.** The log is append-only. If you spot
    an error, add a new entry that points to the old one.
+9. **Install the pre-commit hook locally** (one-time):
+   `npm run setup:hooks`. It runs `npm run agent:check` before every commit so
+   protocol drift is caught immediately, not in CI. Bypass only with
+   `git commit --no-verify`. Remove with `npm run uninstall:hooks`.
 
 The per-tool entry files (e.g. `CLAUDE.md`, `.cursorrules`,
 `.github/copilot-instructions.md`, `.aider.conf.yml`, `.kilocode/instructions.md`,

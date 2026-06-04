@@ -129,6 +129,24 @@ npm run ci:check   # runs agent:check + worklog:check
   the last 14 days? If not, the team has been silent for too long and
   CI fails.
 
+### 5.0 Local pre-commit hook (recommended)
+
+Install a pre-commit hook that runs `agent:check` automatically:
+
+```bash
+npm run setup:hooks     # one-time, installs .git/hooks/pre-commit
+npm run uninstall:hooks # removes it
+```
+
+The hook is a 30-line Node script (no new dependencies) and works on
+Windows, macOS, and Linux. It refuses to overwrite an existing pre-commit
+hook — pass `--force` if you really mean it, or rely on the auto-backup
+(`pre-commit.bak.<timestamp>`).
+
+The hook runs `agent:check` only, not `worklog:check`. The worklog is
+updated as part of the commit, so a freshness check at pre-commit time is
+unreliable. The right place for worklog freshness is CI (§5.1).
+
 ### 5.1 CI wiring (already done in this repo)
 
 `.github/workflows/deploy.yml` has a top-level `protocol-check` job that runs
