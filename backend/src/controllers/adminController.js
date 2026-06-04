@@ -648,9 +648,9 @@ exports.cleanupSeasonDuplicates = async (req, res) => {
   const seasonPattern = '%/Season %';
 
   const queryResult = await db.query(
-    `SELECT id, title, source_path, payload FROM content_catalog
+    `SELECT id, title, payload->>'sourcePath' AS source_path, payload FROM content_catalog
      WHERE content_type = 'series'
-       AND (source_path ILIKE $1 OR source_path ~ '/S\d{2}(/|$)')
+       AND (payload->>'sourcePath' ILIKE $1 OR payload->>'sourcePath' ~ '/S\d{2}(/|$)')
      ORDER BY id`,
     [seasonPattern],
   );
