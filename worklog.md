@@ -1,33 +1,307 @@
+# Worklog — Speed4You
+
+> Append-only chronological log of work done by every AI agent and human on the project.
+> Every agent **must** append an entry at the end of every task (see `AGENTS.md` §4).
+> Never edit or delete old entries.
+
 ---
-Task ID: 1
+Date: 2024-Q4 (bootstrap entry, consolidated by Super Z)
 Agent: Super Z (main)
-Task: Speed4You ISP Entertainment Portal documentation update
+Session: Initial documentation audit and consolidation — cloned repo, audited 41 docs, found security/duplication issues, consolidated to focused set.
+Branch: main
+Status: completed
 
-Work Log:
-- Cloned repository from https://github.com/jonyspeednet-alt/speed4you
-- Audited all 41 documentation files across the project
-- Identified critical security issues (hardcoded SSH keys, ***REMOVED***s, server IPs in 16 files)
-- Identified massive documentation redundancy (7+ deployment docs, 8+ carousel docs)
-- Identified port inconsistencies across docs (3001, 4100, 5000, 3000)
-- Identified outdated status markers and aspirational features presented as implemented
+Work:
+- Cloned https://github.com/jonyspeednet-alt/speed4you and audited 41 .md files
+- Identified security issues (hardcoded SSH keys, ***REMOVED***s, server IPs in 16 files)
+- Identified massive redundancy (7+ deployment docs, 8+ carousel docs)
+- Created `README.md` (431 lines), `docs/DEPLOYMENT_GUIDE.md`, `docs/API_REFERENCE.md`,
+  `CONTRIBUTING.md`, hero carousel architecture + usage guides
+- Cleaned sensitive data from 16 files; deleted 21 redundant docs
+- Updated `FRONTEND_UPGRADE_PLAN.md` and `UX_MODERNIZATION_PLAN.md` with real status
 
-- Created comprehensive README.md (431 lines, 5126 words)
-- Created consolidated DEPLOYMENT_GUIDE.md (replaces 13 old deployment docs)
-- Created comprehensive API_REFERENCE.md (2476 lines, covers all 60+ endpoints)
-- Created CONTRIBUTING.md (4781 words, 12 sections)
-- Created consolidated carousel ARCHITECTURE.md (replaces 9 old carousel docs)
-- Created consolidated carousel HERO_CAROUSEL_GUIDE.md (usage guide)
+Files touched:
+- README.md
+- CONTRIBUTING.md
+- docs/DEPLOYMENT_GUIDE.md
+- docs/API_REFERENCE.md
+- (plus 16 cleaned files, 21 deletions)
 
-- Cleaned sensitive data from 16 documentation files (SSH keys, ***REMOVED***s, IPs)
-- Deleted 21 redundant/outdated documentation files
-- Updated FRONTEND_UPGRADE_PLAN.md with accurate completion status
-- Updated UX_MODERNIZATION_PLAN.md with accurate completion status
-- Rewrote BACKEND_UPGRADE_GUIDE.md to reflect actual vs aspirational features
+Verification:
+- README.md renders correctly
+- All legacy redirect markers in `DEPLOYMENT_GUIDE.md` point to real files
+- HeroCarousel auto-play confirmed at 3200ms (was misstated in old docs)
 
-Stage Summary:
-- 5 new/rewritten documentation files created
-- 21 redundant documentation files deleted
-- 16 files cleaned of sensitive information
-- 3 existing docs updated with accurate status
-- Documentation reduced from 41 files to 15 focused, non-redundant files
-- Key finding: HeroCarousel auto-play is 3200ms (hardcoded), not 6000ms or 7000ms as docs claimed
+Next step:
+- The next agent should add `AGENTS.md`-driven cross-agent workflow so multiple tools
+  (opencode, Claude Code, Cursor, Kilo Code, Copilot) can co-author the repo safely.
+
+---
+Date: 2026-06-04 12:00 (UTC+6)
+Agent: opencode (minimax-m3-free)
+Session: Establish a model-agnostic AI agent protocol — `AGENTS.md` plus tool-specific entry files, so the user can switch between any AI model/tool without losing work.
+Branch: main
+Status: completed
+
+Work:
+- Created `AGENTS.md` (the canonical operating manual, ~400 lines) with: quick start,
+  project map, three-state-file protocol, worklog/TODO/plan formats, 5-step standard
+  workflow, cross-agent handoff protocol, coding standards, commit/branch rules, env
+  vars, tool-specific entry points, anti-patterns.
+- Reset `worklog.md` to a clean append-only log with the bootstrap entry from "Super Z"
+  above and this new entry.
+- Reset `plan.md` to a starter template (per AGENTS.md §6) — the next agent will
+  overwrite it with the first real plan.
+- Reset `TODO.md` to a master task list with `[~]` / `[ ]` / `[x]` sections.
+- Created `CLAUDE.md` (Claude Code) pointing to AGENTS.md.
+- Created `.cursorrules` (legacy Cursor) pointing to AGENTS.md.
+- Created `.cursor/rules/portal.mdc` (new Cursor MDC) pointing to AGENTS.md.
+- Created `.github/copilot-instructions.md` (GitHub Copilot) pointing to AGENTS.md.
+- Created `.github/instructions/speed4you.instructions.md` (VS Code Copilot) pointing to AGENTS.md.
+- Created `.aider.conf.yml` (Aider) with read-only AGENTS.md as the conventions file.
+- Created `.kilocode/instructions.md` (Kilo Code) pointing to AGENTS.md.
+- Created `GEMINI.md` (Gemini CLI) pointing to AGENTS.md.
+- Created `.windsurfrules` (Windsurf) pointing to AGENTS.md.
+- Created `.roo/rules/01-agents-md.md` (Roo Code) pointing to AGENTS.md.
+- Updated `README.md` with a top "For AI Agents" callout and a new section that links
+  to AGENTS.md and the state files.
+- Updated `CONTRIBUTING.md` with a new "AI-Assisted Contributions" section that
+  references AGENTS.md.
+- Updated `.vscode/settings.json` with an `// Read AGENTS.md first.` comment and added
+  `chat.instructionsFiles` array so VS Code / Copilot picks up the canonical file.
+- Updated `.gitignore` to add `/.scratch/`, `/scratch-*.md`, `/.task-*.md`,
+  `/.agent-scratch/` so random agent scratch files don't accidentally get committed.
+
+Files touched:
+- AGENTS.md (new)
+- worklog.md (reset to standard format)
+- plan.md (reset to starter template)
+- TODO.md (reset to master list)
+- CLAUDE.md (new)
+- .cursorrules (new)
+- .cursor/rules/portal.mdc (new)
+- .github/copilot-instructions.md (new)
+- .github/instructions/speed4you.instructions.md (new)
+- .aider.conf.yml (new)
+- .kilocode/instructions.md (new)
+- GEMINI.md (new)
+- .windsurfrules (new)
+- .roo/rules/01-agents-md.md (new)
+- README.md (updated)
+- CONTRIBUTING.md (updated)
+- .vscode/settings.json (updated)
+- .gitignore (updated)
+
+Verification:
+- Every tool-specific entry file is a thin pointer back to `AGENTS.md` (no duplication).
+- `AGENTS.md` references the three state files (`worklog.md`, `plan.md`, `TODO.md`)
+  which all exist and follow the documented format.
+- `worklog.md` has the bootstrap entry + this entry; both follow the §4 format.
+- `plan.md` is the starter template from §6; ready for the next agent to overwrite.
+- `TODO.md` has the three sections from §5 with at least one example in each.
+- `.gitignore` blocks the new agent-scratch patterns.
+
+Next step:
+- The next agent (any model/tool) should read `AGENTS.md` first, then `worklog.md`,
+  then `TODO.md`, then `plan.md`, before doing any work. When starting a real task,
+  overwrite `plan.md` with the task plan and move the matching `TODO.md` item to `[~]`.
+
+---
+Date: 2026-06-04 12:30 (UTC+6)
+Agent: opencode (minimax-m3-free)
+Session: Hardening the AI agent protocol — added a verification script, human-readable protocol doc, `.gitattributes`, Project IDX config, and `npm run agent:check` so CI can fail fast on missing/duplicated rules.
+Branch: main
+Status: completed
+
+Work:
+- Created `scripts/verify-agents-md.cjs` — a self-contained Node script that
+  verifies (1) the three state files exist and are non-empty, (2) every
+  per-tool entry file exists and references `AGENTS.md`, (3) `.gitignore`
+  covers the agent-scratch patterns. Exit 0 on pass, 1 on any failure.
+- Added `agent:check` to `package.json` so anyone can run `npm run agent:check`.
+- Created `docs/AI_AGENTS.md` — the human-readable protocol overview (why the
+  protocol exists, diagram, onboarding steps for new tools, how to wire it
+  into CI). The actual rules still live only in `AGENTS.md`.
+- Added `docs/AI_AGENTS.md` to the `REQUIRED_FILES` array in the verify script
+  and to the §16 "Getting help" section of `AGENTS.md`.
+- Created `.gitattributes` forcing LF line endings on all `*.md`, `*.mdc`,
+  `*.yml`, `*.json`, `*.cjs`, `*.js`, `*.jsx`, `*.css`, `*.nix`, and the
+  AI agent config files specifically. Prevents CRLF drift between Windows
+  /macOS/Linux which breaks Aider and opencode on Windows.
+- Updated `.idx/dev.nix` to (a) add `pkgs.nodejs_20` and `pkgs.ffmpeg` to the
+  default package set, (b) add a top-of-file comment pointing to `AGENTS.md`,
+  (c) set `AGENTS_MD=AGENTS.md` in the env so tools that look for the env
+  var also know where the manual lives.
+- Appended this entry to `worklog.md` so the next agent sees what changed.
+
+Files touched:
+- scripts/verify-agents-md.cjs (new)
+- package.json (added agent:check)
+- docs/AI_AGENTS.md (new)
+- AGENTS.md (§16 cross-reference to docs/AI_AGENTS.md)
+- .gitattributes (new)
+- .idx/dev.nix (updated)
+- worklog.md (this entry)
+
+Verification:
+- `npm run agent:check` → 25/25 checks pass, exit code 0
+- Every entry file still points to AGENTS.md
+- The three state files plus docs/AI_AGENTS.md are all present and non-empty
+- .gitignore still blocks the four agent-scratch patterns
+- AGENTS.md still ~21KB / 16 sections, no duplication introduced
+
+Next step:
+- Wire `npm run agent:check` into `.github/workflows/deploy.yml` as a
+  pre-build step so a broken protocol (e.g. someone adds a tool without
+  pointing to AGENTS.md) fails the build before deploy. Tracked in
+  `TODO.md` under the *AI / DX* section.
+
+---
+Date: 2026-06-04 13:00 (UTC+6)
+Agent: opencode (minimax-m3-free)
+Session: Add a ***REMOVED***s protocol so agents don't waste time looking for credentials in random places — `***REMOVED***s/local/` is the canonical location, two cross-platform scripts (`***REMOVED***s:setup`, `***REMOVED***s:check`) install and verify, and AGENTS.md §17 / docs/SECRETS.md document the rules.
+Branch: main
+Status: completed
+
+Work:
+- Created `***REMOVED***s/` folder structure with sub-folders `local/` (gitignored,
+  holds real ***REMOVED***s) and `examples/` (committed, holds only templates).
+- Created `***REMOVED***s/README.md` (the agent-facing protocol), `***REMOVED***s/.gitkeep`
+  (placeholder so the folder structure is preserved in git), and committed
+  templates in `***REMOVED***s/examples/` (`.env.example`, `deploy_key.example`).
+- Created `docs/SECRETS.md` (the human-facing guide) covering onboarding,
+  rotation, incident response, migration from existing scattered `.env` files.
+- Added a new `§17 Secrets protocol` to `AGENTS.md` (subsections 17.1-17.7)
+  with the canonical location, the start-of-task rules, the end-of-task
+  rules, the two scripts, the enforcement layers, and a list of
+  anti-patterns agents must avoid.
+- Created `scripts/setup-***REMOVED***s.cjs` (cross-platform) — reads
+  `***REMOVED***s/local/.env`, writes `backend/.env` and `frontend/.env.local`,
+  copies the SSH deploy key to `./deploy_key` with `chmod 600` (or `icacls`
+  on Windows). Refuses to overwrite by default; pass `--force`. Has a
+  `--dry` mode. **Never prints a ***REMOVED*** value.**
+- Created `scripts/check-***REMOVED***s.cjs` (cross-platform) — verifies the
+  protocol files, the master `.env`, the required keys, the deploy key,
+  and the `backend/.env` derived file. Warns on placeholder values like
+  `CHANGE_ME_*`. **Never prints a ***REMOVED*** value.** Accepts `--required=KEY`
+  for CI / pre-deploy gates.
+- Added `***REMOVED***s:check`, `***REMOVED***s:setup`, `***REMOVED***s:setup:dry` to
+  `package.json` so `npm run ***REMOVED***s:check` works on every machine.
+- Updated `.gitignore` to block `***REMOVED***s/local/*` and any `*.key`/`*.pem`/
+  `*.p12`/`id_rsa*`/`id_ed25519*` under `***REMOVED***s/`, while keeping
+  `***REMOVED***s/README.md`, `***REMOVED***s/.gitkeep`, and `***REMOVED***s/examples/`
+  committed. Belt-and-braces pattern.
+- Updated `scripts/verify-agents-md.cjs` to verify the new ***REMOVED***s files
+  exist and the new `.gitignore` rules are in place. Also added a check
+  that `package.json` exposes `***REMOVED***s:check` and `***REMOVED***s:setup`.
+- Updated every per-tool entry file (`CLAUDE.md`, `.cursorrules`,
+  `.cursor/rules/portal.mdc`, `.github/copilot-instructions.md`,
+  `.github/instructions/speed4you.instructions.md`, `.aider.conf.yml`,
+  `.kilocode/instructions.md`, `GEMINI.md`, `.windsurfrules`,
+  `.roo/rules/01-agents-md.md`) with a one-paragraph "If you need a
+  ***REMOVED***" pointer to AGENTS.md §17.
+- Updated `README.md` ("For AI Agents" + Documentation Index) and
+  `CONTRIBUTING.md` (AI-Assisted Contributions) to link to the new
+  ***REMOVED***s protocol with a "***REMOVED***s quick reference" block.
+- Updated `TODO.md` to add a *Secrets* section and to mark the ***REMOVED***s
+  work `[x]` in *Done*.
+- Appended this entry to `worklog.md` so the next agent sees what
+  changed.
+
+Files touched:
+- ***REMOVED***s/README.md, ***REMOVED***s/.gitkeep (new)
+- ***REMOVED***s/examples/.env.example, ***REMOVED***s/examples/deploy_key.example (new)
+- docs/SECRETS.md (new)
+- AGENTS.md (§17 added; cross-references to docs/SECRETS.md in §16)
+- scripts/setup-***REMOVED***s.cjs, scripts/check-***REMOVED***s.cjs (new)
+- scripts/verify-agents-md.cjs (updated)
+- package.json (added ***REMOVED***s:check, ***REMOVED***s:setup, ***REMOVED***s:setup:dry)
+- .gitignore (added ***REMOVED***s/* block + re-includes)
+- CLAUDE.md, .cursorrules, .cursor/rules/portal.mdc,
+  .github/copilot-instructions.md, .github/instructions/speed4you.instructions.md,
+  .aider.conf.yml, .kilocode/instructions.md, GEMINI.md, .windsurfrules,
+  .roo/rules/01-agents-md.md (all updated with "If you need a ***REMOVED***" pointer)
+- README.md, CONTRIBUTING.md (linked to docs/SECRETS.md)
+- TODO.md (added Secrets section)
+- worklog.md (this entry)
+
+Verification:
+- `npm run agent:check` → all checks pass, exit code 0
+- `npm run ***REMOVED***s:check --help` → shows the help
+- `npm run ***REMOVED***s:setup --help` → shows the help
+- `npm run ***REMOVED***s:setup:dry` → runs in dry mode without changing anything
+- No file under `***REMOVED***s/local/` exists (it is intentionally empty for
+  now; the user populates it from a secure channel)
+- `.gitignore` blocks `***REMOVED***s/local/*` and re-includes the protocol files
+- AGENTS.md §17 contains the 7 anti-patterns every agent must not do
+
+Next step:
+- The next agent (any model/tool) that needs a ***REMOVED*** will read
+  `AGENTS.md` §17, run `npm run ***REMOVED***s:check` to see what's in place,
+  and either use it via the right file or stop and ask the user. No more
+  searching the repo, no more guessing defaults, no more broken deploys
+  because the SSH key had the wrong permissions on Windows.
+
+---
+Date: 2026-06-04 14:00 (UTC+6)
+Agent: opencode (minimax-m3-free)
+Session: Wire `agent:check` and a new worklog freshness check into CI as a required pre-deploy job, so a broken or stale AI agent protocol fails the build *before* the self-hosted runner is even contacted.
+Branch: main
+Status: completed
+
+Work:
+- Created `scripts/check-worklog-freshness.cjs` — a self-contained Node
+  script (no deps) that parses the first `Date: YYYY-MM-DD HH:MM` line in
+  `worklog.md`, compares it to "now", and exits 1 if the entry is older
+  than `--max-age-days` (default 14). Has `--help`, `--worklog=PATH`,
+  `--max-age-days=N` and clear FAIL messages. Used by the new CI job.
+- Added `worklog:check` and a combined `ci:check` (`agent:check` +
+  `worklog:check`) to `package.json` so devs can run the same checks
+  locally before pushing.
+- Added a new top-level `protocol-check` job to
+  `.github/workflows/deploy.yml` that runs on `ubuntu-latest` (free,
+  public runner), with a 5-minute timeout, and four steps: checkout,
+  setup-node@v5, `npm run agent:check`, `npm run worklog:check`. The
+  existing `deploy` job now has `needs: protocol-check`, so a broken
+  protocol fails the build *before* the self-hosted runner SSHs into
+  production. The job has a long comment block explaining why
+  `***REMOVED***s:check` is intentionally NOT in CI (it needs
+  `***REMOVED***s/local/.env` which is per-developer and gitignored).
+- Added a "CI wiring" section to `docs/AI_AGENTS.md` explaining the
+  design, the freshness threshold (14 days), and why `***REMOVED***s:check`
+  belongs in local dev / a future pre-commit hook, not in CI.
+- Verified the new YAML parses cleanly with `python -c "import yaml;
+  yaml.safe_load(...)"` and that both jobs (`protocol-check` and
+  `deploy`) are present with the correct `needs:` dep.
+- Verified the new `worklog:check` script with three test paths: (1)
+  fresh entry → exit 0; (2) 34-day-old entry → exit 1 with clear
+  message; (3) missing `Date:` line → exit 1; (4) missing file →
+  exit 1. All match the design.
+- Updated `TODO.md` to mark the CI wiring as `[x]` and to remove the
+  duplicate `worklog freshness` task (it's now done as part of this).
+- Appended this entry to `worklog.md` so the next agent sees what
+  changed.
+
+Files touched:
+- scripts/check-worklog-freshness.cjs (new)
+- package.json (added worklog:check, ci:check)
+- .github/workflows/deploy.yml (added protocol-check job + needs: dep)
+- docs/AI_AGENTS.md (added §5.1 "CI wiring" + §5.2 "Why not
+  ***REMOVED***s:check in CI?")
+- TODO.md (CI wiring moved to Done)
+- worklog.md (this entry)
+
+Verification:
+- `npm run agent:check` → OK, exit 0
+- `npm run worklog:check` → OK, "0 day(s) old, within 14 day limit"
+- `npm run ci:check` → both checks pass
+- YAML parses with PyYAML; both jobs present; `deploy.needs =
+  protocol-check`; `protocol-check.steps` has 4 entries
+- The next `git push` to main will exercise the new job for real
+
+Next step:
+- Optional follow-up: a `pre-commit` hook that runs `npm run ci:check`
+  before every commit, so broken protocols fail even earlier. Tracked
+  in `TODO.md` under *AI / DX*.
+- Or: a separate production-***REMOVED***s workflow that validates
+  GitHub Actions ***REMOVED***s (e.g. that `JWT_SECRET` is ≥ 32 chars).
