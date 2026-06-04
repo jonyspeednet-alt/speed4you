@@ -7,37 +7,6 @@
 
 ---
 
-## For AI Agents & Models
-
-> If you are an AI coding agent (opencode, Claude Code, Cursor, Aider, Kilo Code,
-> GitHub Copilot, Roo Code, Cline, Windsurf, Gemini CLI, Continue, etc.) reading
-> this repository: **start with [`AGENTS.md`](AGENTS.md)**. It is the canonical
-> operating manual that defines the workflow, coding standards, commit format,
-> cross-agent handoff protocol, **and the ***REMOVED***s protocol (§17)** for this project.
->
-> The three shared state files that every agent must read and update:
-> - [`worklog.md`](worklog.md) — append-only log of what every agent did
-> - [`TODO.md`](TODO.md) — master task list
-> - [`plan.md`](plan.md) — the active plan for the current task
->
-> If you need a ***REMOVED***, **read [`AGENTS.md` §17](AGENTS.md#17-***REMOVED***s-protocol-read-this-if-you-need-a-credential)**,
-> then run `npm run ***REMOVED***s:check` (no values printed). Never grep, never
-> search git history, never try common defaults.
->
-> Tool-specific entry files (`CLAUDE.md`, `.cursorrules`, `.github/copilot-instructions.md`,
-> `.aider.conf.yml`, `.kilocode/instructions.md`, `GEMINI.md`, `.windsurfrules`,
-> `.roo/rules/`) are thin pointers back to `AGENTS.md`. Do not duplicate the rules —
-> update `AGENTS.md` and the entry files will follow.
->
-> **Local dev tip:** install the pre-commit hook so a broken protocol is caught
-> before you push, not in CI:
-> ```bash
-> npm run setup:hooks     # installs .git/hooks/pre-commit
-> git commit --no-verify  # bypass for emergencies only
-> ```
-
----
-
 ## Overview
 
 **Speed4You** is a self-hosted media streaming platform purpose-built for ISP (Internet Service Provider) networks. Think of it as a Netflix-style entertainment portal that runs entirely within your local ISP infrastructure, delivering movies, TV series, and live TV channels directly to your subscribers without consuming external bandwidth. Designed with the needs of regional and community ISPs in mind, Speed4You transforms your network into a premium entertainment destination, increasing subscriber value and reducing churn.
@@ -433,45 +402,12 @@ In summary, the contribution process involves forking the repository, creating a
 
 ## Documentation Index
 
-The repository ships with a layered documentation set. The top three files are the
-ones every contributor (human or AI) must read first:
-
-| File | What it is |
-|---|---|
-| [`AGENTS.md`](AGENTS.md) | Canonical operating manual for any AI agent/model. Defines the workflow, coding standards, commit format, and cross-agent handoff protocol. |
-| [`worklog.md`](worklog.md) | Append-only chronological log of what every agent did. |
-| [`TODO.md`](TODO.md) | Master task list with `[ ]` / `[~]` / `[x]` status. |
-| [`plan.md`](plan.md) | The active plan for the current task. |
-
-Per-tool entry files (each one is a thin pointer to `AGENTS.md`):
-
-- Claude Code: [`CLAUDE.md`](CLAUDE.md)
-- Cursor (legacy): [`.cursorrules`](.cursorrules)
-- Cursor (new): [`.cursor/rules/portal.mdc`](.cursor/rules/portal.mdc)
-- GitHub Copilot: [`.github/copilot-instructions.md`](.github/copilot-instructions.md)
-- GitHub Copilot (VS Code): [`.github/instructions/speed4you.instructions.md`](.github/instructions/speed4you.instructions.md)
-- Aider: [`.aider.conf.yml`](.aider.conf.yml)
-- Kilo Code: [`.kilocode/instructions.md`](.kilocode/instructions.md)
-- Gemini CLI: [`GEMINI.md`](GEMINI.md)
-- Windsurf: [`.windsurfrules`](.windsurfrules)
-- Roo Code: [`.roo/rules/01-agents-md.md`](.roo/rules/01-agents-md.md)
-
 Project documentation:
 
-- [CONTRIBUTING.md](CONTRIBUTING.md) — contribution guide + AI-assisted contribution rules
+- [CONTRIBUTING.md](CONTRIBUTING.md) — contribution guide
 - [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md) — full deployment guide (consolidated)
 - [docs/API_REFERENCE.md](docs/API_REFERENCE.md) — REST API reference
 - [docs/SERVER_WORKFLOW.md](docs/SERVER_WORKFLOW.md) — server-side runbook
-- [docs/AI_AGENTS.md](docs/AI_AGENTS.md) — human-readable overview of the AI agent protocol
-- [docs/SECRETS.md](docs/SECRETS.md) — ***REMOVED***s protocol (how to onboard new devs, rotate keys, respond to leaks)
-
-**Secrets quick reference** (for humans and agents):
-
-```bash
-npm run ***REMOVED***s:setup      # install ***REMOVED***s from ***REMOVED***s/local/ to the right places
-npm run ***REMOVED***s:check      # verify everything is in place (no values printed)
-npm run agent:check        # verify the AI agent protocol is wired up
-```
 
 ---
 
