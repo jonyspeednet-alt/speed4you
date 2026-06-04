@@ -1,0 +1,14 @@
+Read AGENTS.md first. It is the single source of truth for all AI agents and
+models working on Speed4You. The project is a React + Express + PostgreSQL
+ISP streaming portal at https://github.com/jonyspeednet-alt/isp-entertainment-portal.
+
+Required reading order: AGENTS.md -> worklog.md -> TODO.md -> plan.md.
+Required update order: plan.md -> TODO.md -> worklog.md -> git commit (Conventional Commits).
+
+If you need a ***REMOVED***, read AGENTS.md §17, then run `npm run ***REMOVED***s:check`.
+If the ***REMOVED*** is missing, ask the user. Never grep for `.env`/***REMOVED***s/keys,
+never search git history, never try common defaults.
+
+No ***REMOVED***s in commits (including ***REMOVED***s/local/), no `git push` to main without
+user approval, no editing files you haven't read this session, no new
+top-level deps without asking.

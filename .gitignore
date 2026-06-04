@@ -29,8 +29,33 @@ deploy_key
 deploy_key.pub
 DEPLOYMENT-SECRETS.md
 
+# Canonical ***REMOVED***s folder (AGENTS.md §17) — block everything in
+# ***REMOVED***s/local/ but keep the protocol files committed so the team has a
+# stable structure. examples/ is committed (only templates, no real values).
+***REMOVED***s/local/
+***REMOVED***s/local/*
+***REMOVED***s/local/.*
+!***REMOVED***s/README.md
+!***REMOVED***s/.gitkeep
+!***REMOVED***s/examples/
+!***REMOVED***s/examples/**
+# Belt-and-braces: also block every common ***REMOVED*** extension inside the
+# folder in case the rules above are bypassed.
+***REMOVED***s/**/*.key
+***REMOVED***s/**/*.pem
+***REMOVED***s/**/*.p12
+***REMOVED***s/**/id_rsa*
+***REMOVED***s/**/id_ed25519*
+
 # Backup and scratch files
 *.backup
 scratch.js
 tmp-nginx-*.conf
 frontend/dist.zip
+
+# AI agent scratch — random per-session files agents create while exploring.
+# AGENTS.md forbids committing these; the .gitignore enforces it.
+.scratch/
+scratch-*.md
+.task-*.md
+.agent-scratch/

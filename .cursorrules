@@ -1,0 +1,23 @@
+Read AGENTS.md first. It is the single source of truth for all AI agents/models
+working on Speed4You. The project is a React + Express + PostgreSQL ISP streaming
+portal at https://github.com/jonyspeednet-alt/isp-entertainment-portal.
+
+Required reading order at the start of any task:
+1. AGENTS.md
+2. worklog.md
+3. TODO.md
+4. plan.md
+
+Required update order at the end of any task:
+1. plan.md
+2. TODO.md
+3. worklog.md
+4. git add <specific files> + git commit (Conventional Commits)
+
+Key conventions: CommonJS in backend, ES modules in frontend, React 18 functional
+components only, Joi validation on every route, never edit files under
+backend/src/data/ or node_modules/. See AGENTS.md for the full ruleset.
+
+If you need a credential or ***REMOVED***: read AGENTS.md §17, then run
+`npm run ***REMOVED***s:check`. Never grep for `.env`/***REMOVED***s/keys, never search
+git history, never try common defaults. If the ***REMOVED*** is missing, ask the user.
