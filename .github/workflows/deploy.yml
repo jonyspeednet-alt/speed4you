@@ -8,7 +8,39 @@ on:
 
 
 jobs:
+  # Speed4You protocol-check ----------------------------------------------------
+  # Fails the build fast (on a free public runner) if the AI agent operating
+  # manual (AGENTS.md) is broken or stale. See AGENTS.md §1–6 and §16,
+  # docs/AI_AGENTS.md "CI wiring", and the protocol:
+  #   https://github.com/jonyspeednet-alt/isp-entertainment-portal/blob/main/AGENTS.md
+  #
+  # NOTE: This job deliberately does NOT run `npm run ***REMOVED***s:check` — that
+  # script requires `***REMOVED***s/local/.env` which is gitignored and per-developer.
+  # CI cannot see developer-local ***REMOVED***s, and the GitHub Actions ***REMOVED***s
+  # (`***REMOVED***s.*`) are different. The right place for `***REMOVED***s:check` is local
+  # dev and a future pre-commit hook (tracked in TODO.md).
+  protocol-check:
+    name: AI agent protocol & worklog freshness
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+
+      - name: Verify AI agent protocol integrity
+        run: npm run agent:check
+
+      - name: Verify worklog freshness (max 14 days)
+        run: npm run worklog:check
+
   deploy:
+    needs: protocol-check
     runs-on: self-hosted
 
     steps:
