@@ -33,7 +33,7 @@
 - [ ] (infra)    Add uptime monitoring for `/health` (UptimeRobot or similar)
 
 ### AI / DX
-- [ ] (dx)       Add a `pre-commit` hook that runs `npm run ci:check` (optional)
+- [ ] (dx)       Team-wide rollout: each dev runs `npm run setup:hooks` on their machine
 
 ### Secrets
 - [ ] (***REMOVED***s)  Onboard the rest of the team: each developer creates `***REMOVED***s/local/.env` and runs `npm run ***REMOVED***s:setup`
@@ -46,6 +46,7 @@
 - [x] (***REMOVED***s) Created `***REMOVED***s/` folder, `docs/SECRETS.md`, `***REMOVED***s:setup` and `***REMOVED***s:check` scripts — 2026-06-04
 - [x] (dx) Added `npm run agent:check` that verifies AGENTS.md and the three state files are in sync — 2026-06-04
 - [x] (ci) Wired `agent:check` and `worklog:check` into `.github/workflows/deploy.yml` as a required `protocol-check` job — 2026-06-04
+- [x] (dx) Added `npm run setup:hooks` — a cross-platform Node-based pre-commit hook installer — 2026-06-04
 - [x] (backend) Fix broken/missing poster images for all 3000 published items; upgraded TMDB enrichment to 4-strategy search, cache bypass for broken paths, deleted sample duplicate — 2026-06-04
 - [x] (frontend) Lazy-load `ContinueWatchingRail` — 2026-05-28
 - [x] (backend) Push `type` filter into `listItems` for movie/series lists — 2026-05-25
