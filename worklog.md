@@ -307,6 +307,72 @@ Next step:
   GitHub Actions ***REMOVED***s (e.g. that `JWT_SECRET` is ≥ 32 chars).
 
 ---
+Date: 2026-06-04 15:00 (UTC+6)
+Agent: opencode (minimax-m3-free)
+Session: Add a cross-platform pre-commit hook installer so a broken AI agent protocol fails locally before the commit lands, not in CI.
+Branch: main
+Status: completed
+
+Work:
+- Created `scripts/pre-commit-hook.cjs` — a 30-line Node script
+  (no new dependencies) that runs `npm run agent:check` before every
+  commit. On failure it prints a clear message and the bypass hint
+  (`git commit --no-verify`). Uses `spawnSync(..., { shell: true })` so
+  npm.cmd resolves correctly on Windows.
+- Created `scripts/install-hooks.cjs` — copies the hook into the active
+  git hooks directory (default `.git/hooks`, respects
+  `core.hooksPath`). Supports `--force` (overwrite), `--uninstall`
+  (remove + restore latest `.bak.<timestamp>`), and `--help`. The
+  installer is idempotent: if our hook is already installed and matches
+  the source, it says "up to date" and exits; if the source has
+  changed, it auto-updates; if a *different* pre-commit hook exists, it
+  backs it up and refuses to overwrite (use `--force` to override).
+- Added `setup:hooks` and `uninstall:hooks` scripts to `package.json`.
+- Updated `README.md` (For AI Agents callout) and `CONTRIBUTING.md`
+  (AI-Assisted Contributions rule 9) with the install command and the
+  bypass hint. Updated `docs/AI_AGENTS.md` §5.0 with the design
+  rationale (why `agent:check` only, not `worklog:check`).
+- Installed the hook on the local machine via `npm run setup:hooks`,
+  so the very next commit on this repo will be guarded.
+- Verified all paths:
+    a) `npm run setup:hooks` → "Installed"
+    b) `npm run setup:hooks` (second time) → "up to date. Nothing to do"
+    c) Touching the source → "Source changed; updating" + reinstall
+    d) `node .git/hooks/pre-commit` on clean tree → exit 0, "OK"
+    e) `node .git/hooks/pre-commit` after corrupting CLAUDE.md →
+       exit 1, "FAIL ... bypass with `git commit --no-verify`"
+    f) After restoring CLAUDE.md → exit 0, "OK"
+    g) `npm run uninstall:hooks` → "Removed" + restores backup if any
+- Updated `TODO.md` to move the pre-commit hook task to `[x]` and to
+  add a "team-wide rollout" follow-up.
+- Appended this entry to `worklog.md` so the next agent sees what
+  changed.
+
+Files touched:
+- scripts/pre-commit-hook.cjs (new — the hook itself)
+- scripts/install-hooks.cjs (new — the installer)
+- package.json (added setup:hooks, uninstall:hooks)
+- README.md (For AI Agents tip)
+- CONTRIBUTING.md (rule 9)
+- docs/AI_AGENTS.md (new §5.0 Local pre-commit hook)
+- TODO.md (pre-commit hook → [x]; team rollout → Ready)
+- worklog.md (this entry)
+- .git/hooks/pre-commit (machine-local install, NOT committed)
+
+Verification:
+- All 7 verification paths above passed
+- `npm run agent:check` → 35+ checks pass
+- `npm run ci:check` → both pass
+- The hook file at `.git/hooks/pre-commit` starts with the correct
+  shebang and has the `Speed4You pre-commit hook` comment header
+- Hook is NOT committed (`.git/hooks/` is git's local state)
+
+Next step:
+- Team-wide rollout: each dev runs `npm run setup:hooks` on their
+  machine. Tracked in `TODO.md` under *AI / DX*.
+- Or: pick a real project task (the protocol/DX work is done).
+
+---
 Date: 2026-06-04 12:52 (UTC+6)
 Agent: Antigravity (Gemini 2.5 Pro)
 Session: Fix broken/missing poster images and metadata for all 3000 published content items on production.
