@@ -19,6 +19,78 @@ Whether you are a small neighborhood ISP looking to add a entertainment perk for
 
 ---
 
+## Screenshots
+
+Live production build at **<https://speed4you.net/>**. All screenshots below are taken from the running site at desktop (1440x900) and mobile (390x844) viewports.
+
+### Homepage
+
+The homepage delivers a cinematic, Netflix-style first impression: a hero carousel at the top showcases featured titles with auto-rotation, followed by multiple content rails for Movies, Series, Latest Releases, Portal Favorites, and a Trending This Week sidebar.
+
+| Desktop | Mobile |
+|---|---|
+| ![Homepage desktop](docs/screenshots/home/home-desktop.png) | ![Homepage mobile](docs/screenshots/home/home-mobile.png) |
+
+### Movies and Series Browse
+
+Two dedicated routes give focused discovery paths for the two content types, each rendering an infinite-scroll grid of poster cards with genre, year, language, and rating metadata.
+
+| | Desktop | Mobile |
+|---|---|---|
+| Movies | ![Movies browse desktop](docs/screenshots/movies/movies-desktop.png) | ![Movies browse mobile](docs/screenshots/movies/movies-mobile.png) |
+| Series | ![Series browse desktop](docs/screenshots/series/series-desktop.png) | ![Series browse mobile](docs/screenshots/series/series-mobile.png) |
+
+### Live TV
+
+A single-page experience that combines the HLS player, current channel info, and a categorized channel list (Bangla, English, Hindi, Islamic, Kids) on the right rail for quick switching.
+
+| Desktop | Mobile |
+|---|---|
+| ![Live TV desktop](docs/screenshots/live-tv/live-tv-desktop.png) | ![Live TV mobile](docs/screenshots/live-tv/live-tv-mobile.png) |
+
+### Full Catalog Browse
+
+The unified browse page is the power-user entry point: every title in the catalog with multi-criteria filters, sort options, and an integrated search field reflected in the URL.
+
+| Desktop | Mobile |
+|---|---|
+| ![Browse desktop](docs/screenshots/browse/browse-desktop.png) | ![Browse mobile](docs/screenshots/browse/browse-mobile.png) |
+
+### Search Results
+
+Typing in the search field filters the catalog in real time. This example shows a search for `matrix`.
+
+| Desktop | Mobile |
+|---|---|
+| ![Search desktop](docs/screenshots/search/search-desktop.png) | ![Search mobile](docs/screenshots/search/search-mobile.png) |
+
+### Content Detail Pages
+
+Detail pages surface rich metadata (backdrop, poster, synopsis, genre, rating, runtime) and a prominent play button. Series detail pages extend this with season tabs and an episode list.
+
+| | Desktop | Mobile |
+|---|---|---|
+| Movie detail | ![Movie detail desktop](docs/screenshots/detail/movie-detail-desktop.png) | ![Movie detail mobile](docs/screenshots/detail/movie-detail-mobile.png) |
+| Series detail | ![Series detail desktop](docs/screenshots/detail/series-detail-desktop.png) | ![Series detail mobile](docs/screenshots/detail/series-detail-mobile.png) |
+
+### Authentication
+
+The admin sign-in page follows a clean two-field form (email + ***REMOVED***) with a portal-themed backdrop.
+
+| Desktop | Mobile |
+|---|---|
+| ![Login desktop](docs/screenshots/auth/login-desktop.png) | ![Login mobile](docs/screenshots/auth/login-mobile.png) |
+
+### State Variants
+
+The UI handles the case where search returns no results with a clear, helpful empty state rather than a blank grid.
+
+| Desktop | Mobile |
+|---|---|
+| ![Empty state desktop](docs/screenshots/states/empty-state-desktop.png) | ![Empty state mobile](docs/screenshots/states/empty-state-mobile.png) |
+
+---
+
 ## Features
 
 ### Content Catalog
@@ -394,7 +466,6 @@ Contributions to Speed4You are welcome and appreciated. Whether you are fixing a
 For detailed contribution guidelines including code style expectations, branch naming conventions, commit message format, pull request process, and development workflow, please refer to the contribution guide:
 
 - **Contributing Guide:** [CONTRIBUTING.md](CONTRIBUTING.md)
-- **AI-Assisted Contributions:** see the *AI-Assisted Contributions* section in [CONTRIBUTING.md](CONTRIBUTING.md) — required reading if you used any AI tool to write the change.
 
 In summary, the contribution process involves forking the repository, creating a feature branch from `main`, making your changes with appropriate test coverage, ensuring all existing tests pass, and submitting a pull request with a clear description of the change and its motivation. Please open an issue before starting work on significant changes to discuss the approach and avoid duplicated effort.
 
