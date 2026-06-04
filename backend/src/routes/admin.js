@@ -97,9 +97,13 @@ router.post('/duplicates/merge', asyncRoute(adminController.mergeCatalogDuplicat
 // Series cleanup — remove episode-level entries incorrectly indexed as standalone series
 router.post('/series/cleanup-episodes', asyncRoute(adminController.cleanupOrphanSeriesEpisodes));
 
+// Series metadata fix — re-enrich all series with skipped/failed/not_found metadata using correct show titles
+router.post('/series/fix-metadata', asyncRoute(adminController.fixSeriesMetadata));
+
 // Metadata
 router.post('/metadata/tmdb', asyncRoute(adminController.fetchTmdbMetadata));
 router.post('/metadata/rematch',      asyncRoute(adminController.rematchMetadata));
+router.post('/metadata/fix-missing-posters', asyncRoute(adminController.fixMissingPosters));
 router.post('/metadata/cleanup-season-duplicates', asyncRoute(adminController.cleanupSeasonDuplicates));
 
 module.exports = router;
