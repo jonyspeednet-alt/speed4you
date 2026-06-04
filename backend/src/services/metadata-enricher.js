@@ -3,7 +3,7 @@ const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p';
 const NOISE_PATTERNS = [
   /\b(480p|720p|1080p|2160p|4k)\b/gi,
   /\b(web[- ]?dl|webrip|bluray|brrip|hdrip|dvdrip|x264|x265|h\.?264|h\.?265|hevc)\b/gi,
-  /\b(dual audio|multi audio|english|hindi|bangla|bengali|japanese|korean|french|spanish|dubbed|subbed)\b/gi,
+  /\b(dual audio|multi audio|english|hindi|bangla|bengali|japanese|korean|french|spanish|dubbed|subbed|esub|msub|engsub|subs?|eng|hin)\b/gi,
   /\b(complete|full)\s+(series|season)\b/gi,
   /\bseason\s*\d{1,2}\b/gi,
   /\bs\d{1,2}\s*[-_. ]*e\d{1,3}\b/gi,
@@ -13,6 +13,9 @@ const NOISE_PATTERNS = [
   /\bepisode\s*\d{1,3}\b/gi,
   /\bTV\s*(Mini\s*)?Series\b/gi,
   /\([^)]*\bTV\s*(Mini\s*)?Series\b[^)]*\)/gi,
+  /\b(nf|netflix|hdtv|hdtvrip|bdrip|10bit|10-bit|8bit|hdr10?|hdr|sdr)\b/gi,
+  /\b(ddp?[+-]?\d([.\s]*\d)?|ddp?|dolby|atmos|ac3|dts|aac|mp3|truehd|he-aac)\b/gi,
+  /\b(katmoviehd|psa|yts|yify|rarbg|fgt|pahe|galaxyrg|tgx|qxr|sartre|tomboc|joy|etrg|juggs|axxo|shaanig)\b/gi,
   /\[[^\]]+\]/g,
   /\{[^}]+\}/g,
 ];
@@ -31,7 +34,7 @@ function isGoodUrl(url) {
 }
 
 function cleanSearchTitle(value) {
-  let normalized = String(value || '').replace(/\.[^.]+$/, '');
+  let normalized = String(value || '').replace(/\.[a-z0-9]{2,4}$/i, '');
   normalized = normalized.replace(/[._]/g, ' ');
   normalized = normalized
     .replace(/\bnormalizing\s+\d+\s+[a-f0-9]{6,}\b/gi, ' ')
@@ -59,7 +62,7 @@ function cleanSearchTitle(value) {
       cleaned = String(value || '').trim();
     }
     // Remove dots/underscores/file extension
-    cleaned = cleaned.replace(/\.[^.]+$/, '').replace(/[._]/g, ' ').trim();
+    cleaned = cleaned.replace(/\.[a-z0-9]{2,4}$/i, '').replace(/[._]/g, ' ').trim();
   }
 
   return cleaned;
