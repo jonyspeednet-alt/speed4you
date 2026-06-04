@@ -42,12 +42,27 @@ function cleanSearchTitle(value) {
     normalized = normalized.replace(pattern, ' ');
   }
 
-  return normalized
+  let cleaned = normalized
     .replace(/\((19|20)\d{2}\)/g, ' ')
     .replace(/\b(19|20)\d{2}\b/g, ' ')
-    .replace(/\s*[-:]+\s*/g, ' ')
+    .replace(/\s*[-:–—]+\s*/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+
+  // If the cleaned title is empty or contains no letters/numbers (e.g. only punctuation like "( - )"),
+  // fall back to taking the part before the first parenthesis
+  if (!cleaned || !/(\p{L}|\p{N})/u.test(cleaned)) {
+    const parts = String(value || '').split('(');
+    if (parts[0].trim()) {
+      cleaned = parts[0].trim();
+    } else {
+      cleaned = String(value || '').trim();
+    }
+    // Remove dots/underscores/file extension
+    cleaned = cleaned.replace(/\.[^.]+$/, '').replace(/[._]/g, ' ').trim();
+  }
+
+  return cleaned;
 }
 
 function inferOriginalLanguage(item) {
