@@ -1,11 +1,5 @@
 # To learn more about how to use Nix to configure your environment
 # see: https://firebase.google.com/docs/customize-workspace
-#
-# AI AGENT NOTE: Before doing any work in this workspace (Project IDX or
-# otherwise), read AGENTS.md first. It is the canonical operating manual
-# for any AI agent/model on Speed4You. Every tool-specific entry file
-# (CLAUDE.md, .cursorrules, .github/copilot-instructions.md, etc.) is a
-# thin pointer back to AGENTS.md. Update AGENTS.md and every tool follows.
 { pkgs, ... }: {
   # Which nixpkgs channel to use.
   channel = "stable-24.05"; # or "unstable"
@@ -21,10 +15,6 @@
 
   # Sets environment variables in the workspace
   env = {
-    # Tell every AI agent in this workspace to read AGENTS.md first.
-    # Most agent CLIs (opencode, Aider, Claude Code) read AGENTS.md
-    # automatically. This is just a safety net for the few that don't.
-    AGENTS_MD = "AGENTS.md";
   };
   idx = {
     # Search for the extensions you want on https://open-vsx.org/ and use "publisher.id"
