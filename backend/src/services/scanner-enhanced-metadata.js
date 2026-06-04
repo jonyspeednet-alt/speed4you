@@ -45,11 +45,16 @@ const METADATA_PATCH_FIELDS = [
   'backdrop',
 ];
 
+function isGoodUrl(url) {
+  if (!url) return false;
+  return url.startsWith('http') || url.startsWith('/portal/uploads');
+}
+
 function extractMetadataPatch(enrichedItem, sourceItem) {
   const patch = {};
   for (const field of METADATA_PATCH_FIELDS) {
     if (enrichedItem[field] === undefined) continue;
-    if ((field === 'poster' || field === 'backdrop') && sourceItem[field]) continue;
+    if ((field === 'poster' || field === 'backdrop') && isGoodUrl(sourceItem[field])) continue;
     patch[field] = enrichedItem[field];
   }
   return patch;
