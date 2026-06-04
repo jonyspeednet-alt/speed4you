@@ -31,10 +31,20 @@ function parseEpisodeIdentity(filename) {
   const input = String(filename || '');
   const basename = cleanTitle(path.basename(input, path.extname(input)));
 
-  const seasonEpisodeMatch = basename.match(/\bS(?:eason)?\s*(\d{1,2})\s*[-_. ]*E(?:p(?:isode)?)?\s*(\d{1,3})\b/i)
+  let seasonEpisodeMatch = basename.match(/\bS(?:eason)?\s*(\d{1,2})\s*[-_. ]*E(?:p(?:isode)?)?\s*(\d{1,3})\b/i)
     || basename.match(/\b(\d{1,2})x(\d{1,3})\b/i)
-    || basename.match(/\bS(\d)(\d{2})\b/i)
-    || basename.match(/\b(\d{1,2})(\d{2})\b(?=.*\b(?:ep|episode|v\d|finale|1080p|720p|480p)\b)/i);
+    || basename.match(/\bS(\d)(\d{2})\b/i);
+
+  if (!seasonEpisodeMatch) {
+    const rawMatch = basename.match(/\b(\d{1,2})(\d{2})\b(?=.*\b(?:ep|episode|v\d|finale|1080p|720p|480p)\b)/i);
+    if (rawMatch) {
+      const combined = Number(rawMatch[1] + rawMatch[2]);
+      if (combined < 1900 || combined > 2099) {
+        seasonEpisodeMatch = rawMatch;
+      }
+    }
+  }
+
   if (seasonEpisodeMatch) {
     return {
       season: Number(seasonEpisodeMatch[1]),

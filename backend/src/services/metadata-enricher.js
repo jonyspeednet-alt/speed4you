@@ -25,6 +25,11 @@ function hasOmdbKey() {
   return Boolean(process.env.OMDB_API_KEY);
 }
 
+function isGoodUrl(url) {
+  if (!url) return false;
+  return url.startsWith('http') || url.startsWith('/portal/uploads');
+}
+
 function cleanSearchTitle(value) {
   let normalized = String(value || '').replace(/\.[^.]+$/, '');
   normalized = normalized.replace(/[._]/g, ' ');
@@ -291,8 +296,8 @@ async function enrichItemWithMetadata(item) {
       return {
         ...item,
         description: item.description || omdbData.description,
-        poster: item.poster || omdbData.poster,
-        backdrop: item.backdrop || omdbData.backdrop,
+        poster: isGoodUrl(item.poster) ? item.poster : omdbData.poster,
+        backdrop: isGoodUrl(item.backdrop) ? item.backdrop : omdbData.backdrop,
         genre: item.genre || omdbData.genre,
         genres: Array.isArray(item.genres) && item.genres.length ? item.genres : omdbData.genres,
         rating: item.rating || omdbData.rating,
@@ -381,8 +386,8 @@ async function enrichItemWithMetadata(item) {
     return {
       ...item,
       description: item.description || details.overview,
-      poster: item.poster || details.poster,
-      backdrop: item.backdrop || details.backdrop || item.poster || details.poster,
+      poster: isGoodUrl(item.poster) ? item.poster : details.poster,
+      backdrop: isGoodUrl(item.backdrop) ? item.backdrop : (details.backdrop || details.poster),
       genre: item.genre || details.genre,
       genres: Array.isArray(item.genres) && item.genres.length ? item.genres : details.genres,
       rating: item.rating || details.rating,

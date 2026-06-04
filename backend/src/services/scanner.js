@@ -175,7 +175,7 @@ function detectSeriesFolder(root, folderPath, files = [], nestedDirectories = []
   }
 
   const directVideoFiles = listVideoFiles(files, folderPath, 'series');
-  const directEpisodeLikeCount = countEpisodeLikeFiles(files);
+  const directEpisodeLikeCount = countEpisodeLikeFiles(directVideoFiles);
   if (directEpisodeLikeCount >= 2) {
     return true;
   }
@@ -190,7 +190,7 @@ function detectSeriesFolder(root, folderPath, files = [], nestedDirectories = []
       const seasonPath = path.join(folderPath, dirName);
       const seasonFiles = listFiles(seasonPath);
       const seasonVideoFiles = listVideoFiles(seasonFiles, seasonPath, 'series');
-      return countEpisodeLikeFiles(seasonFiles) >= 1
+      return countEpisodeLikeFiles(seasonVideoFiles) >= 1
         || seasonVideoFiles.length >= 2
         || hasSequentialEpisodePattern(seasonVideoFiles);
     });

@@ -394,6 +394,46 @@ function ContentLibraryPage() {
     }
   };
 
+  // --- Fix Series Metadata ---
+  const [fixMetaModal, setFixMetaModal] = useState(null); // null | { phase, total, matched, failed, skipped, fixedTitles, errors, dryResult }
+  const [fixMetaRunning, setFixMetaRunning] = useState(false);
+
+  const handleOpenFixMetadata = async () => {
+    setFixMetaModal({ phase: 'preview', total: 0, matched: 0, failed: 0, skipped: 0, fixedTitles: [], errors: [], dryResult: null });
+    setFixMetaRunning(true);
+    try {
+      const dry = await adminService.fixSeriesMetadataDry();
+      setFixMetaModal((m) => ({ ...m, phase: 'ready', dryResult: dry, total: dry.total }));
+    } catch (err) {
+      setFixMetaModal((m) => ({ ...m, phase: 'error', error: err.message }));
+    } finally {
+      setFixMetaRunning(false);
+    }
+  };
+
+  const handleRunFixMetadata = async () => {
+    setFixMetaRunning(true);
+    setFixMetaModal((m) => ({ ...m, phase: 'running', matched: 0, failed: 0, skipped: 0, fixedTitles: [], errors: [] }));
+    try {
+      const result = await adminService.fixSeriesMetadata({ batchSize: 5 });
+      setFixMetaModal((m) => ({
+        ...m,
+        phase: 'done',
+        total: result.total,
+        matched: result.matched,
+        failed: result.failed,
+        skipped: result.skipped || 0,
+        fixedTitles: result.fixedTitles || [],
+        errors: result.errors || [],
+      }));
+      loadContent();
+    } catch (err) {
+      setFixMetaModal((m) => ({ ...m, phase: 'error', error: err.message }));
+    } finally {
+      setFixMetaRunning(false);
+    }
+  };
+
   const exportCsv = () => {
     if (!allContent.length) { setError('No content to export.'); return; }
     const h = ['id', 'title', 'type', 'status', 'sourceType', 'language', 'category', 'collection', 'year', 'metadataStatus', 'metadataConfidence', 'duplicateCount'];
@@ -505,6 +545,12 @@ function ContentLibraryPage() {
           <button type="button" onClick={handleCleanupSeriesEps} style={{ ...styles.chip, color: '#f59e0b' }}>
             Cleanup Orphan Episodes
           </button>
+          {sectionType === 'series' && (
+            <button type="button" onClick={handleOpenFixMetadata}
+              style={{ ...styles.chip, color: '#818cf8', borderColor: 'rgba(99,102,241,0.3)' }}>
+              🔧 Fix Series Metadata
+            </button>
+          )}
         </div>
       </div>
 
@@ -946,6 +992,126 @@ function ContentLibraryPage() {
         confirmText={deleteTarget?.mode === 'bulk' ? 'Delete Selected' : 'Delete'}
         cancelText="Cancel"
       />
+
+      {/* Fix Series Metadata Modal */}
+      {fixMetaModal && (
+        <div style={fixStyles.overlay}>
+          <div style={fixStyles.modal}>
+            <div style={fixStyles.header}>
+              <div style={fixStyles.headerTitle}>🔧 Fix Series Metadata</div>
+              <button type="button" onClick={() => { setFixMetaModal(null); }} style={fixStyles.closeBtn}>✕</button>
+            </div>
+
+            {fixMetaModal.phase === 'preview' && (
+              <div style={fixStyles.body}>
+                <div style={fixStyles.spinner}>⏳ Scanning series with missing metadata…</div>
+              </div>
+            )}
+
+            {fixMetaModal.phase === 'ready' && (
+              <div style={fixStyles.body}>
+                <div style={fixStyles.infoBox}>
+                  <strong style={{ color: '#818cf8' }}>{fixMetaModal.total}</strong> series found with skipped / not_found / failed metadata.
+                  <div style={{ color: '#94a3b8', fontSize: '0.8rem', marginTop: '6px' }}>
+                    The fix will extract the real show title from each folder path, search TMDB, and update episode metadata.
+                  </div>
+                </div>
+                <div style={fixStyles.btnRow}>
+                  <button type="button" onClick={handleRunFixMetadata} disabled={fixMetaRunning || fixMetaModal.total === 0}
+                    style={{ ...fixStyles.primaryBtn, ...(fixMetaModal.total === 0 ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}>
+                    {fixMetaRunning ? 'Running…' : `Fix ${fixMetaModal.total} Series`}
+                  </button>
+                  <button type="button" onClick={() => setFixMetaModal(null)} style={fixStyles.secondaryBtn}>Cancel</button>
+                </div>
+              </div>
+            )}
+
+            {fixMetaModal.phase === 'running' && (
+              <div style={fixStyles.body}>
+                <div style={fixStyles.spinner}>⏳ Enriching series metadata via TMDB… This may take a minute.</div>
+                <div style={fixStyles.progressNote}>Do not close this window until complete.</div>
+              </div>
+            )}
+
+            {fixMetaModal.phase === 'done' && (
+              <div style={fixStyles.body}>
+                <div style={fixStyles.statsRow}>
+                  <div style={fixStyles.statBox}>
+                    <div style={{ ...fixStyles.statNum, color: '#818cf8' }}>{fixMetaModal.total}</div>
+                    <div style={fixStyles.statLbl}>Total</div>
+                  </div>
+                  <div style={fixStyles.statBox}>
+                    <div style={{ ...fixStyles.statNum, color: '#4ade80' }}>{fixMetaModal.matched}</div>
+                    <div style={fixStyles.statLbl}>Processed</div>
+                  </div>
+                  <div style={fixStyles.statBox}>
+                    <div style={{ ...fixStyles.statNum, color: '#f87171' }}>{fixMetaModal.failed}</div>
+                    <div style={fixStyles.statLbl}>Failed</div>
+                  </div>
+                </div>
+
+                {fixMetaModal.fixedTitles.length > 0 && (
+                  <div style={fixStyles.tableWrap}>
+                    <div style={fixStyles.tableTitle}>Results (showing up to 100)</div>
+                    <table style={fixStyles.table}>
+                      <thead>
+                        <tr>
+                          <th style={fixStyles.th}>Original Title</th>
+                          <th style={fixStyles.th}>Extracted</th>
+                          <th style={fixStyles.th}>TMDB Match</th>
+                          <th style={fixStyles.th}>Confidence</th>
+                          <th style={fixStyles.th}>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {fixMetaModal.fixedTitles.map((row, i) => (
+                          <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                            <td style={fixStyles.td}>{row.originalTitle}</td>
+                            <td style={fixStyles.td}>{row.extractedTitle}</td>
+                            <td style={fixStyles.td}>{row.tmdbTitle || '—'}</td>
+                            <td style={fixStyles.td}>
+                              <span style={{ color: row.confidence >= 70 ? '#4ade80' : row.confidence >= 40 ? '#fbbf24' : '#f87171' }}>
+                                {row.confidence}%
+                              </span>
+                            </td>
+                            <td style={fixStyles.td}>
+                              <span style={{ color: row.status === 'matched' ? '#4ade80' : row.status === 'needs_review' ? '#fbbf24' : '#94a3b8' }}>
+                                {row.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {fixMetaModal.errors.length > 0 && (
+                  <div style={fixStyles.errorBox}>
+                    <div style={{ fontWeight: 600, marginBottom: '4px', color: '#f87171' }}>Errors ({fixMetaModal.errors.length})</div>
+                    {fixMetaModal.errors.slice(0, 10).map((e, i) => (
+                      <div key={i} style={{ fontSize: '0.75rem', color: '#94a3b8' }}>ID {e.id}: {e.error}</div>
+                    ))}
+                  </div>
+                )}
+
+                <div style={fixStyles.btnRow}>
+                  <button type="button" onClick={() => setFixMetaModal(null)} style={fixStyles.primaryBtn}>Close</button>
+                </div>
+              </div>
+            )}
+
+            {fixMetaModal.phase === 'error' && (
+              <div style={fixStyles.body}>
+                <div style={fixStyles.errorBox}>Error: {fixMetaModal.error}</div>
+                <div style={fixStyles.btnRow}>
+                  <button type="button" onClick={() => setFixMetaModal(null)} style={fixStyles.secondaryBtn}>Close</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1064,6 +1230,31 @@ const styles = {
   seasonBadge: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '28px', padding: '2px 8px', borderRadius: '4px', background: 'rgba(99,102,241,0.1)', color: '#818cf8', fontSize: '0.7rem', fontWeight: '700' },
   groupMeta: { color: text3, fontSize: '0.72rem', fontWeight: '500', marginLeft: '4px' },
   expandBtn: { width: '24px', height: '24px', borderRadius: '4px', background: 'transparent', border: 'none', color: text2, fontSize: '0.82rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
+};
+
+const fixStyles = {
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' },
+  modal: { background: '#10141c', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '14px', width: '100%', maxWidth: '760px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,0.6)' },
+  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.07)' },
+  headerTitle: { fontSize: '1rem', fontWeight: '700', color: '#f1f5f9' },
+  closeBtn: { width: '28px', height: '28px', borderRadius: '6px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', cursor: 'pointer', fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  body: { padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' },
+  spinner: { textAlign: 'center', color: '#818cf8', fontSize: '0.9rem', padding: '24px' },
+  progressNote: { textAlign: 'center', color: '#475569', fontSize: '0.78rem' },
+  infoBox: { padding: '14px 16px', borderRadius: '10px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: '#c7d2fe', fontSize: '0.85rem' },
+  statsRow: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' },
+  statBox: { padding: '14px', borderRadius: '8px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', textAlign: 'center' },
+  statNum: { fontSize: '1.6rem', fontWeight: '700' },
+  statLbl: { color: '#64748b', fontSize: '0.72rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '2px' },
+  tableWrap: { overflowX: 'auto', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.07)' },
+  tableTitle: { padding: '8px 12px', color: '#475569', fontSize: '0.72rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', background: '#0d1116', borderBottom: '1px solid rgba(255,255,255,0.07)' },
+  table: { width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' },
+  th: { textAlign: 'left', padding: '8px 10px', color: '#475569', fontSize: '0.68rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', background: '#0d1116', borderBottom: '1px solid rgba(255,255,255,0.07)', whiteSpace: 'nowrap' },
+  td: { padding: '8px 10px', color: '#94a3b8', verticalAlign: 'middle' },
+  errorBox: { padding: '12px 14px', borderRadius: '8px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171', fontSize: '0.8rem' },
+  btnRow: { display: 'flex', gap: '8px', justifyContent: 'flex-end' },
+  primaryBtn: { padding: '9px 20px', borderRadius: '8px', background: 'rgba(99,102,241,0.85)', color: '#fff', fontWeight: '700', fontSize: '0.82rem', border: 'none', cursor: 'pointer' },
+  secondaryBtn: { padding: '9px 18px', borderRadius: '8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', fontWeight: '600', fontSize: '0.82rem', cursor: 'pointer' },
 };
 
 export default ContentLibraryPage;
