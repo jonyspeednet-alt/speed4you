@@ -30,7 +30,27 @@ function hasOmdbKey() {
 
 function isGoodUrl(url) {
   if (!url) return false;
-  return url.startsWith('http') || url.startsWith('/portal/uploads');
+  // Only remote http(s) URLs and uploaded files are reliably servable from anywhere.
+  // Local-web-root relative paths (e.g. /Hindi_Movies/...) exist on the server
+  // filesystem but are NOT good — we want to replace them with proper TMDB URLs.
+  return url.startsWith('http') || url.startsWith('/portal/uploads') || url.startsWith('/uploads');
+}
+
+// Extract the 4-digit year embedded in a raw title string (e.g. "Movie Name (2019)..." → 2019)
+function extractYearFromRawTitle(raw) {
+  const match = String(raw || '').match(/\b(19|20)\d{2}\b/);
+  return match ? Number(match[0]) : null;
+}
+
+// Return just the "core" title — everything before the first '(' or '['
+function extractCoreTitle(raw) {
+  const cleaned = String(raw || '')
+    .replace(/\.[a-z0-9]{2,4}$/i, '')
+    .replace(/[._]/g, ' ')
+    .replace(/\[.*/, '')
+    .replace(/\(.*/, '')
+    .trim();
+  return cleaned;
 }
 
 function cleanSearchTitle(value) {
@@ -372,51 +392,84 @@ async function enrichItemWithMetadata(item) {
 
   try {
     const mediaType = item.type === 'series' ? 'tv' : 'movie';
-    const response = await tmdbFetchJson(`/search/${mediaType}`, {
-      query: parsedTitle,
-      year: item.type === 'movie' ? item.year : undefined,
-      first_air_date_year: item.type === 'series' ? item.year : undefined,
-    });
 
-    const results = Array.isArray(response.results) ? response.results : [];
+    // Also try to pull year from raw title if item.year is missing
+    const rawYear = item.year || extractYearFromRawTitle(item.title);
+    const enrichedItem = rawYear && !item.year ? { ...item, year: rawYear } : item;
+
+    // Strategy 1: search with cleaned title + year filter
+    let results = [];
+    let response = await tmdbFetchJson(`/search/${mediaType}`, {
+      query: parsedTitle,
+      year: mediaType === 'movie' ? rawYear : undefined,
+      first_air_date_year: mediaType === 'tv' ? rawYear : undefined,
+    });
+    results = Array.isArray(response.results) ? response.results : [];
+
+    // Strategy 2: if no results with year, retry WITHOUT year filter
+    if (!results.length && rawYear) {
+      response = await tmdbFetchJson(`/search/${mediaType}`, { query: parsedTitle });
+      results = Array.isArray(response.results) ? response.results : [];
+    }
+
+    // Strategy 3: if still no results, retry with core title (text before first paren/bracket)
+    if (!results.length) {
+      const coreTitle = extractCoreTitle(item.title);
+      if (coreTitle && coreTitle !== parsedTitle) {
+        response = await tmdbFetchJson(`/search/${mediaType}`, { query: coreTitle });
+        results = Array.isArray(response.results) ? response.results : [];
+      }
+    }
+
+    // Strategy 4: try multi-search as a last resort
+    if (!results.length) {
+      const coreTitle = extractCoreTitle(item.title) || parsedTitle;
+      const multiResp = await tmdbFetchJson('/search/multi', { query: coreTitle });
+      const multiResults = Array.isArray(multiResp.results) ? multiResp.results : [];
+      results = multiResults.filter((r) => r.media_type === mediaType || r.media_type === (mediaType === 'movie' ? 'movie' : 'tv'));
+      if (!results.length) results = multiResults.filter((r) => r.media_type !== 'person');
+    }
+
     if (!results.length) {
       return {
-        ...item,
+        ...enrichedItem,
         metadataStatus: 'not_found',
         metadataProvider: 'tmdb',
         metadataConfidence: 0,
         metadataUpdatedAt: new Date().toISOString(),
-        metadataError: 'No TMDb match found.',
+        metadataError: 'No TMDb match found after multiple search strategies.',
         parsedTitle,
       };
     }
 
     const rankedResults = results
-      .map((candidate) => ({ candidate, score: scoreCandidate(candidate, item) }))
+      .map((candidate) => ({ candidate, score: scoreCandidate(candidate, enrichedItem) }))
       .sort((left, right) => right.score - left.score);
     const bestMatch = rankedResults[0];
-    const details = await fetchTmdbDetails(bestMatch.candidate.id, mediaType);
-    const seasons = mediaType === 'tv'
+    const candidateMediaType = bestMatch.candidate.media_type || mediaType;
+    const resolvedMediaType = (candidateMediaType === 'tv' || candidateMediaType === 'series') ? 'tv' : 'movie';
+    const details = await fetchTmdbDetails(bestMatch.candidate.id, resolvedMediaType);
+    const seasons = resolvedMediaType === 'tv'
       ? await fetchTvSeasons(details.tmdbId, details.numberOfSeasons)
       : [];
     const confidence = Math.max(0, Math.min(bestMatch.score, 100));
 
     return {
-      ...item,
-      description: item.description || details.overview,
-      poster: isGoodUrl(item.poster) ? item.poster : details.poster,
-      backdrop: isGoodUrl(item.backdrop) ? item.backdrop : (details.backdrop || details.poster),
-      genre: item.genre || details.genre,
-      genres: Array.isArray(item.genres) && item.genres.length ? item.genres : details.genres,
-      rating: item.rating || details.rating,
-      runtime: item.runtime || details.runtime,
-      seasons: item.type === 'series' && seasons.length ? mergeEpisodeMetadata(item.seasons || [], seasons) : item.seasons,
+      ...enrichedItem,
+      description: enrichedItem.description || details.overview,
+      poster: isGoodUrl(enrichedItem.poster) ? enrichedItem.poster : details.poster,
+      backdrop: isGoodUrl(enrichedItem.backdrop) ? enrichedItem.backdrop : (details.backdrop || details.poster),
+      genre: enrichedItem.genre || details.genre,
+      genres: Array.isArray(enrichedItem.genres) && enrichedItem.genres.length ? enrichedItem.genres : details.genres,
+      rating: enrichedItem.rating || details.rating,
+      runtime: enrichedItem.runtime || details.runtime,
+      seasons: enrichedItem.type === 'series' && seasons.length ? mergeEpisodeMetadata(enrichedItem.seasons || [], seasons) : enrichedItem.seasons,
       tmdbId: details.tmdbId,
       imdbId: details.imdbId,
-      title: confidence >= 70 ? details.title : item.title,
+      title: confidence >= 60 ? details.title : enrichedItem.title,
       originalTitle: details.originalTitle,
       originalLanguage: details.originalLanguage,
-      metadataStatus: confidence >= 70 ? 'matched' : 'needs_review',
+      metadataStatus: confidence >= 60 ? 'matched' : 'needs_review',
       metadataProvider: 'tmdb',
       metadataConfidence: confidence,
       metadataUpdatedAt: new Date().toISOString(),

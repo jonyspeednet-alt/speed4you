@@ -232,11 +232,13 @@ const rateLimiters = {
 /**
  * Fetch with rate limiting and caching
  */
-async function fetchWithRateLimitAndCache(provider, fetchFn, params, cacheTtl) {
-  // Check cache first
-  const cached = getCachedMetadata(provider, params);
-  if (cached) {
-    return { data: cached, fromCache: true };
+async function fetchWithRateLimitAndCache(provider, fetchFn, params, cacheTtl, forceRefresh = false) {
+  // Check cache first (skip if forceRefresh)
+  if (!forceRefresh) {
+    const cached = getCachedMetadata(provider, params);
+    if (cached) {
+      return { data: cached, fromCache: true };
+    }
   }
 
   // Apply rate limiting

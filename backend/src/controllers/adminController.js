@@ -555,9 +555,13 @@ exports.fixMissingPosters = async (req, res) => {
      WHERE status = $1
        AND (
          payload->>'poster' IS NULL OR payload->>'poster' = ''
-           OR (payload->>'poster' NOT LIKE 'http%' AND payload->>'poster' NOT LIKE '/portal/uploads%')
+           OR (payload->>'poster' NOT LIKE 'http%'
+               AND payload->>'poster' NOT LIKE '/portal/uploads%'
+               AND payload->>'poster' NOT LIKE '/uploads%')
          OR payload->>'backdrop' IS NULL OR payload->>'backdrop' = ''
-           OR (payload->>'backdrop' NOT LIKE 'http%' AND payload->>'backdrop' NOT LIKE '/portal/uploads%')
+           OR (payload->>'backdrop' NOT LIKE 'http%'
+               AND payload->>'backdrop' NOT LIKE '/portal/uploads%'
+               AND payload->>'backdrop' NOT LIKE '/uploads%')
          OR payload->>'description' IS NULL OR payload->>'description' = ''
          OR payload->>'year' IS NULL
        )
@@ -575,7 +579,7 @@ exports.fixMissingPosters = async (req, res) => {
   // Helper: is a URL a valid remote or uploaded image?
   function isGoodUrl(url) {
     if (!url) return false;
-    return url.startsWith('http') || url.startsWith('/portal/uploads');
+    return url.startsWith('http') || url.startsWith('/portal/uploads') || url.startsWith('/uploads');
   }
 
   for (let i = 0; i < queryResult.rows.length; i += batchSize) {
