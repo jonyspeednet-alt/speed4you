@@ -5,6 +5,7 @@
 - [Welcome](#welcome)
 - [Code of Conduct](#code-of-conduct)
 - [How to Contribute](#how-to-contribute)
+- [AI-Assisted Contributions](#ai-assisted-contributions)
 - [Development Setup](#development-setup)
 - [Project Structure](#project-structure)
 - [Coding Standards](#coding-standards)
@@ -42,6 +43,58 @@ There are many ways to contribute to Speed4You, and we welcome all forms of part
 **Feature Requests:** If you have an idea for a new feature or an improvement to an existing one, open a feature request issue using the template below. Explain the problem you are trying to solve, describe your proposed solution, and consider any alternative approaches you have thought about. Feature requests that include use cases and user stories tend to receive more attention and are more likely to be implemented.
 
 **Pull Requests:** If you want to contribute code, please fork the repository, create a feature branch, make your changes, and submit a pull request. Make sure your PR addresses a specific issue, follows our coding standards, includes appropriate tests, and does not introduce regressions. Detailed instructions for the PR process are provided later in this document.
+
+---
+
+## AI-Assisted Contributions
+
+Speed4You welcomes contributions made with the help of AI coding agents (opencode,
+Claude Code, Cursor, Aider, Kilo Code, GitHub Copilot, Roo Code, Cline, Windsurf,
+Gemini CLI, etc.). To keep the workflow consistent across tools and reviewers, all
+contributors — human or AI-assisted — must follow the project's **agent operating
+manual**:
+
+- **[`AGENTS.md`](AGENTS.md)** — the canonical manual. Defines the workflow, coding
+  standards, commit format, and cross-agent handoff protocol. Read this first.
+- **[`worklog.md`](worklog.md)**, **[`TODO.md`](TODO.md)**, **[`plan.md`](plan.md)**
+  — the three shared state files. They are how the next agent (or human) picks up
+  where the last one left off.
+
+If you need a ***REMOVED*** (DB ***REMOVED***, SSH key, API key, JWT ***REMOVED***, etc.):
+- Read **[`docs/SECRETS.md`](docs/SECRETS.md)** and **[`AGENTS.md` §17](AGENTS.md#17-***REMOVED***s-protocol-read-this-if-you-need-a-credential)**.
+- Run `npm run ***REMOVED***s:check` to see what is in place (no values printed).
+- Run `npm run ***REMOVED***s:setup` to install them from `***REMOVED***s/local/`.
+- If a required ***REMOVED*** is missing, stop and ask the user — never grep, never
+  search git history, never try common defaults.
+
+If you used any AI tool to write or refine the change, you **must**:
+
+1. **Read `AGENTS.md` first** (and the three state files) before starting.
+2. **Append an entry to `worklog.md`** describing what the agent did, which model/tool,
+   and which files were touched. The format is defined in `AGENTS.md` §4.
+3. **Update `TODO.md`** to move the matching task from `[~]` to `[x]` (or back to `[ ]`
+   with a note if blocked).
+4. **Keep `plan.md` honest.** When a plan is done, mark its steps `[x]`. When a new
+   task starts, overwrite `plan.md` with a fresh plan from `AGENTS.md` §6.
+5. **Disclose AI usage in the PR description** with one line, e.g.:
+   > AI tools used: Claude Sonnet 4 via opencode (writing), Copilot (autocomplete).
+6. **Verify before claiming done.** Run the verify step from `AGENTS.md` §7 (lint,
+   tests, build, smoke). Do not hand back code that fails any of these.
+7. **Never commit ***REMOVED***s**, `.env*`, `node_modules/`, `dist/`, or anything under
+   `backend/src/data/`. The `.gitignore` blocks these — do not force-add them.
+8. **Never edit other agents' worklog entries.** The log is append-only. If you spot
+   an error, add a new entry that points to the old one.
+
+The per-tool entry files (e.g. `CLAUDE.md`, `.cursorrules`,
+`.github/copilot-instructions.md`, `.aider.conf.yml`, `.kilocode/instructions.md`,
+`GEMINI.md`, `.windsurfrules`, `.roo/rules/`) are intentionally thin — they all
+point back to `AGENTS.md`. Update the rules once, in `AGENTS.md`, and every tool
+follows.
+
+If you are a reviewer triaging an AI-assisted PR, the entries in `worklog.md` and
+`TODO.md` give you a quick narrative of what the agent did. Use that to set your
+review depth: small one-line tasks need a quick look; large multi-file changes
+need a full pass.
 
 ---
 
