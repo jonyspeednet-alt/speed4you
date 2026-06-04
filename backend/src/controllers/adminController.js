@@ -539,7 +539,8 @@ exports.rematchMetadata = async (req, res) => {
 
 /**
  * Fix published items that are missing poster, backdrop, description, or year.
- * Searches TMDB by title and fills in whatever is missing.
+ * Also fixes items with non-HTTP (local/broken) poster/backdrop URLs.
+ * Searches TMDB by title and fills in whatever is missing or broken.
  * POST /api/admin/metadata/fix-missing-posters
  */
 exports.fixMissingPosters = async (req, res) => {
@@ -548,15 +549,17 @@ exports.fixMissingPosters = async (req, res) => {
   const batchSize = Math.min(20, Math.max(1, Number(req.body?.batchSize || 5)));
   const statusFilter = String(req.body?.status || 'published');
 
-  // Find published items missing key visual/metadata fields
+  // Find published items missing or with broken (non-http) poster/backdrop/description/year
   const queryResult = await db.query(
     `SELECT id, payload FROM content_catalog
      WHERE status = $1
        AND (
-         payload->>'poster' IS NULL OR payload->>'poster' = '' OR
-         payload->>'backdrop' IS NULL OR payload->>'backdrop' = '' OR
-         payload->>'description' IS NULL OR payload->>'description' = '' OR
-         payload->>'year' IS NULL
+         payload->>'poster' IS NULL OR payload->>'poster' = ''
+           OR (payload->>'poster' NOT LIKE 'http%' AND payload->>'poster' NOT LIKE '/portal/uploads%')
+         OR payload->>'backdrop' IS NULL OR payload->>'backdrop' = ''
+           OR (payload->>'backdrop' NOT LIKE 'http%' AND payload->>'backdrop' NOT LIKE '/portal/uploads%')
+         OR payload->>'description' IS NULL OR payload->>'description' = ''
+         OR payload->>'year' IS NULL
        )
      ORDER BY id`,
     [statusFilter],
@@ -569,6 +572,12 @@ exports.fixMissingPosters = async (req, res) => {
   const errors = [];
   const fixedList = [];
 
+  // Helper: is a URL a valid remote or uploaded image?
+  function isGoodUrl(url) {
+    if (!url) return false;
+    return url.startsWith('http') || url.startsWith('/portal/uploads');
+  }
+
   for (let i = 0; i < queryResult.rows.length; i += batchSize) {
     const batch = queryResult.rows.slice(i, i + batchSize);
     await Promise.all(batch.map(async (row) => {
@@ -578,11 +587,16 @@ exports.fixMissingPosters = async (req, res) => {
 
         const enriched = await enrichItemWithMetadata(item);
 
-        // Only update if enrichment actually added something useful
-        const gotPoster = enriched.poster && !item.poster;
-        const gotBackdrop = enriched.backdrop && !item.backdrop;
-        const gotDescription = enriched.description && !item.description;
-        const gotYear = enriched.year && !item.year;
+        // Replace if current value is missing OR is a broken/local path
+        const needsPoster = !isGoodUrl(item.poster);
+        const needsBackdrop = !isGoodUrl(item.backdrop);
+        const needsDescription = !item.description;
+        const needsYear = !item.year;
+
+        const gotPoster = needsPoster && isGoodUrl(enriched.poster);
+        const gotBackdrop = needsBackdrop && isGoodUrl(enriched.backdrop);
+        const gotDescription = needsDescription && !!enriched.description;
+        const gotYear = needsYear && !!enriched.year;
 
         if (!gotPoster && !gotBackdrop && !gotDescription && !gotYear) {
           skipped++;
@@ -592,11 +606,10 @@ exports.fixMissingPosters = async (req, res) => {
         if (!dryRun) {
           await updateItem(item.id, {
             ...enriched,
-            // Don't overwrite existing good values
-            poster: item.poster || enriched.poster,
-            backdrop: item.backdrop || enriched.backdrop,
-            description: item.description || enriched.description,
-            year: item.year || enriched.year,
+            poster: gotPoster ? enriched.poster : item.poster,
+            backdrop: gotBackdrop ? enriched.backdrop : item.backdrop,
+            description: gotDescription ? enriched.description : item.description,
+            year: gotYear ? enriched.year : item.year,
             rating: item.rating || enriched.rating,
           });
         }
@@ -604,7 +617,8 @@ exports.fixMissingPosters = async (req, res) => {
         fixedList.push({
           id: item.id,
           title: item.title,
-          addedPoster: gotPoster,
+          oldPoster: item.poster,
+          newPoster: gotPoster ? enriched.poster : null,
           addedBackdrop: gotBackdrop,
           addedDescription: gotDescription,
           addedYear: gotYear,
