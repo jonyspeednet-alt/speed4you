@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { adminService } from '../../services';
@@ -187,6 +188,9 @@ export default function AdminDashboard() {
               <InfoRow label="Drafts" value={`${stats.draftContent || 0} pending`} />
             </div>
           </div>
+
+          {/* Maintenance Actions */}
+          <MaintenancePanel />
         </div>
       </div>
     </div>
@@ -198,6 +202,94 @@ function InfoRow({ label, value, color }) {
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
       <span style={{ color: TEXT3, fontWeight: '500' }}>{label}</span>
       <span style={{ color: color || TEXT2, fontWeight: '600' }}>{value}</span>
+    </div>
+  );
+}
+
+function MaintenancePanel() {
+  const [posterState, setPosterState] = useState({ running: false, result: null, error: null });
+  const [rematchState, setRematchState] = useState({ running: false, result: null, error: null });
+
+  async function runFixPosters() {
+    setPosterState({ running: true, result: null, error: null });
+    try {
+      const res = await adminService.fixMissingPosters({ batchSize: 10 });
+      setPosterState({ running: false, result: res, error: null });
+    } catch (e) {
+      setPosterState({ running: false, result: null, error: e.message || 'Failed' });
+    }
+  }
+
+  async function runRematch() {
+    setRematchState({ running: true, result: null, error: null });
+    try {
+      const res = await adminService.rematchMetadata({ batchSize: 5 });
+      setRematchState({ running: false, result: res, error: null });
+    } catch (e) {
+      setRematchState({ running: false, result: null, error: e.message || 'Failed' });
+    }
+  }
+
+  return (
+    <div style={{ background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: '14px', padding: '18px' }}>
+      <h3 style={{ fontSize: '0.9rem', fontWeight: '700', color: TEXT, margin: '0 0 12px 0' }}>🔧 Maintenance</h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+
+        {/* Fix Missing Posters */}
+        <div>
+          <button
+            onClick={runFixPosters}
+            disabled={posterState.running}
+            style={{
+              width: '100%', padding: '9px 14px', borderRadius: '9px', fontSize: '0.8rem',
+              fontWeight: '600', cursor: posterState.running ? 'not-allowed' : 'pointer',
+              background: posterState.running ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.2)',
+              color: '#818cf8', border: '1px solid rgba(99,102,241,0.3)',
+              transition: 'all 150ms',
+            }}
+          >
+            {posterState.running ? '⏳ Fixing posters…' : '🖼️ Fix Missing Posters'}
+          </button>
+          {posterState.result && (
+            <div style={{ marginTop: '6px', fontSize: '0.73rem', color: '#4ade80', padding: '6px 10px', background: 'rgba(34,197,94,0.08)', borderRadius: '7px', border: '1px solid rgba(34,197,94,0.15)' }}>
+              ✅ Fixed {posterState.result.fixed} items, skipped {posterState.result.skipped}, failed {posterState.result.failed} (total: {posterState.result.total})
+            </div>
+          )}
+          {posterState.error && (
+            <div style={{ marginTop: '6px', fontSize: '0.73rem', color: '#f87171', padding: '6px 10px', background: 'rgba(248,113,113,0.08)', borderRadius: '7px', border: '1px solid rgba(248,113,113,0.15)' }}>
+              ❌ {posterState.error}
+            </div>
+          )}
+        </div>
+
+        {/* Rematch Metadata */}
+        <div>
+          <button
+            onClick={runRematch}
+            disabled={rematchState.running}
+            style={{
+              width: '100%', padding: '9px 14px', borderRadius: '9px', fontSize: '0.8rem',
+              fontWeight: '600', cursor: rematchState.running ? 'not-allowed' : 'pointer',
+              background: rematchState.running ? 'rgba(245,158,11,0.1)' : 'rgba(245,158,11,0.15)',
+              color: '#fbbf24', border: '1px solid rgba(245,158,11,0.25)',
+              transition: 'all 150ms',
+            }}
+          >
+            {rematchState.running ? '⏳ Rematching…' : '🔄 Re-match Metadata'}
+          </button>
+          {rematchState.result && (
+            <div style={{ marginTop: '6px', fontSize: '0.73rem', color: '#4ade80', padding: '6px 10px', background: 'rgba(34,197,94,0.08)', borderRadius: '7px', border: '1px solid rgba(34,197,94,0.15)' }}>
+              ✅ Matched {rematchState.result.matched}/{rematchState.result.total}, failed {rematchState.result.failed}
+            </div>
+          )}
+          {rematchState.error && (
+            <div style={{ marginTop: '6px', fontSize: '0.73rem', color: '#f87171', padding: '6px 10px', background: 'rgba(248,113,113,0.08)', borderRadius: '7px', border: '1px solid rgba(248,113,113,0.15)' }}>
+              ❌ {rematchState.error}
+            </div>
+          )}
+        </div>
+
+      </div>
     </div>
   );
 }
