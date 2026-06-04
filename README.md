@@ -28,6 +28,13 @@
 > `.aider.conf.yml`, `.kilocode/instructions.md`, `GEMINI.md`, `.windsurfrules`,
 > `.roo/rules/`) are thin pointers back to `AGENTS.md`. Do not duplicate the rules —
 > update `AGENTS.md` and the entry files will follow.
+>
+> **Local dev tip:** install the pre-commit hook so a broken protocol is caught
+> before you push, not in CI:
+> ```bash
+> npm run setup:hooks     # installs .git/hooks/pre-commit
+> git commit --no-verify  # bypass for emergencies only
+> ```
 
 ---
 
