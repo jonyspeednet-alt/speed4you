@@ -4,10 +4,10 @@ const https = require('https');
 
 const router = express.Router();
 
-const TV_PORTAL_BASE = process.env.TV_PORTAL_BASE_URL || 'http://10.45.45.254/';
+const TV_PORTAL_BASE = process.env.TV_PORTAL_BASE_URL || '';
 const TV_REQUEST_TIMEOUT_MS = Number(process.env.TV_REQUEST_TIMEOUT_MS || 15000);
 const ALLOWED_HOSTS = new Set(
-  String(process.env.TV_ALLOWED_HOSTS || '10.45.45.254,103.79.182.170')
+  String(process.env.TV_ALLOWED_HOSTS || '')
     .split(',')
     .map((h) => h.trim())
     .filter(Boolean),
