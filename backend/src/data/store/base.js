@@ -16,18 +16,26 @@ const {
 } = require('./constants');
 
 class BoundedCache {
-  constructor(maxSize = 500, ttlMs = 30 * 60 * 1000) {
+  constructor(maxSize = 500, ttlMs = null) {
     this._map = new Map();
     this._maxSize = maxSize;
     this._ttlMs = ttlMs;
   }
 
-  has(key) { return this._map.has(key); }
+  has(key) {
+    const entry = this._map.get(key);
+    if (!entry) return false;
+    if (this._ttlMs && (Date.now() - entry.ts > this._ttlMs)) {
+      this._map.delete(key);
+      return false;
+    }
+    return true;
+  }
 
   get(key) {
     const entry = this._map.get(key);
     if (!entry) return undefined;
-    if (Date.now() - entry.ts > this._ttlMs) {
+    if (this._ttlMs && (Date.now() - entry.ts > this._ttlMs)) {
       this._map.delete(key);
       return undefined;
     }
@@ -35,7 +43,7 @@ class BoundedCache {
   }
 
   set(key, value) {
-    if (this._map.size >= this._maxSize && !this._map.has(key)) {
+    if (this._map.size >= this._maxSize && !this.has(key)) {
       const oldest = this._map.keys().next().value;
       this._map.delete(oldest);
     }
@@ -47,7 +55,7 @@ class BoundedCache {
   get size() { return this._map.size; }
 }
 
-const appStateCache = new BoundedCache(500, 30 * 60 * 1000);
+const appStateCache = new BoundedCache(500, null);
 
 function readJson(filePath, fallback) {
   try {
