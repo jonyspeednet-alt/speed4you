@@ -1140,6 +1140,7 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
 
     for (const [offset, folderPath] of batch.entries()) {
       const relativeFolder = path.relative(root.scanPath, folderPath) || '.';
+      const folderName = path.basename(folderPath);
       const files = listFiles(folderPath);
       const nestedDirectories = listDirectories(folderPath);
       const fingerprint = getFolderFingerprint(folderPath);
@@ -1823,7 +1824,7 @@ function startScanJob(selectedRootIds = []) {
   let child;
   try {
     child = fork(workerPath, [], {
-      stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
+      stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
       env: {
         ...process.env,
         SCANNER_ROOT_IDS: JSON.stringify(rootIds),

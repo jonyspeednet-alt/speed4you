@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import ProfileMenu from "./ProfileMenu";
 import { useBreakpoint, useTVMode } from "../../hooks";
@@ -21,6 +21,8 @@ function TopNav() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [hoveredLink, setHoveredLink] = useState(null);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const navRef = useRef(null);
   const { isMobile, isTablet, isSmallMobile, width } = useBreakpoint();
   const isTVMode = useTVMode();
   const isDesktop = !isMobile && !isTablet;
@@ -52,18 +54,33 @@ function TopNav() {
 
   useEffect(() => {
     setIsMoreOpen(false);
+    setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
   useEffect(() => {
-    if (!isMoreOpen) return;
+    if (!isMoreOpen && !isMobileMenuOpen) return;
+
     const handleClick = (e) => {
-      if (!e.target.closest(".top-nav-more-dropdown")) {
+      if (navRef.current && !navRef.current.contains(e.target)) {
         setIsMoreOpen(false);
+        setIsMobileMenuOpen(false);
       }
     };
+
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        setIsMoreOpen(false);
+        setIsMobileMenuOpen(false);
+      }
+    };
+
     document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [isMoreOpen]);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMoreOpen, isMobileMenuOpen]);
 
   const navClasses = [
     "top-nav-container",
@@ -127,10 +144,10 @@ function TopNav() {
     .join(" ");
 
   return (
-    <nav aria-label="Primary" className={navClasses}>
+    <nav ref={navRef} aria-label="Primary" className={navClasses}>
       <div className={containerClasses}>
         <Link to="/" className={logoClasses}>
-          <span className="top-nav-logo-mark">S4U</span>
+          <img src="/logo.png" alt="Speed4You" className="top-nav-logo-mark" />
           <div className={logoCopyClasses}>
             <span className="top-nav-logo-title">Entertainment Portal</span>
             {!isSmallMobile && showSubtitle && (
@@ -172,12 +189,11 @@ function TopNav() {
               );
             })}
             {overflowNavItems.length > 0 && (
-              <li style={{ position: "relative" }} className="top-nav-more-dropdown">
+              <li className="top-nav-more-dropdown">
                 <button
                   type="button"
                   className={`top-nav-link ${isTablet || isCompactDesktop ? "top-nav-link-tablet" : ""} ${isMoreOpen ? "top-nav-link-hover" : ""}`}
                   onClick={() => setIsMoreOpen((v) => !v)}
-                  onBlur={() => setTimeout(() => setIsMoreOpen(false), 150)}
                   aria-expanded={isMoreOpen}
                   aria-haspopup="true"
                 >
@@ -187,20 +203,7 @@ function TopNav() {
                   </svg>
                 </button>
                 {isMoreOpen && (
-                  <div className="top-nav-more-dropdown" style={{
-                    position: "absolute",
-                    top: "calc(100% + 8px)",
-                    left: 0,
-                    minWidth: "160px",
-                    padding: "6px",
-                    borderRadius: "16px",
-                    background: "rgba(13, 26, 45, 0.95)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    backdropFilter: "blur(24px)",
-                    WebkitBackdropFilter: "blur(24px)",
-                    boxShadow: "0 16px 48px rgba(0,0,0,0.5)",
-                    zIndex: 300,
-                  }}>
+                  <div className="top-nav-more-panel">
                     {overflowNavItems.map((item) => {
                       const isActive = location.pathname.startsWith(item.path);
                       return (
@@ -208,19 +211,7 @@ function TopNav() {
                           key={item.path}
                           to={item.path}
                           onClick={() => setIsMoreOpen(false)}
-                          style={{
-                            display: "block",
-                            padding: "10px 14px",
-                            borderRadius: "10px",
-                            color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
-                            background: isActive ? "rgba(255,255,255,0.08)" : "transparent",
-                            fontWeight: "600",
-                            fontSize: "0.88rem",
-                            transition: "background 150ms ease",
-                            textDecoration: "none",
-                          }}
-                          onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
-                          onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
+                          className={`top-nav-more-item ${isActive ? "active" : ""}`}
                         >
                           {item.label}
                         </Link>
@@ -305,41 +296,107 @@ function TopNav() {
             />
           )}
           {isMobile && (
-            <button
-              type="button"
-              onClick={() =>
-                window.dispatchEvent(new Event("open-global-search"))
-              }
-              aria-label="Search"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "40px",
-                height: "40px",
-                borderRadius: "50%",
-                background: "rgba(255,255,255,0.08)",
-                border: "1px solid rgba(255,255,255,0.12)",
-                color: "var(--text-primary)",
-                flexShrink: 0,
-              }}
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                aria-hidden="true"
+            <>
+              <button
+                type="button"
+                className="top-nav-mobile-toggle"
+                onClick={() => setIsMobileMenuOpen((v) => !v)}
+                aria-expanded={isMobileMenuOpen}
+                aria-label={isMobileMenuOpen ? "Close navigation" : "Open navigation"}
               >
-                <circle cx="11" cy="11" r="8" />
-                <path d="M21 21l-4.35-4.35" />
-              </svg>
-            </button>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  aria-hidden="true"
+                >
+                  <path d="M4 7h16M4 12h16M4 17h16" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="top-nav-mobile-search"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  window.dispatchEvent(new Event("open-global-search"));
+                }}
+                aria-label="Search"
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  aria-hidden="true"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="M21 21l-4.35-4.35" />
+                </svg>
+              </button>
+            </>
           )}
         </div>
       </div>
+
+      {isMobile && isMobileMenuOpen && (
+        <div className="top-nav-mobile-menu" role="menu" aria-label="Mobile navigation">
+          <div className="top-nav-mobile-menu-inner">
+            <div className="top-nav-mobile-menu-header">
+              <span>Navigation</span>
+              <button
+                type="button"
+                className="top-nav-mobile-menu-close"
+                onClick={() => setIsMobileMenuOpen(false)}
+                aria-label="Close menu"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <ul className="top-nav-mobile-menu-list">
+              {navItems.map((item) => {
+                const isActive =
+                  item.path === "/"
+                    ? location.pathname === "/"
+                    : location.pathname.startsWith(item.path);
+                return (
+                  <li key={item.path}>
+                    <Link
+                      to={item.path}
+                      className={`top-nav-mobile-menu-item ${isActive ? "active" : ""}`}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      {item.label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="top-nav-mobile-menu-partners">
+              <span>Partner sites</span>
+              {partnerSites.map((site) => (
+                <a
+                  key={site.url}
+                  href={site.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="top-nav-mobile-menu-item"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  {site.label}
+                </a>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

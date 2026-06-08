@@ -240,10 +240,6 @@ function HomePage() {
       {hasFeaturedHero ? <HeroCarousel items={content.featured} /> : null}
 
       <div style={{ ...styles.content, ...(isTVMode ? styles.contentTV : {}), ...(isMobile ? styles.contentMobile : {}) }}>
-        {loading && Object.keys(content).length === 0 ? (
-          <div style={styles.loadingNote}>Building your portal...</div>
-        ) : null}
-
         {content.movies?.length >= 3 ? (
           <ContentRail title="Movies" subtitle="Lean-back movie night" items={content.movies} viewAllLink="/movies" />
         ) : null}
@@ -313,13 +309,6 @@ const styles = {
   contentMobile: {
     gap: 'var(--spacing-xl)',
     marginTop: '-30px',
-  },
-  loadingNote: {
-    textAlign: 'center',
-    padding: '80px 0',
-    fontSize: '1rem',
-    fontWeight: '600',
-    color: 'var(--text-muted)',
   },
 };
 

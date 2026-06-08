@@ -622,9 +622,9 @@ main,
 
 .top-nav-container {
   position: fixed;
-  top: 18px;
-  left: 18px;
-  right: 18px;
+  top: max(18px, env(safe-area-inset-top, 0px));
+  left: max(18px, env(safe-area-inset-left, 0px));
+  right: max(18px, env(safe-area-inset-right, 0px));
   z-index: 1100;
   border-radius: 30px;
   background: rgba(5, 12, 22, 0.45);
@@ -691,18 +691,11 @@ main,
 }
 
 .top-nav-logo-mark {
-  display: grid;
-  place-items: center;
   width: 48px;
   height: 48px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-violet) 100%);
-  color: #050c16;
-  font-family: var(--font-family-display);
-  font-size: 1rem;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
+  border-radius: 12px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .top-nav-logo-copy {
@@ -802,6 +795,39 @@ main,
 .top-nav-link-hover {
   color: var(--text-primary);
   background: rgba(255, 255, 255, 0.06);
+}
+
+.top-nav-more-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 160px;
+  padding: 8px;
+  border-radius: 16px;
+  background: rgba(13, 26, 45, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+  z-index: 300;
+}
+
+.top-nav-more-item {
+  display: block;
+  padding: 10px 14px;
+  border-radius: 12px;
+  color: var(--text-secondary);
+  background: transparent;
+  font-weight: 600;
+  font-size: 0.88rem;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  text-decoration: none;
+}
+
+.top-nav-more-item:hover,
+.top-nav-more-item.active {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 /* Partner FTP Links */
@@ -908,6 +934,113 @@ main,
   min-width: 120px;
   max-width: 200px;
   gap: 6px;
+}
+
+.top-nav-mobile-toggle,
+.top-nav-mobile-search {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.top-nav-mobile-toggle:hover,
+.top-nav-mobile-search:hover,
+.top-nav-mobile-menu-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+.top-nav-mobile-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  right: 0;
+  padding: 14px;
+  border-radius: 24px;
+  background: rgba(7, 17, 31, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  z-index: 1200;
+}
+
+.top-nav-mobile-menu-inner {
+  display: grid;
+  gap: 12px;
+}
+
+.top-nav-mobile-menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.top-nav-mobile-menu-close {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.top-nav-mobile-menu-list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.top-nav-mobile-menu-item {
+  display: block;
+  padding: 12px 14px;
+  border-radius: 16px;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+  text-decoration: none;
+  transition: all var(--transition-fast);
+}
+
+.top-nav-mobile-menu-item:hover,
+.top-nav-mobile-menu-item:focus-visible {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.top-nav-mobile-menu-item.active {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.top-nav-mobile-menu-partners {
+  display: grid;
+  gap: 10px;
+}
+
+.top-nav-mobile-menu-partners span {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .top-nav-search-icon {
