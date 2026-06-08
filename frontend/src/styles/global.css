@@ -656,7 +656,7 @@ main,
 }
 
 .top-nav-main {
-  min-height: 74px;
+  min-height: 80px;
   width: 100%;
   max-width: 1720px;
   margin: 0 auto;
@@ -667,7 +667,7 @@ main,
 }
 
 .top-nav-mobile-container {
-  min-height: 62px;
+  min-height: 66px;
   width: 100%;
   padding: 8px 10px 8px 14px;
 }
@@ -691,7 +691,7 @@ main,
 }
 
 .top-nav-logo-mark {
-  height: 50px;
+  height: 56px;
   width: auto;
   border-radius: 8px;
   object-fit: contain;
