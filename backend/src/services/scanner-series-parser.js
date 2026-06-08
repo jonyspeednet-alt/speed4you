@@ -29,7 +29,8 @@ function parseSeasonNumber(seasonName, fallbackNumber) {
 
 function parseEpisodeIdentity(filename) {
   const input = String(filename || '');
-  const basename = cleanTitle(path.basename(input, path.extname(input)));
+  const decoded = safeDecodeURIComponent(input);
+  const basename = cleanTitle(path.basename(decoded, path.extname(decoded)));
 
   let seasonEpisodeMatch = basename.match(/\bS(?:eason)?\s*(\d{1,2})\s*[-_. ]*E(?:p(?:isode)?)?\s*(\d{1,3})\b/i)
     || basename.match(/\b(\d{1,2})x(\d{1,3})\b/i)
@@ -125,7 +126,8 @@ function countEpisodeLikeFiles(files = []) {
   ];
 
   return files.reduce((count, file) => {
-    const normalized = cleanTitle(file);
+    const decoded = safeDecodeURIComponent(file);
+    const normalized = cleanTitle(decoded);
     if (explicitEpisodePatterns.some((pattern) => pattern.test(normalized))) {
       return count + 1;
     }
@@ -167,7 +169,7 @@ function buildEpisodesFromFiles(root, seriesSlug, seasonPath, seasonNumber, file
     return {
       id: `${seriesSlug}-${seasonNumber}-${parsedNumber}`,
       number: parsedNumber,
-      title: cleanTitle(file),
+      title: cleanTitle(safeDecodeURIComponent(file)),
       videoUrl: toPublicUrl(root, path.join(seasonPath, file)),
       sourcePath: path.join(seasonPath, file),
       duration: '',
@@ -295,6 +297,36 @@ function sortEpisodesWithinSeason(episodes = []) {
   });
 }
 
+function isExplicitSeriesFile(filename) {
+  const name = String(filename || '');
+  return /\bS(\d{1,2})\s*[-_. ]*E(\d{1,3})\b/i.test(name) ||
+         /\b(\d{1,2})x(\d{1,3})\b/i.test(name) ||
+         /\bEpisode\s*(\d{1,3})\b/i.test(name);
+}
+
+function safeDecodeURIComponent(str) {
+  try {
+    return decodeURIComponent(str);
+  } catch {
+    return str;
+  }
+}
+
+function parseShowNameFromFilename(filename) {
+  const decoded = safeDecodeURIComponent(filename);
+  const nameWithoutExt = path.basename(decoded, path.extname(decoded));
+  const match = nameWithoutExt.match(/(.*?)\b(?:S(?:eason)?\s*(\d{1,2})\s*[-_. ]*E(?:p(?:isode)?)?\s*(\d{1,3})|(\d{1,2})x(\d{1,3})|Episode\s*(\d{1,3}))/i);
+  if (match) {
+    let showName = match[1];
+    showName = showName.replace(/\./g, ' ');
+    showName = showName.replace(/[-_.]+$/, '').trim();
+    if (showName) {
+      return cleanTitle(showName);
+    }
+  }
+  return null;
+}
+
 module.exports = {
   buildSeriesSeasons,
   cleanTitle,
@@ -305,4 +337,7 @@ module.exports = {
   parseSeasonNumber,
   slugify,
   sortEpisodeFiles,
+  isExplicitSeriesFile,
+  parseShowNameFromFilename,
+  safeDecodeURIComponent,
 };

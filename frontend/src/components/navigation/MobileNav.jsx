@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useBreakpoint } from '../../hooks';
 
 const navItems = [
@@ -41,6 +41,18 @@ const navItems = [
     ),
   },
   {
+    path: '/tv',
+    label: 'Live TV',
+    icon: (
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+        <line x1="8" y1="21" x2="16" y2="21" />
+        <line x1="12" y1="17" x2="12" y2="21" />
+        <circle cx="12" cy="10" r="2" fill="currentColor" opacity="0.4" />
+      </svg>
+    ),
+  },
+  {
     path: '/browse',
     label: 'Discover',
     icon: (
@@ -63,7 +75,6 @@ function MobileNav() {
   // main cause of visible stutter on mid-range mobile GPUs.
   const [skipAnimation, setSkipAnimation] = useState(false);
   const location = useLocation();
-  const navigate = useNavigate();
   const { isSmallMobile } = useBreakpoint();
   const menuRef = useRef(null);
   const firstFocusableRef = useRef(null);
@@ -79,6 +90,8 @@ function MobileNav() {
     const menu = menuRef.current;
     if (!menu) return;
 
+    firstFocusableRef.current?.focus();
+
     function handleKeyDown(e) {
       if (e.key === 'Escape') {
         setIsOpen(false);
@@ -86,9 +99,13 @@ function MobileNav() {
       }
       if (e.key !== 'Tab') return;
 
-      const focusable = menu.querySelectorAll(
-        'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      const focusable = Array.from(
+        menu.querySelectorAll(
+          'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
       );
+      if (focusable.length === 0) return;
+
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
 
@@ -158,7 +175,9 @@ function MobileNav() {
   return (
     <>
       <button
+        type="button"
         onClick={() => setIsOpen(true)}
+        aria-controls="mobile-navigation-menu"
         style={styles.menuBtn}
         aria-label="Open navigation menu"
         aria-expanded={isOpen}
@@ -173,17 +192,19 @@ function MobileNav() {
       {isOpen && (
         <div
           style={{ ...styles.overlay, opacity: menuOpacity }}
+          onPointerDown={() => setIsOpen(false)}
           onClick={() => setIsOpen(false)}
-          onTouchEnd={() => setIsOpen(false)}
           aria-hidden="true"
         />
       )}
 
       <div
+        id="mobile-navigation-menu"
         ref={menuRef}
         role="dialog"
         aria-modal="true"
         aria-label="Navigation menu"
+        aria-hidden={!isOpen}
         style={{
           ...styles.menu,
           ...(isSmallMobile ? styles.menuCompact : {}),
@@ -211,13 +232,14 @@ function MobileNav() {
         {/* Top row */}
         <div style={styles.topRow}>
           <div style={styles.logo}>
-            <span style={styles.logoBadge} aria-hidden="true">ISP</span>
+            <span style={styles.logoBadge} aria-hidden="true">S4U</span>
             <div>
               <span style={styles.logoText}>Entertainment Portal</span>
-              <span style={styles.logoSub}>Curated local streaming</span>
+              <span style={styles.logoSub}>Movies & series in one place</span>
             </div>
           </div>
           <button
+            type="button"
             ref={firstFocusableRef}
             onClick={closeMenu}
             style={styles.closeBtn}
@@ -300,7 +322,7 @@ function MobileNav() {
         {/* Partner FTP */}
         <div style={styles.sectionLabel} aria-hidden="true">Partner FTP</div>
         <div style={styles.quickActions}>
-          <a href="http://bokasoka.net" target="_blank" rel="noopener noreferrer" style={styles.partnerChip} onClick={closeMenu}>
+          <a href="https://bokasoka.net" target="_blank" rel="noopener noreferrer" style={styles.partnerChip} onClick={closeMenu}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
               <polyline points="15 3 21 3 21 9" />
@@ -308,7 +330,7 @@ function MobileNav() {
             </svg>
             Bokasoka
           </a>
-          <a href="http://cinemabazar.net" target="_blank" rel="noopener noreferrer" style={styles.partnerChip} onClick={closeMenu}>
+          <a href="https://cinemabazar.net" target="_blank" rel="noopener noreferrer" style={styles.partnerChip} onClick={closeMenu}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
               <polyline points="15 3 21 3 21 9" />
@@ -347,6 +369,7 @@ const styles = {
     background: 'rgba(255,255,255,0.08)',
     border: '1px solid rgba(255,255,255,0.12)',
     minHeight: '44px',
+    touchAction: 'manipulation',
   },
   menuBtnLabel: {
     fontSize: '0.86rem',
@@ -359,15 +382,16 @@ const styles = {
     backdropFilter: 'blur(6px)',
     zIndex: 2000,
     transition: 'opacity 280ms ease',
+    touchAction: 'manipulation',
   },
   menu: {
     position: 'fixed',
-    left: '10px',
-    right: '10px',
-    bottom: '10px',
-    maxHeight: '92vh',
+    left: 'calc(10px + env(safe-area-inset-left, 0px))',
+    right: 'calc(10px + env(safe-area-inset-right, 0px))',
+    bottom: 'calc(10px + env(safe-area-inset-bottom, 0px))',
+    maxHeight: 'calc(100vh - 20px)',
     overflowY: 'auto',
-    padding: '16px 16px 24px',
+    padding: '16px 16px calc(24px + env(safe-area-inset-bottom, 0px))',
     borderRadius: '30px',
     background: 'linear-gradient(180deg, rgba(13,26,43,0.85), rgba(5,12,22,0.95))',
     border: '1px solid rgba(255,255,255,0.08)',
@@ -411,6 +435,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    touchAction: 'manipulation',
   },
   logo: {
     display: 'flex',

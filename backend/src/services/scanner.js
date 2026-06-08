@@ -32,6 +32,9 @@ const {
   looksLikeSeasonFolder,
   parseEpisodeIdentity,
   slugify,
+  isExplicitSeriesFile,
+  parseShowNameFromFilename,
+  safeDecodeURIComponent,
 } = require('./scanner-series-parser');
 
 const VIDEO_EXTENSIONS = new Set(
@@ -151,7 +154,7 @@ function waitForImmediate() {
 
 function toPublicUrl(root, absolutePath) {
   const relativePath = path.relative(root.scanPath, absolutePath).split(path.sep).join('/');
-  return `${root.publicBaseUrl}/${relativePath.split('/').map(encodeURIComponent).join('/')}`.replace(/%2520/g, '%20');
+  return `${root.publicBaseUrl}/${relativePath.split('/').map(encodeURIComponent).join('/')}`;
 }
 
 function extractYear(value) {
@@ -721,7 +724,10 @@ function shouldExpandMovieFolder(relativeFolder, folderName, videoFiles) {
 
 function buildMovieCandidates(root, folderPath, relativeFolder, files) {
   const folderName = path.basename(folderPath);
-  const videoFiles = listVideoFiles(files, folderPath, 'movie');
+  let videoFiles = listVideoFiles(files, folderPath, 'movie');
+
+  // Exclude explicit series files from movie candidates in movie roots
+  videoFiles = videoFiles.filter((videoFile) => !isExplicitSeriesFile(videoFile));
 
   if (!videoFiles.length) {
     return [];
@@ -1037,6 +1043,84 @@ function updateRootProgress(summary, rootId, patch) {
   };
 }
 
+async function hasAllSignaturesInCatalog(signatures = [], existingSignatureSet = null) {
+  if (existingSignatureSet instanceof Set) {
+    return signatures.every((sig) => existingSignatureSet.has(sig));
+  }
+  if (!signatures.length) {
+    return false;
+  }
+  const results = await Promise.all(
+    signatures.map((sig) => getItemByScanSignature(sig).catch(() => null))
+  );
+  return results.every(Boolean);
+}
+
+function buildSeriesFromSingleFiles(root, showName, showFiles, folderPath, relativeFolder, scanContext) {
+  const showSlug = slugify(showName);
+  const seasonsMap = new Map();
+
+  for (const file of showFiles) {
+    const identity = parseEpisodeIdentity(file);
+    const seasonNumber = identity.season || 1;
+    const episodeNumber = identity.episode || 1;
+
+    if (!seasonsMap.has(seasonNumber)) {
+      seasonsMap.set(seasonNumber, []);
+    }
+    seasonsMap.get(seasonNumber).push({
+      file,
+      episodeNumber,
+    });
+  }
+
+  const seasons = [];
+  for (const [seasonNumber, episodesInfo] of seasonsMap.entries()) {
+    episodesInfo.sort((a, b) => a.episodeNumber - b.episodeNumber);
+
+    const episodes = episodesInfo.map((info) => {
+      const file = info.file;
+      return {
+        id: `${showSlug}-${seasonNumber}-${info.episodeNumber}`,
+        number: info.episodeNumber,
+        title: cleanTitle(safeDecodeURIComponent(file)),
+        videoUrl: toPublicUrl(root, path.join(folderPath, file)),
+        sourcePath: path.join(folderPath, file),
+        duration: '',
+      };
+    });
+
+    seasons.push({
+      id: `${showSlug}-season-${seasonNumber}`,
+      number: seasonNumber,
+      title: `Season ${seasonNumber}`,
+      sourcePath: folderPath,
+      episodes,
+    });
+  }
+
+  seasons.sort((a, b) => a.number - b.number);
+
+  const item = createBaseScannerItem(root, {
+    title: showName,
+    slug: showSlug,
+    type: 'series',
+    year: extractYear(showName) || (seasons[0]?.episodes[0] ? extractYear(seasons[0].episodes[0].title) : null),
+    poster: pickPoster(root, folderPath, showFiles),
+    backdrop: pickBackdrop(root, folderPath, showFiles),
+    seasonCount: seasons.length,
+    episodeCount: seasons.reduce((sum, season) => sum + season.episodes.length, 0),
+    seasons,
+    sourcePath: path.join(folderPath, showSlug),
+    sourcePublicPath: toPublicUrl(root, folderPath),
+    scanSignature: `${root.id}:${relativeFolder === '.' ? '' : `${relativeFolder}/`}series:${showSlug}`,
+    lastScanRunId: scanContext.runId,
+    lastScanRunAt: scanContext.startedAt,
+  });
+
+  return item;
+}
+
 async function processMovieRoot(root, summary, progressCallback, scanContext, existingSignatureSet) {
   const rootState = await loadRootState(root.id);
   const nextRootState = {
@@ -1063,6 +1147,22 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
       const isSeriesFolder = relativeFolder !== '.' && detectSeriesFolder(root, folderPath, files, nestedDirectories);
       const movieCandidates = isSeriesFolder ? [] : buildMovieCandidates(root, folderPath, relativeFolder, files);
 
+      // Detect explicit series files in this folder when it is not already classified as a series folder
+      const allVideoFiles = listVideoFiles(files, folderPath, 'series');
+      const seriesFiles = isSeriesFolder ? [] : allVideoFiles.filter((f) => isExplicitSeriesFile(f));
+
+      // Group series files by show name
+      const seriesGroups = new Map();
+      for (const file of seriesFiles) {
+        const showName = parseShowNameFromFilename(file);
+        if (showName) {
+          if (!seriesGroups.has(showName)) {
+            seriesGroups.set(showName, []);
+          }
+          seriesGroups.get(showName).push(file);
+        }
+      }
+
       const processedCount = Math.min(start + offset + 1, candidateFolders.length);
       updateRootProgress(summary, root.id, {
         processed: processedCount,
@@ -1071,12 +1171,8 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
         progressCallback(buildProgressPayload(summary, { activeRootId: root.id }));
       }
 
-      if (!movieCandidates.length) {
-        if (!isSeriesFolder) {
-          continue;
-        }
-
-        const { seasons, seriesFiles } = buildSeriesSeasons(root, path.basename(folderPath), folderPath);
+      if (isSeriesFolder) {
+        const { seasons, seriesFiles: buildFiles } = buildSeriesSeasons(root, path.basename(folderPath), folderPath);
         if (!seasons.length) {
           continue;
         }
@@ -1086,8 +1182,8 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
           slug: slugify(path.basename(folderPath)),
           type: 'series',
           year: extractYear(relativeFolder) || extractYear(path.basename(folderPath)),
-          poster: pickPoster(root, folderPath, seriesFiles),
-          backdrop: pickBackdrop(root, folderPath, seriesFiles),
+          poster: pickPoster(root, folderPath, buildFiles),
+          backdrop: pickBackdrop(root, folderPath, buildFiles),
           seasonCount: seasons.length,
           episodeCount: seasons.reduce((sum, season) => sum + season.episodes.length, 0),
           seasons,
@@ -1131,11 +1227,17 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
         continue;
       }
 
-      if (previousFingerprint && previousFingerprint === fingerprint && await hasAllCandidatesInCatalog(movieCandidates, existingSignatureSet)) {
-        movieCandidates.forEach((candidate) => seenSignatures.add(candidate.scanSignature));
-        summary.unchanged += movieCandidates.length;
+      // Compute expected signatures for fingerprint checking
+      const expectedSignatures = [
+        ...movieCandidates.map((c) => c.scanSignature),
+        ...[...seriesGroups.keys()].map((showName) => `${root.id}:${relativeFolder === '.' ? '' : `${relativeFolder}/`}series:${slugify(showName)}`),
+      ];
+
+      if (previousFingerprint && previousFingerprint === fingerprint && await hasAllSignaturesInCatalog(expectedSignatures, existingSignatureSet)) {
+        expectedSignatures.forEach((sig) => seenSignatures.add(sig));
+        summary.unchanged += expectedSignatures.length;
         const current = summary.rootResults.find((entry) => entry.id === root.id);
-        updateRootProgress(summary, root.id, { unchanged: (current?.unchanged || 0) + movieCandidates.length });
+        updateRootProgress(summary, root.id, { unchanged: (current?.unchanged || 0) + expectedSignatures.length });
         continue;
       }
 
@@ -1185,16 +1287,49 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
           duplicateDrafts: (current?.duplicateDrafts || 0) + (result.item.duplicateCount > 0 ? 1 : 0),
         });
       }
+
+      for (const [showName, showFiles] of seriesGroups.entries()) {
+        const item = buildSeriesFromSingleFiles(root, showName, showFiles, folderPath, relativeFolder, scanContext);
+        if (seenSignatures.has(item.scanSignature)) {
+          continue;
+        }
+        seenSignatures.add(item.scanSignature);
+
+        const enrichedItem = await renameMediaForItem(assignScannerTaxonomy(await enrichItemWithMetadata(item)));
+        const result = await retryAsync(() => upsertScannedItem(enrichedItem));
+
+        if (result.created) {
+          summary.created += 1;
+        }
+        if (result.updated) {
+          summary.updated += 1;
+        }
+        if (result.item.duplicateCount > 0) {
+          summary.duplicateDrafts += 1;
+        }
+        summary.drafts.push(result.item);
+        if (summary.drafts.length > 100) summary.drafts.shift();
+
+        const current = summary.rootResults.find((entry) => entry.id === root.id);
+        updateRootProgress(summary, root.id, {
+          discovered: (current?.discovered || 0) + 1,
+          created: (current?.created || 0) + (result.created ? 1 : 0),
+          updated: (current?.updated || 0) + (result.updated ? 1 : 0),
+          duplicateDrafts: (current?.duplicateDrafts || 0) + (result.item.duplicateCount > 0 ? 1 : 0),
+        });
+      }
+
       nextRootState.folders[relativeFolder] = {
         fingerprint,
-        scanSignature: movieCandidates.map(c => c.scanSignature).join(','),
-        title: movieCandidates[0]?.titleSource || folderName,
+        scanSignature: expectedSignatures.join(','),
+        title: movieCandidates[0]?.titleSource || [...seriesGroups.keys()][0] || folderName,
         updatedAt: new Date().toISOString(),
       };
     }
 
     await waitForImmediate();
   }
+
 
   updateRootProgress(summary, root.id, {
     status: 'finalizing',

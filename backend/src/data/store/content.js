@@ -451,14 +451,43 @@ async function getLibraryOrganization(filters = {}) {
   const params = [];
   const clauses = buildCatalogFilterClauses(filters, params);
   const whereClause = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-  const totalsPromise = db.query(`SELECT COUNT(*)::int AS items, COUNT(DISTINCT collection)::int AS collections FROM content_catalog ${whereClause}`, params);
+  const totalsPromise = db.query(`
+    SELECT 
+      COUNT(*)::int AS items, 
+      COUNT(DISTINCT collection)::int AS collections,
+      COUNT(CASE WHEN status = 'published' THEN 1 END)::int AS published,
+      COUNT(CASE WHEN status = 'draft' THEN 1 END)::int AS drafts,
+      COUNT(CASE WHEN source_type = 'scanner' THEN 1 END)::int AS scanner,
+      COUNT(CASE WHEN source_type = 'manual' THEN 1 END)::int AS manual,
+      COUNT(CASE WHEN metadata_status = 'needs_review' THEN 1 END)::int AS needs_review,
+      COUNT(CASE WHEN duplicate_count > 0 THEN 1 END)::int AS duplicates
+    FROM content_catalog 
+    ${whereClause}
+  `, params);
   const categoriesPromise = db.query(`SELECT category AS label, COUNT(*)::int AS count FROM content_catalog ${whereClause} GROUP BY label ORDER BY count DESC, label ASC LIMIT 200`, params);
   const languagesPromise = db.query(`SELECT language AS label, COUNT(*)::int AS count FROM content_catalog ${whereClause} GROUP BY label ORDER BY count DESC, label ASC LIMIT 200`, params);
   const collectionsPromise = db.query(`SELECT collection AS label, COUNT(*)::int AS count FROM content_catalog ${whereClause ? whereClause + '\n    AND' : 'WHERE'} collection <> '' GROUP BY label ORDER BY count DESC, label ASC LIMIT 200`, params);
   const rootsPromise = db.query(`SELECT COALESCE(NULLIF(payload->>'sourceRootLabel', ''), source_root_id) AS label, COUNT(*)::int AS count FROM content_catalog ${whereClause} GROUP BY label ORDER BY count DESC, label ASC LIMIT 100`, params);
   const tagsPromise = db.query(`SELECT tag AS label, COUNT(*)::int AS count FROM (SELECT payload->'tags' AS tags FROM content_catalog ${whereClause}) AS filtered, jsonb_array_elements_text(COALESCE(filtered.tags, '[]'::jsonb)) AS tag GROUP BY label ORDER BY count DESC, label ASC LIMIT 200`, params);
   const [totalsRes, categoriesRes, languagesRes, collectionsRes, rootsRes, tagsRes] = await Promise.all([totalsPromise, categoriesPromise, languagesPromise, collectionsPromise, rootsPromise, tagsPromise]);
-  return { totals: { items: totalsRes.rows[0]?.items || 0, collections: totalsRes.rows[0]?.collections || 0, tags: tagsRes.rows.length }, collections: collectionsRes.rows, tags: tagsRes.rows, categories: categoriesRes.rows, languages: languagesRes.rows, roots: rootsRes.rows.filter((r) => r.label !== null) };
+  return { 
+    totals: { 
+      items: totalsRes.rows[0]?.items || 0, 
+      collections: totalsRes.rows[0]?.collections || 0, 
+      tags: tagsRes.rows.length,
+      published: totalsRes.rows[0]?.published || 0,
+      drafts: totalsRes.rows[0]?.drafts || 0,
+      scanner: totalsRes.rows[0]?.scanner || 0,
+      manual: totalsRes.rows[0]?.manual || 0,
+      needsReview: totalsRes.rows[0]?.needs_review || 0,
+      duplicates: totalsRes.rows[0]?.duplicates || 0
+    }, 
+    collections: collectionsRes.rows, 
+    tags: tagsRes.rows, 
+    categories: categoriesRes.rows, 
+    languages: languagesRes.rows, 
+    roots: rootsRes.rows.filter((r) => r.label !== null) 
+  };
 }
 
 /**

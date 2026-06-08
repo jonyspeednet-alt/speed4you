@@ -148,42 +148,19 @@ function ContentLibraryPage() {
     sortBy, sortDir,
   }), [sectionType, filters, pagination.page, pagination.limit, sortBy, sortDir]);
 
-  // Duplicate count query: only fetch when the duplicates filter is off
-  // (so we know the TOTAL across all matching filters, not just current page).
-  const duplicateCountParams = useMemo(() => {
-    if (filters.duplicatesOnly) return null;
-    return {
-      ...(sectionType === 'movie' ? { type: 'movie' } : {}),
-      ...(sectionType === 'series' ? { type: 'series' } : {}),
-      ...(filters.search ? { search: filters.search } : {}),
-      ...(filters.status ? { status: filters.status } : {}),
-      ...(filters.source ? { source: filters.source } : {}),
-      ...(filters.language ? { language: filters.language } : {}),
-      ...(filters.category ? { category: filters.category } : {}),
-      ...(filters.collection ? { collection: filters.collection } : {}),
-      ...(filters.tag ? { tag: filters.tag } : {}),
-      ...(filters.sourceRootId ? { sourceRootId: filters.sourceRootId } : {}),
-      duplicatesOnly: 'true',
-      page: 1, limit: 1,
-    };
-  }, [sectionType, filters]);
-
-  const [duplicateTotal, setDuplicateTotal] = useState(0);
-
-  useEffect(() => {
-    if (!duplicateCountParams) {
-      setDuplicateTotal(pagination.total || 0);
-      return;
-    }
-    let cancelled = false;
-    const fetcher = sectionType === 'movie'
-      ? adminService.getMovies
-      : sectionType === 'series' ? adminService.getSeries : adminService.getContent;
-    fetcher(duplicateCountParams)
-      .then((res) => { if (!cancelled) setDuplicateTotal(res?.total || 0); })
-      .catch(() => { if (!cancelled) setDuplicateTotal(0); });
-    return () => { cancelled = true; };
-  }, [duplicateCountParams, pagination.total, sectionType]);
+  const orgParams = useMemo(() => ({
+    ...(sectionType === 'movie' ? { type: 'movie' } : {}),
+    ...(sectionType === 'series' ? { type: 'series' } : {}),
+    ...(filters.search ? { search: filters.search } : {}),
+    ...(filters.status ? { status: filters.status } : {}),
+    ...(filters.source ? { source: filters.source } : {}),
+    ...(filters.language ? { language: filters.language } : {}),
+    ...(filters.category ? { category: filters.category } : {}),
+    ...(filters.collection ? { collection: filters.collection } : {}),
+    ...(filters.tag ? { tag: filters.tag } : {}),
+    ...(filters.sourceRootId ? { sourceRootId: filters.sourceRootId } : {}),
+    ...(filters.duplicatesOnly ? { duplicatesOnly: 'true' } : {}),
+  }), [sectionType, filters]);
 
   const loadContent = useCallback(async () => {
     try {
@@ -204,20 +181,23 @@ function ContentLibraryPage() {
 
   useEffect(() => { loadContent(); }, [loadContent]);
 
-  const loadAux = useCallback(async () => {
+  useEffect(() => {
+    adminService.getScannerRoots()
+      .then((res) => setRoots(res?.items || []))
+      .catch(() => {});
+  }, []);
+
+  const loadOrganization = useCallback(async () => {
     try {
-      const [rootsRes, orgRes] = await Promise.all([
-        adminService.getScannerRoots().catch(() => ({ items: [] })),
-        adminService.getContentOrganization(
-          sectionType === 'movie' ? { type: 'movie' } : sectionType === 'series' ? { type: 'series' } : {}
-        ).catch(() => ({})),
-      ]);
-      setRoots(rootsRes?.items || []);
+      const orgRes = await adminService.getContentOrganization(orgParams);
       setOrganization(orgRes || {});
     } catch {}
-  }, [sectionType]);
+  }, [orgParams]);
 
-  useEffect(() => { const t = setTimeout(loadAux, 50); return () => clearTimeout(t); }, [loadAux]);
+  useEffect(() => {
+    const t = setTimeout(loadOrganization, 50);
+    return () => clearTimeout(t);
+  }, [loadOrganization]);
 
   useEffect(() => { setPagination((c) => ({ ...c, page: 1 })); }, [
     filters.search, filters.status, filters.source, filters.language,
@@ -231,17 +211,19 @@ function ContentLibraryPage() {
     tags: [...new Set(allContent.flatMap((i) => i.tags || []).filter(Boolean))].sort(),
   }), [allContent]);
 
-  const contentMetrics = useMemo(() => ({
-    total: pagination.total, visible: allContent.length,
-    published: allContent.filter((i) => i.status === 'published').length,
-    drafts: allContent.filter((i) => i.status === 'draft').length,
-    scanner: allContent.filter((i) => i.sourceType === 'scanner').length,
-    manual: allContent.filter((i) => i.sourceType === 'manual').length,
-    needsReview: allContent.filter((i) => i.metadataStatus === 'needs_review').length,
-    duplicateRisk: filters.duplicatesOnly
-      ? pagination.total
-      : duplicateTotal,
-  }), [allContent, pagination.total, filters.duplicatesOnly, duplicateTotal]);
+  const contentMetrics = useMemo(() => {
+    const totals = organization?.totals || {};
+    return {
+      total: pagination.total,
+      visible: allContent.length,
+      published: totals.published ?? 0,
+      drafts: totals.drafts ?? 0,
+      scanner: totals.scanner ?? 0,
+      manual: totals.manual ?? 0,
+      needsReview: totals.needsReview ?? 0,
+      duplicateRisk: totals.duplicates ?? 0,
+    };
+  }, [organization, pagination.total, allContent.length]);
 
   const seriesGroups = useMemo(() => {
     if (!groupBySeries) return null;

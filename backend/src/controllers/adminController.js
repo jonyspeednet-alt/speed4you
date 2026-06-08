@@ -177,8 +177,19 @@ exports.getSeries = async (req, res) => {
 };
 
 exports.getLibraryOrganization = async (req, res) => {
-  const { status, type, source, sourceRootId, language, category, collection, tag, search } = req.query;
-  res.json(await getLibraryOrganization({ status, type, source, sourceRootId, language, category, collection, tag, search }));
+  const { status, type, source, sourceRootId, language, category, collection, tag, search, duplicatesOnly } = req.query;
+  res.json(await getLibraryOrganization({ 
+    status, 
+    type, 
+    source, 
+    sourceRootId, 
+    language, 
+    category, 
+    collection, 
+    tag, 
+    search, 
+    duplicatesOnly: String(duplicatesOnly) === 'true' 
+  }));
 };
 
 exports.getContentById = async (req, res) => {

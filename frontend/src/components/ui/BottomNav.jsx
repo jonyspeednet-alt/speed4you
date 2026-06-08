@@ -32,6 +32,17 @@ const NAV_ITEMS = [
     ),
   },
   {
+    path: '/tv',
+    label: 'Live TV',
+    icon: (active) => (
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+        <rect x="2" y="4" width="20" height="13" rx="2" fill={active ? 'currentColor' : 'none'} opacity={active ? '0.18' : '1'} />
+        <path d="M8 21h8M12 17v4" />
+        {active && <circle cx="12" cy="10.5" r="2.5" fill="currentColor" opacity="0.5" />}
+      </svg>
+    ),
+  },
+  {
     path: '/browse',
     label: 'Browse',
     icon: (active) => (
@@ -47,7 +58,7 @@ function BottomNav() {
   const location = useLocation();
   const [pressedItem, setPressedItem] = useState(null);
 
-  if (location.pathname.startsWith('/tv')) return null;
+  // Bottom nav always visible for navigation access
 
   return (
     <nav className="bottom-nav" aria-label="Bottom navigation">
