@@ -945,14 +945,14 @@
     }
 
     .top-nav-main {
-        min-height: 56px;
+        min-height: 60px;
         padding: 8px 10px 8px 12px;
         gap: 8px;
         flex-wrap: nowrap;
     }
 
     .top-nav-logo-mark {
-        height: 42px;
+        height: 46px;
         width: auto;
         border-radius: 6px;
         flex-shrink: 0;
@@ -1106,13 +1106,13 @@
     }
 
     .top-nav-main {
-        min-height: 52px;
+        min-height: 56px;
         padding: 6px 8px;
         gap: 6px;
     }
 
     .top-nav-logo-mark {
-        height: 36px;
+        height: 40px;
         width: auto;
         border-radius: 6px;
     }
