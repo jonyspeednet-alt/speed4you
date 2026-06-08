@@ -1,0 +1,1 @@
+SELECT id, payload->>'scanSignature' as sig, payload->>'title' as title, payload->>'sourcePath' as path, created_at FROM content_catalog WHERE payload->>'scanSignature' = 'extra-storage-bangla-movies:Indian Bangla Movies/2021/Aloukik (2021)' LIMIT 5;

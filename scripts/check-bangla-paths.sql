@@ -1,0 +1,1 @@
+SELECT count(1) as old_path_count FROM content_catalog WHERE source_root_id='extra-storage-bangla-movies' AND (payload->>'videoUrl' LIKE '/Extra_Storage/%' OR payload->>'sourcePath' LIKE '%/Extra_Storage/%');
