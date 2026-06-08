@@ -147,7 +147,7 @@ function TopNav() {
     <nav ref={navRef} aria-label="Primary" className={navClasses}>
       <div className={containerClasses}>
         <Link to="/" className={logoClasses}>
-          <img src="/logo.png" alt="Speed4You" className="top-nav-logo-mark top-nav-logo-main" />
+          <img src="/logo.png" alt="Speed4You" className="top-nav-logo-mark" />
           <span className="sr-only">Entertainment Portal</span>
         </Link>
 

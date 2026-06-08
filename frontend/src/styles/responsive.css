@@ -952,13 +952,11 @@
     }
 
     .top-nav-logo-mark {
-        height: 36px;
+        height: 42px;
         width: auto;
         border-radius: 6px;
         flex-shrink: 0;
     }
-
-    .top-nav-logo-main { width: 48px; height: 48px; }
 
     .top-nav-logo-copy {
         min-width: 0;
@@ -1114,12 +1112,10 @@
     }
 
     .top-nav-logo-mark {
-        height: 32px;
+        height: 36px;
         width: auto;
         border-radius: 6px;
     }
-
-    .top-nav-logo-main { width: 44px; height: 44px; }
 
     .top-nav-logo-copy {
         max-width: 42vw;
@@ -1506,20 +1502,6 @@
     gap: 16px;
     padding: 12px 18px;
     align-items: center;
-}
-
-.top-nav-logo-mark {
-    width: 44px;
-    height: 44px;
-    border-radius: 10px;
-    object-fit: contain;
-    box-shadow: 0 6px 18px rgba(99,102,241,0.12);
-}
-
-/* Larger main logo when using the main modifier */
-.top-nav-logo-main {
-    width: 64px;
-    height: 64px;
 }
 
 .top-nav-logo-copy {
