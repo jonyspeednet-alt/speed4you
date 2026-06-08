@@ -147,15 +147,8 @@ function TopNav() {
     <nav ref={navRef} aria-label="Primary" className={navClasses}>
       <div className={containerClasses}>
         <Link to="/" className={logoClasses}>
-          <img src="/logo.png" alt="Speed4You" className="top-nav-logo-mark" />
-          <div className={logoCopyClasses}>
-            <span className="top-nav-logo-title">Entertainment Portal</span>
-            {!isSmallMobile && showSubtitle && (
-              <span className="top-nav-logo-subtitle">
-                Movies & series in one place
-              </span>
-            )}
-          </div>
+          <img src="/logo.png" alt="Speed4You" className="top-nav-logo-mark top-nav-logo-main" />
+          <span className="sr-only">Entertainment Portal</span>
         </Link>
 
         {!isMobile && (
