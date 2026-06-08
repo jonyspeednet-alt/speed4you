@@ -2277,6 +2277,49 @@ Fetch metadata from TMDb or OMDb for enrichment.
 
 ---
 
+### POST `/api/admin/metadata/rematch`
+
+Re-run metadata enrichment for items that were skipped, failed, require review, or could not be found previously.
+
+| Property | Value |
+|---|---|
+| **Auth Required** | Admin JWT |
+
+**Query Parameters:**
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `dry` | `boolean` | `false` | Run without saving changes to the database |
+
+**Request Body:**
+
+| Field | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `batchSize` | `integer` | No | `5` | Concurrent batch size for processing (1 to 20) |
+
+**Response (200):**
+
+```json
+{
+  "ok": true,
+  "dryRun": false,
+  "total": 48,
+  "matched": 48,
+  "failed": 0,
+  "errors": []
+}
+```
+
+**Status Codes:**
+
+| Code | Meaning |
+|---|---|
+| 200 | Rematch batch processing completed |
+| 401 | Unauthorized |
+
+---
+
+
 ## 12. Health
 
 ---
