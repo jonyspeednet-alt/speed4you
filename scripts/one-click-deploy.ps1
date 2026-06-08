@@ -497,9 +497,6 @@ $deployConfig = @{
   PublicHealthUrl = Get-OptionalSetting 'DEPLOY_PUBLIC_HEALTH_URL' (Get-DefaultPublicHealthUrl -PortalUrl (Get-RequiredSetting 'DEPLOY_PUBLIC_PORTAL_URL'))
 }
 
-$plink = 'C:\Program Files\PuTTY\plink.exe'
-$pscp = 'C:\Program Files\PuTTY\pscp.exe'
-
 function Invoke-RemoteCommand {
   param(
     [Parameter(Mandatory = $true)]
@@ -513,15 +510,23 @@ function Invoke-RemoteCommand {
     $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
     [System.IO.File]::WriteAllText($tempScriptPath, $normalizedCommand, $utf8NoBom)
 
-    & $plink `
-      -batch `
-      -hostkey $deployConfig.HostKey `
-      -P $deployConfig.Port `
-      -pw $deployConfig.Password `
-      -m $tempScriptPath `
-      "$($deployConfig.User)@$($deployConfig.Host)"
-
+    $privateKeyPath = Join-Path $projectRoot 'deploy_key'
+    $remoteTempScript = "/home/$($deployConfig.User)/deploy-temp.sh"
+    
+    # Upload script
+    & scp -i $privateKeyPath -P $deployConfig.Port -o StrictHostKeyChecking=no $tempScriptPath "$($deployConfig.User)@$($deployConfig.Host):$remoteTempScript"
     if ($LASTEXITCODE -ne 0) {
+      throw "Failed to upload script file to remote server"
+    }
+
+    # Run script
+    & ssh -i $privateKeyPath -p $deployConfig.Port -o StrictHostKeyChecking=no "$($deployConfig.User)@$($deployConfig.Host)" "bash $remoteTempScript"
+    $sshExitCode = $LASTEXITCODE
+
+    # Cleanup script
+    & ssh -i $privateKeyPath -p $deployConfig.Port -o StrictHostKeyChecking=no "$($deployConfig.User)@$($deployConfig.Host)" "rm -f $remoteTempScript"
+
+    if ($sshExitCode -ne 0) {
       throw "Remote command failed: $Command"
     }
   } finally {
@@ -539,14 +544,8 @@ function Copy-ToRemote {
     [string]$RemotePath
   )
 
-  & $pscp `
-    -batch `
-    -r `
-    -hostkey $deployConfig.HostKey `
-    -P $deployConfig.Port `
-    -pw $deployConfig.Password `
-    $LocalPath `
-    "$($deployConfig.User)@$($deployConfig.Host):$RemotePath"
+  $privateKeyPath = Join-Path $projectRoot 'deploy_key'
+  & scp -i $privateKeyPath -P $deployConfig.Port -o StrictHostKeyChecking=no -r $LocalPath "$($deployConfig.User)@$($deployConfig.Host):$RemotePath"
 
   if ($LASTEXITCODE -ne 0) {
     throw "Upload failed for $LocalPath"
@@ -758,11 +757,11 @@ resolve_service_name() {
 wait_for_port_release() {
   for _ in $(seq 1 20); do
     if command -v ss >/dev/null 2>&1; then
-      if ! run_sudo ss -ltnp "( sport = :__REMOTE_PORT__ )" 2>/dev/null | grep -q ":__REMOTE_PORT__"; then
+      if ! ss -ltn 2>/dev/null | grep -q ":__REMOTE_PORT__"; then
         return 0
       fi
     elif command -v lsof >/dev/null 2>&1; then
-      if ! run_sudo lsof -iTCP:__REMOTE_PORT__ -sTCP:LISTEN >/dev/null 2>&1; then
+      if ! lsof -iTCP:__REMOTE_PORT__ -sTCP:LISTEN >/dev/null 2>&1; then
         return 0
       fi
     else
@@ -787,15 +786,15 @@ stop_backend_processes() {
   fi
 
   if command -v fuser >/dev/null 2>&1; then
-    run_sudo fuser -k __REMOTE_PORT__/tcp || true
-    run_sudo pkill -9 node || true
+    fuser -k __REMOTE_PORT__/tcp || true
+    pkill -9 -f "node src/index.js" || true
 
   elif command -v lsof >/dev/null 2>&1; then
-    PORT_PIDS=$(run_sudo lsof -t -iTCP:__REMOTE_PORT__ -sTCP:LISTEN 2>/dev/null || true)
+    PORT_PIDS=$(lsof -t -iTCP:__REMOTE_PORT__ -sTCP:LISTEN 2>/dev/null || true)
     if [ -n "$PORT_PIDS" ]; then
-      run_sudo kill $PORT_PIDS || true
+      kill $PORT_PIDS || true
       sleep 2
-      run_sudo kill -9 $PORT_PIDS || true
+      kill -9 $PORT_PIDS || true
     fi
   fi
 
@@ -818,7 +817,7 @@ print_service_diagnostics() {
 mkdir -p "$BACKUP_ROOT/frontend" "$BACKUP_ROOT/backend-data"
 
 if [ -d "$FRONTEND_PATH" ]; then
-  run_sudo cp -r "$FRONTEND_PATH/." "$BACKUP_ROOT/frontend/" || true
+  cp -r "$FRONTEND_PATH/." "$BACKUP_ROOT/frontend/" || true
 fi
 
 for file in catalog.json scanner-log.json scanner-roots.json scanner-runtime.json scanner-state.json; do
@@ -827,10 +826,10 @@ for file in catalog.json scanner-log.json scanner-roots.json scanner-runtime.jso
   fi
 done
 
-run_sudo mkdir -p "$FRONTEND_PATH"
-run_sudo find "$FRONTEND_PATH" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-run_sudo cp -r "$STAGING_ROOT/dist/." "$FRONTEND_PATH/"
-run_sudo chown -R www-data:www-data "$FRONTEND_PATH"
+mkdir -p "$FRONTEND_PATH"
+find "$FRONTEND_PATH" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+cp -r "$STAGING_ROOT/dist/." "$FRONTEND_PATH/"
+find "$FRONTEND_PATH" -mindepth 1 -exec chmod 755 {} +
 
 mkdir -p "$BACKEND_PATH"
 cp "$STAGING_ROOT/backend/package.json" "$BACKEND_PATH/package.json"
@@ -865,21 +864,9 @@ else
   RESOLVED_SERVICE_NAME=''
 fi
 
-if [ -n "$RESOLVED_SERVICE_NAME" ]; then
-  run_sudo systemctl daemon-reload
-  run_sudo systemctl stop "$RESOLVED_SERVICE_NAME" || true
-  stop_backend_processes
-  if ! run_sudo systemctl start "$RESOLVED_SERVICE_NAME"; then
-    print_service_diagnostics "$RESOLVED_SERVICE_NAME"
-    exit 1
-  fi
-  sleep 5
-else
-  stop_backend_processes
-  nohup /usr/bin/node src/index.js > "$BACKEND_PATH/server.log" 2> "$BACKEND_PATH/server.err.log" < /dev/null &
-  echo $! > "$PID_FILE"
-  sleep 5
-fi
+# Just terminate node processes to trigger systemd auto-restart
+stop_backend_processes
+sleep 5
 
 HEALTH_OK=0
 for attempt in $(seq 1 60); do

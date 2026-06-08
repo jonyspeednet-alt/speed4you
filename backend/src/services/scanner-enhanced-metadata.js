@@ -43,6 +43,7 @@ const METADATA_PATCH_FIELDS = [
   'releasedAt',
   'poster',
   'backdrop',
+  'seasons',
 ];
 
 function isGoodUrl(url) {
@@ -78,6 +79,7 @@ function applyMetadataPatch(item, patch, parsedTitle) {
     originalTitle: patch.originalTitle || item.originalTitle || '',
     originalLanguage: patch.originalLanguage || item.originalLanguage || '',
     releasedAt: item.releasedAt || patch.releasedAt || '',
+    seasons: patch.seasons || item.seasons || [],
     metadataStatus: patch.metadataStatus || item.metadataStatus || 'skipped',
     metadataProvider: patch.metadataProvider || item.metadataProvider || '',
     metadataConfidence: patch.metadataConfidence ?? item.metadataConfidence ?? 0,

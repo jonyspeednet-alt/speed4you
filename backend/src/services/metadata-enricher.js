@@ -88,7 +88,37 @@ function cleanSearchTitle(value) {
   return cleaned;
 }
 
+function detectLanguageFromText(text) {
+  const normalized = String(text || '').toLowerCase();
+  if (/\b(bangla|bengali)\b/i.test(normalized)) return 'bn';
+  if (/\b(hindi)\b/i.test(normalized)) return 'hi';
+  if (/\b(tamil)\b/i.test(normalized)) return 'ta';
+  if (/\b(telugu)\b/i.test(normalized)) return 'te';
+  if (/\b(malayalam)\b/i.test(normalized)) return 'ml';
+  if (/\b(kannada)\b/i.test(normalized)) return 'kn';
+  if (/\b(japanese|anime)\b/i.test(normalized)) return 'ja';
+  if (/\b(korean)\b/i.test(normalized)) return 'ko';
+  return null;
+}
+
 function inferOriginalLanguage(item) {
+  // 1. Try to detect from item title or source path
+  let detected = detectLanguageFromText(item.title) || detectLanguageFromText(item.sourcePath);
+  if (detected) return detected;
+
+  // 2. Try to detect from episodes (if any exist)
+  if (Array.isArray(item.seasons)) {
+    for (const season of item.seasons) {
+      if (Array.isArray(season.episodes)) {
+        for (const episode of season.episodes) {
+          detected = detectLanguageFromText(episode.title) || detectLanguageFromText(episode.sourcePath);
+          if (detected) return detected;
+        }
+      }
+    }
+  }
+
+  // 3. Fall back to existing root-based/category-based mapping
   const categoryText = `${item.category || ''} ${item.sourceRootLabel || ''}`.toLowerCase();
   const languageText = String(item.language || '').toLowerCase();
 
@@ -98,6 +128,7 @@ function inferOriginalLanguage(item) {
   if (languageText.includes('korean')) return 'ko';
   return 'en';
 }
+
 
 function scoreCandidate(candidate, item) {
   const searchTitle = cleanSearchTitle(item.title).toLowerCase();
@@ -531,4 +562,6 @@ module.exports = {
   fetchMetadataFromOmdb,
   hasTmdbKey,
   hasOmdbKey,
+  inferOriginalLanguage,
+  detectLanguageFromText,
 };

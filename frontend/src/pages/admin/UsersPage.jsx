@@ -180,6 +180,6 @@ const tdStyle = {
 
 const actionBtn = {
   padding: '6px 12px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '700',
-  cursor: 'pointer', border: 'none', background: SURFACE2, color: '#60a5fa',
+  cursor: 'pointer', background: SURFACE2, color: '#60a5fa',
   border: `1px solid ${BORDER}`,
 };

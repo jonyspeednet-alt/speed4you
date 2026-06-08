@@ -13,14 +13,15 @@ const navItems = [
 ];
 
 const partnerSites = [
-  { url: "http://bokasoka.net", label: "Bokasoka", icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15l-5-5 1.41-1.41L11 14.17l7.59-7.59L20 8l-9 9z" },
-  { url: "http://cinemabazar.net", label: "Cinemabazar", icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15l-5-5 1.41-1.41L11 14.17l7.59-7.59L20 8l-9 9z" },
+  { url: "https://bokasoka.net", label: "Bokasoka", icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15l-5-5 1.41-1.41L11 14.17l7.59-7.59L20 8l-9 9z" },
+  { url: "https://cinemabazar.net", label: "Cinemabazar", icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15l-5-5 1.41-1.41L11 14.17l7.59-7.59L20 8l-9 9z" },
 ];
 
 function TopNav() {
   const location = useLocation();
   const [isScrolled, setIsScrolled] = useState(false);
   const [hoveredLink, setHoveredLink] = useState(null);
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
   const { isMobile, isTablet, isSmallMobile, width } = useBreakpoint();
   const isTVMode = useTVMode();
   const isDesktop = !isMobile && !isTablet;
@@ -30,7 +31,9 @@ function TopNav() {
   const showSubtitle = isDesktop && width >= 1560;
   const showFullSearchText = isDesktop && width >= 1480;
   const showLiveChip = isDesktop && width >= 1600;
-  const visibleNavItems = navItems;
+  const isTabletOrCompact = isTablet || isCompactDesktop;
+  const primaryNavItems = isTabletOrCompact ? navItems.slice(0, 3) : navItems;
+  const overflowNavItems = isTabletOrCompact ? navItems.slice(3) : [];
 
   const [user] = useState(() => {
     const storedUser = localStorage.getItem("user");
@@ -47,6 +50,21 @@ function TopNav() {
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  useEffect(() => {
+    setIsMoreOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!isMoreOpen) return;
+    const handleClick = (e) => {
+      if (!e.target.closest(".top-nav-more-dropdown")) {
+        setIsMoreOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [isMoreOpen]);
 
   const navClasses = [
     "top-nav-container",
@@ -126,7 +144,7 @@ function TopNav() {
 
         {!isMobile && (
           <ul className={linksClasses}>
-            {visibleNavItems.map((item) => {
+            {primaryNavItems.map((item) => {
               const isActive =
                 item.path === "/"
                   ? location.pathname === "/"
@@ -154,6 +172,65 @@ function TopNav() {
                 </li>
               );
             })}
+            {overflowNavItems.length > 0 && (
+              <li style={{ position: "relative" }} className="top-nav-more-dropdown">
+                <button
+                  type="button"
+                  className={`top-nav-link ${isTablet || isCompactDesktop ? "top-nav-link-tablet" : ""} ${isMoreOpen ? "top-nav-link-hover" : ""}`}
+                  onClick={() => setIsMoreOpen((v) => !v)}
+                  onBlur={() => setTimeout(() => setIsMoreOpen(false), 150)}
+                  aria-expanded={isMoreOpen}
+                  aria-haspopup="true"
+                >
+                  More
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginLeft: "4px" }} aria-hidden="true">
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+                {isMoreOpen && (
+                  <div className="top-nav-more-dropdown" style={{
+                    position: "absolute",
+                    top: "calc(100% + 8px)",
+                    left: 0,
+                    minWidth: "160px",
+                    padding: "6px",
+                    borderRadius: "16px",
+                    background: "rgba(13, 26, 45, 0.95)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    backdropFilter: "blur(24px)",
+                    WebkitBackdropFilter: "blur(24px)",
+                    boxShadow: "0 16px 48px rgba(0,0,0,0.5)",
+                    zIndex: 300,
+                  }}>
+                    {overflowNavItems.map((item) => {
+                      const isActive = location.pathname.startsWith(item.path);
+                      return (
+                        <Link
+                          key={item.path}
+                          to={item.path}
+                          onClick={() => setIsMoreOpen(false)}
+                          style={{
+                            display: "block",
+                            padding: "10px 14px",
+                            borderRadius: "10px",
+                            color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
+                            background: isActive ? "rgba(255,255,255,0.08)" : "transparent",
+                            fontWeight: "600",
+                            fontSize: "0.88rem",
+                            transition: "background 150ms ease",
+                            textDecoration: "none",
+                          }}
+                          onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
+                          onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
+                        >
+                          {item.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </li>
+            )}
             <li className="top-nav-partner-divider" role="separator" />
             {partnerSites.map((site) => (
               <li key={site.url}>

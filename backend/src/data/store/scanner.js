@@ -218,13 +218,17 @@ async function upsertScannedItem(payload) {
     const itemWithDuplicates = await computeDuplicateMetadataInMemory(baseItem);
 
     const insertCols = extractTypedColumns(itemWithDuplicates);
-    await db.query(
+    // Use ON CONFLICT DO NOTHING to guard against race conditions where two concurrent
+    // scan threads both see "not found" and both attempt INSERT for the same scanSignature.
+    // If INSERT is skipped (0 rows), we fall through to the update path below.
+    const insertResult = await db.query(
       `INSERT INTO content_catalog
         (id, payload, created_at, updated_at, status, content_type, title, title_key,
          language, category, collection, source_type, source_root_id, last_scan_run_id,
          year, rating, featured, featured_order, trending_score, duplicate_count,
          metadata_status, published_at, released_at)
-       VALUES ($1,$2::jsonb,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
+       VALUES ($1,$2::jsonb,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+       ON CONFLICT DO NOTHING`,
       [itemWithDuplicates.id, JSON.stringify(itemWithDuplicates), now, now,
        insertCols.status, insertCols.content_type, insertCols.title, insertCols.title_key,
        insertCols.language, insertCols.category, insertCols.collection,
@@ -234,9 +238,23 @@ async function upsertScannedItem(payload) {
        insertCols.published_at, insertCols.released_at],
     );
 
-    // Defensive sync: only updates if the column value drifted from in-memory state.
-    await syncDuplicateCountColumn(itemWithDuplicates.id, itemWithDuplicates.duplicateCount);
-    return { item: itemWithDuplicates, created: true, updated: false };
+    // If INSERT was skipped due to conflict (race condition), re-fetch the winner and update it.
+    if (!insertResult.rowCount) {
+      const raceWinner = await db.query(
+        "SELECT id, payload FROM content_catalog WHERE payload->>'scanSignature' = $1 LIMIT 1",
+        [payload.scanSignature],
+      );
+      current = raceWinner.rows[0]?.payload || null;
+      if (!current) {
+        // Should not happen, but guard anyway
+        return { item: itemWithDuplicates, created: false, updated: false };
+      }
+      // Fall through to the existing-item update path (current is now set)
+    } else {
+      // Defensive sync: only updates if the column value drifted from in-memory state.
+      await syncDuplicateCountColumn(itemWithDuplicates.id, itemWithDuplicates.duplicateCount);
+      return { item: itemWithDuplicates, created: true, updated: false };
+    }
   }
 
   // ── EXISTING ITEM — preserve user-managed fields ─────────────────────────
