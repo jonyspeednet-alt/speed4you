@@ -126,6 +126,9 @@ DB_USER=postgres
 DB_PASSWORD=postgres
 FFMPEG_PATH=/usr/bin/ffmpeg
 FFPROBE_PATH=/usr/bin/ffprobe
+TV_PORTAL_BASE_URL=
+TV_ALLOWED_HOSTS=
+TV_ALLOWED_PORTS=80,8082
 EOF
 fi
 

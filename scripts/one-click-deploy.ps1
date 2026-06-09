@@ -694,6 +694,11 @@ if ! grep -Eq '^[[:space:]]*FFPROBE_PATH=' '$($deployConfig.RemoteBackendPath)/.
   echo 'Added missing FFPROBE_PATH to remote .env'
 fi
 
+if ! grep -Eq '^[[:space:]]*TV_PORTAL_BASE_URL=' '$($deployConfig.RemoteBackendPath)/.env'; then
+  printf 'TV_PORTAL_BASE_URL=\n' >> '$($deployConfig.RemoteBackendPath)/.env'
+  echo 'Added missing TV_PORTAL_BASE_URL to remote .env'
+fi
+
 if ! grep -Eq '^[[:space:]]*DB_HOST=' '$($deployConfig.RemoteBackendPath)/.env'; then
   printf 'DB_HOST=localhost\n' >> '$($deployConfig.RemoteBackendPath)/.env'
   echo 'Added missing DB_HOST to remote .env'
