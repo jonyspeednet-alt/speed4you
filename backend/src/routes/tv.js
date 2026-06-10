@@ -232,19 +232,19 @@ router.get('/channels', async (req, res, next) => {
     if (error.status === 400) {
       status = 503;
       code = 'TV_SOURCE_NOT_ALLOWED';
-      message = `TV source is not allowed. Check TV_ALLOWED_HOSTS and TV_ALLOWED_PORTS. (${error.message})`;
+      message = 'TV source host is not allowed.';
     } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
       status = 503;
       code = 'TV_PORTAL_UNREACHABLE';
-      message = `TV portal at ${TV_PORTAL_BASE} is unreachable.`;
+      message = 'TV source is unreachable.';
     } else if (error.message && error.message.includes('timed out')) {
       status = 504;
       code = 'TV_REQUEST_TIMEOUT';
-      message = `TV portal at ${TV_PORTAL_BASE} did not respond in time.`;
+      message = 'TV source did not respond in time.';
     } else {
       status = 500;
       code = error.code || 'TV_SERVICE_UNAVAILABLE';
-      message = `Failed to fetch TV channels: ${error.message}`;
+      message = 'Failed to fetch TV channels.';
     }
 
     res.status(status).json({
