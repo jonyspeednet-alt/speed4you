@@ -26,8 +26,10 @@ jobs:
         run: npm ci
         working-directory: frontend
 
-      - name: Build frontend
-        run: npm run build
+      - name: Build frontend (clean)
+        run: |
+          rm -rf dist
+          npm run build
         working-directory: frontend
         env:
           VITE_APP_BASE: /
@@ -43,6 +45,8 @@ jobs:
           fi
           echo "bundle=$bundle" >> "$GITHUB_OUTPUT"
           echo "Built frontend main bundle: $bundle"
+          echo "=== Dist files ==="
+          ls -la frontend/dist/index.html frontend/dist/assets/index-*.js 2>/dev/null
 
       - name: Install backend dependencies (lockfile only)
         run: npm ci
@@ -90,29 +94,31 @@ jobs:
             fi
             echo "Backup complete"
 
-      - name: Copy frontend without sudo
-        run: |
-          SRC=frontend/dist
-          DEST_USER=/home/speed4you/portal-frontend
-          echo "Copying $SRC to $DEST_USER..."
-          mkdir -p "$DEST_USER"
-          cp -r "$SRC/." "$DEST_USER/"
-          echo "Copy complete: $(find "$DEST_USER" -type f | wc -l) files"
-
-      - name: Deploy frontend via sudo
-        run: |
-          set -e
-          SRC_USER=/home/speed4you/portal-frontend
-          DEST=/var/www/speed4you.net
-          printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p "$DEST"
-          printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' rm -f "$DEST/index.html"
-          printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' rm -rf "$DEST/assets"
-          printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -r "$SRC_USER/." "$DEST/"
-          printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$DEST"
-          printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chmod -R o+rX "$DEST"
-          echo "=== Frontend deployed, main bundle: $(ls "$DEST/assets/"index-*.js 2>/dev/null || echo unknown) ==="
+      - name: Deploy frontend via SSH
+        uses: appleboy/ssh-action@v1.2.0
         env:
           SUDO_PASSWORD: ${{ ***REMOVED***s.SUDO_PASSWORD }}
+        with:
+          host: ${{ ***REMOVED***s.DEPLOY_HOST }}
+          username: ${{ ***REMOVED***s.DEPLOY_USER }}
+          key: ${{ ***REMOVED***s.DEPLOY_SSH_KEY }}
+          port: ${{ ***REMOVED***s.DEPLOY_PORT }}
+          envs: SUDO_PASSWORD
+          script: |
+            SRC=/home/speed4you/actions-runner/_work/speed4you/speed4you/frontend/dist
+            DEST=/var/www/speed4you.net
+            echo "=== Source dist ==="
+            ls -la "$SRC/index.html" "$SRC/assets/index-"*.js 2>/dev/null || echo "Source empty or missing"
+            echo "=== Deploying frontend ==="
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p "$DEST"
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' rm -f "$DEST/index.html" "$DEST/assets/index-"*.js
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' rm -rf "$DEST/assets"
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -r "$SRC/." "$DEST/"
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$DEST"
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chmod -R o+rX "$DEST"
+            echo "=== Deployed files ==="
+            ls -la "$DEST/index.html" "$DEST/assets/index-"*.js 2>/dev/null
+            grep -oE 'index-[a-z0-9]+\.js' "$DEST/index.html" || echo "No index hash found"
 
       - name: Copy backend to app directory
         uses: appleboy/ssh-action@v1.2.0
