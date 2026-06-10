@@ -621,35 +621,19 @@ main,
 /* ── Modern TopNav Component Styles ── */
 
 .top-nav-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
   z-index: 1100;
-  background: transparent;
-  border-bottom: 1px solid transparent;
-  transform: translateY(0);
-  transition:
-    transform 0.32s cubic-bezier(0.4, 0, 0.2, 1),
-    background 0.32s ease,
-    border-color 0.32s ease,
-    backdrop-filter 0.32s ease,
-    box-shadow 0.32s ease;
+  background: rgba(5, 12, 22, 0.92);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.5);
 }
 
 .top-nav-tablet {}
 .top-nav-mobile {}
 
-.top-nav-hidden {
-  transform: translateY(-100%);
-}
-
 .top-nav-scrolled {
-  background: rgba(5, 12, 22, 0.92);
-  border-bottom-color: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
 }
 
 .top-nav-main {
