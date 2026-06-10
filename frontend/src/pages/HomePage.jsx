@@ -8,7 +8,7 @@ import { contentService } from '../services';
 import { progressService } from '../services/apiClient';
 import { useBreakpoint, useRecentlyViewed, useTVMode } from '../hooks';
 
-const posterFallback = '/portal/assets/poster-placeholder.svg';
+const posterFallback = `${import.meta.env.BASE_URL}assets/poster-placeholder.svg`;
 const RAIL_SIZE = 10;
 const HOMEPAGE_POOL_LIMIT = 40;
 const HOMEPAGE_CACHE_KEY = 'portal-homepage-cache-v2'; // Cache key updated
@@ -311,7 +311,7 @@ function HomePage() {
             subtitle="Pick up where you left off"
             items={recentlyViewed.map(item => ({
               ...item,
-              poster: item.poster || '/portal/assets/poster-placeholder.svg',
+              poster: item.poster || `${import.meta.env.BASE_URL}assets/poster-placeholder.svg`,
               genre: item.genre || 'Featured',
               language: item.language || 'Mixed',
             }))}

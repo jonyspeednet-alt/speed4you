@@ -1,4 +1,4 @@
-const posterFallback = "/portal/assets/poster-placeholder.svg";
+const posterFallback = `${import.meta.env.BASE_URL}assets/poster-placeholder.svg`;
 
 export const posterFallbackUrl = posterFallback;
 

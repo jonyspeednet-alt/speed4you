@@ -1,4 +1,31 @@
-const API_BASE = (import.meta.env.VITE_API_URL || '/portal-api').replace(/\/$/, '');
+// In Capacitor Android builds, VITE_API_URL is set to the external server.
+// VITE_LOCAL_API_URL (optional) points to the local ISP server (e.g. http://10.45.45.254/portal-api).
+// At runtime, if the local URL is configured and reachable, it is preferred for lower latency.
+const _externalBase = (import.meta.env.VITE_API_URL || '/portal-api').replace(/\/$/, '');
+const _localBase = import.meta.env.VITE_LOCAL_API_URL
+  ? import.meta.env.VITE_LOCAL_API_URL.replace(/\/$/, '')
+  : null;
+
+let _resolvedBase = _externalBase;
+let _localProbed = false;
+
+async function resolveApiBase() {
+  if (!_localBase || _localProbed) return _resolvedBase;
+  _localProbed = true;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 1500);
+    const r = await fetch(`${_localBase}/api/health`, { signal: ctrl.signal, cache: 'no-store' });
+    clearTimeout(t);
+    if (r.ok) _resolvedBase = _localBase;
+  } catch {
+    // local server unreachable — keep external
+  }
+  return _resolvedBase;
+}
+
+// For non-async callers that haven't probed yet, use the last resolved value.
+const API_BASE = _externalBase;
 
 class ApiError extends Error {
   constructor(message, { status = 500, code = 'REQUEST_FAILED', details = null, requestId = '' } = {}) {
@@ -94,7 +121,8 @@ async function apiClient(endpoint, options = {}) {
   }
 
   const method = (options.method || 'GET').toUpperCase();
-  const endpointUrl = new URL(`${API_BASE || ''}/api${endpoint}`, window.location.origin);
+  const activeBase = await resolveApiBase();
+  const endpointUrl = new URL(`${activeBase || ''}/api${endpoint}`, window.location.origin);
 
   // Only add cache-busting timestamp for mutations or when explicitly requested
   if ((method !== 'GET' || options.bustCache === true) && options.bustCache !== false) {

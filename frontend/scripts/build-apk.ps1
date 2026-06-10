@@ -1,5 +1,6 @@
 $ErrorActionPreference = "Stop"
 $env:VITE_API_URL = "https://speed4you.net/portal-api"
+$env:VITE_LOCAL_API_URL = "http://10.45.45.254/portal-api"
 
 Write-Host "=== Building frontend for Android ==="
 npm run build
@@ -9,7 +10,7 @@ npx cap sync
 
 Write-Host "=== Building APK ==="
 $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
-$androidHome = "C:\Users\Speed Net IT\AppData\Local\Android\Sdk"
+$env:ANDROID_HOME = "C:\Users\Speed Net IT\AppData\Local\Android\Sdk"
 
 Set-Location -LiteralPath (Join-Path $PSScriptRoot "..\android")
 & .\gradlew.bat assembleDebug
@@ -22,4 +23,10 @@ Copy-Item -Path $apkSource -Destination $apkDest -Force
 
 $size = (Get-Item $apkDest).Length
 Write-Host "APK built: $apkDest ($([math]::Round($size/1MB, 1)) MB)"
+
+# Also copy to public/ so the website serves the latest APK
+$publicApkDest = Join-Path $PSScriptRoot "..\public\speed4you.apk"
+Copy-Item -Path $apkSource -Destination $publicApkDest -Force
+Write-Host "APK copied to public/: $publicApkDest"
+
 Set-Location -LiteralPath (Join-Path $PSScriptRoot "..")
