@@ -209,6 +209,13 @@ async function proxyRemoteUrl(targetUrl, res) {
 
 router.get('/channels', async (req, res, next) => {
   try {
+    if (!TV_PORTAL_BASE) {
+      return res.status(503).json({
+        ok: false,
+        error: { code: 'TV_PORTAL_NOT_CONFIGURED', message: 'TV_PORTAL_BASE_URL is not set. Configure it in the .env file to enable live TV.' },
+      });
+    }
+
     const upstream = await requestUrl(TV_PORTAL_BASE);
     const html = upstream.body.toString('utf8');
     const parsed = parseChannels(html);
@@ -220,7 +227,16 @@ router.get('/channels', async (req, res, next) => {
       updatedAt: new Date().toISOString(),
     });
   } catch (error) {
-    next(error);
+    const status = error.status || (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED' ? 503 : 500);
+    res.status(status).json({
+      ok: false,
+      error: {
+        code: error.code || 'TV_SERVICE_UNAVAILABLE',
+        message: status === 503
+          ? 'TV portal is unreachable. Check your TV_PORTAL_BASE_URL configuration.'
+          : 'Failed to fetch TV channels.',
+      },
+    });
   }
 });
 
