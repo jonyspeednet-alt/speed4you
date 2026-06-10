@@ -94,14 +94,14 @@ jobs:
             fi
             echo "Backup complete"
 
-      - name: Deploy frontend via SCP and SSH
-        uses: appleboy/scp-action@v0.1.7
+      - name: Deploy frontend via SCP
+        uses: appleboy/scp-action@v1
         with:
           host: ${{ ***REMOVED***s.DEPLOY_HOST }}
           username: ${{ ***REMOVED***s.DEPLOY_USER }}
           key: ${{ ***REMOVED***s.DEPLOY_SSH_KEY }}
           port: ${{ ***REMOVED***s.DEPLOY_PORT }}
-          source: frontend/dist/
+          source: "frontend/dist/"
           target: /home/speed4you/portal-frontend-staging
           strip_components: 2
           rm: true
