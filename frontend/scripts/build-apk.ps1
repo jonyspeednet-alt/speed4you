@@ -1,6 +1,5 @@
 $ErrorActionPreference = "Stop"
 $env:VITE_API_URL = "https://speed4you.net/portal-api"
-$env:VITE_LOCAL_API_URL = "http://10.45.45.254/portal-api"
 
 Write-Host "=== Building frontend for Android ==="
 npm run build

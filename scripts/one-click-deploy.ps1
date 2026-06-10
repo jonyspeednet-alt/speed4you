@@ -674,9 +674,12 @@ DB_PASSWORD=postgres
 EOF
 fi
 
-if ! grep -Eq '^[[:space:]]*CORS_ALLOWED_ORIGINS=' '$($deployConfig.RemoteBackendPath)/.env'; then
+if grep -Eq '^[[:space:]]*CORS_ALLOWED_ORIGINS=' '$($deployConfig.RemoteBackendPath)/.env'; then
+  sed -i "s|^[[:space:]]*CORS_ALLOWED_ORIGINS=.*|CORS_ALLOWED_ORIGINS=$($deployConfig.RemoteCorsAllowedOrigins)|" '$($deployConfig.RemoteBackendPath)/.env'
+  echo 'Updated CORS_ALLOWED_ORIGINS in remote .env'
+else
   printf '\nCORS_ALLOWED_ORIGINS=$($deployConfig.RemoteCorsAllowedOrigins)\n' >> '$($deployConfig.RemoteBackendPath)/.env'
-  echo 'Added missing CORS_ALLOWED_ORIGINS to remote .env'
+  echo 'Added CORS_ALLOWED_ORIGINS to remote .env'
 fi
 
 if ! grep -Eq '^[[:space:]]*PLAYER_CACHE_ROOT=' '$($deployConfig.RemoteBackendPath)/.env'; then
