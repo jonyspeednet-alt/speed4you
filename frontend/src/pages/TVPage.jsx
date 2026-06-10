@@ -53,7 +53,7 @@ export default function TVPage() {
         }
       }
     }).catch((e) => {
-      if (!ok) setErr("TV service unavailable. Check your TV portal configuration.");
+      if (!ok) setErr(e?.message || "TV service unavailable");
     }).finally(() => { if (!ok) setLoad(false); });
     return () => { ok = true; };
   }, []);
@@ -130,7 +130,7 @@ export default function TVPage() {
               <span style={{ fontSize: "1.4rem", color: "#ff6b6b" }}>!</span>
             </div>
             <p style={{ margin: 0, color: "var(--text-muted)", fontSize: ".85rem", maxWidth: 360, lineHeight: 1.5 }}>{err}</p>
-            <button type="button" onClick={() => { setLoad(true); setErr(""); tvService.getChannels().then((r) => { setChs(r.channels || []); setCats(r.categories || []); setSid(r.defaultStreamId || r.channels?.[0]?.streamId || ""); }).catch((e) => { setErr("TV service unavailable. Check your TV portal configuration."); }).finally(() => setLoad(false)); }} style={{ padding: "8px 18px", borderRadius: 8, fontSize: ".75rem", fontWeight: 600, cursor: "pointer", background: "rgba(255,255,255,0.08)", color: "var(--text-primary)", border: "1px solid rgba(255,255,255,0.1)" }}>Retry</button>
+            <button type="button" onClick={() => { setLoad(true); setErr(""); tvService.getChannels().then((r) => { setChs(r.channels || []); setCats(r.categories || []); setSid(r.defaultStreamId || r.channels?.[0]?.streamId || ""); }).catch((e) => { setErr(e?.message || "TV service unavailable"); }).finally(() => setLoad(false)); }} style={{ padding: "8px 18px", borderRadius: 8, fontSize: ".75rem", fontWeight: 600, cursor: "pointer", background: "rgba(255,255,255,0.08)", color: "var(--text-primary)", border: "1px solid rgba(255,255,255,0.1)" }}>Retry</button>
           </div>
         )}
 
