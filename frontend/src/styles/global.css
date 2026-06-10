@@ -94,7 +94,6 @@ html {
   scrollbar-gutter: stable;
   color-scheme: dark;
   background: var(--bg-primary);
-  overflow-x: clip;
   overflow-y: auto;
 }
 
@@ -112,7 +111,6 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  overflow-x: clip;
   overflow-y: auto;
   -webkit-tap-highlight-color: transparent;
 }
