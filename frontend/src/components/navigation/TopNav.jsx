@@ -18,7 +18,6 @@ const partnerSites = [
 
 function TopNav() {
   const location = useLocation();
-  const [isScrolled, setIsScrolled] = useState(false);
   const [hoveredLink, setHoveredLink] = useState(null);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -45,12 +44,6 @@ function TopNav() {
       return null;
     }
   });
-
-  useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 60);
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
 
   useEffect(() => {
     setIsMoreOpen(false);
@@ -86,7 +79,6 @@ function TopNav() {
     "top-nav-container",
     isMobile && "top-nav-mobile",
     isTablet && "top-nav-tablet",
-    isScrolled && "top-nav-scrolled",
     isTVMode && "tv-mode",
   ]
     .filter(Boolean)
@@ -236,7 +228,7 @@ function TopNav() {
             ))}
             <li>
               <a
-                href="/speed4you.apk"
+                href={`${import.meta.env.BASE_URL}speed4you.apk`.replace(/\/\//g, '/')}
                 download
                 className="top-nav-link top-nav-partner-link"
               >
@@ -427,7 +419,7 @@ function TopNav() {
                 </a>
               ))}
               <a
-                href="/speed4you.apk"
+                href={`${import.meta.env.BASE_URL}speed4you.apk`.replace(/\/\//g, '/')}
                 download
                 className="top-nav-mobile-menu-item"
                 onClick={() => setIsMobileMenuOpen(false)}
