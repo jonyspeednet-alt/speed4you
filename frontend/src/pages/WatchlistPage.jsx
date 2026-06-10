@@ -197,14 +197,14 @@ function WatchlistPage() {
                   <div style={styles.posterWrapper}>
                     <img
                       src={
-                        item.poster || "/portal/assets/poster-placeholder.svg"
+                        item.poster || `${import.meta.env.BASE_URL}assets/poster-placeholder.svg`
                       }
                       alt={item.title}
                       style={styles.poster}
                       loading="lazy"
                       onError={(e) => {
                         e.currentTarget.src =
-                          "/portal/assets/poster-placeholder.svg";
+                          `${import.meta.env.BASE_URL}assets/poster-placeholder.svg`;
                       }}
                     />
                     <div style={styles.overlay} />

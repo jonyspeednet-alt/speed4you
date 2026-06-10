@@ -48,7 +48,7 @@ const YEAR_OPTIONS = [
   "Pre-1990s",
 ];
 const PAGE_SIZE = 24;
-const posterFallback = "/portal/assets/poster-placeholder.svg";
+const posterFallback = `${import.meta.env.BASE_URL}assets/poster-placeholder.svg`;
 
 function normalizeItem(item) {
   return {

@@ -4,7 +4,7 @@ import searchService from '../services/searchService';
 import { useBreakpoint, useRecentlyViewed } from '../hooks';
 
 
-const posterFallback = '/portal/assets/poster-placeholder.svg';
+const posterFallback = `${import.meta.env.BASE_URL}assets/poster-placeholder.svg`;
 const languageOptions = ['All', 'English', 'Hindi', 'Bengali', 'Korean', 'Japanese'];
 const typeOptions = ['all', 'movie', 'series'];
 
