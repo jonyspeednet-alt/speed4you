@@ -107,13 +107,10 @@ jobs:
           printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p "$DEST"
           printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' rm -f "$DEST/index.html"
           printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' rm -rf "$DEST/assets"
-          printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p "$DEST/assets"
           printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -r "$SRC_USER/." "$DEST/"
           printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$DEST"
           printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chmod -R o+rX "$DEST"
-          echo "=== Deployed file listing ==="
-          ls -la "$DEST/index.html" "$DEST/assets/index-"*.js 2>/dev/null
-          echo "Frontend deployed to $DEST"
+          echo "=== Frontend deployed, main bundle: $(ls "$DEST/assets/"index-*.js 2>/dev/null || echo unknown) ==="
         env:
           SUDO_PASSWORD: ${{ ***REMOVED***s.SUDO_PASSWORD }}
 
