@@ -18,6 +18,7 @@ const partnerSites = [
 
 function TopNav() {
   const location = useLocation();
+  const [isScrolled, setIsScrolled] = useState(false);
   const [hoveredLink, setHoveredLink] = useState(null);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -44,6 +45,12 @@ function TopNav() {
       return null;
     }
   });
+
+  useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 10);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   useEffect(() => {
     setIsMoreOpen(false);
@@ -79,6 +86,7 @@ function TopNav() {
     "top-nav-container",
     isMobile && "top-nav-mobile",
     isTablet && "top-nav-tablet",
+    isScrolled && "top-nav-scrolled",
     isTVMode && "tv-mode",
   ]
     .filter(Boolean)
