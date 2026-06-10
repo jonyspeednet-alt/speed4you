@@ -7,3 +7,4 @@ export { default as accessService } from './accessService';
 export { default as adminService } from './adminService';
 export { default as moviesService } from './moviesService';
 export { default as seriesService } from './seriesService';
+export { default as watchlistService } from './watchlistService';
