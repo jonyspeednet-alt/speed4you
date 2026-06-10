@@ -627,12 +627,19 @@ main,
   right: max(18px, env(safe-area-inset-right, 0px));
   z-index: 1100;
   border-radius: 30px;
-  background: rgba(5, 12, 22, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(32px);
-  -webkit-backdrop-filter: blur(32px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  transition: all var(--transition-normal);
+  background: transparent;
+  border: 1px solid transparent;
+  backdrop-filter: blur(0px);
+  -webkit-backdrop-filter: blur(0px);
+  box-shadow: none;
+  transition: background 0.35s ease, border-color 0.35s ease,
+    backdrop-filter 0.35s ease, box-shadow 0.35s ease,
+    transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), top 0.35s ease;
+  transform: translateY(0);
+}
+
+.top-nav-hidden {
+  transform: translateY(calc(-100% - 24px));
 }
 
 .top-nav-tablet {
@@ -650,9 +657,11 @@ main,
 
 .top-nav-scrolled {
   top: 10px;
-  background: rgba(7, 17, 31, 0.9);
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-card);
+  background: rgba(7, 17, 31, 0.88);
+  border-color: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
 .top-nav-main {
@@ -696,6 +705,7 @@ main,
   border-radius: 8px;
   object-fit: contain;
   flex-shrink: 0;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5));
 }
 
 .top-nav-logo-copy {
@@ -758,6 +768,7 @@ main,
   transition: all var(--transition-fast);
   position: relative;
   overflow: hidden;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
 }
 
 .top-nav-link::before {
@@ -1617,13 +1628,22 @@ main,
 
 /* Duplicate rules removed — see unified definitions above */
 
-/* Mobile: larger touch targets for rail nav buttons */
+/* Mobile: larger touch targets for rail nav buttons + reduced side padding */
 @media (max-width: 768px) {
   .content-rail-controls button {
     width: 44px;
     height: 44px;
     min-width: 44px;
     min-height: 44px;
+  }
+
+  .content-rail-header {
+    padding: 0 16px;
+  }
+
+  .content-rail-list {
+    padding: 0 16px 10px;
+    gap: 12px;
   }
 }
 
@@ -1687,7 +1707,7 @@ main,
 
 .hero-carousel__layout.hero-carousel--mobile {
   width: calc(100vw - 32px);
-  height: calc(clamp(420px, 62vh, 560px) - var(--nav-occupied-desktop));
+  height: calc(clamp(420px, 62vh, 560px) - var(--nav-occupied-mobile));
   grid-template-columns: 1fr;
   gap: 18px;
   padding: 22px 0 62px;
@@ -2238,18 +2258,6 @@ main,
   * {
     color: black !important;
     background: white !important;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
   }
 }
 

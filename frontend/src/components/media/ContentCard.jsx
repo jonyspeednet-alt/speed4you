@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import WatchlistButton from "../ui/WatchlistButton";
 
 
 /**
@@ -206,6 +207,15 @@ function ContentCard({
                 </svg>
               </div>
               <span style={styles.hoverLabel}>View Details</span>
+              <div style={styles.hoverWatchlist} onClick={e => e.stopPropagation()}>
+                <WatchlistButton
+                  contentType={isSeries ? 'series' : 'movie'}
+                  contentId={item.id}
+                  title={item.title}
+                  compact
+                  checkOnMount={false}
+                />
+              </div>
             </div>
           ) : null}
         </div>
@@ -444,6 +454,11 @@ const styles = {
     textTransform: "uppercase",
     letterSpacing: "0.1em",
     textShadow: "0 2px 8px rgba(0,0,0,0.5)",
+  },
+  hoverWatchlist: {
+    position: "absolute",
+    top: "10px",
+    right: "10px",
   },
   cardInfo: {
     padding: "0 2px",

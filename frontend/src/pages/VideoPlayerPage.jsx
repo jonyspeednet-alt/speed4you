@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { moviesService } from '../services/moviesService';
 import { seriesService } from '../services/seriesService';
+import { progressService } from '../services/apiClient';
 
 const RATES = [0.5, 0.75, 1, 1.25, 1.5, 2];
 const VOL_STEPS = [0, 0.25, 0.5, 0.75, 1];
@@ -21,6 +22,7 @@ export default function VideoPlayerPage() {
   const [showControls, setShowControls] = useState(true);
   const [showRate, setShowRate] = useState(false);
   const [showVol, setShowVol] = useState(false);
+  const lastTapRef = useRef({ time: 0, x: 0 });
   const [error, setError] = useState('');
   const controlsTimer = useRef(null);
   const seasonNum = Number(sp.get('season')) || 1;
@@ -70,6 +72,38 @@ export default function VideoPlayerPage() {
 
   const nextEp = getNextEpisode();
 
+  // Progress tracking — save every 15s and on pause/exit
+  const lastSavedRef = useRef(0);
+  const saveProgress = useCallback(() => {
+    const v = videoRef.current;
+    if (!v || !v.duration || !type || !id) return;
+    const position = Math.floor(v.currentTime);
+    const duration = Math.floor(v.duration);
+    if (position < 5) return;
+    progressService.update(type, id, position, duration).catch(() => {});
+    lastSavedRef.current = position;
+    if (position / duration >= 0.95) {
+      progressService.markComplete(type, id).catch(() => {});
+    }
+  }, [type, id]);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const onTimeUpdate = () => {
+      const pos = Math.floor(v.currentTime);
+      if (pos - lastSavedRef.current >= 15) saveProgress();
+    };
+    const onPause = () => saveProgress();
+    v.addEventListener('timeupdate', onTimeUpdate);
+    v.addEventListener('pause', onPause);
+    return () => {
+      v.removeEventListener('timeupdate', onTimeUpdate);
+      v.removeEventListener('pause', onPause);
+      saveProgress();
+    };
+  }, [src, saveProgress]);
+
   const startHideTimer = useCallback(() => {
     clearTimeout(controlsTimer.current);
     setShowControls(true);
@@ -77,6 +111,25 @@ export default function VideoPlayerPage() {
   }, []);
 
   useEffect(() => { startHideTimer(); return () => clearTimeout(controlsTimer.current); }, [startHideTimer]);
+
+  const handleTap = useCallback((e) => {
+    const now = Date.now();
+    const x = e.changedTouches?.[0]?.clientX ?? e.clientX;
+    const elapsed = now - lastTapRef.current.time;
+    if (elapsed < 300 && Math.abs(x - lastTapRef.current.x) < 60) {
+      // double-tap: seek based on left/right half
+      const isRight = x > window.innerWidth / 2;
+      seek(isRight ? 1 : -1);
+      lastTapRef.current = { time: 0, x: 0 };
+    } else {
+      lastTapRef.current = { time: now, x };
+      // single tap — show/hide controls only
+      setShowControls(v => {
+        if (!v) { startHideTimer(); return true; }
+        return v;
+      });
+    }
+  }, [seek, startHideTimer]);
 
   const togglePlay = useCallback(() => {
     const v = videoRef.current; if (!v) return;
@@ -159,7 +212,7 @@ export default function VideoPlayerPage() {
     }}>
       {/* Top bar */}
       <div style={{
-        position:'absolute', top:0, left:0, right:0, zIndex:10, padding:'12px 20px',
+        position:'absolute', top:0, left:0, right:0, zIndex:10, padding:'calc(12px + env(safe-area-inset-top, 0px)) 20px 12px',
         background: showControls ? 'linear-gradient(rgba(0,0,0,0.7),transparent)' : 'none',
         opacity: showControls ? 1 : 0, transition:'opacity 0.3s',
         display:'flex', alignItems:'center', gap:14,
@@ -174,6 +227,7 @@ export default function VideoPlayerPage() {
       {/* Video */}
       <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}
         onMouseMove={startHideTimer} onClick={togglePlay}
+        onTouchEnd={handleTap}
       >
         {!src ? (
           <div style={{ color:'rgba(255,255,255,0.4)', fontSize:'1.1rem' }}>Loading player...</div>
@@ -201,7 +255,7 @@ export default function VideoPlayerPage() {
         position:'absolute', bottom:0, left:0, right:0, zIndex:10,
         background: showControls ? 'linear-gradient(transparent,rgba(0,0,0,0.8))' : 'none',
         opacity: showControls ? 1 : 0, transition:'opacity 0.3s',
-        padding:'24px 20px 14px',
+        padding:'24px 20px calc(14px + env(safe-area-inset-bottom, 0px))',
       }}>
         {/* Progress bar */}
         <div style={{ marginBottom:10 }}>
@@ -230,10 +284,8 @@ export default function VideoPlayerPage() {
           </span>
 
           {/* Volume */}
-          <div style={{ position:'relative', display:'flex', alignItems:'center', gap:4 }}
-            onMouseEnter={() => setShowVol(true)} onMouseLeave={() => setShowVol(false)}
-          >
-            <button onClick={e => { e.stopPropagation(); toggleMute(); }} style={ctrlBtn}>
+          <div style={{ position:'relative', display:'flex', alignItems:'center', gap:4 }}>
+            <button onClick={e => { e.stopPropagation(); setShowVol(v => !v); setShowRate(false); }} style={ctrlBtn}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none">
                 {muted || volume === 0
                   ? <><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15" stroke="currentColor" strokeWidth="2"/><line x1="17" y1="9" x2="23" y2="15" stroke="currentColor" strokeWidth="2"/></>
@@ -244,7 +296,7 @@ export default function VideoPlayerPage() {
             {showVol && (
               <div style={{ position:'absolute', bottom:'100%', left:'50%', transform:'translateX(-50%)', background:'rgba(30,30,30,0.95)', borderRadius:8, padding:'8px 10px', display:'flex', flexDirection:'column', alignItems:'center', gap:4, marginBottom:6 }}>
                 {VOL_STEPS.map(v => (
-                  <button key={v} onClick={() => changeVolume(v)} style={{ ...ctrlBtn, background: volume === v ? 'rgba(0,255,255,0.2)' : 'none', width:40, justifyContent:'flex-start' }}>
+                  <button key={v} onClick={() => { changeVolume(v); setShowVol(false); }} style={{ ...ctrlBtn, background: volume === v ? 'rgba(0,255,255,0.2)' : 'none', width:40, justifyContent:'flex-start' }}>
                     <span style={{ fontSize:'0.72rem', color: volume >= v ? 'var(--accent-cyan,#00ffff)' : 'rgba(255,255,255,0.4)' }}>{Math.round(v * 100)}%</span>
                   </button>
                 ))}
@@ -314,6 +366,7 @@ function PlayerTime({ videoRef }) {
 
 const ctrlBtn = {
   background:'none', border:'none', color:'#fff', cursor:'pointer',
-  padding:'6px 8px', borderRadius:8, display:'flex', alignItems:'center',
+  padding:'10px 12px', borderRadius:8, display:'flex', alignItems:'center',
   gap:6, fontSize:'0.82rem', transition:'all 0.15s',
+  minWidth:44, minHeight:44, justifyContent:'center',
 };
