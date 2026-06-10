@@ -19,8 +19,7 @@ html.tv-mode,
    TV FOCUS STATES (Remote Control Navigation)
    ────────────────────────────────────────────────────────────── */
 
-.tv-mode :focus-visible,
-.tv-mode :focus {
+.tv-mode :focus-visible {
     outline: var(--focus-outline) solid var(--accent-cyan);
     outline-offset: var(--focus-offset);
     box-shadow: 0 0 var(--focus-glow) rgba(0, 255, 255, 0.4);
@@ -151,11 +150,8 @@ html.tv-mode,
 
 .tv-mode .container {
     width: min(1720px, calc(100vw - 8rem));
-    padding: 0 4rem;
-}
-
-.tv-mode .container {
     max-width: min(1720px, calc(100vw - 8rem));
+    padding: 0 4rem;
 }
 
 .tv-mode .content-rail-section,

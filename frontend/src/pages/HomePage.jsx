@@ -350,7 +350,7 @@ const styles = {
     minHeight: '100vh',
   },
   pageWithoutHero: {
-    paddingTop: 'calc(var(--nav-occupied-desktop) + 24px)',
+    paddingTop: 'calc(var(--nav-occupied-mobile) + 16px)',
   },
   errorPage: {
     minHeight: '100vh',
