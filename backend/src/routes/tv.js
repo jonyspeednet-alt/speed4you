@@ -296,473 +296,570 @@ router.get('/player/:streamId', async (req, res, next) => {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TV Player</title>
+  <title>${channelName.replace(/</g, '&lt;')} — Live TV</title>
   <style>
+    *, *::before, *::after { box-sizing: border-box; }
     html, body {
-      margin: 0;
-      width: 100%;
-      height: 100%;
-      background:
-        radial-gradient(circle at top, rgba(49, 84, 135, 0.18), transparent 38%),
-        linear-gradient(180deg, #02060c, #030913 48%, #02050b);
+      margin: 0; width: 100%; height: 100%;
+      background: #000;
       overflow: hidden;
-      font-family: "Segoe UI", Arial, sans-serif;
+      font-family: "Segoe UI", system-ui, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      color: #fff;
+      cursor: none;
     }
-    body {
-      display: grid;
-      place-items: center;
-    }
+    body { display: grid; place-items: center; }
+    body.controls-visible { cursor: default; }
+
     video {
-      width: 100%;
-      height: 100%;
+      width: 100%; height: 100%;
       background: #000;
       object-fit: contain;
+      display: block;
     }
+
+    /* Gradient vignette — only visible when controls shown */
     .chrome {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
+      position: absolute; inset: 0; pointer-events: none;
       background:
-        linear-gradient(180deg, rgba(3, 9, 19, 0.88) 0%, rgba(3, 9, 19, 0.14) 24%, rgba(3, 9, 19, 0) 55%, rgba(3, 9, 19, 0.88) 100%);
+        linear-gradient(180deg,
+          rgba(0,0,0,.72) 0%,
+          rgba(0,0,0,.08) 22%,
+          rgba(0,0,0,0)   52%,
+          rgba(0,0,0,.10) 70%,
+          rgba(0,0,0,.78) 100%);
+      opacity: 0;
+      transition: opacity 320ms ease;
+      z-index: 5;
     }
+    body.controls-visible .chrome { opacity: 1; }
+
+    /* ── TOP BAR ── */
     .topbar {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      right: 20px;
-      z-index: 12;
-      display: flex;
-      justify-content: space-between;
-      gap: 16px;
-      align-items: flex-start;
+      position: absolute; top: 0; left: 0; right: 0; z-index: 10;
+      padding: 20px 24px 32px;
+      display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;
       pointer-events: none;
+      transform: translateY(-8px);
+      opacity: 0;
+      transition: opacity 280ms ease, transform 280ms ease;
     }
-    .info-card {
-      max-width: min(520px, calc(100vw - 180px));
-      padding: 18px 20px;
-      border-radius: 24px;
-      background: rgba(7, 17, 31, 0.44);
-      border: 1px solid rgba(255,255,255,0.08);
-      backdrop-filter: blur(14px);
-      box-shadow: 0 16px 38px rgba(0,0,0,0.24);
-    }
-    .eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 10px;
-      color: #6fd5ff;
-      text-transform: uppercase;
-      letter-spacing: 0.14em;
-      font-size: 11px;
-      font-weight: 700;
+    body.controls-visible .topbar { opacity: 1; transform: translateY(0); }
+
+    .channel-info { display: flex; flex-direction: column; gap: 5px; }
+    .live-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px; border-radius: 999px;
+      background: rgba(255,50,50,.18); border: 1px solid rgba(255,50,50,.35);
+      color: #ff8080; font-size: 10px; font-weight: 800;
+      letter-spacing: .12em; text-transform: uppercase;
+      width: fit-content;
     }
     .live-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 999px;
-      background: #ff624d;
-      box-shadow: 0 0 0 6px rgba(255,98,77,0.16);
+      width: 6px; height: 6px; border-radius: 50%; background: #ff4040;
+      animation: dot-pulse 1.8s ease-in-out infinite;
     }
-    .channel-title {
-      margin: 0 0 6px;
-      color: #fff;
-      font-size: clamp(1.2rem, 2.6vw, 2rem);
-      line-height: 1.15;
+    @keyframes dot-pulse {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: .4; transform: scale(.75); }
     }
-    .channel-meta {
-      color: rgba(255,255,255,0.76);
-      font-size: 14px;
-      line-height: 1.5;
+    .channel-name {
+      margin: 0; font-size: clamp(1.1rem, 2.8vw, 1.9rem);
+      font-weight: 800; line-height: 1.15; letter-spacing: -.02em;
+      text-shadow: 0 2px 18px rgba(0,0,0,.7);
     }
-    .meta-badges {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
+    .channel-cat {
+      font-size: 12px; color: rgba(255,255,255,.55); font-weight: 500;
+    }
+
+    .topbar-right {
+      display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
       pointer-events: auto;
     }
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 14px;
-      border-radius: 999px;
-      background: rgba(7, 17, 31, 0.56);
-      border: 1px solid rgba(255,255,255,0.1);
-      backdrop-filter: blur(12px);
-      color: #fff;
-      font-size: 12px;
-      font-weight: 700;
+    .clock-badge {
+      display: flex; align-items: center; gap: 7px;
+      padding: 7px 13px; border-radius: 12px;
+      background: rgba(0,0,0,.44); border: 1px solid rgba(255,255,255,.10);
+      backdrop-filter: blur(14px);
+      font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums;
+      letter-spacing: .03em; color: rgba(255,255,255,.88);
     }
-    .status-bar {
-      position: absolute;
-      left: 20px;
-      right: 20px;
-      bottom: 20px;
-      z-index: 12;
-      display: grid;
-      gap: 14px;
-      padding: 18px 20px;
-      border-radius: 28px;
-      background: rgba(7, 17, 31, 0.62);
-      border: 1px solid rgba(255,255,255,0.08);
-      backdrop-filter: blur(16px);
-      box-shadow: 0 24px 60px rgba(0,0,0,0.26);
-      pointer-events: auto;
+    .clock-icon { width: 14px; height: 14px; color: rgba(255,255,255,.45); flex-shrink: 0; }
+
+    /* ── BOTTOM CONTROLS ── */
+    .controls {
+      position: absolute; bottom: 0; left: 0; right: 0; z-index: 10;
+      padding: 24px 20px 20px;
+      display: flex; flex-direction: column; gap: 12px;
+      transform: translateY(8px);
+      opacity: 0;
+      transition: opacity 280ms ease, transform 280ms ease;
+      pointer-events: none;
     }
-    .status-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      align-items: center;
-      flex-wrap: wrap;
+    body.controls-visible .controls { opacity: 1; transform: translateY(0); pointer-events: auto; }
+
+    /* State label */
+    .state-row {
+      display: flex; align-items: center; gap: 10px;
     }
-    .state {
-      color: #fff;
-      font-size: 13px;
-      letter-spacing: 0.02em;
+    .state-label {
+      font-size: 12px; font-weight: 600; color: rgba(255,255,255,.55);
+      letter-spacing: .03em;
     }
-    .control-row {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    .actions,
-    .utility {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    .action {
-      appearance: none;
-      border: 1px solid rgba(255,255,255,0.14);
-      background: rgba(255,255,255,0.08);
-      color: #fff;
-      padding: 11px 14px;
-      border-radius: 999px;
-      font-size: 12px;
-      cursor: pointer;
-      font-weight: 700;
-      transition: transform 140ms ease, background 140ms ease, border-color 140ms ease;
-    }
-    .action:hover {
-      transform: translateY(-1px);
-      background: rgba(255,255,255,0.14);
-      border-color: rgba(255,255,255,0.22);
-    }
-    .action-primary {
-      background: linear-gradient(135deg, #ffffff, #d8ecff);
-      color: #07111f;
-      border-color: transparent;
-    }
-    .debug {
-      position: absolute;
-      inset: 108px 20px auto auto;
-      z-index: 10;
-      max-width: min(520px, calc(100vw - 32px));
-      padding: 12px 14px;
-      border-radius: 14px;
-      background: rgba(7,12,20,0.78);
-      border: 1px solid rgba(255,255,255,0.12);
-      color: #d9e6ff;
-      font-size: 12px;
-      line-height: 1.45;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-    .debug.hidden {
+    .state-spinner {
+      width: 12px; height: 12px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,.15);
+      border-top-color: rgba(255,255,255,.65);
+      animation: spin .7s linear infinite; flex-shrink: 0;
       display: none;
     }
-    @media (max-width: 720px) {
-      .topbar {
-        flex-direction: column;
-      }
-      .info-card {
-        max-width: none;
-      }
-      .debug {
-        inset: auto 20px 136px 20px;
-        max-width: none;
-      }
-      .status-bar {
-        bottom: 12px;
-        left: 12px;
-        right: 12px;
-        padding: 16px;
-      }
+    .state-spinner.active { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Scrubber-style live bar */
+    .live-bar {
+      height: 3px; border-radius: 999px;
+      background: rgba(255,255,255,.12); overflow: hidden; position: relative;
+    }
+    .live-bar-fill {
+      position: absolute; inset: 0 0 0 0;
+      background: linear-gradient(90deg, #ff4040, #ff7a40);
+      border-radius: 999px;
+      animation: live-fill 2.5s ease-in-out infinite alternate;
+    }
+    .live-bar-fill.buffering {
+      background: rgba(255,255,255,.35);
+      animation: live-shimmer 1.2s linear infinite;
+      background-size: 200% 100%;
+      background-image: linear-gradient(90deg,
+        rgba(255,255,255,.1) 0%,
+        rgba(255,255,255,.35) 50%,
+        rgba(255,255,255,.1) 100%);
+    }
+    @keyframes live-fill {
+      0%   { left: 0;   right: 60%; }
+      100% { left: 60%; right: 0; }
+    }
+    @keyframes live-shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* Buttons row */
+    .btn-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .btn-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+    .btn {
+      appearance: none; border: none; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+      border-radius: 12px; font-family: inherit; font-weight: 700;
+      transition: background 160ms, transform 120ms, opacity 160ms;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active { transform: scale(.94); }
+    .btn:focus-visible { outline: 2px solid rgba(255,255,255,.6); outline-offset: 2px; }
+
+    /* Icon-only round buttons */
+    .btn-icon {
+      width: 42px; height: 42px; border-radius: 50%;
+      background: rgba(255,255,255,.10); color: #fff;
+      border: 1px solid rgba(255,255,255,.12);
+      font-size: 0;
+    }
+    .btn-icon svg { width: 18px; height: 18px; }
+    .btn-icon:hover { background: rgba(255,255,255,.18); }
+
+    /* Primary play/pause */
+    .btn-play {
+      width: 52px; height: 52px; border-radius: 50%;
+      background: rgba(255,255,255,.95); color: #07111f;
+      border: none; box-shadow: 0 4px 24px rgba(0,0,0,.35);
+      font-size: 0;
+    }
+    .btn-play svg { width: 22px; height: 22px; }
+    .btn-play:hover { background: #fff; transform: scale(1.06); }
+
+    /* Text pill buttons */
+    .btn-pill {
+      height: 34px; padding: 0 14px;
+      background: rgba(255,255,255,.08); color: rgba(255,255,255,.8);
+      border: 1px solid rgba(255,255,255,.10);
+      font-size: 12px;
+    }
+    .btn-pill:hover { background: rgba(255,255,255,.15); color: #fff; }
+    .btn-pill svg { width: 14px; height: 14px; }
+
+    /* Mute active state */
+    .btn-icon.muted { background: rgba(255,80,80,.15); border-color: rgba(255,80,80,.25); }
+    .btn-icon.muted svg { color: #ff8080; }
+
+    /* ── DEBUG PANEL ── */
+    .debug {
+      position: absolute; top: 80px; right: 16px; z-index: 20;
+      width: min(440px, calc(100vw - 32px));
+      padding: 12px 14px; border-radius: 12px;
+      background: rgba(4,10,20,.88); border: 1px solid rgba(255,255,255,.10);
+      backdrop-filter: blur(16px);
+      color: #9ecfff; font-size: 11px; line-height: 1.5;
+      white-space: pre-wrap; word-break: break-all;
+      transition: opacity 200ms;
+    }
+    .debug.hidden { opacity: 0; pointer-events: none; }
+
+    /* ── LOADING OVERLAY ── */
+    .loader {
+      position: absolute; inset: 0; z-index: 15;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+      background: rgba(0,0,0,.55); backdrop-filter: blur(4px);
+      transition: opacity 350ms ease;
+    }
+    .loader.hidden { opacity: 0; pointer-events: none; }
+    .loader-ring {
+      width: 48px; height: 48px; border-radius: 50%;
+      border: 3px solid rgba(255,255,255,.10);
+      border-top-color: rgba(255,255,255,.75);
+      animation: spin .85s linear infinite;
+    }
+    .loader-text {
+      font-size: 13px; font-weight: 600; color: rgba(255,255,255,.55);
+      letter-spacing: .04em;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 600px) {
+      .topbar { padding: 14px 14px 24px; }
+      .controls { padding: 18px 14px 14px; }
+      .channel-name { font-size: 1.1rem; }
+      .btn-play { width: 46px; height: 46px; }
+      .btn-play svg { width: 20px; height: 20px; }
+      .btn-icon { width: 38px; height: 38px; }
+      .btn-icon svg { width: 16px; height: 16px; }
+      .clock-badge { font-size: 11px; padding: 5px 10px; }
     }
   </style>
 </head>
 <body>
-  <video id="video" controls autoplay muted playsinline></video>
+  <video id="video" autoplay muted playsinline></video>
   <div class="chrome"></div>
+
+  <!-- Loading overlay -->
+  <div class="loader" id="loader">
+    <div class="loader-ring"></div>
+    <span class="loader-text">Connecting to live stream…</span>
+  </div>
+
+  <!-- Top bar -->
   <div class="topbar">
-    <div class="info-card">
-      <div class="eyebrow"><span class="live-dot"></span>Live Broadcast</div>
-      <h1 class="channel-title">${channelName.replace(/</g, '&lt;')}</h1>
-      <div class="channel-meta">${channelCategory.replace(/</g, '&lt;')} channel stream</div>
+    <div class="channel-info">
+      <div class="live-chip"><span class="live-dot"></span>LIVE</div>
+      <h1 class="channel-name">${channelName.replace(/</g, '&lt;')}</h1>
+      <span class="channel-cat">${channelCategory.replace(/</g, '&lt;')}</span>
     </div>
-    <div class="meta-badges">
-      <div class="badge" id="liveClock">--:--:--</div>
-      <div class="badge">Stream ${String(req.params.streamId || '')}</div>
-    </div>
-  </div>
-  <div class="debug hidden" id="debugPanel">Preparing player diagnostics...</div>
-  <div class="status-bar">
-    <div class="status-head">
-      <div class="state" id="state">Connecting to live TV...</div>
-      <div class="utility">
-        <button class="action" id="debugToggle" type="button">Show Debug</button>
-        <button class="action" id="openTabButton" type="button">Open Tab</button>
-      </div>
-    </div>
-    <div class="control-row">
-      <div class="actions">
-        <button class="action action-primary" id="playPauseButton" type="button">Pause</button>
-        <button class="action" id="muteButton" type="button">Unmute</button>
-        <button class="action" id="retryButton" type="button">Retry</button>
-      </div>
-      <div class="utility">
-        <button class="action" id="pipButton" type="button">PiP</button>
-        <button class="action" id="fullscreenButton" type="button">Fullscreen</button>
+    <div class="topbar-right">
+      <div class="clock-badge">
+        <svg class="clock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span id="liveClock">--:--:--</span>
       </div>
     </div>
   </div>
+
+  <!-- Debug panel (hidden, toggle with backtick key) -->
+  <pre class="debug hidden" id="debugPanel">Initialising…</pre>
+
+  <!-- Bottom controls -->
+  <div class="controls" id="controls">
+    <div class="state-row">
+      <div class="state-spinner" id="stateSpinner"></div>
+      <span class="state-label" id="state">Connecting…</span>
+    </div>
+    <div class="live-bar"><div class="live-bar-fill buffering" id="liveBarFill"></div></div>
+    <div class="btn-row">
+      <div class="btn-group">
+        <!-- Play/Pause -->
+        <button class="btn btn-play" id="playPauseButton" type="button" aria-label="Pause">
+          <svg id="iconPlay" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="display:none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <svg id="iconPause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+        </button>
+        <!-- Mute -->
+        <button class="btn btn-icon" id="muteButton" type="button" aria-label="Mute">
+          <svg id="iconVolOn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+          <svg id="iconVolOff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="display:none"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+        </button>
+        <!-- Retry -->
+        <button class="btn btn-pill" id="retryButton" type="button" aria-label="Retry stream">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.95"/></svg>
+          Retry
+        </button>
+      </div>
+      <div class="btn-group">
+        <!-- PiP -->
+        <button class="btn btn-icon" id="pipButton" type="button" aria-label="Picture in picture">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><rect x="12" y="11" width="9" height="6" rx="1"/></svg>
+        </button>
+        <!-- Fullscreen -->
+        <button class="btn btn-icon" id="fullscreenButton" type="button" aria-label="Fullscreen">
+          <svg id="iconFullIn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+          <svg id="iconFullOut" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="display:none"><polyline points="8 3 3 3 3 8"/><polyline points="21 8 21 3 16 3"/><polyline points="3 16 3 21 8 21"/><polyline points="16 21 21 21 21 16"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script src="${hlsScriptUrl}"></script>
   <script>
-    const video = document.getElementById('video');
-    const state = document.getElementById('state');
+    const video      = document.getElementById('video');
+    const loader     = document.getElementById('loader');
+    const stateEl    = document.getElementById('state');
+    const spinner    = document.getElementById('stateSpinner');
+    const liveBar    = document.getElementById('liveBarFill');
     const debugPanel = document.getElementById('debugPanel');
-    const playPauseButton = document.getElementById('playPauseButton');
-    const muteButton = document.getElementById('muteButton');
-    const retryButton = document.getElementById('retryButton');
-    const pipButton = document.getElementById('pipButton');
+    const liveClock  = document.getElementById('liveClock');
+    const playPauseButton  = document.getElementById('playPauseButton');
+    const muteButton       = document.getElementById('muteButton');
+    const retryButton      = document.getElementById('retryButton');
+    const pipButton        = document.getElementById('pipButton');
     const fullscreenButton = document.getElementById('fullscreenButton');
-    const openTabButton = document.getElementById('openTabButton');
-    const debugToggle = document.getElementById('debugToggle');
-    const liveClock = document.getElementById('liveClock');
+    const iconPlay    = document.getElementById('iconPlay');
+    const iconPause   = document.getElementById('iconPause');
+    const iconVolOn   = document.getElementById('iconVolOn');
+    const iconVolOff  = document.getElementById('iconVolOff');
+    const iconFullIn  = document.getElementById('iconFullIn');
+    const iconFullOut = document.getElementById('iconFullOut');
+
     const source = ${JSON.stringify(proxiedStreamUrl)};
     let hls;
     const debugLines = [];
+    let hideTimer = null;
+    let isReady = false;
 
     video.muted = true;
     video.defaultMuted = true;
     video.autoplay = true;
     video.playsInline = true;
 
+    // ── Auto-hide controls ──────────────────────────────────────────────────
+    function showControls() {
+      document.body.classList.add('controls-visible');
+      clearTimeout(hideTimer);
+      if (isReady) {
+        hideTimer = setTimeout(hideControls, 3000);
+      }
+    }
+    function hideControls() {
+      if (!isReady) return;
+      document.body.classList.remove('controls-visible');
+    }
+
+    document.addEventListener('mousemove', showControls);
+    document.addEventListener('touchstart', showControls, { passive: true });
+    document.addEventListener('click', showControls);
+    document.addEventListener('keydown', showControls);
+
+    // Start with controls visible (loading state)
+    showControls();
+
+    // ── Clock ────────────────────────────────────────────────────────────────
     function updateClock() {
       liveClock.textContent = new Date().toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
       });
     }
+    updateClock();
+    setInterval(updateClock, 1000);
 
-    function updateButtons() {
-      playPauseButton.textContent = video.paused ? 'Play' : 'Pause';
-      muteButton.textContent = video.muted ? 'Unmute' : 'Mute';
-      fullscreenButton.textContent = document.fullscreenElement ? 'Windowed' : 'Fullscreen';
-      pipButton.textContent = document.pictureInPictureElement ? 'Exit PiP' : 'PiP';
+    // ── State UI ─────────────────────────────────────────────────────────────
+    function setState(msg, busy) {
+      stateEl.textContent = msg;
+      spinner.classList.toggle('active', Boolean(busy));
+      pushDebug('State: ' + msg);
     }
 
-    function pushDebug(message) {
+    function setReady() {
+      isReady = true;
+      loader.classList.add('hidden');
+      liveBar.classList.remove('buffering');
+      setState('Live — ' + ${JSON.stringify(channelName.replace(/</g, '&lt;'))});
+      // auto-hide after 3s
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(hideControls, 3000);
+    }
+
+    // ── Button state sync ────────────────────────────────────────────────────
+    function updateButtons() {
+      const paused = video.paused;
+      iconPlay.style.display  = paused ? '' : 'none';
+      iconPause.style.display = paused ? 'none' : '';
+      playPauseButton.setAttribute('aria-label', paused ? 'Play' : 'Pause');
+
+      const muted = video.muted || video.volume === 0;
+      iconVolOn.style.display  = muted ? 'none' : '';
+      iconVolOff.style.display = muted ? '' : 'none';
+      muteButton.classList.toggle('muted', muted);
+
+      const isFull = Boolean(document.fullscreenElement);
+      iconFullIn.style.display  = isFull ? 'none' : '';
+      iconFullOut.style.display = isFull ? '' : 'none';
+      fullscreenButton.setAttribute('aria-label', isFull ? 'Exit fullscreen' : 'Fullscreen');
+
+      const isPip = Boolean(document.pictureInPictureElement);
+      pipButton.setAttribute('aria-label', isPip ? 'Exit picture in picture' : 'Picture in picture');
+    }
+
+    // ── Debug ────────────────────────────────────────────────────────────────
+    function pushDebug(msg) {
       const stamp = new Date().toLocaleTimeString();
-      debugLines.unshift('[' + stamp + '] ' + message);
-      if (debugLines.length > 8) {
-        debugLines.length = 8;
-      }
+      debugLines.unshift('[' + stamp + '] ' + msg);
+      if (debugLines.length > 12) debugLines.length = 12;
       debugPanel.textContent = debugLines.join('\\n');
       try {
         window.parent.postMessage({
           type: 'tv-player-debug',
           streamId: ${JSON.stringify(String(req.params.streamId || ''))},
           lines: debugLines.slice(),
-          state: state.textContent,
-          source: source,
+          state: stateEl.textContent,
+          source,
         }, '*');
-      } catch (error) {
-        // Ignore parent messaging failures.
-      }
+      } catch (_) {}
     }
 
-    function setState(message) {
-      state.textContent = message;
-      pushDebug('State: ' + message);
-    }
+    // Toggle debug with backtick key
+    document.addEventListener('keydown', function (e) {
+      if (e.key === '\`') debugPanel.classList.toggle('hidden');
+    });
 
+    // ── HLS / native playback ────────────────────────────────────────────────
     function destroyHls() {
-      if (hls) {
-        pushDebug('Destroying HLS instance');
-        hls.destroy();
-        hls = null;
-      }
+      if (hls) { hls.destroy(); hls = null; }
     }
 
     function playNative() {
       destroyHls();
       video.src = source;
       video.load();
-      setState('Opening live stream...');
-      pushDebug('Using native HLS playback');
-      video.play().catch(function () {
-        setState('Tap play to start the live channel');
-      });
-    }
-
-    async function togglePlayback() {
-      if (video.paused) {
-        await video.play().catch(function () {
-          setState('Tap play to start the live channel');
-        });
-      } else {
-        video.pause();
-      }
-      updateButtons();
-    }
-
-    async function togglePictureInPicture() {
-      if (!document.pictureInPictureEnabled) {
-        setState('Picture in Picture is not available');
-        return;
-      }
-
-      try {
-        if (document.pictureInPictureElement) {
-          await document.exitPictureInPicture();
-        } else {
-          await video.requestPictureInPicture();
-        }
-      } catch (error) {
-        pushDebug('PiP error: ' + error.message);
-      }
-      updateButtons();
-    }
-
-    async function toggleFullscreen() {
-      try {
-        if (document.fullscreenElement) {
-          await document.exitFullscreen();
-        } else {
-          await video.requestFullscreen();
-        }
-      } catch (error) {
-        pushDebug('Fullscreen error: ' + error.message);
-      }
-      updateButtons();
+      setState('Opening stream…', true);
+      pushDebug('Native HLS playback');
+      video.play().catch(function () { setState('Tap play to start'); });
     }
 
     function attachHls() {
       destroyHls();
       hls = new window.Hls({
-        debug: false,
-        enableWorker: true,
-        lowLatencyMode: false,
-        backBufferLength: 90,
+        debug: false, enableWorker: true,
+        lowLatencyMode: false, backBufferLength: 90,
       });
-      pushDebug('Using HLS.js playback');
+      pushDebug('HLS.js playback');
 
       hls.on(window.Hls.Events.MANIFEST_PARSED, function () {
-        setState('Live channel ready');
-        video.play().catch(function () {
-          setState('Tap play to start the live channel');
-        });
+        setReady();
+        video.play().catch(function () { setState('Tap play to start'); });
       });
 
-      hls.on(window.Hls.Events.LEVEL_LOADED, function (event, data) {
-        pushDebug('Level loaded: fragments=' + (data?.details?.fragments?.length || 0));
+      hls.on(window.Hls.Events.LEVEL_LOADED, function (e, data) {
+        pushDebug('Level loaded: frags=' + (data?.details?.fragments?.length || 0));
       });
 
-      hls.on(window.Hls.Events.ERROR, function (event, data) {
-        pushDebug('HLS error: type=' + (data?.type || 'unknown') + ', details=' + (data?.details || 'n/a') + ', fatal=' + Boolean(data?.fatal));
-        if (!data || !data.fatal) {
-          return;
-        }
-
+      hls.on(window.Hls.Events.ERROR, function (e, data) {
+        pushDebug('HLS err: ' + (data?.type || '?') + ' / ' + (data?.details || '?') + ' fatal=' + Boolean(data?.fatal));
+        if (!data?.fatal) return;
         if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR) {
-          setState('Reconnecting to live stream...');
+          setState('Reconnecting…', true);
+          liveBar.classList.add('buffering');
           hls.startLoad();
-          return;
-        }
-
-        if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR) {
-          setState('Recovering stream playback...');
+        } else if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR) {
+          setState('Recovering…', true);
           hls.recoverMediaError();
-          return;
+        } else {
+          setState('Stream temporarily unavailable');
         }
-
-        setState('Live stream is temporarily unavailable');
       });
 
       hls.loadSource(source);
       hls.attachMedia(video);
     }
 
+    // ── Video events ─────────────────────────────────────────────────────────
     video.addEventListener('loadedmetadata', function () {
-      setState('Live channel ready');
-      pushDebug('Video metadata loaded: readyState=' + video.readyState);
-      video.play().catch(function () {
-        setState('Tap play to start the live channel');
-      });
-    });
-
-    video.addEventListener('error', function () {
-      const mediaError = video.error;
-      pushDebug('Video element error: code=' + (mediaError?.code || 'unknown'));
-      setState('Player could not load the live stream');
+      setReady();
+      pushDebug('Metadata loaded, readyState=' + video.readyState);
+      video.play().catch(function () { setState('Tap play to start'); });
     });
 
     video.addEventListener('playing', function () {
-      pushDebug('Video playing');
+      setReady();
       updateButtons();
     });
 
     video.addEventListener('waiting', function () {
-      pushDebug('Video waiting for more data');
+      setState('Buffering…', true);
+      liveBar.classList.add('buffering');
+      pushDebug('Buffering');
     });
 
-    video.addEventListener('pause', updateButtons);
-    video.addEventListener('volumechange', updateButtons);
+    video.addEventListener('canplay', function () {
+      liveBar.classList.remove('buffering');
+    });
+
+    video.addEventListener('error', function () {
+      const code = video.error?.code || '?';
+      pushDebug('Video error: code=' + code);
+      setState('Could not load stream');
+    });
+
+    video.addEventListener('stalled', function () { pushDebug('Stalled'); });
+    video.addEventListener('pause',         updateButtons);
+    video.addEventListener('volumechange',  updateButtons);
     document.addEventListener('fullscreenchange', updateButtons);
     document.addEventListener('enterpictureinpicture', updateButtons);
     document.addEventListener('leavepictureinpicture', updateButtons);
 
-    playPauseButton.addEventListener('click', togglePlayback);
+    // ── Controls ──────────────────────────────────────────────────────────────
+    playPauseButton.addEventListener('click', async function () {
+      if (video.paused) {
+        await video.play().catch(function () { setState('Tap play to start'); });
+      } else {
+        video.pause();
+      }
+      updateButtons();
+    });
+
     muteButton.addEventListener('click', function () {
       video.muted = !video.muted;
       updateButtons();
     });
 
-    video.addEventListener('stalled', function () {
-      pushDebug('Video stalled');
-    });
-
     retryButton.addEventListener('click', function () {
-      setState('Retrying live stream...');
-      pushDebug('Manual retry requested');
-      if (window.Hls && window.Hls.isSupported()) {
-        attachHls();
-        return;
-      }
-
+      setState('Retrying…', true);
+      liveBar.classList.add('buffering');
+      loader.classList.remove('hidden');
+      isReady = false;
+      pushDebug('Manual retry');
+      if (window.Hls && window.Hls.isSupported()) { attachHls(); return; }
       playNative();
     });
 
-    pipButton.addEventListener('click', togglePictureInPicture);
-    fullscreenButton.addEventListener('click', toggleFullscreen);
-    openTabButton.addEventListener('click', function () {
-      window.open(window.location.href, '_blank', 'noopener,noreferrer');
-    });
-    debugToggle.addEventListener('click', function () {
-      debugPanel.classList.toggle('hidden');
-      debugToggle.textContent = debugPanel.classList.contains('hidden') ? 'Show Debug' : 'Hide Debug';
+    pipButton.addEventListener('click', async function () {
+      if (!document.pictureInPictureEnabled) { setState('PiP not available'); return; }
+      try {
+        if (document.pictureInPictureElement) await document.exitPictureInPicture();
+        else await video.requestPictureInPicture();
+      } catch (err) { pushDebug('PiP error: ' + err.message); }
+      updateButtons();
     });
 
+    fullscreenButton.addEventListener('click', async function () {
+      try {
+        if (document.fullscreenElement) await document.exitFullscreen();
+        else await (document.documentElement.requestFullscreen?.() || video.requestFullscreen?.());
+      } catch (err) { pushDebug('Fullscreen error: ' + err.message); }
+      updateButtons();
+    });
+
+    // ── Init ──────────────────────────────────────────────────────────────────
     pushDebug('Source: ' + source);
-    pushDebug('Hls supported=' + Boolean(window.Hls && window.Hls.isSupported()) + ', native=' + Boolean(video.canPlayType('application/vnd.apple.mpegurl')));
-    updateClock();
-    setInterval(updateClock, 1000);
+    pushDebug('HLS.js=' + Boolean(window.Hls?.isSupported()) + '  Native=' + Boolean(video.canPlayType('application/vnd.apple.mpegurl')));
+    setState('Connecting…', true);
     updateButtons();
 
     if (window.Hls && window.Hls.isSupported()) {
@@ -770,7 +867,8 @@ router.get('/player/:streamId', async (req, res, next) => {
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       playNative();
     } else {
-      setState('This browser cannot play the live TV stream');
+      setState('Browser cannot play this stream');
+      loader.classList.add('hidden');
     }
   </script>
 </body>
