@@ -234,6 +234,19 @@ function TopNav() {
                 </a>
               </li>
             ))}
+            <li>
+              <a
+                href="/speed4you.apk"
+                download
+                className="top-nav-link top-nav-partner-link"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                  <line x1="12" y1="18" x2="12.01" y2="18" />
+                </svg>
+                Android App
+              </a>
+            </li>
           </ul>
         )}
 
@@ -386,6 +399,14 @@ function TopNav() {
                   {site.label}
                 </a>
               ))}
+              <a
+                href="/speed4you.apk"
+                download
+                className="top-nav-mobile-menu-item"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Android App
+              </a>
             </div>
           </div>
         </div>

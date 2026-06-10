@@ -1,0 +1,11 @@
+{
+  "appId": "net.speed4you.portal",
+  "appName": "Speed4You Portal",
+  "webDir": "dist",
+  "server": {
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}
