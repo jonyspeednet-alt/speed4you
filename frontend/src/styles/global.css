@@ -622,46 +622,52 @@ main,
 
 .top-nav-container {
   position: fixed;
-  top: max(18px, env(safe-area-inset-top, 0px));
-  left: max(18px, env(safe-area-inset-left, 0px));
-  right: max(18px, env(safe-area-inset-right, 0px));
+  top: 0;
+  left: 0;
+  right: 0;
   z-index: 1100;
-  border-radius: 30px;
+  border-radius: 0;
   background: transparent;
-  border: 1px solid transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
   backdrop-filter: blur(0px);
   -webkit-backdrop-filter: blur(0px);
   box-shadow: none;
-  transition: background 0.35s ease, border-color 0.35s ease,
-    backdrop-filter 0.35s ease, box-shadow 0.35s ease,
-    transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), top 0.35s ease;
-  transform: translateY(0);
-}
-
-.top-nav-hidden {
-  transform: translateY(calc(-100% - 24px));
+  transition:
+    background 0.4s ease,
+    border-color 0.4s ease,
+    backdrop-filter 0.4s ease,
+    box-shadow 0.4s ease,
+    top 0.4s ease,
+    left 0.4s ease,
+    right 0.4s ease,
+    border-radius 0.4s ease;
 }
 
 .top-nav-tablet {
-  top: 14px;
-  left: 14px;
-  right: 14px;
+  top: 0;
+  left: 0;
+  right: 0;
 }
 
 .top-nav-mobile {
-  top: 10px;
-  left: 10px;
-  right: 10px;
-  border-radius: 24px;
+  top: 0;
+  left: 0;
+  right: 0;
+  border-radius: 0;
 }
 
 .top-nav-scrolled {
-  top: 10px;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  border-radius: 28px;
+  border-bottom: none;
   background: rgba(7, 17, 31, 0.88);
-  border-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(32px);
   -webkit-backdrop-filter: blur(32px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
 }
 
 .top-nav-main {
@@ -1804,8 +1810,14 @@ main,
 
   /* Better mobile navigation */
   .top-nav-container {
-    border-radius: 16px !important;
-    padding: 8px !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+  }
+  .top-nav-container.top-nav-scrolled {
+    border-radius: 20px !important;
+    top: 8px !important;
+    left: 8px !important;
+    right: 8px !important;
   }
 }
 
@@ -1853,8 +1865,14 @@ main,
 
   /* Enhanced tablet navigation */
   .top-nav-container {
-    border-radius: 20px !important;
-    padding: 12px !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+  }
+  .top-nav-container.top-nav-scrolled {
+    border-radius: 24px !important;
+    top: 10px !important;
+    left: 10px !important;
+    right: 10px !important;
   }
 }
 
@@ -1920,6 +1938,11 @@ main,
   }
 
   .top-nav-container {
+    left: 0 !important;
+    right: 0 !important;
+    border-radius: 0 !important;
+  }
+  .top-nav-container.top-nav-scrolled {
     left: 32px !important;
     right: 32px !important;
     border-radius: 32px !important;
