@@ -78,6 +78,11 @@ replit.md
 skills/
 .claude.json
 
+# Android — local.properties has machine-specific SDK path, android/ and apk/ are build artifacts
+local.properties
+frontend/android/
+frontend/apk/
+
 # Raw API payloads / agent state that some agents write to disk.
 **/api_conversation_history.json
 **/raw_api_payload_*.json
