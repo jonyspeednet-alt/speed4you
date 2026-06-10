@@ -52,7 +52,12 @@ function ContentCard({
     .trim();
   const itemRating = item.rating || null;
   const displayDate = formatReleaseDate(item.releasedAt) || item.year || null;
-  const isAdmin = typeof localStorage !== 'undefined' && localStorage.getItem('token');
+  const isAdmin = useMemo(() => {
+    try {
+      const u = JSON.parse(localStorage.getItem('user') || 'null');
+      return u?.role === 'admin';
+    } catch { return false; }
+  }, []);
 
   return (
     <article

@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import HeroCarousel from '../features/home/components/HeroCarousel';
 import ContentRail from '../features/home/components/ContentRail';
 import TrendingBento from '../features/home/components/TrendingBento';
+import { HeroBannerSkeleton, RailSkeleton } from '../components/feedback/Skeleton';
 import { contentService } from '../services';
 import { useBreakpoint, useRecentlyViewed, useTVMode } from '../hooks';
 
@@ -192,48 +193,72 @@ function HomePage() {
   const { items: recentlyViewed } = useRecentlyViewed();
   const [content, setContent] = useState(() => readHomepageCache()?.content || {});
   const [loading, setLoading] = useState(() => !readHomepageCache());
+  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  const fetchHomepageData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-    async function fetchHomepageData() {
-      if (cancelled) return;
-      setLoading(true);
+    try {
+      const seedContentId = recentlyViewed?.[0]?.id || '';
 
-      try {
-        const seedContentId = recentlyViewed?.[0]?.id || '';
+      const [homepageResponse, recommendations, localTrending] = await Promise.all([
+        contentService.getHomepage(HOMEPAGE_POOL_LIMIT).catch(() => ({})),
+        seedContentId ? contentService.getRecommendations(seedContentId).catch(() => ({ items: [] })) : Promise.resolve({ items: [] }),
+        contentService.getLocalTrending().catch(() => ({ items: [] })),
+      ]);
 
-        const [homepageResponse, recommendations, localTrending] = await Promise.all([
-          contentService.getHomepage(HOMEPAGE_POOL_LIMIT).catch(() => ({})),
-          seedContentId ? contentService.getRecommendations(seedContentId).catch(() => ({ items: [] })) : Promise.resolve({ items: [] }),
-          contentService.getLocalTrending().catch(() => ({ items: [] })),
-        ]);
+      const nextContent = buildHomepageContent({
+        ...homepageResponse,
+        recommendations: recommendations?.items,
+        localTrending: localTrending?.items,
+      });
 
-        const nextContent = buildHomepageContent({
-          ...homepageResponse,
-          recommendations: recommendations?.items,
-          localTrending: localTrending?.items,
-        });
-
-        if (!cancelled) {
-          setContent(nextContent);
-          writeHomepageCache({ content: nextContent, generatedAt: new Date().toISOString() });
-        }
-      } catch (error) {
-        console.error('Failed to fetch homepage data:', error);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+      setContent(nextContent);
+      writeHomepageCache({ content: nextContent, generatedAt: new Date().toISOString() });
+    } catch (err) {
+      console.error('Failed to fetch homepage data:', err);
+      setError(err);
+    } finally {
+      setLoading(false);
     }
-
-    fetchHomepageData();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    fetchHomepageData();
+  }, [fetchHomepageData]);
+
   const hasFeaturedHero = Array.isArray(content.featured) && content.featured.length > 0;
+
+  if (loading) {
+    return (
+      <div style={styles.page}>
+        <HeroBannerSkeleton />
+        <div style={{ ...styles.content, ...(isTVMode ? styles.contentTV : {}), ...(isMobile ? styles.contentMobile : {}) }}>
+          <RailSkeleton count={isMobile ? 4 : 6} />
+          <RailSkeleton count={isMobile ? 4 : 6} />
+          <RailSkeleton count={isMobile ? 4 : 6} />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={styles.errorPage}>
+        <div style={styles.errorBox}>
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <p style={styles.errorText}>Could not load content. Check your connection.</p>
+          <button onClick={fetchHomepageData} style={styles.retryBtn}>Try again</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ ...styles.page, ...(!hasFeaturedHero ? styles.pageWithoutHero : {}) }}>
@@ -258,6 +283,19 @@ function HomePage() {
 
         {content.bengali?.length >= 2 ? (
           <ContentRail title="Bengali Picks" subtitle="Local language highlights" items={content.bengali} viewAllLink="/browse?language=Bengali" />
+        ) : null}
+
+        {recentlyViewed?.length >= 2 ? (
+          <ContentRail
+            title="Recently Viewed"
+            subtitle="Pick up where you left off"
+            items={recentlyViewed.map(item => ({
+              ...item,
+              poster: item.poster || '/portal/assets/poster-placeholder.svg',
+              genre: item.genre || 'Featured',
+              language: item.language || 'Mixed',
+            }))}
+          />
         ) : null}
 
         {content.recommendations?.length > 0 ? (
@@ -293,6 +331,41 @@ const styles = {
   },
   pageWithoutHero: {
     paddingTop: 'calc(var(--nav-occupied-desktop) + 24px)',
+  },
+  errorPage: {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 'var(--nav-occupied-desktop)',
+  },
+  errorBox: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '20px',
+    textAlign: 'center',
+    padding: '48px 32px',
+    borderRadius: '24px',
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid rgba(255,255,255,0.07)',
+    maxWidth: '360px',
+  },
+  errorText: {
+    color: 'var(--text-secondary)',
+    fontSize: '0.95rem',
+    lineHeight: '1.5',
+  },
+  retryBtn: {
+    padding: '12px 32px',
+    borderRadius: '999px',
+    background: 'var(--accent-cyan)',
+    color: '#050c16',
+    fontSize: '0.9rem',
+    fontWeight: '900',
+    cursor: 'pointer',
+    border: 'none',
+    letterSpacing: '0.04em',
   },
   content: {
     position: 'relative',
