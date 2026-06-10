@@ -19,6 +19,8 @@ const partnerSites = [
 function TopNav() {
   const location = useLocation();
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isHidden, setIsHidden] = useState(false);
+  const lastScrollY = useRef(0);
   const [hoveredLink, setHoveredLink] = useState(null);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -47,10 +49,25 @@ function TopNav() {
   });
 
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 10);
+    const handleScroll = () => {
+      const y = window.scrollY;
+      setIsScrolled(y > 50);
+      if (y <= 50) {
+        setIsHidden(false);
+      } else if (y > lastScrollY.current + 8) {
+        setIsHidden(true);
+      } else if (y < lastScrollY.current - 4) {
+        setIsHidden(false);
+      }
+      lastScrollY.current = y;
+    };
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  useEffect(() => {
+    if (isMoreOpen || isMobileMenuOpen) setIsHidden(false);
+  }, [isMoreOpen, isMobileMenuOpen]);
 
   useEffect(() => {
     setIsMoreOpen(false);
@@ -87,6 +104,7 @@ function TopNav() {
     isMobile && "top-nav-mobile",
     isTablet && "top-nav-tablet",
     isScrolled && "top-nav-scrolled",
+    isHidden && "top-nav-hidden",
     isTVMode && "tv-mode",
   ]
     .filter(Boolean)

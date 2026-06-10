@@ -94,8 +94,7 @@ html {
   scrollbar-gutter: stable;
   color-scheme: dark;
   background: var(--bg-primary);
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow-x: clip;
 }
 
 body {
@@ -112,8 +111,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow-x: clip;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -621,28 +619,35 @@ main,
 /* ── Modern TopNav Component Styles ── */
 
 .top-nav-container {
-  position: sticky;
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  width: 100%;
   z-index: 1100;
   background: transparent;
-  border: none;
   border-bottom: 1px solid transparent;
-  transition: background 0.35s ease, border-color 0.35s ease,
-    backdrop-filter 0.35s ease, box-shadow 0.35s ease;
+  transform: translateY(0);
+  transition:
+    transform 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+    background 0.32s ease,
+    border-color 0.32s ease,
+    backdrop-filter 0.32s ease,
+    box-shadow 0.32s ease;
 }
 
 .top-nav-tablet {}
 .top-nav-mobile {}
 
+.top-nav-hidden {
+  transform: translateY(-100%);
+}
+
 .top-nav-scrolled {
-  background: rgba(5, 12, 22, 0.88);
-  border-bottom-color: rgba(255, 255, 255, 0.07);
+  background: rgba(5, 12, 22, 0.92);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.5);
 }
 
 .top-nav-main {
