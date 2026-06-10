@@ -227,15 +227,29 @@ router.get('/channels', async (req, res, next) => {
       updatedAt: new Date().toISOString(),
     });
   } catch (error) {
-    const status = error.status || (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED' ? 503 : 500);
+    let status, code, message;
+
+    if (error.status === 400) {
+      status = 503;
+      code = 'TV_SOURCE_NOT_ALLOWED';
+      message = `TV source is not allowed. Check TV_ALLOWED_HOSTS and TV_ALLOWED_PORTS. (${error.message})`;
+    } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+      status = 503;
+      code = 'TV_PORTAL_UNREACHABLE';
+      message = `TV portal at ${TV_PORTAL_BASE} is unreachable.`;
+    } else if (error.message && error.message.includes('timed out')) {
+      status = 504;
+      code = 'TV_REQUEST_TIMEOUT';
+      message = `TV portal at ${TV_PORTAL_BASE} did not respond in time.`;
+    } else {
+      status = 500;
+      code = error.code || 'TV_SERVICE_UNAVAILABLE';
+      message = `Failed to fetch TV channels: ${error.message}`;
+    }
+
     res.status(status).json({
       ok: false,
-      error: {
-        code: error.code || 'TV_SERVICE_UNAVAILABLE',
-        message: status === 503
-          ? 'TV portal is unreachable. Check your TV_PORTAL_BASE_URL configuration.'
-          : 'Failed to fetch TV channels.',
-      },
+      error: { code, message },
     });
   }
 });
