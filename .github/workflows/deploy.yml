@@ -236,10 +236,44 @@ jobs:
             FFPROBE_PATH=/usr/bin/ffprobe
             ADMIN_USERNAME=${ADMIN_USERNAME}
             ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH}
+            echo "=== TV ENV DIAGNOSTICS ==="
+            echo "TV_PORTAL_BASE_URL=[${TV_PORTAL_BASE_URL:-UNSET}]"
+            echo "TV_ALLOWED_HOSTS=[${TV_ALLOWED_HOSTS:-UNSET}]"
+            echo "TV_ALLOWED_PORTS=[${TV_ALLOWED_PORTS:-UNSET}]"
+            TV_PORTAL_BASE_URL="${TV_PORTAL_BASE_URL}"
+            TV_ALLOWED_HOSTS="${TV_ALLOWED_HOSTS:-10.45.45.254}"
+            TV_ALLOWED_PORTS="${TV_ALLOWED_PORTS:-80,8082}"
+            TV_REQUEST_TIMEOUT_MS="${TV_REQUEST_TIMEOUT_MS:-15000}"
+            echo "=== TV ENV RESOLVED ==="
+            echo "TV_PORTAL_BASE_URL=[${TV_PORTAL_BASE_URL}]"
+            echo "TV_ALLOWED_HOSTS=[${TV_ALLOWED_HOSTS}]"
+            echo "TV_ALLOWED_PORTS=[${TV_ALLOWED_PORTS}]"
+            echo "TV_REQUEST_TIMEOUT_MS=[${TV_REQUEST_TIMEOUT_MS}]"
+            cat > .env <<EOF
+            PORT=4100
+            JWT_SECRET=${JWT_SECRET}
+            TMDB_API_KEY=${TMDB_API_KEY}
+            OMDB_API_KEY=${OMDB_KEY}
+            CORS_ALLOWED_ORIGINS=${CORS}
+            PLAYER_CACHE_ROOT=${PLAYER_CACHE_ROOT}
+            SCANNER_CACHE_DIR=${SCANNER_CACHE_DIR}
+            MEDIA_NORMALIZER_TEMP_DIR=${MEDIA_NORMALIZER_TEMP_DIR}
+            PUBLIC_API_PER_IP_LIMIT=${PUBLIC_API_PER_IP_LIMIT:-200}
+            DB_POOL_MAX=${DB_POOL_MAX:-50}
+            PLAYER_MAX_CONCURRENT_LIVE_STREAMS=${PLAYER_MAX_CONCURRENT_LIVE_STREAMS:-10}
+            DB_HOST=${DB_HOST}
+            DB_PORT=${DB_PORT}
+            DB_NAME=${DB_NAME}
+            DB_USER=${DB_USER}
+            DB_PASSWORD=${DB_PASSWORD}
+            FFMPEG_PATH=/usr/bin/ffmpeg
+            FFPROBE_PATH=/usr/bin/ffprobe
+            ADMIN_USERNAME=${ADMIN_USERNAME}
+            ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH}
             TV_PORTAL_BASE_URL=${TV_PORTAL_BASE_URL}
-            TV_ALLOWED_HOSTS=${TV_ALLOWED_HOSTS:-localhost}
-            TV_ALLOWED_PORTS=${TV_ALLOWED_PORTS:-80,8082}
-            TV_REQUEST_TIMEOUT_MS=${TV_REQUEST_TIMEOUT_MS:-15000}
+            TV_ALLOWED_HOSTS=${TV_ALLOWED_HOSTS}
+            TV_ALLOWED_PORTS=${TV_ALLOWED_PORTS}
+            TV_REQUEST_TIMEOUT_MS=${TV_REQUEST_TIMEOUT_MS}
             EOF
 
             echo "Ensuring new metadata routes exist in admin.js..."
