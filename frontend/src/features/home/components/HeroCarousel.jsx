@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useBreakpoint, useTVMode } from '../../../hooks';
 import StarRating from '../../../components/ui/StarRating';
-import styles from './HeroCarousel.module.css'; // Import CSS module
+import WatchlistButton from '../../../components/ui/WatchlistButton';
+import styles from './HeroCarousel.module.css';
 
 const AUTO_PLAY_DURATION = 3200;
 const AUTO_PLAY_RESUME_DELAY = 1200;
@@ -213,6 +214,27 @@ function HeroCarousel({ content, items }) {
                             </div>
                         ))}
                     </div>
+
+                    {!isPlaceholder && id && (
+                        <div className={styles.actions}>
+                            <Link
+                                to={isSeries ? `/series/${id}` : `/movies/${id}`}
+                                className={`${styles.button} ${styles.buttonPrimary}`}
+                            >
+                                <span className={styles.buttonIcon}>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                        <path d="M8 5v14l11-7z" />
+                                    </svg>
+                                </span>
+                                Watch Now
+                            </Link>
+                            <WatchlistButton
+                                contentType={isSeries ? 'series' : 'movie'}
+                                contentId={id}
+                                title={title}
+                            />
+                        </div>
+                    )}
                 </div>
 
                 {!isTVMode && (
