@@ -2,7 +2,7 @@ import {
   useEffect, useMemo, useRef, useState, useCallback, memo, forwardRef,
 } from "react";
 import tvService from "../services/tvService";
-import { useBreakpoint } from "../hooks";
+import { useBreakpoint, useTVMode } from "../hooks";
 
 const API = (import.meta.env.VITE_API_URL || "/portal-api").replace(/\/$/, "");
 const api  = (p) => (p?.startsWith("http") ? p : `${API}${p}`);
@@ -348,7 +348,8 @@ function PlayerSpinner() {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function TVPage() {
-  const { isMobile } = useBreakpoint(); // tablets get split layout now
+  const { isMobile } = useBreakpoint();
+  const isTVMode = useTVMode();
 
   const [chs,    setChs]    = useState([]);
   const [cats,   setCats]   = useState([]);
@@ -657,13 +658,13 @@ const CSS = `
 /* Page */
 .tv-page {
   min-height: 100vh;
-  padding: 0px 20px 48px;
+  padding: calc(var(--nav-occupied-desktop, 104px) + 16px) 20px 48px;
   max-width: 1520px;
   margin: 0 auto;
   box-sizing: border-box;
 }
 @media (max-width: 768px) {
-  .tv-page { padding: 0px 12px 100px; }
+  .tv-page { padding: calc(var(--nav-occupied-mobile, 82px) + 12px) 12px calc(var(--bottom-nav-height, 68px) + 16px); }
 }
 
 /* Header */
@@ -1038,4 +1039,53 @@ const CSS = `
 .tv-empty-icon { width: 44px; height: 44px; opacity: .4; margin-bottom: 4px; }
 .tv-empty-msg  { font-size: .88rem; font-weight: 600; }
 .tv-empty-sub  { font-size: .75rem; opacity: .6; }
+
+/* ── TV/large-screen enhancements (≥1600px) ── */
+@media (min-width: 1600px) {
+  .tv-page { padding-left: 40px; padding-right: 40px; max-width: 1920px; }
+  .tv-header-title { font-size: 1.8rem; }
+  .tv-header-count { font-size: .88rem; padding: 4px 14px; }
+  .tv-split { grid-template-columns: 1fr 400px; gap: 24px; }
+  .tv-sidebar { height: calc(100vh - var(--nav-occupied-desktop, 124px) - 80px); }
+  .tv-ch { padding: 14px 16px; gap: 14px; border-radius: 16px; min-height: 72px; }
+  .tv-ch-name { font-size: 1rem; }
+  .tv-ch-cat  { font-size: .72rem; }
+  .tv-ch--compact { padding: 12px 14px; min-height: 64px; }
+  .tv-pill { padding: 8px 16px; font-size: .84rem; min-height: 40px; }
+  .tv-pill-count { font-size: .72rem; padding: 2px 8px; }
+  .tv-search-input { font-size: 1rem; padding: 13px 80px 13px 44px; min-height: 52px; }
+  .tv-search-ic { width: 18px; height: 18px; left: 14px; }
+  .tv-recent-chip { padding: 8px 14px; font-size: .82rem; min-height: 40px; }
+  .tv-recent-chip-name { max-width: 130px; }
+  .tv-recent-label { font-size: .76rem; }
+  .tv-toggle-btn { padding: 10px 20px; font-size: .88rem; min-height: 44px; }
+  .tv-player-bar-name { font-size: 1rem; }
+  .tv-player-bar-cat  { font-size: .72rem; }
+  .tv-player-bar-min  { padding: 8px 16px; font-size: .8rem; min-height: 40px; }
+  .tv-player-ctrl { width: 44px; height: 44px; border-radius: 10px; }
+  .tv-player-ctrl svg { width: 20px; height: 20px; }
+  .tv-kbd-hint { font-size: .82rem; gap: 8px; }
+  .tv-kbd-hint kbd { padding: 3px 8px; font-size: .76rem; }
+  .tv-skel { height: 86px; }
+  .tv-skel--compact { height: 72px; }
+  .tv-grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+}
+
+/* TV mode class — D-pad focus ring on channel cards */
+html.tv-mode .tv-ch:focus-visible {
+  outline: 4px solid var(--accent-cyan, #00ffff);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(0,255,255,0.15), 0 0 40px rgba(0,255,255,0.2);
+  transform: scale(1.02) translateY(-2px);
+  z-index: 2;
+  transition: all 200ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+html.tv-mode .tv-pill:focus-visible {
+  outline: 3px solid var(--accent-cyan, #00ffff);
+  outline-offset: 2px;
+  transform: scale(1.06);
+}
+html.tv-mode .tv-player-ctrls { opacity: 1 !important; }
+html.tv-mode .tv-player-ctrl { width: 52px; height: 52px; }
+html.tv-mode .tv-player-ctrl svg { width: 22px; height: 22px; }
 `;

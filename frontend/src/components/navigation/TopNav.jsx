@@ -402,6 +402,33 @@ function TopNav() {
               })}
             </ul>
             <div className="top-nav-mobile-menu-partners">
+              <span>Account</span>
+              {user ? (
+                <Link
+                  to="/profile"
+                  className="top-nav-mobile-menu-item"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  {user.name || user.email || 'My Profile'}
+                </Link>
+              ) : (
+                <Link
+                  to="/login"
+                  className="top-nav-mobile-menu-item"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Login / Sign Up
+                </Link>
+              )}
+              <Link
+                to="/watchlist"
+                className="top-nav-mobile-menu-item"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                My Watchlist
+              </Link>
+            </div>
+            <div className="top-nav-mobile-menu-partners">
               <span>Partner sites</span>
               {partnerSites.map((site) => (
                 <a
