@@ -2,8 +2,10 @@ import { useEffect, useState, useCallback } from 'react';
 import HeroCarousel from '../features/home/components/HeroCarousel';
 import ContentRail from '../features/home/components/ContentRail';
 import TrendingBento from '../features/home/components/TrendingBento';
+import ContinueWatchingRail from '../features/continueWatching/components/ContinueWatchingRail';
 import { HeroBannerSkeleton, RailSkeleton } from '../components/feedback/Skeleton';
 import { contentService } from '../services';
+import { progressService } from '../services/apiClient';
 import { useBreakpoint, useRecentlyViewed, useTVMode } from '../hooks';
 
 const posterFallback = '/portal/assets/poster-placeholder.svg';
@@ -194,6 +196,9 @@ function HomePage() {
   const [content, setContent] = useState(() => readHomepageCache()?.content || {});
   const [loading, setLoading] = useState(() => !readHomepageCache());
   const [error, setError] = useState(null);
+  const [continueWatching, setContinueWatching] = useState([]);
+  const [cwLoading, setCwLoading] = useState(false);
+  const isLoggedIn = typeof localStorage !== 'undefined' && !!localStorage.getItem('token');
 
   const fetchHomepageData = useCallback(async () => {
     setLoading(true);
@@ -229,6 +234,15 @@ function HomePage() {
     fetchHomepageData();
   }, [fetchHomepageData]);
 
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    setCwLoading(true);
+    progressService.getContinueWatching()
+      .then(res => setContinueWatching(res?.items || []))
+      .catch(() => setContinueWatching([]))
+      .finally(() => setCwLoading(false));
+  }, [isLoggedIn]);
+
   const hasFeaturedHero = Array.isArray(content.featured) && content.featured.length > 0;
 
   if (loading) {
@@ -263,6 +277,12 @@ function HomePage() {
   return (
     <div style={{ ...styles.page, ...(!hasFeaturedHero ? styles.pageWithoutHero : {}) }}>
       {hasFeaturedHero ? <HeroCarousel items={content.featured} /> : null}
+
+      {(isLoggedIn && (cwLoading || continueWatching.length > 0)) ? (
+        <div style={{ padding: '0 max(48px, calc((100vw - 1720px) / 2))', marginTop: hasFeaturedHero ? '-20px' : '0' }}>
+          <ContinueWatchingRail items={continueWatching} isLoading={cwLoading} />
+        </div>
+      ) : null}
 
       <div style={{ ...styles.content, ...(isTVMode ? styles.contentTV : {}), ...(isMobile ? styles.contentMobile : {}) }}>
         {content.movies?.length >= 3 ? (

@@ -1,11 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { seriesService } from '../services/seriesService';
+import { contentService } from '../services/contentService';
 import { useBreakpoint } from '../hooks';
 import { useRecentlyViewed } from '../hooks';
 import ShareButton from '../components/ui/ShareButton';
 import StarRating from '../components/ui/StarRating';
+import WatchlistButton from '../components/ui/WatchlistButton';
 import VideoPlayerModal from '../components/player/VideoPlayerModal';
+import ConfirmDialog from '../components/overlays/ConfirmDialog';
+import ContentRail from '../features/home/components/ContentRail';
 import { DETAIL_STYLES, DETAIL_SKELETON, posterFallbackUrl } from '../styles/detailPage';
 
 const posterFallback = posterFallbackUrl;
@@ -71,6 +75,7 @@ function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMo
   const [downloadHovered, setDownloadHovered] = useState(false);
   const [playHovered, setPlayHovered] = useState(false);
   const [playerSrc, setPlayerSrc] = useState(null);
+  const [showDownloadConfirm, setShowDownloadConfirm] = useState(false);
 
   const apiBase = (import.meta.env.VITE_API_URL || '/portal-api').replace(/\/$/, '');
   const downloadUrl = `${apiBase}/api/player/download/series/${seriesId}?season=${seasonParam}&episode=${episodeParam}`;
@@ -142,11 +147,7 @@ function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMo
         })()}
         {/* Download button */}
         <button
-          onClick={() => {
-            if (window.confirm('Download this episode?')) {
-              window.location.href = downloadUrl;
-            }
-          }}
+          onClick={() => setShowDownloadConfirm(true)}
           style={{ ...downloadBtnStyle, border:'none', cursor:'pointer' }}
           onMouseEnter={() => setDownloadHovered(true)}
           onMouseLeave={() => setDownloadHovered(false)}
@@ -164,6 +165,15 @@ function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMo
       {playerSrc && (
         <VideoPlayerModal src={playerSrc} title={episode.name || `Episode ${episode.episode_number || index + 1}`} onClose={() => setPlayerSrc(null)} />
       )}
+      <ConfirmDialog
+        isOpen={showDownloadConfirm}
+        onClose={() => setShowDownloadConfirm(false)}
+        onConfirm={() => { window.location.href = downloadUrl; setShowDownloadConfirm(false); }}
+        title="Download Episode"
+        message={`Download Episode ${episodeParam}${episode.title ? ` — ${episode.title}` : ''}?`}
+        confirmText="Download"
+        cancelText="Cancel"
+      />
     </>
   );
 }
@@ -180,8 +190,12 @@ export default function SeriesDetailsPage() {
   const [descExpanded, setDescExpanded] = useState(false);
   const [posterError, setPosterError] = useState(false);
   const [backdropError, setBackdropError] = useState(false);
+  const [related, setRelated] = useState([]);
   const activeTabRef = useRef(null);
   const seasonTabsRef = useRef(null);
+  const isAdmin = useMemo(() => {
+    try { const u = JSON.parse(localStorage.getItem('user') || 'null'); return u?.role === 'admin'; } catch { return false; }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -206,6 +220,13 @@ export default function SeriesDetailsPage() {
     load();
     return () => { cancelled = true; };
   }, [slug, trackView]);
+
+  useEffect(() => {
+    if (!series?.id) return;
+    contentService.getRecommendations(series.id, 10)
+      .then(res => setRelated((res?.items || []).filter(i => i.id !== series.id)))
+      .catch(() => {});
+  }, [series?.id]);
 
   // Scroll active season tab into view
   useEffect(() => {
@@ -326,8 +347,9 @@ export default function SeriesDetailsPage() {
             {/* Actions */}
             <div style={{ ...s.actions, ...(isMobile ? s.actionsMobile : {}) }}>
               <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <WatchlistButton contentType="series" contentId={series.id} title={series.title} />
                 <ShareButton title={series.title} url={`${window.location.origin}/series/${series.id}`} />
-                {typeof localStorage !== 'undefined' && localStorage.getItem('token') && (
+                {isAdmin && (
                   <Link to={`/admin/content/${series.id}/edit`} style={{
                     display: 'inline-flex', alignItems: 'center', gap: '8px',
                     padding: '10px 20px', borderRadius: '10px',
@@ -458,6 +480,16 @@ export default function SeriesDetailsPage() {
           <Link to="/series" style={s.browseBtn}>Browse all series →</Link>
         </div>
       </div>
+
+      {related.length >= 3 && (
+        <ContentRail
+          title="You May Also Like"
+          subtitle="Similar series"
+          items={related}
+          type="series"
+          viewAllLink={`/browse?genre=${genres[0] || ''}&type=series`}
+        />
+      )}
     </div>
   );
 }

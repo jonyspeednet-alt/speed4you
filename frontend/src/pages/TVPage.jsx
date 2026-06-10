@@ -657,13 +657,13 @@ const CSS = `
 /* Page */
 .tv-page {
   min-height: 100vh;
-  padding: var(--nav-occupied-desktop, 104px) 20px 48px;
+  padding: 0px 20px 48px;
   max-width: 1520px;
   margin: 0 auto;
   box-sizing: border-box;
 }
 @media (max-width: 768px) {
-  .tv-page { padding: var(--nav-occupied-mobile, 82px) 12px 100px; }
+  .tv-page { padding: 0px 12px 100px; }
 }
 
 /* Header */

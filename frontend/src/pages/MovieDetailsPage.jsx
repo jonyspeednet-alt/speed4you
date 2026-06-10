@@ -1,11 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { moviesService } from '../services/moviesService';
+import { contentService } from '../services/contentService';
 import { useBreakpoint } from '../hooks';
 import { useRecentlyViewed } from '../hooks';
 import ShareButton from '../components/ui/ShareButton';
 import StarRating from '../components/ui/StarRating';
+import WatchlistButton from '../components/ui/WatchlistButton';
 import VideoPlayerModal from '../components/player/VideoPlayerModal';
+import ConfirmDialog from '../components/overlays/ConfirmDialog';
+import ContentRail from '../features/home/components/ContentRail';
 import { DETAIL_STYLES, DETAIL_SKELETON, posterFallbackUrl } from '../styles/detailPage';
 
 const posterFallback = posterFallbackUrl;
@@ -75,6 +79,11 @@ export default function MovieDetailsPage() {
   const [downloadHovered, setDownloadHovered] = useState(false);
   const [playHovered, setPlayHovered] = useState(false);
   const [playerSrc, setPlayerSrc] = useState(null);
+  const [showDownloadConfirm, setShowDownloadConfirm] = useState(false);
+  const [related, setRelated] = useState([]);
+  const isAdmin = useMemo(() => {
+    try { const u = JSON.parse(localStorage.getItem('user') || 'null'); return u?.role === 'admin'; } catch { return false; }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -98,6 +107,13 @@ export default function MovieDetailsPage() {
     load();
     return () => { cancelled = true; };
   }, [slug, trackView]);
+
+  useEffect(() => {
+    if (!movie?.id) return;
+    contentService.getRecommendations(movie.id, 10)
+      .then(res => setRelated((res?.items || []).filter(i => i.id !== movie.id)))
+      .catch(() => {});
+  }, [movie?.id]);
 
   if (loading && !movie) return <MovieDetailsSkeleton />;
   if (error || !movie) {
@@ -258,11 +274,7 @@ export default function MovieDetailsPage() {
                       );
                     })()}
                     <button
-                      onClick={() => {
-                        if (window.confirm('Start downloading this movie?')) {
-                          window.location.href = downloadUrl;
-                        }
-                      }}
+                      onClick={() => setShowDownloadConfirm(true)}
                       style={{ ...getDlBtnStyle(downloadHovered), ...(isMobile ? s.btnFull : {}), border:'none', fontFamily:'inherit', fontSize:'1.05rem' }}
                       onMouseEnter={() => setDownloadHovered(true)}
                       onMouseLeave={() => setDownloadHovered(false)}
@@ -276,8 +288,9 @@ export default function MovieDetailsPage() {
                     </button>
                   </div>
                   <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center', ...(isMobile ? { width: '100%', justifyContent: 'flex-start' } : {}) }}>
+                    <WatchlistButton contentType="movie" contentId={movie.id} title={movie.title} />
                     <ShareButton title={movie.title} url={`${window.location.origin}/movies/${movie.id}`} />
-                    {typeof localStorage !== 'undefined' && localStorage.getItem('token') && (
+                    {isAdmin && (
                       <Link to={`/admin/content/${movie.id}/edit`} style={{
                         display: 'inline-flex', alignItems: 'center', gap: '8px',
                         padding: '10px 20px', borderRadius: '10px',
@@ -351,6 +364,23 @@ export default function MovieDetailsPage() {
     </div>
       {playerSrc && (
         <VideoPlayerModal src={playerSrc} title={movie?.title || ''} onClose={() => setPlayerSrc(null)} />
+      )}
+      <ConfirmDialog
+        isOpen={showDownloadConfirm}
+        onClose={() => setShowDownloadConfirm(false)}
+        onConfirm={() => { window.location.href = `${(import.meta.env.VITE_API_URL || '/portal-api').replace(/\/$/, '')}/api/player/download/movie/${movie.id}`; setShowDownloadConfirm(false); }}
+        title="Download Movie"
+        message={`Download "${movie?.title}"? This may use significant data.`}
+        confirmText="Download"
+        cancelText="Cancel"
+      />
+      {related.length >= 3 && (
+        <ContentRail
+          title="You May Also Like"
+          subtitle="Similar picks"
+          items={related}
+          viewAllLink={`/browse?genre=${genres[0] || ''}`}
+        />
       )}
     </>
   );

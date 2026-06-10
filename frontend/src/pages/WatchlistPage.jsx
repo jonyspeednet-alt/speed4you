@@ -17,6 +17,7 @@ function WatchlistPage() {
   const isTVMode = useTVMode();
   const [items, setItems] = useState([]);
   const [filter, setFilter] = useState("all");
+  const [sort, setSort] = useState("date");
   const [loading, setLoading] = useState(true);
   const [hoveredFilter, setHoveredFilter] = useState(null);
 
@@ -48,10 +49,13 @@ function WatchlistPage() {
     }
   };
 
-  const filteredItems =
-    filter === "all"
-      ? items
-      : items.filter((item) => (item.type || "movie") === filter);
+  const filteredItems = (filter === "all" ? items : items.filter((item) => (item.type || "movie") === filter))
+    .slice()
+    .sort((a, b) => {
+      if (sort === "title") return (a.title || "").localeCompare(b.title || "");
+      if (sort === "rating") return (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0);
+      return new Date(b.addedAt || 0) - new Date(a.addedAt || 0);
+    });
 
   return (
     <div
@@ -76,29 +80,48 @@ function WatchlistPage() {
           </p>
         </div>
 
-        <div
-          style={{
-            ...styles.filters,
-            ...(isMobile ? styles.filtersMobile : {}),
-          }}
-        >
-          {["all", "movie", "series"].map((item) => (
-            <button
-              key={item}
-              onClick={() => setFilter(item)}
-              style={{
-                ...styles.filterBtn,
-                ...(filter === item ? styles.filterBtnActive : {}),
-                ...(hoveredFilter === item && filter !== item
-                  ? styles.filterBtnHover
-                  : {}),
-              }}
-              onMouseEnter={() => setHoveredFilter(item)}
-              onMouseLeave={() => setHoveredFilter(null)}
-            >
-              {item === "all" ? "All" : item === "movie" ? "Movies" : "Series"}
-            </button>
-          ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div
+            style={{
+              ...styles.filters,
+              ...(isMobile ? styles.filtersMobile : {}),
+            }}
+          >
+            {["all", "movie", "series"].map((item) => (
+              <button
+                key={item}
+                onClick={() => setFilter(item)}
+                style={{
+                  ...styles.filterBtn,
+                  ...(filter === item ? styles.filterBtnActive : {}),
+                  ...(hoveredFilter === item && filter !== item
+                    ? styles.filterBtnHover
+                    : {}),
+                }}
+                onMouseEnter={() => setHoveredFilter(item)}
+                onMouseLeave={() => setHoveredFilter(null)}
+              >
+                {item === "all" ? "All" : item === "movie" ? "Movies" : "Series"}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Sort:</span>
+            {[{ key: 'date', label: 'Date Added' }, { key: 'title', label: 'A–Z' }, { key: 'rating', label: 'Rating' }].map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setSort(key)}
+                style={{
+                  ...styles.filterBtn,
+                  ...(sort === key ? styles.filterBtnActive : {}),
+                  padding: '6px 12px',
+                  fontSize: '0.72rem',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -227,7 +250,7 @@ function WatchlistPage() {
                     ...(isMobile ? styles.cardActionsMobile : {}),
                   }}
                 >
-                  <Link to={`/watch/${item.id}`} style={styles.quickPlayBtn}>
+                  <Link to={`/play/${item.type === 'series' ? 'series' : 'movie'}/${item.id}`} style={styles.quickPlayBtn}>
                     <svg
                       viewBox="0 0 24 24"
                       width="14"
