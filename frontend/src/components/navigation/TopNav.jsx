@@ -61,18 +61,18 @@ function TopNav() {
 
   useEffect(() => {
     const check = async (site) => {
-      const httpsUrl = site.url;
       const httpUrl = site.url.replace("https://", "http://");
+      const httpsUrl = site.url;
       try {
-        await fetch(httpsUrl, { method: "HEAD", mode: "no-cors" });
-        return [site.label, httpsUrl];
-      } catch {
+        await fetch(httpUrl, { method: "HEAD", mode: "no-cors" });
         try {
-          await fetch(httpUrl, { method: "HEAD", mode: "no-cors" });
-          return [site.label, httpUrl];
+          await fetch(httpsUrl, { method: "HEAD", mode: "no-cors" });
+          return [site.label, httpsUrl];
         } catch {
           return [site.label, httpUrl];
         }
+      } catch {
+        return [site.label, httpUrl];
       }
     };
     Promise.all(partnerSites.map(check)).then((results) => {
