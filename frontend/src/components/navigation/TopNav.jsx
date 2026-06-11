@@ -22,6 +22,7 @@ function TopNav() {
   const [hoveredLink, setHoveredLink] = useState(null);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isPartnerOpen, setIsPartnerOpen] = useState(false);
   const navRef = useRef(null);
   const { isMobile, isTablet, isSmallMobile, width } = useBreakpoint();
   const isTVMode = useTVMode();
@@ -54,18 +55,45 @@ function TopNav() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  const [workingUrls, setWorkingUrls] = useState(() =>
+    Object.fromEntries(partnerSites.map(s => [s.label, s.url]))
+  );
+
+  useEffect(() => {
+    const check = async (site) => {
+      const httpsUrl = site.url;
+      const httpUrl = site.url.replace("https://", "http://");
+      try {
+        await fetch(httpsUrl, { method: "HEAD", mode: "no-cors" });
+        return [site.label, httpsUrl];
+      } catch {
+        try {
+          await fetch(httpUrl, { method: "HEAD", mode: "no-cors" });
+          return [site.label, httpUrl];
+        } catch {
+          return [site.label, httpUrl];
+        }
+      }
+    };
+    Promise.all(partnerSites.map(check)).then((results) => {
+      setWorkingUrls(Object.fromEntries(results));
+    });
+  }, []);
+
   useEffect(() => {
     setIsMoreOpen(false);
     setIsMobileMenuOpen(false);
+    setIsPartnerOpen(false);
   }, [location.pathname]);
 
   useEffect(() => {
-    if (!isMoreOpen && !isMobileMenuOpen) return;
+    if (!isMoreOpen && !isMobileMenuOpen && !isPartnerOpen) return;
 
     const handleClick = (e) => {
       if (navRef.current && !navRef.current.contains(e.target)) {
         setIsMoreOpen(false);
         setIsMobileMenuOpen(false);
+        setIsPartnerOpen(false);
       }
     };
 
@@ -73,6 +101,7 @@ function TopNav() {
       if (e.key === "Escape") {
         setIsMoreOpen(false);
         setIsMobileMenuOpen(false);
+        setIsPartnerOpen(false);
       }
     };
 
@@ -216,26 +245,41 @@ function TopNav() {
                 )}
               </li>
             )}
-            <li className="top-nav-partner-divider" role="separator" />
-            {partnerSites.map((site) => (
-              <li key={site.url}>
-                <a
-                  href={site.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="top-nav-link top-nav-partner-link"
-                  onMouseEnter={() => setHoveredLink(site.url)}
-                  onMouseLeave={() => setHoveredLink(null)}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                    <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
-                    <polyline points="15 3 21 3 21 9" />
-                    <line x1="10" y1="14" x2="21" y2="3" />
-                  </svg>
-                  {site.label}
-                </a>
-              </li>
-            ))}
+            <li className="top-nav-partner-dropdown">
+              <button
+                type="button"
+                className={`top-nav-link top-nav-partner-btn ${isPartnerOpen ? "top-nav-link-hover" : ""}`}
+                onClick={() => setIsPartnerOpen((v) => !v)}
+                aria-expanded={isPartnerOpen}
+                aria-haspopup="true"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+                  <polyline points="15 3 21 3 21 9" />
+                  <line x1="10" y1="14" x2="21" y2="3" />
+                </svg>
+                Partner FTP
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginLeft: "4px" }} aria-hidden="true">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+              {isPartnerOpen && (
+                <div className="top-nav-partner-panel">
+                  {partnerSites.map((site) => (
+                    <a
+                      key={site.url}
+                      href={workingUrls[site.label] || site.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="top-nav-more-item"
+                      onClick={() => setIsPartnerOpen(false)}
+                    >
+                      {site.label}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </li>
             <li>
               <a
                 href={`${import.meta.env.BASE_URL}speed4you.apk`.replace(/\/\//g, '/')}
@@ -415,11 +459,11 @@ function TopNav() {
               </Link>
             </div>
             <div className="top-nav-mobile-menu-partners">
-              <span>Partner sites</span>
+              <span>Partner FTP</span>
               {partnerSites.map((site) => (
                 <a
                   key={site.url}
-                  href={site.url}
+                  href={workingUrls[site.label] || site.url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="top-nav-mobile-menu-item"
