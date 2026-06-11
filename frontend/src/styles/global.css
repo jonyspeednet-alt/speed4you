@@ -710,8 +710,7 @@ main,
   flex: 0 1 auto;
   justify-content: flex-start;
   min-width: 0;
-  overflow-x: visible;
-  overflow-y: hidden;
+  overflow: visible;
 }
 
 .top-nav-links-tablet {

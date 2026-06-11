@@ -111,7 +111,7 @@ function TopNav() {
       document.removeEventListener("mousedown", handleClick);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isMoreOpen, isMobileMenuOpen]);
+  }, [isMoreOpen, isMobileMenuOpen, isPartnerOpen]);
 
   const navClasses = [
     "top-nav-container",
