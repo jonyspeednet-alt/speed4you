@@ -56,7 +56,7 @@ function TopNav() {
   }, []);
 
   const [workingUrls, setWorkingUrls] = useState(() =>
-    Object.fromEntries(partnerSites.map(s => [s.label, s.url]))
+    Object.fromEntries(partnerSites.map(s => [s.label, s.url.replace("https://", "http://")]))
   );
 
   useEffect(() => {
