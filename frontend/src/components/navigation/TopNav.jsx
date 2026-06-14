@@ -23,6 +23,7 @@ function TopNav() {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isPartnerOpen, setIsPartnerOpen] = useState(false);
+  const [isOthersOpen, setIsOthersOpen] = useState(false);
   const navRef = useRef(null);
   const { isMobile, isTablet, isSmallMobile, width } = useBreakpoint();
   const isTVMode = useTVMode();
@@ -84,16 +85,18 @@ function TopNav() {
     setIsMoreOpen(false);
     setIsMobileMenuOpen(false);
     setIsPartnerOpen(false);
+    setIsOthersOpen(false);
   }, [location.pathname]);
 
   useEffect(() => {
-    if (!isMoreOpen && !isMobileMenuOpen && !isPartnerOpen) return;
+    if (!isMoreOpen && !isMobileMenuOpen && !isPartnerOpen && !isOthersOpen) return;
 
     const handleClick = (e) => {
       if (navRef.current && !navRef.current.contains(e.target)) {
         setIsMoreOpen(false);
         setIsMobileMenuOpen(false);
         setIsPartnerOpen(false);
+        setIsOthersOpen(false);
       }
     };
 
@@ -102,6 +105,7 @@ function TopNav() {
         setIsMoreOpen(false);
         setIsMobileMenuOpen(false);
         setIsPartnerOpen(false);
+        setIsOthersOpen(false);
       }
     };
 
@@ -111,7 +115,7 @@ function TopNav() {
       document.removeEventListener("mousedown", handleClick);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isMoreOpen, isMobileMenuOpen, isPartnerOpen]);
+  }, [isMoreOpen, isMobileMenuOpen, isPartnerOpen, isOthersOpen]);
 
   const navClasses = [
     "top-nav-container",
@@ -277,6 +281,38 @@ function TopNav() {
                       {site.label}
                     </a>
                   ))}
+                </div>
+              )}
+            </li>
+            <li className="top-nav-partner-dropdown">
+              <button
+                type="button"
+                className={`top-nav-link top-nav-partner-btn ${isOthersOpen ? "top-nav-link-hover" : ""}`}
+                onClick={() => setIsOthersOpen((v) => !v)}
+                aria-expanded={isOthersOpen}
+                aria-haspopup="true"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <circle cx="12" cy="5" r="2" />
+                  <circle cx="12" cy="12" r="2" />
+                  <circle cx="12" cy="19" r="2" />
+                </svg>
+                Others
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginLeft: "4px" }} aria-hidden="true">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+              {isOthersOpen && (
+                <div className="top-nav-partner-panel">
+                  <a
+                    href="https://data.speed4you.net/Software/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="top-nav-more-item"
+                    onClick={() => setIsOthersOpen(false)}
+                  >
+                    Software
+                  </a>
                 </div>
               )}
             </li>
@@ -457,6 +493,18 @@ function TopNav() {
               >
                 My Watchlist
               </Link>
+            </div>
+            <div className="top-nav-mobile-menu-partners">
+              <span>Others</span>
+              <a
+                href="https://data.speed4you.net/Software/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="top-nav-mobile-menu-item"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Software
+              </a>
             </div>
             <div className="top-nav-mobile-menu-partners">
               <span>Partner FTP</span>
