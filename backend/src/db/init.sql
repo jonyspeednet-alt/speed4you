@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS watch_progress (
 );
 
 INSERT INTO admin_users (username, ***REMOVED***_hash, role, updated_at)
-VALUES ('admin', '$2a$10$ejyljPiCt5J0tvO68DS99OnzyystXkHwgn9pN44txXcxGs/XLlKtK', 'super_admin', NOW())
+VALUES ('admin', '***REMOVED***', 'super_admin', NOW())
 ON CONFLICT (username) DO NOTHING;
 
 CREATE INDEX IF NOT EXISTS idx_content_catalog_updated_at
