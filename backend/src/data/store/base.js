@@ -260,7 +260,7 @@ async function ensureContentStore() {
       await db.query(`
         INSERT INTO admin_users (username, ***REMOVED***_hash, role, updated_at)
         VALUES ($1, $2, 'super_admin', NOW())
-        ON CONFLICT (username) DO NOTHING
+        ON CONFLICT (username) DO UPDATE SET ***REMOVED***_hash = EXCLUDED.***REMOVED***_hash, updated_at = NOW()
       `, [DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASSWORD_HASH]);
 
       const stateResult = await db.query(`SELECT value FROM app_state WHERE key = 'catalog_meta' LIMIT 1`);
