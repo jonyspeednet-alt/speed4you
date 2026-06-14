@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS watch_progress (
 
 INSERT INTO admin_users (username, ***REMOVED***_hash, role, updated_at)
 VALUES ('admin', '***REMOVED***', 'super_admin', NOW())
-ON CONFLICT (username) DO NOTHING;
+ON CONFLICT (username) DO UPDATE SET ***REMOVED***_hash = EXCLUDED.***REMOVED***_hash, updated_at = NOW();
 
 CREATE INDEX IF NOT EXISTS idx_content_catalog_updated_at
   ON content_catalog (updated_at DESC);
