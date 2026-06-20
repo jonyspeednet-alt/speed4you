@@ -147,7 +147,7 @@ exports.getStats = async (req, res) => {
 };
 
 exports.getContentList = async (req, res) => {
-  const { status, type, source, sourceRootId, language, category, collection, tag, search, sort, page, limit, summary, duplicatesOnly } = req.query;
+  const { status, type, source, sourceRootId, language, category, collection, tag, search, sort, page, limit, summary, duplicatesOnly, metadataStatus } = req.query;
   const pageNum = Number(page) || 1;
   const limitNum = Number(limit) || 50;
   const offset = (pageNum - 1) * limitNum;
@@ -162,6 +162,7 @@ exports.getContentList = async (req, res) => {
     tag,
     search,
     duplicatesOnly: String(duplicatesOnly) === 'true',
+    metadataStatus,
   }, offset, limitNum, sort || 'latest', false);
   res.json(withSummaryResult(result, String(summary) === 'true'));
 };
@@ -177,7 +178,7 @@ exports.getSeries = async (req, res) => {
 };
 
 exports.getLibraryOrganization = async (req, res) => {
-  const { status, type, source, sourceRootId, language, category, collection, tag, search, duplicatesOnly } = req.query;
+  const { status, type, source, sourceRootId, language, category, collection, tag, search, duplicatesOnly, metadataStatus } = req.query;
   res.json(await getLibraryOrganization({ 
     status, 
     type, 
@@ -188,7 +189,8 @@ exports.getLibraryOrganization = async (req, res) => {
     collection, 
     tag, 
     search, 
-    duplicatesOnly: String(duplicatesOnly) === 'true' 
+    duplicatesOnly: String(duplicatesOnly) === 'true',
+    metadataStatus,
   }));
 };
 

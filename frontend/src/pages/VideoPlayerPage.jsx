@@ -131,6 +131,11 @@ export default function VideoPlayerPage() {
     }, 3000);
   }, []);
 
+  useEffect(() => {
+    document.documentElement.style.overflow = 'hidden';
+    return () => { document.documentElement.style.overflow = ''; };
+  }, []);
+
   useEffect(() => { startHideTimer(); return () => clearTimeout(controlsTimer.current); }, [startHideTimer]);
 
   useEffect(() => {

@@ -82,7 +82,7 @@ export default function MovieDetailsPage() {
   const [showDownloadConfirm, setShowDownloadConfirm] = useState(false);
   const [related, setRelated] = useState([]);
   const isAdmin = useMemo(() => {
-    try { const u = JSON.parse(localStorage.getItem('user') || 'null'); return u?.role === 'admin'; } catch { return false; }
+    try { const u = JSON.parse(localStorage.getItem('user') || 'null'); return ['admin', 'super_admin'].includes(u?.role); } catch { return false; }
   }, []);
 
   useEffect(() => {
@@ -346,20 +346,30 @@ export default function MovieDetailsPage() {
           )}
         </div>
 
-        {/* Browse more */}
-        <div style={s.browseMore}>
-          {genres[0] && (
-            <Link to={`/browse?genre=${genres[0]}`} style={s.browseBtn}>
-              More {genres[0]} films →
-            </Link>
-          )}
-          {language && (
-            <Link to={`/browse?language=${language}`} style={s.browseBtn}>
-              More {language} films →
-            </Link>
-          )}
-          <Link to="/browse" style={s.browseBtn}>Browse all →</Link>
-        </div>
+        {/* Similar content mini poster row */}
+        {related.length >= 3 && (
+          <div style={s.similarSection}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h3 style={{ color: '#ffffff', fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>More Like This</h3>
+              <Link to={`/browse?genre=${genres[0] || ''}`} style={s.viewAllLink}>View All →</Link>
+            </div>
+            <div style={s.similarRow}>
+              {related.slice(0, 6).map((item) => (
+                <Link key={item.id} to={`/movies/${item.id}`} style={s.similarCard}>
+                  <div style={s.similarPosterWrap}>
+                    <img
+                      src={item.poster || posterFallback}
+                      alt={item.title}
+                      style={s.similarPoster}
+                      loading="lazy"
+                    />
+                  </div>
+                  <p style={s.similarTitle}>{item.title}</p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
       {playerSrc && (
@@ -374,11 +384,11 @@ export default function MovieDetailsPage() {
         confirmText="Download"
         cancelText="Cancel"
       />
-      {related.length >= 3 && (
+      {related.length >= 6 && (
         <ContentRail
           title="You May Also Like"
           subtitle="Similar picks"
-          items={related}
+          items={related.slice(6)}
           viewAllLink={`/browse?genre=${genres[0] || ''}`}
         />
       )}
@@ -394,4 +404,50 @@ s.qualityBadge = {
   border: '1px solid rgba(255,255,255,0.12)', color: '#ffffff',
   fontSize: '0.78rem', fontWeight: '700', letterSpacing: '0.08em',
   textTransform: 'uppercase',
+};
+s.similarSection = {
+  marginTop: '32px',
+};
+s.viewAllLink = {
+  color: 'var(--accent-cyan, #7df9ff)',
+  fontSize: '0.85rem',
+  fontWeight: '700',
+  textDecoration: 'none',
+  transition: 'opacity 150ms ease',
+  letterSpacing: '0.02em',
+};
+s.similarRow = {
+  display: 'flex',
+  gap: '14px',
+  overflowX: 'auto',
+  paddingBottom: '8px',
+  scrollbarWidth: 'thin',
+};
+s.similarCard = {
+  flex: '0 0 auto',
+  width: '150px',
+  textDecoration: 'none',
+  transition: 'transform 180ms ease',
+};
+s.similarPosterWrap = {
+  width: '150px',
+  height: '215px',
+  borderRadius: '12px',
+  overflow: 'hidden',
+  background: 'rgba(255,255,255,0.04)',
+};
+s.similarPoster = {
+  width: '100%',
+  height: '100%',
+  objectFit: 'cover',
+  display: 'block',
+};
+s.similarTitle = {
+  color: '#c8d0da',
+  fontSize: '0.8rem',
+  fontWeight: 600,
+  marginTop: '8px',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
 };

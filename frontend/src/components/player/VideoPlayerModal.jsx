@@ -30,6 +30,11 @@ export default function VideoPlayerModal({ src, title, onClose, onNext }) {
   useEffect(() => { startHideTimer(); return () => clearTimeout(controlsTimer.current); }, [startHideTimer]);
 
   useEffect(() => {
+    document.documentElement.style.overflow = 'hidden';
+    return () => { document.documentElement.style.overflow = ''; };
+  }, []);
+
+  useEffect(() => {
     if (!showRate && !volHover) return;
     const handler = (e) => {
       if (showRate && !e.target.closest('.player-speed-btn') && !e.target.closest('.player-speed-popup') && !e.target.closest('.player-speed-opt')) {

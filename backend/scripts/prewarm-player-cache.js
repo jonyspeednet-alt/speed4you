@@ -8,7 +8,7 @@ const {
   buildPlayerCachePath,
   isCacheReadyStat,
 } = require('../src/config/player-cache');
-const { SUPPORTED_VIDEO_EXTENSIONS } = require('../src/services/player-media');
+const SUPPORTED_VIDEO_EXTENSIONS = new Set(['.mp4', '.m4v', '.webm', '.mov', '.mkv', '.avi', '.wmv', '.mpg', '.mpeg', '.ts', '.m2ts']);
 
 const catalogPath = path.resolve(__dirname, '../src/data/catalog.json');
 
