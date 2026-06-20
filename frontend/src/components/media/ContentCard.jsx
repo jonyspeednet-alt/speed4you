@@ -56,7 +56,7 @@ function ContentCard({
   const isAdmin = useMemo(() => {
     try {
       const u = JSON.parse(localStorage.getItem('user') || 'null');
-      return u?.role === 'admin';
+      return ['admin', 'super_admin'].includes(u?.role);
     } catch { return false; }
   }, []);
 

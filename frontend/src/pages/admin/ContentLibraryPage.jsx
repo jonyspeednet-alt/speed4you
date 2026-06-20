@@ -88,7 +88,7 @@ function ContentLibraryPage() {
   const [bulkUpdateLoading, setBulkUpdateLoading] = useState(false);
   const [bulkStatusLoading, setBulkStatusLoading] = useState(false);
   const [bulkEditor, setBulkEditor] = useState({ collection: '', tags: '', adminNotes: '', featuredOrder: '' });
-  const [filters, setFilters] = useState({ search: '', status: '', source: '', language: '', category: '', collection: '', tag: '', sourceRootId: '', duplicatesOnly: false });
+  const [filters, setFilters] = useState({ search: '', status: '', source: '', language: '', category: '', collection: '', tag: '', sourceRootId: '', duplicatesOnly: false, metadataStatus: '' });
   const [searchInput, setSearchInput] = useState('');
   const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0 });
   const [pageInput, setPageInput] = useState('1');
@@ -144,6 +144,7 @@ function ContentLibraryPage() {
     ...(filters.tag ? { tag: filters.tag } : {}),
     ...(filters.sourceRootId ? { sourceRootId: filters.sourceRootId } : {}),
     ...(filters.duplicatesOnly ? { duplicatesOnly: 'true' } : {}),
+    ...(filters.metadataStatus ? { metadataStatus: filters.metadataStatus } : {}),
     page: pagination.page, limit: pagination.limit,
     sortBy, sortDir,
   }), [sectionType, filters, pagination.page, pagination.limit, sortBy, sortDir]);
@@ -160,6 +161,7 @@ function ContentLibraryPage() {
     ...(filters.tag ? { tag: filters.tag } : {}),
     ...(filters.sourceRootId ? { sourceRootId: filters.sourceRootId } : {}),
     ...(filters.duplicatesOnly ? { duplicatesOnly: 'true' } : {}),
+    ...(filters.metadataStatus ? { metadataStatus: filters.metadataStatus } : {}),
   }), [sectionType, filters]);
 
   const loadContent = useCallback(async () => {
@@ -201,7 +203,7 @@ function ContentLibraryPage() {
 
   useEffect(() => { setPagination((c) => ({ ...c, page: 1 })); }, [
     filters.search, filters.status, filters.source, filters.language,
-    filters.category, filters.collection, filters.tag, filters.sourceRootId, filters.duplicatesOnly,
+    filters.category, filters.collection, filters.tag, filters.sourceRootId, filters.duplicatesOnly, filters.metadataStatus,
   ]);
 
   const filterOptions = useMemo(() => ({
@@ -221,6 +223,7 @@ function ContentLibraryPage() {
       scanner: totals.scanner ?? 0,
       manual: totals.manual ?? 0,
       needsReview: totals.needsReview ?? 0,
+      notFound: totals.notFound ?? 0,
       duplicateRisk: totals.duplicates ?? 0,
     };
   }, [organization, pagination.total, allContent.length]);
@@ -248,7 +251,7 @@ function ContentLibraryPage() {
   }, []);
 
   const updateFilter = (key, value) => setFilters((c) => ({ ...c, [key]: value }));
-  const resetFilters = () => setFilters({ search: '', status: '', source: '', language: '', category: '', collection: '', tag: '', sourceRootId: '', duplicatesOnly: false });
+  const resetFilters = () => setFilters({ search: '', status: '', source: '', language: '', category: '', collection: '', tag: '', sourceRootId: '', duplicatesOnly: false, metadataStatus: '' });
 
   const toggleSort = (column) => {
     if (sortBy === column) { setSortDir((d) => (d === 'asc' ? 'desc' : 'asc')); }
@@ -495,6 +498,7 @@ function ContentLibraryPage() {
         <StatCard label="Published" value={contentMetrics.published} />
         <StatCard label="Drafts" value={contentMetrics.drafts} />
         <StatCard label="Needs Review" value={contentMetrics.needsReview} />
+        <StatCard label="Not Found" value={contentMetrics.notFound} />
         <StatCard label="Scanner" value={contentMetrics.scanner} />
         <StatCard label="Manual" value={contentMetrics.manual} />
       </div>
@@ -521,6 +525,10 @@ function ContentLibraryPage() {
             style={{ ...styles.chip, ...(filters.status === 'draft' ? styles.chipActive : {}) }}>Drafts</button>
           <button type="button" onClick={() => updateFilter('status', filters.status === 'published' ? '' : 'published')}
             style={{ ...styles.chip, ...(filters.status === 'published' ? styles.chipActive : {}) }}>Published</button>
+          <button type="button" onClick={() => updateFilter('metadataStatus', filters.metadataStatus === 'not_found' ? '' : 'not_found')}
+            style={{ ...styles.chip, ...(filters.metadataStatus === 'not_found' ? styles.chipActive : {}) }}>Not Found</button>
+          <button type="button" onClick={() => updateFilter('metadataStatus', filters.metadataStatus === 'needs_review' ? '' : 'needs_review')}
+            style={{ ...styles.chip, ...(filters.metadataStatus === 'needs_review' ? styles.chipActive : {}) }}>Needs Review</button>
         </div>
         <div style={styles.toolbarRight}>
           <button type="button" onClick={exportCsv} style={styles.chip}>Export CSV</button>
@@ -545,6 +553,18 @@ function ContentLibraryPage() {
                 <option value="">All</option>
                 <option value="draft">Draft</option>
                 <option value="published">Published</option>
+              </select>
+            </div>
+            <div style={styles.field}>
+              <label style={styles.filterLabel}>Metadata</label>
+              <select value={filters.metadataStatus} onChange={(e) => updateFilter('metadataStatus', e.target.value)} style={styles.select}>
+                <option value="">All</option>
+                <option value="matched">Matched</option>
+                <option value="not_found">Not Found</option>
+                <option value="needs_review">Needs Review</option>
+                <option value="skipped">Skipped</option>
+                <option value="failed">Failed</option>
+                <option value="pending">Pending</option>
               </select>
             </div>
             <div style={styles.field}>

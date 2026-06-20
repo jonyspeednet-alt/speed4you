@@ -194,7 +194,7 @@ export default function SeriesDetailsPage() {
   const activeTabRef = useRef(null);
   const seasonTabsRef = useRef(null);
   const isAdmin = useMemo(() => {
-    try { const u = JSON.parse(localStorage.getItem('user') || 'null'); return u?.role === 'admin'; } catch { return false; }
+    try { const u = JSON.parse(localStorage.getItem('user') || 'null'); return ['admin', 'super_admin'].includes(u?.role); } catch { return false; }
   }, []);
 
   useEffect(() => {

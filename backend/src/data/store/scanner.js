@@ -193,6 +193,34 @@ async function upsertScannedItem(payload) {
     }
   }
 
+  // ── TITLE KEY FALLBACK (prevents duplicate creation) ────────────────────
+  // When scan paths change (root path rename, file move, etc.), both
+  // scanSignature and sourcePath won't match, so a new item would be created.
+  // Check by titleKey instead — if an existing scanner item with the same
+  // type:titleKey is found, update it rather than creating a duplicate.
+  if (!current) {
+    const computedTitleKey = normalizeTitleKey(payload.title, payload.year);
+    if (computedTitleKey) {
+      const titleKeyMatch = await db.query(
+        `SELECT id, payload FROM content_catalog
+         WHERE content_type = $1 AND title_key = $2
+           AND source_type = 'scanner'
+         LIMIT 1`,
+        [String(payload.type || '').toLowerCase(), computedTitleKey],
+      );
+      if (titleKeyMatch.rows[0]) {
+        current = titleKeyMatch.rows[0].payload;
+        payload = {
+          ...payload,
+          title: payload.title || current.title,
+          seasons: payload.seasons || current.seasons || [],
+          seasonCount: payload.seasonCount ?? current.seasonCount ?? 0,
+          episodeCount: payload.episodeCount ?? current.episodeCount ?? 0,
+        };
+      }
+    }
+  }
+
   // ── NEW ITEM (truly new) ────────────────────────────────────────────────
   if (!current) {
     const shouldAutoPublish = payload.metadataStatus === 'matched' || payload.metadataStatus === 'skipped';

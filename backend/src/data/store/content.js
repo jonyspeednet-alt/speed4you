@@ -48,8 +48,9 @@ function buildCatalogFilterClauses(filters = {}, params = []) {
     return `$${params.length}`;
   };
 
-  if (filters.status)       clauses.push(`status = ${push(String(filters.status))}`);
-  if (filters.type)         clauses.push(`content_type = ${push(String(filters.type))}`);
+  if (filters.status)         clauses.push(`status = ${push(String(filters.status))}`);
+  if (filters.metadataStatus) clauses.push(`metadata_status = ${push(String(filters.metadataStatus))}`);
+  if (filters.type)           clauses.push(`content_type = ${push(String(filters.type))}`);
   if (filters.source)       clauses.push(`source_type = ${push(String(filters.source))}`);
   if (filters.sourceRootId) clauses.push(`source_root_id = ${push(String(filters.sourceRootId))}`);
   if (filters.scanRunId)    clauses.push(`last_scan_run_id = ${push(String(filters.scanRunId))}`);
@@ -460,6 +461,7 @@ async function getLibraryOrganization(filters = {}) {
       COUNT(CASE WHEN source_type = 'scanner' THEN 1 END)::int AS scanner,
       COUNT(CASE WHEN source_type = 'manual' THEN 1 END)::int AS manual,
       COUNT(CASE WHEN metadata_status = 'needs_review' THEN 1 END)::int AS needs_review,
+      COUNT(CASE WHEN metadata_status = 'not_found' THEN 1 END)::int AS not_found,
       COUNT(CASE WHEN duplicate_count > 0 THEN 1 END)::int AS duplicates
     FROM content_catalog 
     ${whereClause}
@@ -480,6 +482,7 @@ async function getLibraryOrganization(filters = {}) {
       scanner: totalsRes.rows[0]?.scanner || 0,
       manual: totalsRes.rows[0]?.manual || 0,
       needsReview: totalsRes.rows[0]?.needs_review || 0,
+      notFound: totalsRes.rows[0]?.not_found || 0,
       duplicates: totalsRes.rows[0]?.duplicates || 0
     }, 
     collections: collectionsRes.rows, 
