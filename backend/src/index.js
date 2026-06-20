@@ -228,6 +228,17 @@ if (fs.existsSync(frontendDistPath)) {
     setHeaders: setStaticCacheHeaders,
   }));
 
+  // Explicitly serve manifest.json before SPA fallback to avoid returning index.html
+  app.get('/manifest.json', (req, res) => {
+    const manifestPath = path.join(frontendDistPath, 'manifest.json');
+    if (fs.existsSync(manifestPath)) {
+      res.setHeader('Content-Type', 'application/json');
+      res.sendFile(manifestPath);
+    } else {
+      res.status(404).json({ error: 'manifest.json not found' });
+    }
+  });
+
   // Handle SPA routing: serve index.html for all non-API routes
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api/') || req.path.startsWith('/portal-api/')) {
