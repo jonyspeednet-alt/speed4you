@@ -525,9 +525,9 @@ function ContentLibraryPage() {
             style={{ ...styles.chip, ...(filters.status === 'draft' ? styles.chipActive : {}) }}>Drafts</button>
           <button type="button" onClick={() => updateFilter('status', filters.status === 'published' ? '' : 'published')}
             style={{ ...styles.chip, ...(filters.status === 'published' ? styles.chipActive : {}) }}>Published</button>
-          <button type="button" onClick={() => updateFilter('metadataStatus', filters.metadataStatus === 'not_found' ? '' : 'not_found')}
+          <button type="button" onClick={() => { console.log('[Not Found] clicked, current:', filters.metadataStatus); setFilters((prev) => { const next = prev.metadataStatus === 'not_found' ? '' : 'not_found'; console.log('[Not Found] setting to:', next); return { ...prev, metadataStatus: next }; }); }}
             style={{ ...styles.chip, ...(filters.metadataStatus === 'not_found' ? styles.chipActive : {}) }}>Not Found</button>
-          <button type="button" onClick={() => updateFilter('metadataStatus', filters.metadataStatus === 'needs_review' ? '' : 'needs_review')}
+          <button type="button" onClick={() => { console.log('[Needs Review] clicked, current:', filters.metadataStatus); setFilters((prev) => { const next = prev.metadataStatus === 'needs_review' ? '' : 'needs_review'; console.log('[Needs Review] setting to:', next); return { ...prev, metadataStatus: next }; }); }}
             style={{ ...styles.chip, ...(filters.metadataStatus === 'needs_review' ? styles.chipActive : {}) }}>Needs Review</button>
         </div>
         <div style={styles.toolbarRight}>
