@@ -206,6 +206,14 @@ function ContentLibraryPage() {
     filters.category, filters.collection, filters.tag, filters.sourceRootId, filters.duplicatesOnly, filters.metadataStatus,
   ]);
 
+  useEffect(() => {
+    const t = setTimeout(() => loadContent(), 50);
+    return () => clearTimeout(t);
+  }, [
+    filters.search, filters.status, filters.source, filters.language,
+    filters.category, filters.collection, filters.tag, filters.sourceRootId, filters.duplicatesOnly, filters.metadataStatus,
+  ]);
+
   const filterOptions = useMemo(() => ({
     languages: [...new Set(allContent.map((i) => i.language).filter(Boolean))].sort(),
     categories: [...new Set(allContent.map((i) => i.category).filter(Boolean))].sort(),
@@ -525,9 +533,9 @@ function ContentLibraryPage() {
             style={{ ...styles.chip, ...(filters.status === 'draft' ? styles.chipActive : {}) }}>Drafts</button>
           <button type="button" onClick={() => updateFilter('status', filters.status === 'published' ? '' : 'published')}
             style={{ ...styles.chip, ...(filters.status === 'published' ? styles.chipActive : {}) }}>Published</button>
-          <button type="button" onClick={() => { console.log('[Not Found] clicked, current:', filters.metadataStatus); setFilters((prev) => { const next = prev.metadataStatus === 'not_found' ? '' : 'not_found'; console.log('[Not Found] setting to:', next); return { ...prev, metadataStatus: next }; }); }}
+          <button type="button" onClick={() => updateFilter('metadataStatus', filters.metadataStatus === 'not_found' ? '' : 'not_found')}
             style={{ ...styles.chip, ...(filters.metadataStatus === 'not_found' ? styles.chipActive : {}) }}>Not Found</button>
-          <button type="button" onClick={() => { console.log('[Needs Review] clicked, current:', filters.metadataStatus); setFilters((prev) => { const next = prev.metadataStatus === 'needs_review' ? '' : 'needs_review'; console.log('[Needs Review] setting to:', next); return { ...prev, metadataStatus: next }; }); }}
+          <button type="button" onClick={() => updateFilter('metadataStatus', filters.metadataStatus === 'needs_review' ? '' : 'needs_review')}
             style={{ ...styles.chip, ...(filters.metadataStatus === 'needs_review' ? styles.chipActive : {}) }}>Needs Review</button>
         </div>
         <div style={styles.toolbarRight}>
