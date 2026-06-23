@@ -128,6 +128,7 @@ const globalApiLimiter = rateLimit({
   message: { error: 'Too many requests. Please slow down.' },
   skip: (req) =>
     !req.path.startsWith('/api/')
+    || req.path.startsWith('/api/tv/asset')
     || (!isProduction && isLocalRequest(req)),
 });
 
@@ -208,7 +209,7 @@ apiRouter.use('/movies', publicContentLimiter, publicPerIpLimiter, require('./ro
 apiRouter.use('/series', publicContentLimiter, publicPerIpLimiter, require('./routes/series'));
 apiRouter.use('/search', publicContentLimiter, publicPerIpLimiter, require('./routes/search'));
 apiRouter.use('/player', require('./routes/player'));
-apiRouter.use('/tv', publicContentLimiter, require('./routes/tv'));
+apiRouter.use('/tv', publicContentLimiter, publicPerIpLimiter, require('./routes/tv'));
 apiRouter.use('/admin', require('./routes/admin'));
 
 // Mount at both /api (legacy/dev), / (proxied production), and /portal-api/api (Vite-configured prefix)

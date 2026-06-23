@@ -1,8 +1,39 @@
 const express = require('express');
 const http = require('http');
 const https = require('https');
+const crypto = require('crypto');
 
 const router = express.Router();
+
+// Reuse TCP connections to upstream TV portal (avoids DNS + handshake overhead per request)
+const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 10, maxFreeSockets: 5, timeout: TV_REQUEST_TIMEOUT_MS });
+const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 10, maxFreeSockets: 5, timeout: TV_REQUEST_TIMEOUT_MS });
+
+// Simple in-memory LRU cache for proxied upstream assets
+const assetCache = new Map();
+const ASSET_CACHE_MAX = 500;
+const ASSET_CACHE_TTL_MS = 5000; // 5 seconds for segments/playlists
+const LOGO_CACHE_TTL_MS = 600000; // 10 minutes for logos
+const CHANNELS_CACHE_TTL_MS = 30000; // 30 seconds — channel list rarely changes
+const PLAYER_CACHE_TTL_MS = 15000; // 15 seconds — stream source is stable
+
+function cacheGet(key, ttlMs) {
+  const entry = assetCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > ttlMs) {
+    assetCache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+function cacheSet(key, data) {
+  if (assetCache.size >= ASSET_CACHE_MAX) {
+    const oldestKey = assetCache.keys().next().value;
+    assetCache.delete(oldestKey);
+  }
+  assetCache.set(key, { data, ts: Date.now() });
+}
 
 const TV_PORTAL_BASE = process.env.TV_PORTAL_BASE_URL || '';
 const TV_REQUEST_TIMEOUT_MS = Number(process.env.TV_REQUEST_TIMEOUT_MS || 15000);
@@ -36,9 +67,10 @@ function ensureAllowedUrl(input) {
 function requestUrl(targetUrl, redirectCount = 0, method = 'GET') {
   const safeUrl = ensureAllowedUrl(targetUrl);
   const transport = safeUrl.protocol === 'https:' ? https : http;
+  const agent = safeUrl.protocol === 'https:' ? httpsAgent : httpAgent;
 
   return new Promise((resolve, reject) => {
-    const request = transport.request(safeUrl, { headers: DEFAULT_HEADERS, method, timeout: TV_REQUEST_TIMEOUT_MS }, (response) => {
+    const request = transport.request(safeUrl, { headers: DEFAULT_HEADERS, method, timeout: TV_REQUEST_TIMEOUT_MS, agent }, (response) => {
       const location = response.headers.location;
 
       if (location && response.statusCode >= 300 && response.statusCode < 400 && redirectCount < 5) {
@@ -91,7 +123,7 @@ function parseChannels(html) {
       name,
       category,
       categories: classes.filter((item) => item !== 'All'),
-      logoPath: `/api/tv/asset?url=${encodeURIComponent(imageUrl)}`,
+      logoPath: imageUrl,
       playerPath: `/api/tv/player/${streamId}`,
     };
   });
@@ -180,31 +212,71 @@ function toSiblingAssetPath(targetUrl) {
 }
 
 async function proxyRemoteUrl(targetUrl, res) {
-  const upstream = await requestUrl(targetUrl);
+  const cacheKey = targetUrl.toString();
+  const safeUrl = ensureAllowedUrl(targetUrl);
+  const transport = safeUrl.protocol === 'https:' ? https : http;
+  const agent = safeUrl.protocol === 'https:' ? httpsAgent : httpAgent;
 
-  if (upstream.statusCode >= 400) {
-    res.status(upstream.statusCode).send(upstream.body);
-    return;
-  }
+  return new Promise((resolve, reject) => {
+    const proxyReq = transport.request(safeUrl, { headers: DEFAULT_HEADERS, method: 'GET', timeout: TV_REQUEST_TIMEOUT_MS, agent }, (upstream) => {
+      if (upstream.statusCode >= 400) {
+        const chunks = [];
+        upstream.on('data', (chunk) => chunks.push(chunk));
+        upstream.on('end', () => {
+          res.status(upstream.statusCode).send(Buffer.concat(chunks));
+          resolve();
+        });
+        return;
+      }
 
-  const contentType = String(upstream.headers['content-type'] || '');
-  const isPlaylist = contentType.includes('mpegurl') || upstream.url.pathname.endsWith('.m3u8');
+      const contentType = String(upstream.headers['content-type'] || '');
+      const isPlaylist = contentType.includes('mpegurl') || safeUrl.pathname.endsWith('.m3u8');
 
-  if (isPlaylist) {
-    res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
-    res.send(rewritePlaylist(upstream.body.toString('utf8'), upstream.url));
-    return;
-  }
+      if (isPlaylist) {
+        res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+        res.setHeader('Cache-Control', 'private, max-age=3');
+        const chunks = [];
+        upstream.on('data', (chunk) => chunks.push(chunk));
+        upstream.on('end', () => {
+          const body = Buffer.concat(chunks).toString('utf8');
+          res.send(rewritePlaylist(body, safeUrl));
+          resolve();
+        });
+        return;
+      }
 
-  if (contentType) {
-    res.setHeader('Content-Type', contentType);
-  }
+      const isImage = contentType.startsWith('image/');
+      if (contentType) res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', isImage ? 'public, max-age=600' : 'private, max-age=10, stale-while-revalidate=5');
 
-  const cacheControl = contentType.startsWith('image/')
-    ? 'public, max-age=300'
-    : 'private, no-store';
-  res.setHeader('Cache-Control', cacheControl);
-  res.send(upstream.body);
+      // Stream directly for large binary (video segments) — avoids buffering entire file in memory
+      const contentLength = Number(upstream.headers['content-length'] || 0);
+      if (contentLength > 65536 && !isImage) {
+        cacheSet(cacheKey, { stream: true, contentType, contentLength });
+        upstream.pipe(res);
+        upstream.on('end', resolve);
+        upstream.on('error', reject);
+        return;
+      }
+
+      // Small responses: buffer and cache
+      const chunks = [];
+      upstream.on('data', (chunk) => chunks.push(chunk));
+      upstream.on('end', () => {
+        const buf = Buffer.concat(chunks);
+        cacheSet(cacheKey, buf);
+        res.send(buf);
+        resolve();
+      });
+    });
+
+    proxyReq.on('error', reject);
+    proxyReq.on('timeout', () => {
+      proxyReq.destroy();
+      reject(new Error(`TV request timed out after ${TV_REQUEST_TIMEOUT_MS}ms`));
+    });
+    proxyReq.end();
+  });
 }
 
 router.get('/channels', async (req, res, next) => {
@@ -216,16 +288,38 @@ router.get('/channels', async (req, res, next) => {
       });
     }
 
+    const cached = cacheGet('channels', CHANNELS_CACHE_TTL_MS);
+    if (cached) {
+      const body = JSON.stringify(cached);
+      const etag = `"${crypto.createHash('md5').update(body).digest('hex')}"`;
+      res.setHeader('Cache-Control', 'private, max-age=5');
+      res.setHeader('ETag', etag);
+      if (req.headers['if-none-match'] === etag) {
+        return res.status(304).end();
+      }
+      return res.json(cached);
+    }
+
     const upstream = await requestUrl(TV_PORTAL_BASE);
     const html = upstream.body.toString('utf8');
     const parsed = parseChannels(html);
 
-    res.json({
+    const response = {
       ...parsed,
       defaultStreamId: pickDefaultStreamId(parsed.channels),
       source: TV_PORTAL_BASE,
       updatedAt: new Date().toISOString(),
-    });
+    };
+
+    cacheSet('channels', response);
+    const body = JSON.stringify(response);
+    const etag = `"${crypto.createHash('md5').update(body).digest('hex')}"`;
+    res.setHeader('Cache-Control', 'private, max-age=5');
+    res.setHeader('ETag', etag);
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end();
+    }
+    res.json(response);
   } catch (error) {
     let status, code, message;
 
@@ -256,11 +350,18 @@ router.get('/channels', async (req, res, next) => {
 
 router.get('/stream/:streamId', async (req, res, next) => {
   try {
-    const upstream = await requestUrl(`${TV_PORTAL_BASE}player.php?stream=${encodeURIComponent(req.params.streamId)}`);
-    const sourceUrl = await resolvePlayableSource(extractPrimarySource(upstream.body.toString('utf8')));
+    const streamId = String(req.params.streamId || '');
+    const sourceCacheKey = `player-source:${streamId}`;
+    let sourceUrl = cacheGet(sourceCacheKey, PLAYER_CACHE_TTL_MS);
+
+    if (!sourceUrl) {
+      const upstream = await requestUrl(`${TV_PORTAL_BASE}player.php?stream=${encodeURIComponent(streamId)}`);
+      sourceUrl = await resolvePlayableSource(extractPrimarySource(upstream.body.toString('utf8')));
+      cacheSet(sourceCacheKey, sourceUrl);
+    }
 
     res.json({
-      streamId: String(req.params.streamId || ''),
+      streamId,
       sourcePath: toSiblingAssetPath(sourceUrl),
     });
   } catch (error) {
@@ -271,6 +372,19 @@ router.get('/stream/:streamId', async (req, res, next) => {
 router.get('/asset', async (req, res, next) => {
   try {
     const targetUrl = ensureAllowedUrl(String(req.query.url || ''));
+    const cacheKey = targetUrl.toString();
+    const isImage = /\.(jpg|jpeg|png|gif|svg|webp|ico)(\?|$)/i.test(targetUrl.pathname);
+    const isJs = /\.js(\?|$)/i.test(targetUrl.pathname);
+    const ttl = isImage ? LOGO_CACHE_TTL_MS : isJs ? 3600000 : ASSET_CACHE_TTL_MS; // JS: 1 hour, images: 10 min, segments: 5s
+    const cached = cacheGet(cacheKey, ttl);
+
+    if (cached) {
+      const contentType = isImage ? 'image/png' : isJs ? 'application/javascript' : 'application/octet-stream';
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', isImage ? 'public, max-age=600' : isJs ? 'public, max-age=3600' : 'private, max-age=10, stale-while-revalidate=5');
+      return res.send(cached);
+    }
+
     await proxyRemoteUrl(targetUrl, res);
   } catch (error) {
     next(error);
@@ -279,16 +393,24 @@ router.get('/asset', async (req, res, next) => {
 
 router.get('/player/:streamId', async (req, res, next) => {
   try {
-    const upstream = await requestUrl(`${TV_PORTAL_BASE}player.php?stream=${encodeURIComponent(req.params.streamId)}`);
-    const sourceUrl = await resolvePlayableSource(extractPrimarySource(upstream.body.toString('utf8')));
+    const streamId = String(req.params.streamId || '');
+    const sourceCacheKey = `player-source:${streamId}`;
+    let sourceUrl = cacheGet(sourceCacheKey, PLAYER_CACHE_TTL_MS);
+
+    if (!sourceUrl) {
+      const upstream = await requestUrl(`${TV_PORTAL_BASE}player.php?stream=${encodeURIComponent(streamId)}`);
+      sourceUrl = await resolvePlayableSource(extractPrimarySource(upstream.body.toString('utf8')));
+      cacheSet(sourceCacheKey, sourceUrl);
+    }
+
     const proxiedStreamUrl = toSiblingAssetPath(sourceUrl);
     const hlsScriptUrl = toSiblingAssetPath(new URL('js/hls.js?v=5', TV_PORTAL_BASE).toString());
-    const channelName = String(req.query.name || `Channel ${req.params.streamId}`);
+    const channelName = String(req.query.name || `Channel ${streamId}`);
     const channelCategory = String(req.query.category || 'Live TV');
 
     res.setHeader(
       'Content-Security-Policy',
-      "default-src 'self'; base-uri 'self'; frame-ancestors 'self'; img-src 'self' data: https:; media-src 'self' blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https:; connect-src 'self'; worker-src 'self' blob:;",
+      "default-src 'self'; base-uri 'self'; frame-ancestors 'self'; img-src 'self' data: http: https:; media-src 'self' blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https:; connect-src 'self'; worker-src 'self' blob:;",
     );
 
     res.type('html').send(`<!DOCTYPE html>
