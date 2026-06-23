@@ -1,6 +1,8 @@
 import {
   useEffect, useMemo, useRef, useState, useCallback, memo, forwardRef,
 } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { FixedSizeList } from "react-window";
 import tvService from "../services/tvService";
 import { useBreakpoint, useTVMode } from "../hooks";
 
@@ -351,15 +353,12 @@ export default function TVPage() {
   const { isMobile } = useBreakpoint();
   const isTVMode = useTVMode();
 
-  const [chs,    setChs]    = useState([]);
-  const [cats,   setCats]   = useState([]);
-  const [cat,    setCat]    = useState("All");
   const [sid,    setSid]    = useState("");
-  const [load,   setLoad]   = useState(true);
   const [pLoad,  setPLoad]  = useState(false);
   const [err,    setErr]    = useState("");
   const [pMin,   setPMin]   = useState(false);
   const [query,  setQuery]  = useState("");
+  const [cat,    setCat]    = useState("All");
 
   const dQuery = useDebounce(query, 220);
   const [recent, addRecent] = useRecentlyWatched();
@@ -371,23 +370,29 @@ export default function TVPage() {
 
   const [isFull, toggleFull] = useFullscreen(playerRef);
 
-  // ── Data fetch ──────────────────────────────────────────────────────────────
-  const fetchChannels = useCallback(() => {
-    setLoad(true);
-    setErr("");
-    tvService.getChannels()
-      .then((r) => {
-        setChs(r.channels || []);
-        setCats(r.categories || []);
-        const def = r.defaultStreamId || r.channels?.[0]?.streamId || "";
-        setSid(def);
-        if (!def && !r.channels?.length) setErr("No channels available");
-      })
-      .catch((e) => setErr(e?.message || "TV service unavailable"))
-      .finally(() => setLoad(false));
-  }, []);
+  // ── Data fetch (React Query with 30s stale time) ────────────────────────────
+  const { data: tvData, isLoading, error: fetchErr, refetch: refetchChannels } = useQuery({
+    queryKey: ["tv-channels"],
+    queryFn: () => tvService.getChannels(),
+    staleTime: 30000,
+    cacheTime: 300000,
+    refetchOnWindowFocus: false,
+    retry: 2,
+  });
 
-  useEffect(() => { fetchChannels(); }, [fetchChannels]);
+  const chs  = useMemo(() => tvData?.channels || [], [tvData]);
+  const cats = useMemo(() => tvData?.categories || [], [tvData]);
+  const load = isLoading;
+
+  useEffect(() => {
+    if (fetchErr) setErr(fetchErr?.message || "TV service unavailable");
+    else if (!load && !chs.length) setErr("No channels available");
+    else setErr("");
+  }, [fetchErr, load, chs.length]);
+
+  useEffect(() => {
+    if (!sid && tvData?.defaultStreamId) setSid(tvData.defaultStreamId);
+  }, [tvData, sid]);
 
   // ── Player loading timeout ──────────────────────────────────────────────────
   useEffect(() => {
@@ -567,7 +572,33 @@ export default function TVPage() {
                 ? Array.from({ length: 9 }).map((_, i) => (
                     <div key={i} className="tv-skel tv-skel--compact" />
                   ))
-                : renderChannels(true)
+                : list.length === 0
+                  ? <EmptyState hasSearch={isFiltered} />
+                  : (
+                    <FixedSizeList
+                      height={Math.min(list.length * 58, 500)}
+                      itemCount={list.length}
+                      itemSize={58}
+                      width="100%"
+                    >
+                      {({ index, style }) => {
+                        const ch = list[index];
+                        const active = ch.streamId === sid;
+                        return (
+                          <div style={style}>
+                            <ChannelCard
+                              ref={active ? activeChRef : null}
+                              ch={ch}
+                              active={active}
+                              isConnecting={active && pLoad}
+                              onClick={() => selectChannel(ch)}
+                              compact
+                            />
+                          </div>
+                        );
+                      }}
+                    </FixedSizeList>
+                  )
               }
             </div>
           </aside>
@@ -618,7 +649,7 @@ export default function TVPage() {
                 </svg>
               </div>
               <p>{err}</p>
-              <button type="button" className="tv-retry-btn" onClick={fetchChannels}>Try Again</button>
+              <button type="button" className="tv-retry-btn" onClick={() => refetchChannels()}>Try Again</button>
             </div>
           )}
 
