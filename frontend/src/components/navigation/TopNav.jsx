@@ -205,14 +205,27 @@ function TopNav() {
 
               return (
                 <li key={item.path}>
-                  <Link
-                    to={item.path}
-                    className={linkClasses}
-                    onMouseEnter={() => setHoveredLink(item.path)}
-                    onMouseLeave={() => setHoveredLink(null)}
-                  >
-                    {item.label}
-                  </Link>
+                  {item.path === "/tv" ? (
+                    <a
+                      href="http://10.45.45.254/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={linkClasses}
+                      onMouseEnter={() => setHoveredLink(item.path)}
+                      onMouseLeave={() => setHoveredLink(null)}
+                    >
+                      {item.label}
+                    </a>
+                  ) : (
+                    <Link
+                      to={item.path}
+                      className={linkClasses}
+                      onMouseEnter={() => setHoveredLink(item.path)}
+                      onMouseLeave={() => setHoveredLink(null)}
+                    >
+                      {item.label}
+                    </Link>
+                  )}
                 </li>
               );
             })}
@@ -235,14 +248,27 @@ function TopNav() {
                     {overflowNavItems.map((item) => {
                       const isActive = location.pathname.startsWith(item.path);
                       return (
-                        <Link
-                          key={item.path}
-                          to={item.path}
-                          onClick={() => setIsMoreOpen(false)}
-                          className={`top-nav-more-item ${isActive ? "active" : ""}`}
-                        >
-                          {item.label}
-                        </Link>
+                        item.path === "/tv" ? (
+                          <a
+                            key={item.path}
+                            href="http://10.45.45.254/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="top-nav-more-item"
+                            onClick={() => setIsMoreOpen(false)}
+                          >
+                            {item.label}
+                          </a>
+                        ) : (
+                          <Link
+                            key={item.path}
+                            to={item.path}
+                            onClick={() => setIsMoreOpen(false)}
+                            className={`top-nav-more-item ${isActive ? "active" : ""}`}
+                          >
+                            {item.label}
+                          </Link>
+                        )
                       );
                     })}
                   </div>
@@ -368,10 +394,10 @@ function TopNav() {
             </button>
 
             {showLiveChip && (
-              <Link to="/tv" className="top-nav-live-chip">
+              <a href="http://10.45.45.254/" target="_blank" rel="noopener noreferrer" className="top-nav-live-chip">
                 <span className="top-nav-live-dot" />
                 <span>Live now</span>
-              </Link>
+              </a>
             )}
           </div>
         )}
@@ -456,13 +482,25 @@ function TopNav() {
                     : location.pathname.startsWith(item.path);
                 return (
                   <li key={item.path}>
-                    <Link
-                      to={item.path}
-                      className={`top-nav-mobile-menu-item ${isActive ? "active" : ""}`}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      {item.label}
-                    </Link>
+                    {item.path === "/tv" ? (
+                      <a
+                        href="http://10.45.45.254/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`top-nav-mobile-menu-item ${isActive ? "active" : ""}`}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        {item.label}
+                      </a>
+                    ) : (
+                      <Link
+                        to={item.path}
+                        className={`top-nav-mobile-menu-item ${isActive ? "active" : ""}`}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        {item.label}
+                      </Link>
+                    )}
                   </li>
                 );
               })}

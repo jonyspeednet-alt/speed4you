@@ -67,7 +67,30 @@ function BottomNav() {
           ? location.pathname === '/'
           : location.pathname.startsWith(item.path);
 
-        return (
+        return item.path === '/tv' ? (
+          <a
+            key={item.path}
+            href="http://10.45.45.254/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`bottom-nav-item${isActive ? ' active' : ''}`}
+            style={{
+              ...styles.item,
+              ...(isActive ? styles.itemActive : {}),
+              transform: pressedItem === item.path ? 'scale(0.96)' : 'scale(1)',
+            }}
+            onMouseDown={() => setPressedItem(item.path)}
+            onMouseUp={() => setPressedItem(null)}
+            onTouchStart={() => setPressedItem(item.path)}
+            onTouchEnd={() => setPressedItem(null)}
+            aria-current={isActive ? 'page' : undefined}
+          >
+            <span className={`bottom-nav-icon${isActive ? ' active' : ''}`} style={{ ...styles.iconWrap, ...(isActive ? styles.iconWrapActive : {}) }}>
+              {item.icon(isActive)}
+            </span>
+            <span className={`bottom-nav-label${isActive ? ' active' : ''}`} style={{ ...styles.label, ...(isActive ? styles.labelActive : {}) }}>{item.label}</span>
+          </a>
+        ) : (
           <Link
             key={item.path}
             to={item.path}
