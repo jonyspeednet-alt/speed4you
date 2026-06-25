@@ -149,7 +149,6 @@ const publicPerIpLimiter = rateLimit({
   max: PUBLIC_API_PER_IP_LIMIT,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.ip,
   message: { error: 'Too many requests from your IP. Please slow down.' },
   skip: isLocalRequest,
 });
