@@ -409,9 +409,35 @@ export default function TVPage() {
   }, []);
 
   // ── Select channel ──────────────────────────────────────────────────────────
+  const iframeRef = useRef(null);
+  const loadedSid = useRef("");
+  const initialStreamUrl = useRef("");
+
   const selectChannel = useCallback((ch) => {
     setSid(ch.streamId);
     addRecent(ch);
+
+    // Pre-warm server cache, then switch via postMessage if iframe already loaded
+    fetch(`${API}/api/tv/prewarm/${ch.streamId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (iframeRef.current && loadedSid.current) {
+          // Iframe already loaded — switch via postMessage (no destroy/recreate)
+          iframeRef.current.contentWindow.postMessage({
+            type: "tv-switch-channel",
+            sourcePath: data.sourcePath,
+          }, "*");
+          setPLoad(false);
+        } else {
+          // First load — iframe will mount via streamUrl
+          loadedSid.current = ch.streamId;
+        }
+      })
+      .catch(() => {
+        if (!loadedSid.current) {
+          loadedSid.current = ch.streamId;
+        }
+      });
   }, [addRecent]);
 
   // ── Computed state (must come before effects that reference them) ───────────
@@ -466,6 +492,10 @@ export default function TVPage() {
   const streamUrl = cur && !err
     ? `${API}/api/tv/player/${cur.streamId}?${new URLSearchParams({ name: cur.name || "", category: cur.category || "" })}`
     : "";
+
+  // Lock the iframe src to the first streamUrl — subsequent switches use postMessage
+  const effectiveStreamUrl = loadedSid.current ? initialStreamUrl.current || streamUrl : streamUrl;
+  if (!initialStreamUrl.current && streamUrl) initialStreamUrl.current = streamUrl;
 
   const isSearching  = dQuery.trim().length > 0;
   const isFiltered   = isSearching || cat !== "All";
@@ -538,10 +568,11 @@ export default function TVPage() {
           <div className="tv-split-left">
             <div className="tv-player-wrap" ref={playerRef}>
               {pLoad    && <PlayerSpinner />}
-              {streamUrl && (
+              {effectiveStreamUrl && (
                 <iframe
-                  key={cur.streamId}
-                  src={streamUrl}
+                  ref={iframeRef}
+                  key="tv-player-main"
+                  src={effectiveStreamUrl}
                   title={cur.name}
                   className="tv-iframe"
                   allow="autoplay; fullscreen"
@@ -613,10 +644,11 @@ export default function TVPage() {
             <>
               <div className="tv-player-wrap tv-player-wrap--stack" ref={playerRef}>
                 {pLoad    && <PlayerSpinner />}
-                {streamUrl && (
+                {effectiveStreamUrl && (
                   <iframe
-                    key={cur.streamId}
-                    src={streamUrl}
+                    ref={iframeRef}
+                    key="tv-player-main"
+                    src={effectiveStreamUrl}
                     title={cur.name}
                     className="tv-iframe"
                     allow="autoplay; fullscreen"
@@ -624,7 +656,7 @@ export default function TVPage() {
                     onLoad={handleIframeLoad}
                   />
                 )}
-                {!streamUrl && !pLoad && <PlayerPlaceholder />}
+                {!effectiveStreamUrl && !pLoad && <PlayerPlaceholder />}
                 <PlayerControls onFullscreen={toggleFull} isFull={isFull} />
               </div>
               {cur && <PlayerBar ch={cur} onMinimise={() => setPMin(true)} />}

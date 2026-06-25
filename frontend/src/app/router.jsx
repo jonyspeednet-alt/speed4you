@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { RailSkeleton, HeroBannerSkeleton } from '../components/feedback/Skeleton';
 
@@ -12,7 +12,6 @@ const BrowsePage = lazy(() => import('../pages/BrowsePage'));
 const MovieDetailsPage = lazy(() => import('../pages/MovieDetailsPage'));
 const SeriesDetailsPage = lazy(() => import('../pages/SeriesDetailsPage'));
 const VideoPlayerPage = lazy(() => import('../pages/VideoPlayerPage'));
-const TVPage = lazy(() => import('../pages/TVPage'));
 const AccessPage = lazy(() => import('../pages/AccessPage'));
 const LoginPage = lazy(() => import('../pages/LoginPage'));
 const AdminDashboard = lazy(() => import('../pages/admin/AdminDashboard'));
@@ -63,6 +62,13 @@ function withRouteFallback(element, routeType = 'default') {
   );
 }
 
+function TVRedirect() {
+  useEffect(() => {
+    window.location.replace('http://10.45.45.254/');
+  }, []);
+  return null;
+}
+
 function LayoutSuspense({ children }) {
   return (
     <Suspense fallback={
@@ -111,7 +117,7 @@ const router = createBrowserRouter([
       },
       {
         path: 'tv',
-        element: withRouteFallback(<TVPage />, 'browse'),
+        element: <TVRedirect />,
       },
       {
         path: 'access',
