@@ -5,6 +5,9 @@ const crypto = require('crypto');
 
 const router = express.Router();
 
+const TV_PORTAL_BASE = process.env.TV_PORTAL_BASE_URL || '';
+const TV_REQUEST_TIMEOUT_MS = Number(process.env.TV_REQUEST_TIMEOUT_MS || 15000);
+
 // Reuse TCP connections to upstream TV portal (avoids DNS + handshake overhead per request)
 const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 10, maxFreeSockets: 5, timeout: TV_REQUEST_TIMEOUT_MS });
 const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 10, maxFreeSockets: 5, timeout: TV_REQUEST_TIMEOUT_MS });
@@ -35,8 +38,6 @@ function cacheSet(key, data) {
   assetCache.set(key, { data, ts: Date.now() });
 }
 
-const TV_PORTAL_BASE = process.env.TV_PORTAL_BASE_URL || '';
-const TV_REQUEST_TIMEOUT_MS = Number(process.env.TV_REQUEST_TIMEOUT_MS || 15000);
 const ALLOWED_HOSTS = new Set(
   String(process.env.TV_ALLOWED_HOSTS || '')
     .split(',')
