@@ -174,14 +174,23 @@ async function getDuplicateGroupsForItems(items = [], { bypassCache = false } = 
   return groups;
 }
 
-async function listItems(filters = {}, offset = 0, limit = null, sort = 'latest', includeDuplicates = true) {
+async function listItems(filters = {}, offset = 0, limit = null, sort = 'latest', includeDuplicates = true, deduplicate = false) {
   await ensureContentStore();
   const params = [];
   const clauses = buildCatalogFilterClauses(filters, params);
   const whereClause = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
 
-  const countResult = await db.query(`SELECT COUNT(*)::int AS count FROM content_catalog ${whereClause}`, params);
-  const total = Number(countResult.rows[0]?.count || 0);
+  let total;
+  if (deduplicate) {
+    const countResult = await db.query(
+      `SELECT COUNT(*)::int AS count FROM (SELECT DISTINCT ON (content_type, title_key) 1 FROM content_catalog ${whereClause}) sub`,
+      params,
+    );
+    total = Number(countResult.rows[0]?.count || 0);
+  } else {
+    const countResult = await db.query(`SELECT COUNT(*)::int AS count FROM content_catalog ${whereClause}`, params);
+    total = Number(countResult.rows[0]?.count || 0);
+  }
 
   let orderClause = '';
   if (sort === 'popular') {
@@ -209,7 +218,17 @@ async function listItems(filters = {}, offset = 0, limit = null, sort = 'latest'
     pagingClause += ` OFFSET $${listParams.length}`;
   }
 
-  const result = await db.query(`SELECT payload FROM content_catalog ${whereClause} ${orderClause} ${pagingClause}`, listParams);
+  let dataQuery;
+  if (deduplicate) {
+    dataQuery = `SELECT payload FROM (
+      SELECT payload, ROW_NUMBER() OVER (PARTITION BY content_type, title_key ORDER BY updated_at DESC NULLS LAST, id DESC) AS rn
+      FROM content_catalog ${whereClause}
+    ) sub WHERE rn = 1 ${orderClause.replace('ORDER BY', '')} ${pagingClause}`;
+  } else {
+    dataQuery = `SELECT payload FROM content_catalog ${whereClause} ${orderClause} ${pagingClause}`;
+  }
+
+  const result = await db.query(dataQuery, listParams);
   const items = result.rows.map((row) => normalizeItem(row.payload));
   if (!includeDuplicates) return { items, total };
 

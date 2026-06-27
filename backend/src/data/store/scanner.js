@@ -425,9 +425,10 @@ async function deleteScannerItemsNotInSignatures(sourceRootId, scanSignatures = 
   const signatures = [...new Set((scanSignatures || []).filter(Boolean))];
 
   // SAFE DELETE: only remove items that are NOT user-managed.
-  // published, archived, and draft items are NEVER auto-deleted — admin must remove manually.
-  // This prevents the create/delete loop when media paths fluctuate.
-  const PROTECTED_STATUSES = ['published', 'archived', 'draft'];
+  // published and archived items are NEVER auto-deleted — admin must remove manually.
+  // draft items ARE auto-deleted when orphaned (stale scanSignature + sourcePath) because
+  // the titleKey fallback (June 2026) prevents re-creation of legitimate drafts.
+  const PROTECTED_STATUSES = ['published', 'archived'];
 
   let result;
   if (signatures.length) {

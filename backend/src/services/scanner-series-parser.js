@@ -5,6 +5,7 @@ function cleanTitle(name) {
     .replace(/\.[a-z0-9]{2,5}$/i, '')
     .replace(/_/g, ' ')
     .replace(/\.(?=\s|[0-9]|[A-Z])/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/\s+/g, ' ')
     .trim();
 }

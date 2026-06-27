@@ -121,7 +121,7 @@ function withSummaryResult(result, summaryRequested) {
 exports.getDashboard = async (req, res) => {
   const stats = await getStats();
   const recentContent = await getRecentItems(8);
-  const { items: scannerDrafts } = await listItems({ source: 'scanner', status: 'draft' }, 0, 12);
+  const { items: scannerDrafts } = await listItems({ source: 'scanner', status: 'draft' }, 0, 12, 'latest', true, true);
   const allUsers = await listUsers();
   const scannerHealth = await getScannerHealth();
 
@@ -163,7 +163,7 @@ exports.getContentList = async (req, res) => {
     search,
     duplicatesOnly: String(duplicatesOnly) === 'true',
     metadataStatus,
-  }, offset, limitNum, sort || 'latest', false);
+  }, offset, limitNum, sort || 'latest', false, true);
   res.json(withSummaryResult(result, String(summary) === 'true'));
 };
 
@@ -298,7 +298,7 @@ exports.getScannerDrafts = async (req, res) => {
     source: 'scanner',
     status: req.query.status || 'draft',
     ...(latestRunId ? { scanRunId: latestRunId } : {}),
-  }, offset, limit);
+  }, offset, limit, 'latest', true, true);
   res.json({
     ...result,
     page,

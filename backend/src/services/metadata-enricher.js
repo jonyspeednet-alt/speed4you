@@ -65,6 +65,8 @@ function cleanSearchTitle(value) {
     normalized = normalized.replace(pattern, ' ');
   }
 
+  normalized = normalized.replace(/([a-z])([A-Z])/g, '$1 $2');
+
   let cleaned = normalized
     .replace(/\((19|20)\d{2}\)/g, ' ')
     .replace(/\b(19|20)\d{2}\b/g, ' ')
@@ -458,7 +460,6 @@ async function enrichItemWithMetadata(item) {
       const multiResp = await tmdbFetchJson('/search/multi', { query: coreTitle });
       const multiResults = Array.isArray(multiResp.results) ? multiResp.results : [];
       results = multiResults.filter((r) => r.media_type === mediaType || r.media_type === (mediaType === 'movie' ? 'movie' : 'tv'));
-      if (!results.length) results = multiResults.filter((r) => r.media_type !== 'person');
     }
 
     if (!results.length) {
