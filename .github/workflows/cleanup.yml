@@ -1,0 +1,43 @@
+name: Run Cleanup Script
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run misclassified cleanup on server
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          SUDO_PASSWORD: ${{ ***REMOVED***s.SUDO_PASSWORD }}
+        with:
+          host: ${{ ***REMOVED***s.DEPLOY_HOST }}
+          username: ${{ ***REMOVED***s.DEPLOY_USER }}
+          key: ${{ ***REMOVED***s.DEPLOY_SSH_KEY }}
+          port: ${{ ***REMOVED***s.DEPLOY_PORT }}
+          envs: SUDO_PASSWORD
+          script: |
+            BACKEND=/home/speed4you/portal-app/backend
+            cd "$BACKEND"
+
+            echo "=== Running misclassified cleanup (dry run) ==="
+            node scripts/fix-misclassified.js
+
+            echo ""
+            echo "=== Deleting all Sonic-folder entries ==="
+            node scripts/fix-misclassified.js --apply --delete-all-sonic
+
+            echo ""
+            echo "=== Running general duplicate cleanup (dry run) ==="
+            node scripts/cleanup-duplicates.js
+
+            echo ""
+            echo "=== Restarting backend ==="
+            echo "$SUDO_PASSWORD" | sudo -S systemctl restart speed4you-backend 2>/dev/null || \
+            echo "$SUDO_PASSWORD" | sudo -S pm2 restart all 2>/dev/null || \
+            echo "$SUDO_PASSWORD" | sudo -S supervisorctl restart all 2>/dev/null || \
+            echo "Could not restart - please restart manually"
+
+            echo ""
+            echo "=== Cleanup complete ==="
