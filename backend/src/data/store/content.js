@@ -223,7 +223,7 @@ async function listItems(filters = {}, offset = 0, limit = null, sort = 'latest'
     dataQuery = `SELECT payload FROM (
       SELECT payload, ROW_NUMBER() OVER (PARTITION BY content_type, title_key ORDER BY updated_at DESC NULLS LAST, id DESC) AS rn
       FROM content_catalog ${whereClause}
-    ) sub WHERE rn = 1 ${orderClause.replace('ORDER BY', '')} ${pagingClause}`;
+    ) sub WHERE rn = 1 ORDER BY (sub.payload->>'title') ASC NULLS LAST ${pagingClause}`;
   } else {
     dataQuery = `SELECT payload FROM content_catalog ${whereClause} ${orderClause} ${pagingClause}`;
   }
