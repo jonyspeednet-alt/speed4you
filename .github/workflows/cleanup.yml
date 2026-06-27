@@ -7,8 +7,12 @@ jobs:
   cleanup:
     runs-on: ubuntu-latest
     steps:
-      - name: Run misclassified cleanup on server
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run cleanup on server
         uses: appleboy/ssh-action@v1.2.0
+        timeout: 5m
         env:
           SUDO_PASSWORD: ${{ ***REMOVED***s.SUDO_PASSWORD }}
         with:
@@ -17,20 +21,21 @@ jobs:
           key: ${{ ***REMOVED***s.DEPLOY_SSH_KEY }}
           port: ${{ ***REMOVED***s.DEPLOY_PORT }}
           envs: SUDO_PASSWORD
+          command_timeout: 5m
           script: |
             BACKEND=/home/speed4you/portal-app/backend
             cd "$BACKEND"
 
             echo "=== Running misclassified cleanup (dry run) ==="
-            node scripts/fix-misclassified.js
+            node scripts/fix-misclassified.js || true
 
             echo ""
             echo "=== Deleting all Sonic-folder entries ==="
-            node scripts/fix-misclassified.js --apply --delete-all-sonic
+            node scripts/fix-misclassified.js --apply --delete-all-sonic || true
 
             echo ""
             echo "=== Running general duplicate cleanup (dry run) ==="
-            node scripts/cleanup-duplicates.js
+            node scripts/cleanup-duplicates.js || true
 
             echo ""
             echo "=== Restarting backend ==="
