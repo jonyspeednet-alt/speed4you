@@ -22,16 +22,33 @@ jobs:
             BACKEND=/home/speed4you/portal-app/backend
             cd "$BACKEND"
 
-            echo "=== Running misclassified cleanup (dry run) ==="
-            node scripts/fix-misclassified.js || true
+            echo "=== Finding Batman entries with Sonic paths ==="
+            node -e "
+              const { Pool } = require('pg');
+              const pool = new Pool({ host: process.env.DB_HOST || 'localhost', port: Number(process.env.DB_PORT) || 5432, database: process.env.DB_NAME || 'isp_entertainment', user: process.env.DB_USER || 'postgres', ***REMOVED***: process.env.DB_PASSWORD });
+              (async () => {
+                // Find Batman entries
+                const r1 = await pool.query(\"SELECT id, title, payload->>'sourcePath' AS sp, payload->>'sourcePublicPath' AS spp, payload->>'videoUrl' AS vu, status FROM content_catalog WHERE title ILIKE '%batman%' ORDER BY id\");
+                console.log('Batman entries:', r1.rows.length);
+                for (const r of r1.rows) console.log('  id=' + r.id + ' status=' + r.status + ' sp=' + r.sp + ' spp=' + r.spp + ' vu=' + r.vu);
+
+                // Find entries from Sonic-like paths
+                const r2 = await pool.query(\"SELECT id, title, payload->>'sourcePath' AS sp, status FROM content_catalog WHERE (payload->>'sourcePath' ILIKE '%sonic%' OR payload->>'sourcePublicPath' ILIKE '%sonic%' OR payload->>'videoUrl' ILIKE '%sonic%') ORDER BY id\");
+                console.log('Sonic path entries:', r2.rows.length);
+                for (const r of r2.rows) console.log('  id=' + r.id + ' title=' + r.title + ' status=' + r.status + ' sp=' + r.sp);
+
+                // Find entries from Movies_Archive/TVSeries path
+                const r3 = await pool.query(\"SELECT id, title, payload->>'sourcePath' AS sp, status FROM content_catalog WHERE (payload->>'sourcePath' ILIKE '%Movies_Archive/TVSeries%' OR payload->>'sourcePublicPath' ILIKE '%Movies_Archive/TVSeries%') ORDER BY id\");
+                console.log('Movies_Archive/TVSeries entries:', r3.rows.length);
+                for (const r of r3.rows) console.log('  id=' + r.id + ' title=' + r.title + ' status=' + r.status + ' sp=' + r.sp);
+
+                await pool.end();
+              })();
+            " || true
 
             echo ""
-            echo "=== Deleting all Sonic-folder entries ==="
-            node scripts/fix-misclassified.js --apply --delete-all-sonic || true
-
-            echo ""
-            echo "=== Running general duplicate cleanup (dry run) ==="
-            node scripts/cleanup-duplicates.js || true
+            echo "=== Deleting all duplicates with --apply ==="
+            node scripts/cleanup-duplicates.js --apply || true
 
             echo ""
             echo "=== Restarting backend ==="
