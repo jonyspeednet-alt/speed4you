@@ -12,5 +12,5 @@ test('removes common season and episode tokens from series search titles', () =>
 test('removes year and episode tokens from noisy series filenames', () => {
   const result = cleanSearchTitle('Money.Heist.2017.S01E01.720p.NF.WEB-DL');
 
-  assert.equal(result, 'Money Heist NF');
+  assert.equal(result, 'Money Heist');
 });

@@ -9,7 +9,7 @@ async function getStats() {
 }
 
 async function getRecentItems(limit = 10) {
-  const { items } = await listItems({ status: 'published' }, 0, limit);
+  const { items } = await listItems({ status: 'published' }, 0, limit, 'latest', true, true);
   return items;
 }
 
