@@ -30,9 +30,11 @@ const keyframes = `
   @keyframes scn-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
   @keyframes scn-slide-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes scn-progress-flow { 0% { background-position: 0 0; } 100% { background-position: 30px 0; } }
+  @keyframes scn-skeleton { 0%,100% { opacity: 0.4; } 50% { opacity: 0.8; } }
   .scn-anim-in { animation: scn-slide-in 0.3s ease-out; }
   .scn-pulse-dot { animation: scn-pulse 1.5s ease-in-out infinite; }
   .scn-spin { animation: scn-spin 2s linear infinite; }
+  .scn-skeleton { animation: scn-skeleton 1.4s ease-in-out infinite; border-radius: 6px; background: rgba(255,255,255,0.06); }
   .scn-bar-flow { background-image: linear-gradient(90deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 50%, rgba(255,255,255,0.15) 100%); background-size: 30px 100%; animation: scn-progress-flow 1.2s linear infinite; }
 `;
 
@@ -124,6 +126,7 @@ function Icon({ name, size = 16, color = 'currentColor', strokeWidth = 2 }) {
     film: <><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18" /><line x1="7" y1="2" x2="7" y2="22" /><line x1="17" y1="2" x2="17" y2="22" /><line x1="2" y1="12" x2="22" y2="12" /><line x1="2" y1="7" x2="7" y2="7" /><line x1="2" y1="17" x2="7" y2="17" /><line x1="17" y1="7" x2="22" y2="7" /><line x1="17" y1="17" x2="22" y2="17" /></>,
     zap: <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />,
     layers: <><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></>,
+    alert: <><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></>,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
@@ -330,9 +333,9 @@ export default function ScannerPage() {
                 <Icon name="activity" size={20} color={isRunning ? C.running : TEXT2} />
               </div>
               <div>
-                <h1 style={{ fontSize: '1.4rem', fontWeight: '800', color: TEXT, margin: 0, letterSpacing: '-0.02em' }}>
+                <h2 style={{ fontSize: '1.4rem', fontWeight: '800', color: TEXT, margin: 0, letterSpacing: '-0.02em' }}>
                   {isRunning ? 'Scanner Running' : displayStatus ? `Scanner ${String(displayStatus).replace(/_/g, ' ')}` : 'Scanner'}
-                </h1>
+                </h2>
                 <p aria-live="polite" style={{ fontSize: '0.82rem', color: TEXT2, margin: '2px 0 0 0' }}>
                   {isRunning
                     ? `Processing ${activeRoot?.label || 'next root'} • ${activeRoot ? `${activeRoot.processed || 0} / ${activeRoot.totalCandidates || 0} folders` : 'preparing...'}`
@@ -344,6 +347,15 @@ export default function ScannerPage() {
             {isRunning && (
               <div style={{ marginTop: '16px' }}>
                 <ProgressBar percent={overallProgress} color="linear-gradient(90deg, #4ade80 0%, #22c55e 100%)" height={8} animated label={`${elapsed} elapsed`} />
+              </div>
+            )}
+            {!isRunning && job?.summary && (
+              <div style={{ marginTop: '12px', display: 'flex', gap: '16px', fontSize: '0.78rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ color: '#4ade80', fontWeight: '700' }}>+{job.summary.created || 0} created</span>
+                <span style={{ color: TEXT2 }}>{job.summary.updated || 0} updated</span>
+                <span style={{ color: TEXT3 }}>{job.summary.unchanged || 0} unchanged</span>
+                {(job.summary.duplicateDrafts || 0) > 0 && <span style={{ color: '#a78bfa' }}>{job.summary.duplicateDrafts} duplicates</span>}
+                {(job.summary.totalErrors || 0) > 0 && <span style={{ color: '#f87171', fontWeight: '700' }}>{job.summary.totalErrors} errors</span>}
               </div>
             )}
           </div>
@@ -364,7 +376,7 @@ export default function ScannerPage() {
                 transition: 'all 0.2s ease',
               }}>
               <Icon name="play" size={14} color={isRunning ? TEXT3 : '#fff'} />
-              {runMutation.isPending ? 'Starting...' : selectedRoots.length ? `Scan ${selectedRoots.length}` : 'Run Scan'}
+              {runMutation.isPending ? 'Starting...' : selectedRoots.length ? `Scan ${selectedRoots.length} root${selectedRoots.length > 1 ? 's' : ''}` : 'Run Scan'}
             </button>
 
             {confirmStop ? (
@@ -409,7 +421,7 @@ export default function ScannerPage() {
               <button type="button" onClick={() => setConfirmClearCache(true)} disabled={clearCacheMutation.isPending || isRunning}
                 title={isRunning ? 'Cannot clear cache while a scan is running' : undefined}
                 style={{ padding: '11px 14px', borderRadius: '12px', fontSize: '0.82rem', fontWeight: '600', cursor: (clearCacheMutation.isPending || isRunning) ? 'not-allowed' : 'pointer', opacity: (clearCacheMutation.isPending || isRunning) ? 0.5 : 1, background: SURFACE2, color: TEXT2, border: `1px solid ${BORDER}`, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                <Icon name="trash" size={12} /> Cache
+                <Icon name="trash" size={12} /> Clear Cache
               </button>
             )}
           </div>
@@ -418,10 +430,20 @@ export default function ScannerPage() {
 
       {/* Stats Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
-        <Stat label="Roots" value={roots.length} accent="linear-gradient(90deg, #6366f1, #8b5cf6)" icon={<Icon name="layers" size={14} />} />
-        <Stat label="Healthy" value={health?.healthyRoots ?? 0} accent="linear-gradient(90deg, #4ade80, #22c55e)" icon={<Icon name="check" size={14} />} />
-        <Stat label="Total Videos" value={totalVideos.toLocaleString()} accent="linear-gradient(90deg, #60a5fa, #3b82f6)" icon={<Icon name="film" size={14} />} />
-        <Stat label="Discovered" value={totalDiscovered.toLocaleString()} accent="linear-gradient(90deg, #a78bfa, #8b5cf6)" icon={<Icon name="zap" size={14} />} />
+        {healthLoading ? (
+          <>
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="scn-skeleton" style={{ height: '78px', borderRadius: '14px' }} />
+            ))}
+          </>
+        ) : (
+          <>
+            <Stat label="Roots" value={roots.length} accent="linear-gradient(90deg, #6366f1, #8b5cf6)" icon={<Icon name="layers" size={14} />} />
+            <Stat label="Healthy" value={health?.healthyRoots ?? 0} accent="linear-gradient(90deg, #4ade80, #22c55e)" icon={<Icon name="check" size={14} />} />
+            <Stat label="Total Videos" value={totalVideos.toLocaleString()} accent="linear-gradient(90deg, #60a5fa, #3b82f6)" icon={<Icon name="film" size={14} />} />
+            <Stat label="Discovered" value={totalDiscovered.toLocaleString()} accent="linear-gradient(90deg, #a78bfa, #8b5cf6)" icon={<Icon name="zap" size={14} />} />
+          </>
+        )}
       </div>
 
       {/* Current Job Details */}
@@ -433,19 +455,19 @@ export default function ScannerPage() {
               Job Progress
             </h3>
             <span style={{ fontSize: '0.78rem', color: TEXT3 }}>
-              {job.summary.rootsScanned || 0} / {job.summary.rootsRequested || 0} roots done
+              {job.summary?.rootsScanned || 0} / {job.summary?.rootsRequested || 0} roots done
             </span>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '16px' }}>
-            <Stat label="Created" value={job.summary.created || 0} accent="linear-gradient(90deg, #4ade80, #22c55e)" />
-            <Stat label="Updated" value={job.summary.updated || 0} accent="linear-gradient(90deg, #60a5fa, #3b82f6)" />
-            <Stat label="Unchanged" value={job.summary.unchanged || 0} accent="linear-gradient(90deg, #94a3b8, #64748b)" />
-            <Stat label="Duplicates" value={job.summary.duplicateDrafts || 0} accent="linear-gradient(90deg, #a78bfa, #8b5cf6)" />
-            {(job.summary.totalErrors || 0) > 0 && (
+            <Stat label="Created" value={job.summary?.created || 0} accent="linear-gradient(90deg, #4ade80, #22c55e)" />
+            <Stat label="Updated" value={job.summary?.updated || 0} accent="linear-gradient(90deg, #60a5fa, #3b82f6)" />
+            <Stat label="Unchanged" value={job.summary?.unchanged || 0} accent="linear-gradient(90deg, #94a3b8, #64748b)" />
+            <Stat label="Duplicates" value={job.summary?.duplicateDrafts || 0} accent="linear-gradient(90deg, #a78bfa, #8b5cf6)" />
+            {(job.summary?.totalErrors || 0) > 0 && (
               <Stat label="Errors" value={job.summary.totalErrors} accent="linear-gradient(90deg, #f87171, #ef4444)" />
             )}
-            {(job.summary.deleted || 0) > 0 && (
+            {(job.summary?.deleted || 0) > 0 && (
               <Stat label="Deleted" value={job.summary.deleted} accent="linear-gradient(90deg, #f59e0b, #d97706)" />
             )}
           </div>
@@ -511,6 +533,12 @@ export default function ScannerPage() {
         </div>
 
         <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+          {roots.length > 0 && selectedRoots.length < roots.length && (
+            <button type="button" onClick={() => setSelectedRoots(roots.map(r => r.id))}
+              style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', background: 'rgba(99,102,241,0.1)', color: ACCENT, border: `1px solid rgba(99,102,241,0.25)`, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <Icon name="check" size={10} /> Select All
+            </button>
+          )}
           {selectedRoots.length > 0 && (
             <button type="button" onClick={() => setSelectedRoots([])}
               style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', background: SURFACE2, color: TEXT3, border: `1px solid ${BORDER}`, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
@@ -527,7 +555,11 @@ export default function ScannerPage() {
         ) : filteredRoots.length === 0 ? (
           <div style={{ color: TEXT3, padding: '40px', textAlign: 'center' }}>
             <Icon name="folder" size={32} color={TEXT3} />
-            <p style={{ marginTop: '8px', fontSize: '0.85rem' }}>No scan roots match this filter</p>
+            <p style={{ marginTop: '8px', fontSize: '0.85rem' }}>
+              {filter === 'selected'
+                ? 'No roots selected — click a root card below to select it for a partial scan'
+                : 'No scan roots match this filter'}
+            </p>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '10px' }}>
@@ -564,7 +596,7 @@ export default function ScannerPage() {
                         <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: statusColor, flexShrink: 0 }} />
                         <span style={{ fontWeight: '600', color: TEXT, fontSize: '0.88rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{root.label}</span>
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: TEXT3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{root.scanPath}</div>
+                      <div style={{ fontSize: '0.72rem', color: TEXT3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={root.scanPath}>{root.scanPath}</div>
                       <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
                         <Tag>{root.type}</Tag>
                         <Tag>{root.videoCount || 0} videos</Tag>
@@ -573,7 +605,7 @@ export default function ScannerPage() {
                       </div>
                       {root.error && (
                         <div style={{ marginTop: '8px', fontSize: '0.72rem', color: '#f87171', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Icon name="zap" size={10} color="#f87171" /> {root.error}
+                          <Icon name="alert" size={10} color="#f87171" /> {root.error}
                         </div>
                       )}
                     </div>
@@ -617,7 +649,14 @@ export default function ScannerPage() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
                         <StatusPill status={run.status} size="sm" />
-                        {run.rootIds?.length > 0 && <span style={{ fontSize: '0.72rem', color: TEXT2 }}>{run.rootIds.length} root(s)</span>}
+                        {run.rootIds?.length > 0 && (
+                          <span
+                            style={{ fontSize: '0.72rem', color: TEXT2 }}
+                            title={run.rootIds.map(id => roots.find(r => String(r.id) === String(id))?.label || id).join(', ')}
+                          >
+                            {run.rootIds.length} root{run.rootIds.length > 1 ? 's' : ''}
+                          </span>
+                        )}
                       </div>
                       <div style={{ fontSize: '0.72rem', color: TEXT3 }}>
                         {run.startedAt ? new Date(run.startedAt).toLocaleString() : ''}
@@ -635,6 +674,8 @@ export default function ScannerPage() {
             })}
             <div ref={logEndRef} />
           </div>
+          {/* Fade gradient hinting scrollable content */}
+          <div style={{ pointerEvents: 'none', position: 'relative', marginTop: '-32px', height: '32px', background: `linear-gradient(to bottom, transparent, ${SURFACE})`, borderRadius: '0 0 8px 8px' }} />
         </div>
       )}
       </div>
@@ -690,6 +731,7 @@ function FixRootsButton() {
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
       {!dryResult && !applied && (
         <button type="button" onClick={preview}
+          title="Scans for catalog entries whose file paths no longer match any configured scan root — useful after moving files or changing scanner root paths"
           style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
           <Icon name="zap" size={11} /> Fix Misconfigured
         </button>
