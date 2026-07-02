@@ -7,8 +7,6 @@ import MetadataSection from '../../components/admin/MetadataSection';
 import DetailsSection from '../../components/admin/DetailsSection';
 import ArtworkSection from '../../components/admin/ArtworkSection';
 import ChecklistSection from '../../components/admin/ChecklistSection';
-import DuplicateRadar from '../../components/admin/DuplicateRadar';
-import ScannerSource from '../../components/admin/ScannerSource';
 import FormSkeleton from '../../components/admin/FormSkeleton';
 import { useBreakpoint } from '../../hooks';
 import useContentForm from '../../hooks/useContentForm';
@@ -201,13 +199,6 @@ function AddContentPage() {
       </header>
 
       {form.error ? <div style={S.errorBar} role="alert">{form.error}</div> : null}
-
-      {!form.loadingItem && showMetaRadar && form.isEditMode && form.itemMeta && (
-        <div style={S.radarRow}>
-          <ScannerSource itemMeta={form.itemMeta} styles={S} />
-          <DuplicateRadar duplicateCandidates={duplicateCandidates} styles={S} />
-        </div>
-      )}
 
       {form.loadingItem ? (
         <FormSkeleton styles={S} />
