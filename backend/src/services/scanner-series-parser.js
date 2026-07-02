@@ -1,13 +1,30 @@
 const path = require('path');
 
-function cleanTitle(name) {
-  return String(name || '')
-    .replace(/\.[a-z0-9]{2,5}$/i, '')
-    .replace(/_/g, ' ')
-    .replace(/\.(?=\s|[0-9]|[A-Z])/g, ' ')
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
+function cleanTitle(name, type = 'series') {
+  let cleaned = String(name || '')
+    .replace(/\.[a-z0-9]{2,5}$/i, '') // Remove extension
+    .replace(/_/g, ' ')               // Replace underscores with spaces
+    .replace(/\.(?=\s|[0-9]|[A-Z])/g, ' ') // Replace dots
+    .replace(/([a-z])([A-Z])/g, '$1 $2'); // Separate camelCase words
+
+  // Strip quality tags, codecs, release groups and metadata noise
+  cleaned = cleaned
+    .replace(/\b(\d{3,4}p|bluray|bdrip|brrip|web-?dl|webrip|dvdrip|hdrip|hdtv|camrip|telesync)\b/i, '')
+    .replace(/\b(x264|x265|hevc|h264|h265|aac|dts|dd5\.1|ac3|mp3|esub|sub|dual|dual-audio|multi|multi-audio|hindi-dubbed)\b/i, '')
+    .replace(/\b(yify|yts|psa|qxr|rarbg|tigole|galaxyrg|megusta|mkvca?c?)\b/i, '');
+
+  if (type === 'movie') {
+    cleaned = cleaned
+      .replace(/\[[^\]]*\]/g, '') // Remove anything in brackets []
+      .replace(/\([^)]*\)/g, ''); // Remove anything in parenthesis ()
+  }
+
+  cleaned = cleaned
+    .replace(/[^a-zA-Z0-9\s]/g, ' ') // Remove special chars but preserve spaces
     .replace(/\s+/g, ' ')
     .trim();
+
+  return cleaned;
 }
 
 function slugify(value) {
@@ -156,7 +173,7 @@ function hasSequentialEpisodePattern(files = []) {
   return sequentialPairs >= 1;
 }
 
-function buildEpisodesFromFiles(root, seriesSlug, seasonPath, seasonNumber, files, toPublicUrl) {
+function buildEpisodesFromFiles(root, seriesSlug, seasonPath, seasonNumber, files, toPublicUrl, findSubtitleFile) {
   const sortedFiles = sortEpisodeFiles(files);
   const usedEpisodeNumbers = new Set();
 
@@ -167,13 +184,15 @@ function buildEpisodesFromFiles(root, seriesSlug, seasonPath, seasonNumber, file
     }
     usedEpisodeNumbers.add(parsedNumber);
 
+    const videoPath = path.join(seasonPath, file);
     return {
       id: `${seriesSlug}-${seasonNumber}-${parsedNumber}`,
       number: parsedNumber,
       title: cleanTitle(safeDecodeURIComponent(file)),
-      videoUrl: toPublicUrl(root, path.join(seasonPath, file)),
-      sourcePath: path.join(seasonPath, file),
+      videoUrl: toPublicUrl(root, videoPath),
+      sourcePath: videoPath,
       duration: '',
+      subtitleUrl: typeof findSubtitleFile === 'function' ? findSubtitleFile(root, videoPath) : '',
     };
   });
 }
@@ -184,6 +203,7 @@ function buildSeriesSeasons(root, seriesFolderName, seriesPath, options = {}) {
     listDirectories,
     listVideoFiles,
     toPublicUrl,
+    findSubtitleFile,
     preferredSeasonLabel = 'Season 1',
   } = options;
   const seriesFiles = listFiles(seriesPath);
@@ -225,7 +245,7 @@ function buildSeriesSeasons(root, seriesFolderName, seriesPath, options = {}) {
         number: seasonNumber,
         title: cleanTitle(seasonName),
         sourcePath: seasonPath,
-        episodes: buildEpisodesFromFiles(root, seriesSlug, effectiveSeasonPath, seasonNumber, episodeFiles, toPublicUrl),
+        episodes: buildEpisodesFromFiles(root, seriesSlug, effectiveSeasonPath, seasonNumber, episodeFiles, toPublicUrl, findSubtitleFile),
       });
     }
   }
@@ -238,7 +258,7 @@ function buildSeriesSeasons(root, seriesFolderName, seriesPath, options = {}) {
         number: 1,
         title: preferredSeasonLabel,
         sourcePath: seriesPath,
-        episodes: buildEpisodesFromFiles(root, seriesSlug, seriesPath, 1, episodeFiles, toPublicUrl),
+        episodes: buildEpisodesFromFiles(root, seriesSlug, seriesPath, 1, episodeFiles, toPublicUrl, findSubtitleFile),
       });
     }
   }

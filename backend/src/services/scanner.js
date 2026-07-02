@@ -44,9 +44,9 @@ const VIDEO_EXTENSIONS = new Set(
     .filter(Boolean),
 );
 const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
-const MIN_MOVIE_SIZE = Number(process.env.SCANNER_MIN_MOVIE_SIZE || 104857600); // 100MB
-const MIN_EPISODE_SIZE = Number(process.env.SCANNER_MIN_EPISODE_SIZE || 31457280); // 30MB
-const JUNK_REGEX = /\b(sample|trailer|extras|promo|short|clip|preview|teaser)\b/i;
+const MIN_MOVIE_SIZE = Number(process.env.SCANNER_MIN_MOVIE_SIZE || 524288000); // 500MB
+const MIN_EPISODE_SIZE = Number(process.env.SCANNER_MIN_EPISODE_SIZE || 104857600); // 100MB
+const JUNK_REGEX = /\b(sample|trailer|extras?|promo|short|clip|preview|teaser|behind\s*the\s*scenes|yts\.mx|advertisement|featurette)\b/i;
 const DUPLICATE_HOLD_DIR_NAME = process.env.MEDIA_NORMALIZER_DUPLICATE_DIR || '_duplicate_hold';
 const PREFERRED_POSTER_PATTERNS = [
   /^(poster|cover|folder|front)$/i,
@@ -188,11 +188,15 @@ function buildSeriesSeasons(root, seriesFolderName, seriesPath, preferredSeasonL
     listDirectories,
     listVideoFiles,
     toPublicUrl,
+    findSubtitleFile,
     preferredSeasonLabel,
   });
 }
 
 function detectSeriesFolder(root, folderPath, files = [], nestedDirectories = []) {
+  if (root.type === 'movie' && root.id && !String(root.id).startsWith('auto-')) {
+    return false;
+  }
   if (root.type === 'series') {
     return true;
   }
@@ -258,6 +262,14 @@ async function renameMediaForItem(item) {
   if (!sourcePath || !fs.existsSync(sourcePath)) return item;
 
   try {
+    // Check if the file is currently locked, uploading, or has no write permissions
+    try {
+      fs.accessSync(sourcePath, fs.constants.W_OK);
+    } catch (err) {
+      logScannerEvent('file_rename_skipped_locked', { sourcePath, error: 'File is locked or has no write permissions' });
+      return item;
+    }
+
     const dirName = path.dirname(sourcePath);
     const ext = path.extname(sourcePath);
     const isFile = ext !== '' && fs.statSync(sourcePath).isFile();
@@ -757,6 +769,34 @@ function listVideoFiles(files, dirPath, contentType = 'movie') {
   return files.filter((file) => isValidMediaFile(path.join(dirPath, file), contentType));
 }
 
+function findSubtitleFile(root, videoFilePath) {
+  try {
+    const dir = path.dirname(videoFilePath);
+    const videoName = path.basename(videoFilePath, path.extname(videoFilePath));
+    if (!fs.existsSync(dir)) {
+      return '';
+    }
+
+    const files = fs.readdirSync(dir);
+    // Extensions we accept for subtitle files
+    const subExts = ['.srt', '.vtt'];
+
+    for (const file of files) {
+      const ext = path.extname(file).toLowerCase();
+      if (subExts.includes(ext)) {
+        const subName = path.basename(file, ext);
+        // Match exact name (e.g. Kingsman.srt) or language suffixes (e.g. Kingsman.en.srt)
+        if (subName === videoName || subName.startsWith(`${videoName}.`)) {
+          return toPublicUrl(root, path.join(dir, file));
+        }
+      }
+    }
+  } catch {
+    // Fail-safe
+  }
+  return '';
+}
+
 function isYearFolderName(value) {
   return /^(19|20)\d{2}$/.test(String(value || '').trim());
 }
@@ -786,28 +826,32 @@ function buildMovieCandidates(root, folderPath, relativeFolder, files) {
 
   if (shouldExpandMovieFolder(relativeFolder, folderName, videoFiles)) {
     return videoFiles.map((videoFile) => {
-      const titleSource = cleanTitle(videoFile);
+      const titleSource = cleanTitle(videoFile, 'movie');
+      const videoPath = path.join(folderPath, videoFile);
       return {
         titleSource,
         slugSource: titleSource,
         year: extractYear(titleSource) || extractYear(relativeFolder) || extractYear(folderName),
-        videoUrl: toPublicUrl(root, path.join(folderPath, videoFile)),
-        sourcePath: path.join(folderPath, videoFile),
-        sourcePublicPath: toPublicUrl(root, path.join(folderPath, videoFile)),
+        videoUrl: toPublicUrl(root, videoPath),
+        sourcePath: videoPath,
+        sourcePublicPath: toPublicUrl(root, videoPath),
         scanSignature: `${root.id}:${relativeFolder === '.' ? '' : `${relativeFolder}/`}${videoFile}`,
+        subtitleUrl: findSubtitleFile(root, videoPath),
       };
     });
   }
 
   const titleSource = folderName;
+  const videoPath = path.join(folderPath, videoFiles[0]);
   return [{
     titleSource,
     slugSource: titleSource,
     year: extractYear(relativeFolder) || extractYear(folderName),
-    videoUrl: toPublicUrl(root, path.join(folderPath, videoFiles[0])),
+    videoUrl: toPublicUrl(root, videoPath),
     sourcePath: folderPath,
     sourcePublicPath: toPublicUrl(root, folderPath),
     scanSignature: `${root.id}:${relativeFolder}`,
+    subtitleUrl: findSubtitleFile(root, videoPath),
   }];
 }
 
@@ -2195,7 +2239,47 @@ function bootstrapAutoScanScheduler() {
 if (!process.env.SCANNER_RUN_ID) {
   bootstrapScannerRuntime();
   registerScannerSignalHandlers();
-  // bootstrapAutoScanScheduler();
+  bootstrapAutoScanScheduler();
+  setupFileWatcher();
+}
+
+let fileWatcherTimer = null;
+
+function setupFileWatcher() {
+  const targetDir = DEFAULT_MEDIA_LIBRARY_ROOT;
+  if (!fs.existsSync(targetDir)) {
+    return;
+  }
+
+  logScannerEvent('file_watcher_started', { path: targetDir });
+
+  try {
+    fs.watch(targetDir, { recursive: true }, (eventType, filename) => {
+      if (!filename) return;
+
+      const ext = path.extname(filename).toLowerCase();
+      // Only care about media extensions (ignoring folders, metadata, subtitles, temp files)
+      if (eventType === 'rename' && VIDEO_EXTENSIONS.has(ext)) {
+        // Debounce scan calls to allow full file upload to finish before running a scan
+        if (fileWatcherTimer) {
+          clearTimeout(fileWatcherTimer);
+        }
+        fileWatcherTimer = setTimeout(() => {
+          fileWatcherTimer = null;
+          if (currentScanJob?.status === 'running') {
+            logScannerEvent('watcher_scan_skipped_running');
+            return;
+          }
+          logScannerEvent('watcher_scan_triggered', { file: filename });
+          Promise.resolve(startScanJob([])).catch((err) =>
+            logScannerEvent('watcher_scan_failed', { error: err.message })
+          );
+        }, 5000); // 5-second debounce window
+      }
+    });
+  } catch (err) {
+    logScannerEvent('watcher_init_failed', { error: err.message });
+  }
 }
 
 
