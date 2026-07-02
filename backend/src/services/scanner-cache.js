@@ -13,6 +13,9 @@ const SCANNER_CACHE_DIR = process.env.SCANNER_CACHE_DIR || path.join(process.cwd
 const CACHE_DIR = path.resolve(SCANNER_CACHE_DIR);
 const MEMORY_CACHE = new Map();
 const DEFAULT_TTL = 24 * 60 * 60 * 1000; // 24 hours
+// Bound the in-memory cache so a large scan (one entry per unique title) can't grow it without
+// limit. Map preserves insertion order, so evicting the first key is an LRU-style eviction.
+const MAX_MEMORY_CACHE_ENTRIES = Math.max(100, Number(process.env.SCANNER_MEMORY_CACHE_MAX || 5000));
 
 // Ensure cache directory exists
 function ensureCacheDir() {
@@ -50,15 +53,25 @@ function getFromMemoryCache(cacheKey) {
     MEMORY_CACHE.delete(cacheKey);
     return null;
   }
+  // Refresh LRU position: re-insert so recently-used entries survive eviction.
+  MEMORY_CACHE.delete(cacheKey);
+  MEMORY_CACHE.set(cacheKey, entry);
   return entry.data;
 }
 
 // Set to memory cache
 function setToMemoryCache(cacheKey, data, ttl = DEFAULT_TTL) {
+  MEMORY_CACHE.delete(cacheKey);
   MEMORY_CACHE.set(cacheKey, {
     data,
     expiresAt: Date.now() + ttl,
   });
+  // Evict oldest entries once over the bound.
+  while (MEMORY_CACHE.size > MAX_MEMORY_CACHE_ENTRIES) {
+    const oldestKey = MEMORY_CACHE.keys().next().value;
+    if (oldestKey === undefined) break;
+    MEMORY_CACHE.delete(oldestKey);
+  }
 }
 
 // Get from disk cache
@@ -256,15 +269,22 @@ async function fetchWithRateLimitAndCache(provider, fetchFn, params, cacheTtl, f
   return { data, fromCache: false };
 }
 
-// Auto cache cleanup disabled — only runs on demand
-// if (!global.cacheCleanupInterval) {
-//   global.cacheCleanupInterval = setInterval(() => {
-//     clearExpiredCache();
-//   }, 60 * 60 * 1000);
-//   if (typeof global.cacheCleanupInterval.unref === 'function') {
-//     global.cacheCleanupInterval.unref();
-//   }
-// }
+// Periodically prune expired disk cache entries so the cache dir can't grow without bound.
+// Only in the main server process (not scan workers, which are short-lived and set
+// SCANNER_RUN_ID), and unref'd so it never keeps the process alive.
+if (!process.env.SCANNER_RUN_ID && !global.cacheCleanupInterval) {
+  const cleanupIntervalMs = Math.max(60 * 60 * 1000, Number(process.env.SCANNER_CACHE_CLEANUP_INTERVAL_MS || 6 * 60 * 60 * 1000));
+  global.cacheCleanupInterval = setInterval(() => {
+    try {
+      clearExpiredCache();
+    } catch {
+      // best effort
+    }
+  }, cleanupIntervalMs);
+  if (typeof global.cacheCleanupInterval.unref === 'function') {
+    global.cacheCleanupInterval.unref();
+  }
+}
 
 module.exports = {
   CACHE_DIR,

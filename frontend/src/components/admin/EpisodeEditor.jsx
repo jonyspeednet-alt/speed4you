@@ -21,13 +21,13 @@ function EpisodeEditor({ formData, episodesExpanded, setEpisodesExpanded, handle
           {episodesExpanded ? '▲ Collapse' : '▼ Episodes'}
         </button>
       </div>
-      <div style={{ display: episodesExpanded ? 'grid' : 'none', gap: '12px' }} aria-hidden={!episodesExpanded}>
+      <div style={{ display: episodesExpanded ? 'grid' : 'none', gap: '6px' }} aria-hidden={!episodesExpanded}>
         <div style={styles.infoBox}>
           Manual override from here will save episode-specific Media URL, so each episode can point to its own file.
         </div>
 
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'end', flexWrap: 'wrap' }}>
-          <div style={{ ...styles.field, flex: 1, minWidth: '200px' }}>
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'end', flexWrap: 'wrap' }}>
+          <div style={{ ...styles.field, flex: 1, minWidth: '180px' }}>
             <label style={styles.label}>Batch Set Episode URLs</label>
             <input
               type="text"
@@ -41,7 +41,7 @@ function EpisodeEditor({ formData, episodesExpanded, setEpisodesExpanded, handle
             Apply to All
           </button>
         </div>
-        <div style={{ fontSize: '0.7rem', color: 'var(--text-3, #475569)', marginTop: '-4px' }}>
+        <div style={{ fontSize: '0.65rem', color: 'var(--text-3, #475569)', marginTop: '-2px' }}>
           Use {'{NN}'} for auto-numbered episodes (01, 02, ...), {'{N}'} for 1, 2, ...
         </div>
 
@@ -80,7 +80,7 @@ function EpisodeEditor({ formData, episodesExpanded, setEpisodesExpanded, handle
               <div style={styles.episodeEditorList}>
                 {(season.episodes || []).map((episode, episodeIndex) => (
                   <div key={episode.id || `${seasonIndex}-${episodeIndex}`} style={styles.episodeEditorCard}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '6px' }}>
                       <div style={styles.episodeEditorHeader}>
                         <strong>Episode {episode.number || episodeIndex + 1}</strong>
                         <small style={styles.episodeEditorHint}>{episode.sourcePath || 'No source path found'}</small>
@@ -136,7 +136,7 @@ function EpisodeEditor({ formData, episodesExpanded, setEpisodesExpanded, handle
                         onChange={(event) => handleEpisodeChange(seasonIndex, episodeIndex, 'description', event.target.value)}
                         onInput={(e) => autoResize(e.target)}
                         style={styles.textarea}
-                        rows={2}
+                        rows={1}
                         placeholder="Optional episode notes"
                       />
                     </div>

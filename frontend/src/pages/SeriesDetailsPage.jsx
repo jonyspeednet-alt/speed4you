@@ -10,6 +10,7 @@ import WatchlistButton from '../components/ui/WatchlistButton';
 import VideoPlayerModal from '../components/player/VideoPlayerModal';
 import ConfirmDialog from '../components/overlays/ConfirmDialog';
 import ContentRail from '../features/home/components/ContentRail';
+import { toPlayableSrc } from '../utils/mediaUrl';
 import { DETAIL_STYLES, DETAIL_SKELETON, posterFallbackUrl } from '../styles/detailPage';
 
 const posterFallback = posterFallbackUrl;
@@ -129,7 +130,7 @@ function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMo
         {episode.videoUrl && (() => {
           return (
             <button
-              onClick={() => setPlayerSrc(`/media${episode.videoUrl}`)}
+              onClick={() => setPlayerSrc(toPlayableSrc(episode.videoUrl))}
               style={{
                 ...downloadBtnStyle,
                 background: playHovered ? 'rgba(0, 255, 255, 0.12)' : 'rgba(0, 200, 255, 0.08)',

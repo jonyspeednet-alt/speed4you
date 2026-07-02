@@ -3,6 +3,7 @@ import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { moviesService } from '../services/moviesService';
 import { seriesService } from '../services/seriesService';
 import { progressService } from '../services/apiClient';
+import { toPlayableSrc } from '../utils/mediaUrl';
 import '../styles/videoPlayer.css';
 
 const RATES = [0.5, 0.75, 1, 1.25, 1.5, 2];
@@ -41,14 +42,14 @@ export default function VideoPlayerPage() {
     try {
       if (type === 'movie') {
         const d = await moviesService.getById(id);
-        if (d?.videoUrl) { setSrc(`/media${d.videoUrl}`); setTitle(d.title || 'Movie'); setItem(d); }
+        if (d?.videoUrl) { setSrc(toPlayableSrc(d.videoUrl)); setTitle(d.title || 'Movie'); setItem(d); }
       } else if (type === 'series') {
         const d = await seriesService.getById(id);
         setItem(d);
         for (const s of d?.seasons || []) {
           if (s.number === seasonNum || Number(s.id) === seasonNum) {
             const ep = (s.episodes || []).find(e => e.number === episodeNum || Number(e.id) === episodeNum);
-            if (ep?.videoUrl) { setSrc(`/media${ep.videoUrl}`); setTitle(ep.title || `Episode ${episodeNum}`); }
+            if (ep?.videoUrl) { setSrc(toPlayableSrc(ep.videoUrl)); setTitle(ep.title || `Episode ${episodeNum}`); }
             break;
           }
         }

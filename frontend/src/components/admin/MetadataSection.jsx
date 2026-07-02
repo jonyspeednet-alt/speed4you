@@ -38,7 +38,7 @@ function MetadataSection({ formData, handleChange, tmdbIdInput, setTmdbIdInput, 
         <div style={styles.field}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <label style={styles.label}>Title *</label>
-            <span style={{ fontSize: '0.62rem', color: (formData.title || '').length > 450 ? '#f59e0b' : 'var(--text-3, #475569)' }}>
+            <span style={{ fontSize: '0.58rem', color: (formData.title || '').length > 450 ? '#f59e0b' : 'var(--text-3, #475569)' }}>
               {(formData.title || '').length}/500
             </span>
           </div>
@@ -52,7 +52,7 @@ function MetadataSection({ formData, handleChange, tmdbIdInput, setTmdbIdInput, 
             maxLength={500}
           />
           {hasDuplicateWarning && (
-            <span style={{ fontSize: '0.7rem', color: '#f59e0b' }}>Similar titles found — check Duplicate Radar below</span>
+            <span style={{ fontSize: '0.62rem', color: '#f59e0b' }}>Similar titles found — check Duplicate Radar below</span>
           )}
         </div>
 
@@ -68,7 +68,7 @@ function MetadataSection({ formData, handleChange, tmdbIdInput, setTmdbIdInput, 
       <div style={styles.field}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <label style={styles.label}>Description</label>
-          <span style={{ fontSize: '0.62rem', color: 'var(--text-3, #475569)' }}>
+          <span style={{ fontSize: '0.58rem', color: 'var(--text-3, #475569)' }}>
             {(formData.description || '').length} chars
           </span>
         </div>

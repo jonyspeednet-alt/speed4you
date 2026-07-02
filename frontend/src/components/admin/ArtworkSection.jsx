@@ -31,7 +31,7 @@ function ArtworkSection({ formData, setFormField, onAssetUpload, uploadingPoster
       >
         <label style={styles.label}>Poster Image URL</label>
         <input type="text" name="poster" value={formData.poster} onChange={(e) => { setFormField('poster', e.target.value); setPosterError(false); }} style={styles.input} placeholder="/portal/uploads/posters/..." />
-        <div style={{ display: 'flex', gap: '6px' }}>
+        <div style={{ display: 'flex', gap: '4px' }}>
           <button type="button" onClick={() => posterInputRef.current?.click()} disabled={uploadingPoster} style={styles.uploadBtn}>
             {uploadingPoster ? 'Uploading...' : 'Upload Poster'}
           </button>
@@ -49,7 +49,7 @@ function ArtworkSection({ formData, setFormField, onAssetUpload, uploadingPoster
       >
         <label style={styles.label}>Banner Image URL</label>
         <input type="text" name="backdrop" value={formData.backdrop} onChange={(e) => { setFormField('backdrop', e.target.value); setBackdropError(false); }} style={styles.input} placeholder="/portal/uploads/banners/..." />
-        <div style={{ display: 'flex', gap: '6px' }}>
+        <div style={{ display: 'flex', gap: '4px' }}>
           <button type="button" onClick={() => backdropInputRef.current?.click()} disabled={uploadingBackdrop} style={styles.uploadBtn}>
             {uploadingBackdrop ? 'Uploading...' : 'Upload Banner'}
           </button>
