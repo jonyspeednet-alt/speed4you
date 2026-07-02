@@ -9,7 +9,6 @@ import ArtworkSection from '../../components/admin/ArtworkSection';
 import ChecklistSection from '../../components/admin/ChecklistSection';
 import DuplicateRadar from '../../components/admin/DuplicateRadar';
 import ScannerSource from '../../components/admin/ScannerSource';
-import ActionBar from '../../components/admin/ActionBar';
 import FormSkeleton from '../../components/admin/FormSkeleton';
 import { useBreakpoint } from '../../hooks';
 import useContentForm from '../../hooks/useContentForm';
@@ -31,10 +30,7 @@ function AddContentPage() {
   const [uploadingPoster, setUploadingPoster] = useState(false);
   const [uploadingBackdrop, setUploadingBackdrop] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
-  const [versionHistory, setVersionHistory] = useState([]);
   const [duplicating, setDuplicating] = useState(false);
-  const [showMetaRadar, setShowMetaRadar] = useState(false);
 
   const duplicateCandidates = liveDuplicates ?? (form.itemMeta?.duplicateCandidates || []);
   const hasDuplicateWarning = duplicateCandidates.length > 0;
@@ -118,13 +114,16 @@ function AddContentPage() {
     setShowDeleteConfirm(false);
   }, [form.handleDelete, navigate]);
 
-  const handleTmdbImport = useCallback(async () => {
+  const handleFetchAndApply = useCallback(async () => {
     try {
       await tmdb.handleTmdbImport(form.formData.type);
+      if (tmdb.tmdbPreview) {
+        tmdb.applyTmdbMetadata(tmdb.tmdbPreview);
+      }
     } catch (err) {
-      form.setError(err.message || 'Metadata import failed.');
+      form.setError(err.message || 'Metadata fetch failed.');
     }
-  }, [tmdb.handleTmdbImport, form.formData.type, form.setError]);
+  }, [tmdb.handleTmdbImport, tmdb.applyTmdbMetadata, tmdb.tmdbPreview, form.formData.type, form.setError]);
 
   const handleBatchSetUrls = useCallback((pattern) => {
     const seasons = form.formData.seasons || [];
@@ -170,16 +169,6 @@ function AddContentPage() {
     }
   }, [form.isEditMode, id, form.formData.status, form.setFormField, form.setError, form.itemMeta]);
 
-  const handleLoadHistory = useCallback(async () => {
-    if (!showHistory) {
-      setVersionHistory([
-        { date: form.itemMeta?.updatedAt || new Date().toISOString(), user: 'Admin', action: 'Last update' },
-        { date: form.itemMeta?.createdAt || new Date().toISOString(), user: 'System', action: 'Created by scanner' },
-      ]);
-    }
-    setShowHistory(!showHistory);
-  }, [showHistory, form.itemMeta]);
-
   return (
     <div style={S.page}>
       <header style={S.toolbar}>
@@ -191,17 +180,24 @@ function AddContentPage() {
           title={form.isEditMode ? 'Click to toggle' : ''}
         >{form.formData.status}</span>
         <span style={S.chip}>{form.completenessScore}%</span>
-        <span style={S.chip}>{form.itemMeta?.metadataStatus || 'manual'}</span>
         {SECTION_NAV.map((s) => (
           <button key={s.id} type="button" onClick={() => scrollToSection(s.id)}
             style={{ ...S.navPill, ...(activeSection === s.id ? S.navPillActive : {}) }}>{s.label}</button>
         ))}
         <span style={S.spacer} />
-        {form.isEditMode && <button type="button" onClick={handleDuplicate} disabled={duplicating} style={S.miniBtn}>Dup</button>}
-        {form.isEditMode && <button type="button" onClick={handleLoadHistory} style={S.miniBtn}>Hist</button>}
-        {form.isEditMode && <button type="button" onClick={() => setShowMetaRadar(!showMetaRadar)} style={S.miniBtn}>Radar</button>}
-        <span style={S.hint}>Ctrl+S</span>
+        <button type="submit" disabled={form.loading} style={S.secondaryBtn}>
+          {form.loading ? '..' : (form.isEditMode ? 'Save' : 'Save Draft')}
+        </button>
+        <button type="button" disabled={form.loading} onClick={handleSaveAndPublish} style={S.submitBtn}>
+          {form.loading ? '..' : (form.isEditMode ? 'Publish' : 'Save & Pub')}
+        </button>
+        {form.isEditMode && (
+          <button type="button" disabled={form.loading} onClick={() => setShowDeleteConfirm(true)} style={S.deleteBtn}>Del</button>
+        )}
         {form.isDirty && <span style={S.unsavedDot} />}
+        {!form.isDirty && form.lastSavedAt && <span style={{ fontSize: '0.56rem', color: '#4ade80' }}>saved</span>}
+        <span style={S.hint}>Ctrl+S</span>
+        {form.isEditMode && <button type="button" onClick={handleDuplicate} disabled={duplicating} style={S.miniBtn}>Dup</button>}
       </header>
 
       {form.error ? <div style={S.errorBar} role="alert">{form.error}</div> : null}
@@ -227,8 +223,7 @@ function AddContentPage() {
                   setTmdbIdInput={tmdb.setTmdbIdInput}
                   loadingTmdb={tmdb.loadingTmdb}
                   tmdbPreview={tmdb.tmdbPreview}
-                  onTmdbImport={handleTmdbImport}
-                  onApplyTmdb={() => tmdb.applyTmdbMetadata(tmdb.tmdbPreview)}
+                  onFetchAndApply={handleFetchAndApply}
                   hasDuplicateWarning={hasDuplicateWarning}
                   styles={S}
                   isMobile={isMobile}
@@ -303,21 +298,6 @@ function AddContentPage() {
               )}
             </div>
           </div>
-
-          <ActionBar
-            isEditMode={form.isEditMode}
-            loading={form.loading}
-            onSave={() => form.handleSubmit(new Event('submit'))}
-            onSaveAndPublish={handleSaveAndPublish}
-            onDelete={() => setShowDeleteConfirm(true)}
-            onRetry={() => form.handleSubmit(new Event('submit'))}
-            isDirty={form.isDirty}
-            hasError={!!form.error}
-            publishedUrl={form.publishedUrl}
-            lastSavedAt={form.lastSavedAt}
-            onReset={form.resetForm}
-            styles={S}
-          />
         </form>
       )}
 

@@ -1,22 +1,19 @@
-function MetadataSection({ formData, handleChange, tmdbIdInput, setTmdbIdInput, loadingTmdb, tmdbPreview, onTmdbImport, onApplyTmdb, hasDuplicateWarning, styles: S, isMobile }) {
+function MetadataSection({ formData, handleChange, tmdbIdInput, setTmdbIdInput, loadingTmdb, tmdbPreview, onFetchAndApply, hasDuplicateWarning, styles: S, isMobile }) {
   return (
     <>
       <span style={S.sectionEyebrow}>Metadata</span>
       <div style={{ ...S.tmdbRow, ...(isMobile ? S.tmdbRowMobile : {}) }}>
         <div style={S.field}>
           <input type="text" value={tmdbIdInput} onChange={(e) => setTmdbIdInput(e.target.value)}
-            style={S.input} placeholder="TMDb/IMDb ID (e.g. 728754)" />
+            style={S.input} placeholder="TMDb/IMDb ID → Fetch & Apply" />
         </div>
-        <div style={S.tmdbActions}>
-          <button type="button" onClick={onTmdbImport} disabled={loadingTmdb || !tmdbIdInput} style={S.secondaryBtn}>
-            {loadingTmdb ? '...' : 'Fetch'}
-          </button>
-          <button type="button" onClick={onApplyTmdb} disabled={!tmdbPreview} style={S.submitBtn}>Apply</button>
-        </div>
+        <button type="button" onClick={onFetchAndApply} disabled={loadingTmdb || !tmdbIdInput} style={S.submitBtn}>
+          {loadingTmdb ? '..' : 'Fetch'}
+        </button>
       </div>
       {tmdbPreview && (
         <div style={S.tmdbPreviewCard}>
-          <strong>{tmdbPreview.title || 'Result'}</strong>
+          <strong>{tmdbPreview.title || 'Applied'}</strong>
           <small>{tmdbPreview.type} · {tmdbPreview.year || 'N/A'} · TMDb #{tmdbPreview.tmdbId}</small>
         </div>
       )}
