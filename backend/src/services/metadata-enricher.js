@@ -486,6 +486,18 @@ async function enrichItemWithMetadata(item) {
       : [];
     const confidence = Math.max(0, Math.min(bestMatch.score, 100));
 
+    const langCode = String(details.originalLanguage || '').toLowerCase();
+    const languageMap = {
+      hi: 'Hindi',
+      bn: 'Bengali',
+      en: 'English',
+      ta: 'South Indian',
+      te: 'South Indian',
+      ml: 'South Indian',
+      kn: 'South Indian'
+    };
+    const resolvedLanguage = languageMap[langCode] || enrichedItem.language || 'English';
+
     return {
       ...enrichedItem,
       description: enrichedItem.description || details.overview,
@@ -501,6 +513,9 @@ async function enrichItemWithMetadata(item) {
       title: confidence >= 60 ? details.title : enrichedItem.title,
       originalTitle: details.originalTitle,
       originalLanguage: details.originalLanguage,
+      language: resolvedLanguage,
+      // If TMDb match confidence is 80% or greater, auto-publish directly to website
+      status: confidence >= 80 ? 'published' : 'draft',
       metadataStatus: confidence >= 60 ? 'matched' : 'needs_review',
       metadataProvider: 'tmdb',
       metadataConfidence: confidence,
