@@ -11,10 +11,10 @@ function ChecklistSection({ formData, itemMeta, completenessScore, styles }) {
   return (
     <section id="section-checklist" data-section style={styles.section}>
       <span style={styles.sectionEyebrow}>Publish Checklist</span>
-      <div style={{ ...styles.field, marginBottom: '4px' }}>
+      <div style={{ ...styles.field, marginBottom: '2px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-2, #94a3b8)' }}>Completeness</span>
-          <span style={{ fontSize: '0.72rem', fontWeight: '700', color: completenessScore === 100 ? '#4ade80' : 'var(--text, #f1f5f9)' }}>{completenessScore}%</span>
+          <span style={{ fontSize: '0.65rem', color: 'var(--text-2, #94a3b8)' }}>Completeness</span>
+          <span style={{ fontSize: '0.65rem', fontWeight: '700', color: completenessScore === 100 ? '#4ade80' : 'var(--text, #f1f5f9)' }}>{completenessScore}%</span>
         </div>
         <div
           style={{ height: '4px', borderRadius: '2px', background: 'var(--surface-2, #181b22)', overflow: 'hidden' }}

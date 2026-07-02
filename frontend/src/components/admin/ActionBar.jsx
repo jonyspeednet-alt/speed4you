@@ -33,17 +33,17 @@ function ActionBar({ isEditMode, loading, onSave, onSaveAndPublish, onDelete, on
           Retry
         </button>
       )}
-      <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        {isDirty && !hasError && <span style={{ fontSize: '0.7rem', color: '#f59e0b' }} aria-live="polite">Unsaved changes</span>}
+      <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        {isDirty && !hasError && <span style={{ fontSize: '0.65rem', color: '#f59e0b' }} aria-live="polite">Unsaved changes</span>}
         {!isDirty && lastSavedAt && (
-          <span style={{ fontSize: '0.7rem', color: '#4ade80' }}>Saved {formatTimeAgo(lastSavedAt)}</span>
+          <span style={{ fontSize: '0.65rem', color: '#4ade80' }}>Saved {formatTimeAgo(lastSavedAt)}</span>
         )}
         {isEditMode && publishedUrl && (
-          <a href={publishedUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.7rem', color: 'var(--accent-primary, #6366f1)', textDecoration: 'none' }}>
+          <a href={publishedUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.65rem', color: 'var(--accent-primary, #6366f1)', textDecoration: 'none' }}>
             View on site
           </a>
         )}
-        <span style={{ fontSize: '0.68rem', color: 'var(--text-3, #475569)' }}>Ctrl+S</span>
+        <span style={{ fontSize: '0.62rem', color: 'var(--text-3, #475569)' }}>Ctrl+S</span>
       </span>
     </div>
   );

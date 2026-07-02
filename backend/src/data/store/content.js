@@ -428,14 +428,28 @@ async function pruneCatalog() {
   await ensureContentStore();
   const { items } = await listItems({}, 0, null, 'latest', false);
   const scannerRoots = loadScannerRoots();
-  const scannerPaths = scannerRoots.map(r => r.scanPath).filter(Boolean);
+  
+  // Only check paths for roots that are checkable on the current platform.
+  // This prevents deleting remote items when running on a different OS (e.g. Windows dev vs Linux prod).
+  const checkableRoots = scannerRoots.filter(r => {
+    const p = r.scanPath;
+    if (!p) return false;
+    if (process.platform === 'win32' && p.startsWith('/')) return false;
+    if (process.platform !== 'win32' && (/^[a-zA-Z]:[\\/]/.test(p) || p.startsWith('\\\\'))) return false;
+    return true;
+  });
+  const checkablePaths = checkableRoots.map(r => r.scanPath).filter(Boolean);
+  
   const toDelete = [];
   for (const item of items) {
     const isJunk = JUNK_REGEX.test(item.title) || (item.sourcePath && JUNK_REGEX.test(item.sourcePath));
     if (isJunk) { toDelete.push(item.id); continue; }
     if (!item.sourcePath) continue;
-    const withinScannedPath = scannerPaths.some(rootPath => item.sourcePath.startsWith(rootPath));
-    if (!withinScannedPath) continue;
+    
+    // Only prune if the item belongs to a checkable scanner root
+    const withinCheckablePath = checkablePaths.some(rootPath => item.sourcePath.startsWith(rootPath));
+    if (!withinCheckablePath) continue;
+    
     try {
       if (fs.existsSync(item.sourcePath)) {
         const stats = fs.statSync(item.sourcePath);

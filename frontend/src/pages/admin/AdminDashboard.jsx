@@ -33,7 +33,9 @@ export default function AdminDashboard() {
   const { data: dash, isLoading } = useQuery({
     queryKey: ['admin', 'dashboard'],
     queryFn: () => adminService.getDashboard(),
-    refetchInterval: 15000,
+    staleTime: 60000,
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
   });
 
   const stats = dash?.stats || {};
@@ -170,11 +172,11 @@ export default function AdminDashboard() {
           </div>
 
           {/* Scanner Drafts Alert */}
-          {(dash?.scannerDrafts || []).length > 0 && (
+          {(stats.scannerDrafts || 0) > 0 && (
             <div style={{ padding: '14px 16px', borderRadius: '12px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span style={{ fontSize: '1rem' }}>\u26A0\uFE0F</span>
               <span style={{ fontSize: '0.82rem', color: TEXT2 }}>
-                <strong style={{ color: '#f59e0b' }}>{dash.scannerDrafts.length}</strong> scanner draft{dash.scannerDrafts.length > 1 ? 's' : ''} pending
+                <strong style={{ color: '#f59e0b' }}>{stats.scannerDrafts}</strong> scanner draft{stats.scannerDrafts > 1 ? 's' : ''} pending
               </span>
             </div>
           )}

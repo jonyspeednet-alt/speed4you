@@ -10,6 +10,7 @@ import WatchlistButton from '../components/ui/WatchlistButton';
 import VideoPlayerModal from '../components/player/VideoPlayerModal';
 import ConfirmDialog from '../components/overlays/ConfirmDialog';
 import ContentRail from '../features/home/components/ContentRail';
+import { toPlayableSrc } from '../utils/mediaUrl';
 import { DETAIL_STYLES, DETAIL_SKELETON, posterFallbackUrl } from '../styles/detailPage';
 
 const posterFallback = posterFallbackUrl;
@@ -261,7 +262,7 @@ export default function MovieDetailsPage() {
                     {videoUrl && (() => {
                       return (
                         <button
-                          onClick={() => setPlayerSrc(`/media${videoUrl}`)}
+                          onClick={() => setPlayerSrc(toPlayableSrc(videoUrl))}
                           style={{ ...getPlayBtnStyle(playHovered), ...(isMobile ? s.btnFull : {}), border:'none', fontFamily:'inherit' }}
                           onMouseEnter={() => setPlayHovered(true)}
                           onMouseLeave={() => setPlayHovered(false)}

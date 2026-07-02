@@ -119,11 +119,12 @@ function withSummaryResult(result, summaryRequested) {
 }
 
 exports.getDashboard = async (req, res) => {
-  const stats = await getStats();
-  const recentContent = await getRecentItems(8);
-  const { items: scannerDrafts } = await listItems({ source: 'scanner', status: 'draft' }, 0, 12, 'latest', true, true);
-  const allUsers = await listUsers();
-  const scannerHealth = await getScannerHealth();
+  const [stats, recentContent, allUsers, scannerHealth] = await Promise.all([
+    getStats(),
+    getRecentItems(8),
+    listUsers(),
+    getScannerHealth(),
+  ]);
 
   res.json({
     stats: {
@@ -131,8 +132,6 @@ exports.getDashboard = async (req, res) => {
       totalAdminUsers: allUsers.length,
     },
     recentContent,
-    scannerDrafts,
-    scannerRoots: listScannerRoots(),
     scannerHealth: {
       totalRoots: scannerHealth.totalRoots,
       healthyRoots: scannerHealth.healthyRoots,
@@ -332,9 +331,9 @@ exports.getCurrentScannerJob = async (req, res) => {
   }
 };
 
-exports.runScanner = (req, res) => {
+exports.runScanner = async (req, res) => {
   const rootIds = Array.isArray(req.body?.rootIds) ? req.body.rootIds : [];
-  const job = startScanJob(rootIds);
+  const job = await startScanJob(rootIds);
   res.status(202).json({ job });
 };
 

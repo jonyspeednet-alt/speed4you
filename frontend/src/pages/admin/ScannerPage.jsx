@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useContext, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useContext, useCallback, useMemo, memo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminService } from '../../services';
 import { ToastContext } from '../../components/ui/ToastContext';
@@ -15,6 +15,7 @@ const ACCENT = 'var(--accent-primary, #6366f1)';
 const C = {
   running: '#4ade80',
   completed: '#60a5fa',
+  completed_with_errors: '#f59e0b',
   failed: '#f87171',
   stopped: '#facc15',
   interrupted: '#f59e0b',
@@ -38,6 +39,7 @@ const keyframes = `
 const STATUS_GRADIENTS = {
   running: 'linear-gradient(135deg, rgba(34,197,94,0.18) 0%, rgba(34,197,94,0.06) 100%)',
   completed: 'linear-gradient(135deg, rgba(96,165,250,0.15) 0%, rgba(96,165,250,0.04) 100%)',
+  completed_with_errors: 'linear-gradient(135deg, rgba(245,158,11,0.15) 0%, rgba(245,158,11,0.04) 100%)',
   failed: 'linear-gradient(135deg, rgba(239,68,68,0.15) 0%, rgba(239,68,68,0.04) 100%)',
   stopped: 'linear-gradient(135deg, rgba(250,204,21,0.15) 0%, rgba(250,204,21,0.04) 100%)',
   interrupted: 'linear-gradient(135deg, rgba(245,158,11,0.15) 0%, rgba(245,158,11,0.04) 100%)',
@@ -46,7 +48,7 @@ const STATUS_GRADIENTS = {
   finalizing: 'linear-gradient(135deg, rgba(167,139,250,0.15) 0%, rgba(167,139,250,0.04) 100%)',
 };
 
-function Stat({ label, value, accent, icon }) {
+const Stat = memo(function Stat({ label, value, accent, icon }) {
   return (
     <div style={{
       padding: '16px 18px', borderRadius: '14px',
@@ -62,9 +64,9 @@ function Stat({ label, value, accent, icon }) {
       <span style={{ fontSize: '1.5rem', fontWeight: '800', color: TEXT, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>{value}</span>
     </div>
   );
-}
+});
 
-function ProgressBar({ percent, color, height = 6, animated = false, label }) {
+const ProgressBar = memo(function ProgressBar({ percent, color, height = 6, animated = false, label }) {
   const pct = Math.max(0, Math.min(100, Number(percent) || 0));
   return (
     <div style={{ width: '100%' }}>
@@ -87,9 +89,9 @@ function ProgressBar({ percent, color, height = 6, animated = false, label }) {
       </div>
     </div>
   );
-}
+});
 
-function StatusPill({ status, size = 'md' }) {
+const StatusPill = memo(function StatusPill({ status, size = 'md' }) {
   const color = C[status] || TEXT3;
   const padding = size === 'sm' ? '2px 8px' : '4px 10px';
   const fontSize = size === 'sm' ? '0.68rem' : '0.74rem';
@@ -101,10 +103,10 @@ function StatusPill({ status, size = 'md' }) {
       border: `1px solid ${color}30`,
     }}>
       {status === 'running' && <span className="scn-pulse-dot" style={{ width: '6px', height: '6px', borderRadius: '50%', background: color }} />}
-      {status}
+            {String(status).replace(/_/g, ' ')}
     </span>
   );
-}
+});
 
 function Icon({ name, size = 16, color = 'currentColor', strokeWidth = 2 }) {
   const paths = {
@@ -124,7 +126,7 @@ function Icon({ name, size = 16, color = 'currentColor', strokeWidth = 2 }) {
     layers: <><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></>,
   };
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
       {paths[name]}
     </svg>
   );
@@ -153,28 +155,35 @@ export default function ScannerPage() {
   const logEndRef = useRef(null);
   const runsContainerRef = useRef(null);
   const toast = useContext(ToastContext);
-  const [prevJobStatus, setPrevJobStatus] = useState(null);
+  const prevJobStatusRef = useRef(null);
   const [selectedRoots, setSelectedRoots] = useState([]);
   const [confirmStop, setConfirmStop] = useState(false);
   const [confirmClearCache, setConfirmClearCache] = useState(false);
   const [filter, setFilter] = useState('all');
 
-  const { data: health, isLoading: healthLoading } = useQuery({
-    queryKey: ['admin', 'scanner', 'health'],
-    queryFn: () => adminService.getScannerHealth(),
-    refetchInterval: 3000,
-  });
-
-  const { data: jobData } = useQuery({
+  // The current-job query drives whether a scan is active. It self-schedules: poll fast while
+  // running, stop when idle (avoids hammering 3 endpoints every 2-5s forever). Starting a scan
+  // invalidates ['admin','scanner'], which refetches this and resumes polling.
+  const { data: jobData, isError: jobError } = useQuery({
     queryKey: ['admin', 'scanner', 'currentJob'],
     queryFn: () => adminService.getCurrentScannerJob(),
-    refetchInterval: 2000,
+    refetchInterval: (query) => (query.state.data?.job?.status === 'running' ? 2000 : false),
+  });
+
+  const scanActive = jobData?.job?.status === 'running';
+
+  const { data: health, isLoading: healthLoading, isError: healthError } = useQuery({
+    queryKey: ['admin', 'scanner', 'health'],
+    queryFn: () => adminService.getScannerHealth(),
+    // Health roots are server-cached for 30s, so polling faster than that is wasted. Only
+    // poll while a scan is active; otherwise fetch once on mount / on manual refetch.
+    refetchInterval: scanActive ? 10000 : false,
   });
 
   const { data: logsData } = useQuery({
     queryKey: ['admin', 'scanner', 'logs'],
     queryFn: () => adminService.getScannerLogs(15),
-    refetchInterval: 5000,
+    refetchInterval: scanActive ? 5000 : false,
   });
 
   const runMutation = useMutation({
@@ -202,9 +211,10 @@ export default function ScannerPage() {
   const roots = health?.roots || [];
   const recentRuns = logsData?.items || health?.recentRuns || [];
   const rootResults = job?.summary?.rootResults || [];
-  const hasInProgressRoot = rootResults.some((r) => r.status === 'running' || r.status === 'pending');
-  const displayStatus = (job?.status === 'running' || (job && hasInProgressRoot)) ? 'running' : (job?.status || null);
-  const isRunning = displayStatus === 'running';
+  // Only the job's own status decides "running". Previously a root left in 'pending' after the
+  // job ended pinned the UI to "running" forever (Run stayed disabled, Stop stayed enabled).
+  const isRunning = job?.status === 'running';
+  const displayStatus = job?.status || null;
   const elapsed = useElapsed(isRunning ? job?.startedAt : null);
 
   const activeRoot = useMemo(() => {
@@ -243,7 +253,7 @@ export default function ScannerPage() {
 
   useEffect(() => {
     if (!job) return;
-    if (prevJobStatus === 'running' && job.status !== 'running') {
+    if (prevJobStatusRef.current === 'running' && job.status !== 'running') {
       const summary = job.summary;
       const totalCount = summary?.totalErrors ?? summary?.errors?.length ?? 0;
       const msg = totalCount > 0
@@ -251,8 +261,8 @@ export default function ScannerPage() {
         : `Scan completed successfully. ${summary?.created || 0} created, ${summary?.updated || 0} updated, ${summary?.unchanged || 0} unchanged, ${summary?.duplicateDrafts || 0} duplicates.`;
       toast?.({ type: totalCount > 0 ? 'error' : 'success', message: msg, duration: 6000 });
     }
-    setPrevJobStatus(job.status);
-  }, [job?.status]);
+    prevJobStatusRef.current = job.status;
+  }, [job?.status, job, toast]);
 
   useEffect(() => {
     setConfirmStop(false);
@@ -282,6 +292,25 @@ export default function ScannerPage() {
       <style>{keyframes}</style>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '1200px' }}>
 
+      {(healthError || jobError) && (
+        <div role="alert" style={{
+          display: 'flex', alignItems: 'center', gap: '10px',
+          padding: '12px 16px', borderRadius: '12px',
+          background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
+        }}>
+          <Icon name="x" size={16} color="#f87171" />
+          <span style={{ fontSize: '0.82rem', color: TEXT2 }}>
+            Could not reach the scanner backend. Showing last known data — retrying automatically.
+          </span>
+          <button
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['admin', 'scanner'] })}
+            style={{ marginLeft: 'auto', background: 'none', border: `1px solid ${BORDER}`, color: TEXT2, borderRadius: '8px', padding: '4px 10px', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Hero Status Card */}
       <div style={{
         position: 'relative', overflow: 'hidden',
@@ -302,9 +331,9 @@ export default function ScannerPage() {
               </div>
               <div>
                 <h1 style={{ fontSize: '1.4rem', fontWeight: '800', color: TEXT, margin: 0, letterSpacing: '-0.02em' }}>
-                  {isRunning ? 'Scanner Running' : displayStatus ? `Scanner ${displayStatus}` : 'Scanner'}
+                  {isRunning ? 'Scanner Running' : displayStatus ? `Scanner ${String(displayStatus).replace(/_/g, ' ')}` : 'Scanner'}
                 </h1>
-                <p style={{ fontSize: '0.82rem', color: TEXT2, margin: '2px 0 0 0' }}>
+                <p aria-live="polite" style={{ fontSize: '0.82rem', color: TEXT2, margin: '2px 0 0 0' }}>
                   {isRunning
                     ? `Processing ${activeRoot?.label || 'next root'} • ${activeRoot ? `${activeRoot.processed || 0} / ${activeRoot.totalCandidates || 0} folders` : 'preparing...'}`
                     : 'Ready to scan media folders and detect new content'}
@@ -367,8 +396,8 @@ export default function ScannerPage() {
 
             {confirmClearCache ? (
               <div style={{ display: 'flex', gap: '6px' }}>
-                <button type="button" onClick={() => { clearCacheMutation.mutate(); setConfirmClearCache(false); }}
-                  style={{ padding: '11px 16px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: '700', cursor: 'pointer', background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}>
+                <button type="button" disabled={clearCacheMutation.isPending} onClick={() => { clearCacheMutation.mutate(); setConfirmClearCache(false); }}
+                  style={{ padding: '11px 16px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: '700', cursor: clearCacheMutation.isPending ? 'not-allowed' : 'pointer', opacity: clearCacheMutation.isPending ? 0.5 : 1, background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}>
                   Confirm
                 </button>
                 <button type="button" onClick={() => setConfirmClearCache(false)}
@@ -377,8 +406,9 @@ export default function ScannerPage() {
                 </button>
               </div>
             ) : (
-              <button type="button" onClick={() => setConfirmClearCache(true)} disabled={clearCacheMutation.isPending}
-                style={{ padding: '11px 14px', borderRadius: '12px', fontSize: '0.82rem', fontWeight: '600', cursor: 'pointer', background: SURFACE2, color: TEXT2, border: `1px solid ${BORDER}`, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <button type="button" onClick={() => setConfirmClearCache(true)} disabled={clearCacheMutation.isPending || isRunning}
+                title={isRunning ? 'Cannot clear cache while a scan is running' : undefined}
+                style={{ padding: '11px 14px', borderRadius: '12px', fontSize: '0.82rem', fontWeight: '600', cursor: (clearCacheMutation.isPending || isRunning) ? 'not-allowed' : 'pointer', opacity: (clearCacheMutation.isPending || isRunning) ? 0.5 : 1, background: SURFACE2, color: TEXT2, border: `1px solid ${BORDER}`, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                 <Icon name="trash" size={12} /> Cache
               </button>
             )}
@@ -508,6 +538,9 @@ export default function ScannerPage() {
               const statusColor = !isCheckable ? '#60a5fa' : root.exists ? (root.error ? '#facc15' : '#4ade80') : '#f87171';
               return (
                 <div key={root.id} onClick={() => toggleRoot(root.id)}
+                  role="checkbox" aria-checked={isSelected} tabIndex={0}
+                  aria-label={`Select scan root ${root.label}`}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleRoot(root.id); } }}
                   style={{
                     padding: '14px 16px', borderRadius: '12px',
                     background: isSelected ? 'rgba(99,102,241,0.08)' : SURFACE2,
@@ -517,7 +550,7 @@ export default function ScannerPage() {
                   }}>
                   {isSelected && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #6366f1, #8b5cf6)' }} />}
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                    <div style={{
+                    <div aria-hidden="true" style={{
                       width: '20px', height: '20px', borderRadius: '6px',
                       border: `2px solid ${isSelected ? ACCENT : BORDER}`,
                       background: isSelected ? ACCENT : 'transparent',
@@ -609,7 +642,7 @@ export default function ScannerPage() {
   );
 }
 
-function Tag({ children, color = TEXT2, bg = SURFACE2 }) {
+const Tag = memo(function Tag({ children, color = TEXT2, bg = SURFACE2 }) {
   return (
     <span style={{
       padding: '2px 8px', borderRadius: '5px',
@@ -617,7 +650,7 @@ function Tag({ children, color = TEXT2, bg = SURFACE2 }) {
       background: bg, color, border: `1px solid ${BORDER}`,
     }}>{children}</span>
   );
-}
+});
 
 function FixRootsButton() {
   const [fixing, setFixing] = useState(false);

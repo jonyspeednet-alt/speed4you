@@ -1,5 +1,16 @@
-const { scanSelectedRoots } = require('./scanner');
+const { scanSelectedRoots, requestScanAbort } = require('./scanner');
 const { ensureContentStore } = require('../data/store');
+
+// Orphan protection: if the parent server dies, the IPC channel disconnects — exit rather than
+// keep scanning (and writing to the DB) as an orphaned process.
+process.on('disconnect', () => process.exit(0));
+
+// Graceful stop: on SIGTERM (sent by stopScanJob), stop cooperatively between roots so the
+// current root can finalize instead of being force-killed mid-write. The parent applies a
+// SIGKILL fallback if this takes too long.
+process.on('SIGTERM', () => {
+  requestScanAbort();
+});
 
 function loadRootIds() {
   try {
