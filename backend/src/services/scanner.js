@@ -95,7 +95,6 @@ const BLOCKED_AUTO_ROOT_PATTERNS = [
   /\btutorial\b/i,
   /\bdocs?\b/i,
   /\bdocumentary\b/i,
-  /\brequested?\b/i,
   /\binbox\b/i,
   /\bpending\b/i,
   /\bqueue\b/i,
