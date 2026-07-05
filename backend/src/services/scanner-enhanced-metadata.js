@@ -34,6 +34,7 @@ const METADATA_PATCH_FIELDS = [
   'imdbId',
   'originalTitle',
   'originalLanguage',
+  'status',
   'metadataStatus',
   'metadataProvider',
   'metadataConfidence',
@@ -80,6 +81,11 @@ function applyMetadataPatch(item, patch, parsedTitle) {
     originalLanguage: patch.originalLanguage || item.originalLanguage || '',
     releasedAt: item.releasedAt || patch.releasedAt || '',
     seasons: patch.seasons || item.seasons || [],
+    // Auto-publish signal from the enricher (confidence >= 80). Only ever
+    // upgrade to published here — never downgrade an item that is already
+    // published/archived (the store's upsert additionally preserves
+    // user-managed statuses on existing items).
+    status: patch.status === 'published' ? 'published' : (item.status || 'draft'),
     metadataStatus: patch.metadataStatus || item.metadataStatus || 'skipped',
     metadataProvider: patch.metadataProvider || item.metadataProvider || '',
     metadataConfidence: patch.metadataConfidence ?? item.metadataConfidence ?? 0,
