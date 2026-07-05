@@ -31,12 +31,18 @@ const VERBOSE = args.includes('--verbose');
 function normalizeTitleKey(value, year) {
   const normalized = String(value || '')
     .toLowerCase()
-    .replace(/\b(1080p|720p|480p|2160p|web[- ]?dl|bluray|brrip|x264|x265|hdrip|dvdrip|proper|uncut)\b/g, '')
+    .replace(/\b(1080p|720p|480p|2160p|4k|8k)\b/g, '')
+    .replace(/\b(web[- ]?dl|webrip|bluray|brrip|dvdrip|hdrip|hdtc|hdcam|cam|hqrip|dvdscr|screener|ts|tc)\b/g, '')
+    .replace(/\b(x264|x265|h264|h265|hevc|avc|aac|10bit|dts|ddp5[\.\s]?1|ddp|atmos|truehd|flac|mp3)\b/g, '')
+    .replace(/\b(hdhub4u|cinevood|hdhub|ds4k|imax|line|hc|esubs?|esub|dual|multi)\b/g, '')
+    .replace(/\b(v2|v3|fhd|hq|proper|uncut|extended|unrated|directors?[\s-]?cut)\b/g, '')
+    .replace(/\b(zee5|netflix|amazon|hotstar|disney|sony|jio|aha|mx)\b/g, '')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/[^a-z0-9]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  const key = normalized || String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
-  if (year) return key + '-' + year;
+  const key = normalized || String(value || '').toLowerCase().replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (year) return `${key}-${year}`;
   return key;
 }
 
@@ -123,27 +129,20 @@ async function main() {
     // Rate each item: 0 = broken, 1 = has valid sourcePath, 2 = has valid sourcePath + videoUrl
     const rated = items.map(item => {
       const p = item.payload;
-      const sourceCheck = checkPath(p.sourcePath);
+      const resolved = resolveVideoPath(p);
       let score = 0;
-      let workingPath = null;
+      let workingPath = resolved.path || null;
 
-      if (sourceCheck.exists && sourceCheck.isFile) {
+      if (resolved.exists && resolved.isFile) {
         score = 2;
-        workingPath = p.sourcePath;
-      } else if (sourceCheck.exists && sourceCheck.isDir) {
-        // Check if dir has video files
-        try {
-          const videoFiles = fs.readdirSync(p.sourcePath).filter(f => /\.(mp4|mkv|avi|mov|webm|m4v)$/i.test(f));
-          if (videoFiles.length > 0) {
-            score = 2;
-            workingPath = path.join(p.sourcePath, videoFiles[0]);
-          } else {
-            score = 0;
-          }
-        } catch { score = 0; }
+      } else if (resolved.exists && resolved.isDir) {
+        score = 2;
       } else if (p.videoUrl) {
-        // videoUrl might exist remotely even if sourcePath is missing
         score = 1;
+      }
+
+      if (VERBOSE) {
+        console.log('    ID=' + item.id + ' score=' + score + ' resolved=' + (resolved.path || 'none') + ' method=' + (resolved.method || 'n/a'));
       }
 
       return { ...item, score, workingPath };
@@ -163,7 +162,7 @@ async function main() {
     // Check if the best item has broken videoUrl but correct sourcePath:
     // If so, fix the videoUrl based on scanner roots
     if (best.score >= 1 && best.workingPath && !best.payload.videoUrl) {
-      console.log('  -> Best item has sourcePath but no videoUrl (will fix)');
+      if (VERBOSE) console.log('  -> Best item has sourcePath but no videoUrl (will fix)');
       if (!DRY_RUN) {
         const newPayload = { ...best.payload, videoUrl: best.payload.videoUrl || best.payload.sourcePublicPath || '' };
         await pool.query('UPDATE content_catalog SET payload = $2::jsonb WHERE id = $1', [best.id, JSON.stringify(newPayload)]);
@@ -176,7 +175,9 @@ async function main() {
       if (!DRY_RUN) {
         await pool.query('DELETE FROM content_catalog WHERE id = $1', [dup.id]);
       }
-      console.log('  -> ' + (DRY_RUN ? '[DRY RUN] Would delete' : 'Deleted') + ' ID=' + dup.id + ' (score=' + dup.score + ')');
+      if (VERBOSE) {
+        console.log('  -> ' + (DRY_RUN ? '[DRY RUN] Would delete' : 'Deleted') + ' ID=' + dup.id + ' (score=' + dup.score + ')');
+      }
       totalRemoved++;
     }
 

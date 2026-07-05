@@ -1,6 +1,6 @@
 const { db, appStateCache, ensureContentStore, setAppState } = require('./base');
 const { MAX_SCANNER_RUNS } = require('./constants');
-const { toSafeInteger, rowToScannerRoot, rowToScannerRun, normalizeItem, normalizeTitleKey, extractTypedColumns, attachDuplicateMetadata } = require('./helpers');
+const { toSafeInteger, rowToScannerRoot, rowToScannerRun, normalizeItem, normalizeTitleKey, titlesFuzzyMatch, extractTypedColumns, attachDuplicateMetadata } = require('./helpers');
 
 function loadScannerLog() {
   return appStateCache.get('scanner_log') || { runs: [] };
@@ -198,9 +198,11 @@ async function upsertScannedItem(payload) {
   // scanSignature and sourcePath won't match, so a new item would be created.
   // Check by titleKey instead — if an existing scanner item with the same
   // type:titleKey is found, update it rather than creating a duplicate.
+  // Also try fuzzy matching for similar titles (e.g., "K.G.F" vs "KGF").
   if (!current) {
     const computedTitleKey = normalizeTitleKey(payload.title, payload.year);
     if (computedTitleKey) {
+      // Try exact titleKey match first
       const titleKeyMatch = await db.query(
         `SELECT id, payload FROM content_catalog
          WHERE content_type = $1 AND title_key = $2
@@ -217,6 +219,40 @@ async function upsertScannedItem(payload) {
           seasonCount: payload.seasonCount ?? current.seasonCount ?? 0,
           episodeCount: payload.episodeCount ?? current.episodeCount ?? 0,
         };
+      } else {
+        // No exact match - try fuzzy matching with existing scanner items
+        const existingItems = await db.query(
+          `SELECT id, title, title_key, payload FROM content_catalog
+           WHERE content_type = $1
+             AND source_type = 'scanner'
+             AND title_key IS NOT NULL
+             AND title_key <> ''
+           LIMIT 100`,
+          [String(payload.type || '').toLowerCase()],
+        );
+
+        for (const row of existingItems.rows) {
+          const existingTitle = row.payload?.title || row.title || '';
+          const existingYear = row.payload?.year || null;
+          const existingTitleKey = row.title_key || normalizeTitleKey(existingTitle, existingYear);
+
+          // Check if titles match fuzzily
+          if (titlesFuzzyMatch(payload.title, existingTitle, 0.8)) {
+            // Also check year match if both have years
+            const yearMatch = !payload.year || !existingYear || payload.year === existingYear;
+            if (yearMatch) {
+              current = row.payload;
+              payload = {
+                ...payload,
+                title: payload.title || current.title,
+                seasons: payload.seasons || current.seasons || [],
+                seasonCount: payload.seasonCount ?? current.seasonCount ?? 0,
+                episodeCount: payload.episodeCount ?? current.episodeCount ?? 0,
+              };
+              break;
+            }
+          }
+        }
       }
     }
   }
@@ -453,7 +489,53 @@ async function deleteScannerItemsNotInSignatures(sourceRootId, scanSignatures = 
     );
   }
   const count = Number(result?.rowCount ?? 0);
-  return Number.isFinite(count) ? Math.floor(count) : 0;
+
+  // Clean up stale published entries: published items whose sourcePath doesn't exist
+  // on disk AND whose scanSignature is not in the current set AND a newer entry with
+  // the same titleKey exists. This prevents orphaned published entries from persisting
+  // forever when files are relocated.
+  let stalePublishedDeleted = 0;
+  if (signatures.length) {
+    const stalePublished = await db.query(
+      `SELECT id, payload FROM content_catalog
+       WHERE source_type = $1
+         AND source_root_id = $2
+         AND status = 'published'
+         AND COALESCE(payload->>'scanSignature', '') <> ALL($3::text[])`,
+      ['scanner', rootId, signatures],
+    );
+
+    for (const row of stalePublished.rows) {
+      const p = row.payload;
+      if (!p || !p.sourcePath) continue;
+
+      // Check if sourcePath exists on disk
+      const fs = require('fs');
+      const pathExists = await fs.promises.access(p.sourcePath).then(() => true).catch(() => false);
+      if (pathExists) continue;
+
+      // Check if a newer entry with the same titleKey exists
+      const titleKey = p.title_key || normalizeTitleKey(p.title, p.year);
+      if (!titleKey) continue;
+
+      const newerEntry = await db.query(
+        `SELECT id FROM content_catalog
+         WHERE content_type = $1
+           AND title_key = $2
+           AND source_type = 'scanner'
+           AND id <> $3
+           AND COALESCE(payload->>'scanSignature', '') = ANY($4::text[])`,
+        [p.type || 'movie', titleKey, row.id, signatures],
+      );
+
+      if (newerEntry.rows.length > 0) {
+        await db.query('DELETE FROM content_catalog WHERE id = $1', [row.id]);
+        stalePublishedDeleted += 1;
+      }
+    }
+  }
+
+  return count + stalePublishedDeleted;
 }
 
 async function refreshCatalogReferencesForNormalizedFile(payload = {}) {

@@ -131,7 +131,19 @@ router.get('/download/:contentType/:id', async (req, res, next) => {
       if (process.env.REMOTE_MEDIA_BASE_URL && videoUrl) {
         return res.redirect(`${process.env.REMOTE_MEDIA_BASE_URL}${videoUrl}`);
       }
-      throw new AppError('Source file is not available on the server for download', 404, 'NOT_FOUND');
+      // Log stale path for monitoring
+      logger.warn('Player: source file not available', {
+        itemId: item.id,
+        title: item.title,
+        sourcePath,
+        videoUrl,
+        suggestion: 'Run reconciliation or re-scan to fix stale paths',
+      });
+      throw new AppError(
+        'Source file is not available. The file may have been moved or renamed. Ask admin to re-scan content.',
+        404,
+        'STALE_PATH',
+      );
     }
     const stat = safeStat(resolvedPath);
     if (!stat?.isFile()) {

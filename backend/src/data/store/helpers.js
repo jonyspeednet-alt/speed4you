@@ -1,7 +1,12 @@
 function normalizeTitleKey(value, year) {
   const normalized = String(value || '')
     .toLowerCase()
-    .replace(/\b(1080p|720p|480p|2160p|web[- ]?dl|bluray|brrip|x264|x265|hdrip|dvdrip|proper|uncut)\b/g, '')
+    .replace(/\b(1080p|720p|480p|2160p|4k|8k)\b/g, '')
+    .replace(/\b(web[- ]?dl|webrip|bluray|brrip|dvdrip|hdrip|hdtc|hdcam|cam|hqrip|dvdscr|screener|ts|tc)\b/g, '')
+    .replace(/\b(x264|x265|h264|h265|hevc|avc|aac|10bit|dts|ddp5[\.\s]?1|ddp|atmos|truehd|flac|mp3)\b/g, '')
+    .replace(/\b(hdhub4u|cinevood|hdhub|ds4k|imax|line|hc|esubs?|esub|dual|multi)\b/g, '')
+    .replace(/\b(v2|v3|fhd|hq|proper|uncut|extended|unrated|directors?[\s-]?cut)\b/g, '')
+    .replace(/\b(zee5|netflix|amazon|hotstar|disney|sony|jio|aha|mx)\b/g, '')
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/[^a-z0-9]+/g, ' ')
     .replace(/\s+/g, ' ')
@@ -9,6 +14,69 @@ function normalizeTitleKey(value, year) {
   const key = normalized || String(value || '').toLowerCase().replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
   if (year) return `${key}-${year}`;
   return key;
+}
+
+// Levenshtein distance for fuzzy string matching
+function levenshteinDistance(a, b) {
+  const matrix = [];
+  const aLen = a.length;
+  const bLen = b.length;
+
+  if (aLen === 0) return bLen;
+  if (bLen === 0) return aLen;
+
+  // Initialize matrix
+  for (let i = 0; i <= bLen; i++) matrix[i] = [i];
+  for (let j = 0; j <= aLen; j++) matrix[0][j] = j;
+
+  // Fill matrix
+  for (let i = 1; i <= bLen; i++) {
+    for (let j = 1; j <= aLen; j++) {
+      const cost = b.charAt(i - 1) === a.charAt(j - 1) ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,      // deletion
+        matrix[i][j - 1] + 1,      // insertion
+        matrix[i - 1][j - 1] + cost // substitution
+      );
+    }
+  }
+
+  return matrix[bLen][aLen];
+}
+
+// Check if two titles are similar enough to be considered the same content
+// Returns a similarity score between 0 (no match) and 1 (exact match)
+function titleSimilarity(title1, title2) {
+  const t1 = String(title1 || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const t2 = String(title2 || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  if (t1 === t2) return 1;
+  if (!t1 || !t2) return 0;
+
+  const maxLen = Math.max(t1.length, t2.length);
+  if (maxLen === 0) return 1;
+
+  const distance = levenshteinDistance(t1, t2);
+  return 1 - (distance / maxLen);
+}
+
+// Check if two titles match with fuzzy logic
+// Considers titles matching if:
+// 1. Exact match after normalization
+// 2. One title contains the other
+// 3. Levenshtein similarity > threshold (0.8 = 80% similar)
+function titlesFuzzyMatch(title1, title2, threshold = 0.8) {
+  const t1 = String(title1 || '').toLowerCase().trim();
+  const t2 = String(title2 || '').toLowerCase().trim();
+
+  if (t1 === t2) return true;
+  if (!t1 || !t2) return false;
+
+  // Check containment
+  if (t1.includes(t2) || t2.includes(t1)) return true;
+
+  // Check similarity
+  return titleSimilarity(t1, t2) >= threshold;
 }
 
 function clampNumber(value, min, max) {
@@ -267,6 +335,9 @@ function toCardItem(item) {
 
 module.exports = {
   normalizeTitleKey,
+  levenshteinDistance,
+  titleSimilarity,
+  titlesFuzzyMatch,
   clampNumber,
   parseISODate,
   extractTypedColumns,

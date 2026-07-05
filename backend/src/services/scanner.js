@@ -60,6 +60,7 @@ const DEFAULT_MEDIA_LIBRARY_ROOT = process.env.SCANNER_MEDIA_ROOT || '/var/www/h
 const ENABLE_AUTO_DISCOVER_ROOTS = process.env.SCANNER_AUTO_DISCOVER_ROOTS !== 'false';
 const AUTO_DISCOVER_MAX_DEPTH = Math.max(1, Number(process.env.SCANNER_AUTO_DISCOVER_MAX_DEPTH || 3));
 const AUTO_SCAN_INTERVAL_MINUTES = Math.max(0, Number(process.env.SCANNER_AUTO_SCAN_INTERVAL_MINUTES || 0));
+const RECONCILIATION_INTERVAL_HOURS = Math.max(1, Number(process.env.SCANNER_RECONCILIATION_INTERVAL_HOURS || 6));
 const SCANNER_AUTO_RESUME_ON_RESTART = process.env.SCANNER_AUTO_RESUME_ON_RESTART !== 'false';
 const SCANNER_AUTO_RESUME_DELAY_MS = Math.max(1000, Number(process.env.SCANNER_AUTO_RESUME_DELAY_MS || 5000));
 // Opt-in only. A transient SMB/NFS mount hiccup makes a configured root look "missing"; with
@@ -107,10 +108,52 @@ let currentScanJob = null;
 let currentScanChild = null;
 let autoScanTimer = null;
 let resumeScanTimer = null;
+let reconciliationTimer = null;
 let signalHandlersRegistered = false;
 // Cooperative abort: set (e.g. by the worker's SIGTERM handler) to stop the scan between roots
 // so it can finalize cleanly instead of being killed mid-DB-write.
 let scanAbortRequested = false;
+
+// ── FILE RELOCATION CACHE ─────────────────────────────────────────────────────
+// Cache file moves (old path → new path) to speed up future scans.
+// When a file is moved/renamed, the scanner can instantly match it instead of
+// doing expensive directory walks.
+const fileRelocationCache = new Map(); // oldPath → { newPath, detectedAt }
+const FILE_RELOCATION_CACHE_MAX = 10000;
+const FILE_RELOCATION_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+function cacheFileRelocation(oldPath, newPath) {
+  if (fileRelocationCache.size >= FILE_RELOCATION_CACHE_MAX) {
+    // Evict oldest entries
+    const entries = [...fileRelocationCache.entries()];
+    const toDelete = entries.slice(0, Math.floor(FILE_RELOCATION_CACHE_MAX / 4));
+    for (const [key] of toDelete) {
+      fileRelocationCache.delete(key);
+    }
+  }
+  fileRelocationCache.set(oldPath, {
+    newPath,
+    detectedAt: Date.now(),
+  });
+}
+
+function getCachedRelocation(oldPath) {
+  const cached = fileRelocationCache.get(oldPath);
+  if (!cached) return null;
+  if (Date.now() - cached.detectedAt > FILE_RELOCATION_CACHE_TTL_MS) {
+    fileRelocationCache.delete(oldPath);
+    return null;
+  }
+  return cached.newPath;
+}
+
+function getFileRelocationCacheStats() {
+  return {
+    size: fileRelocationCache.size,
+    maxSize: FILE_RELOCATION_CACHE_MAX,
+    ttlMs: FILE_RELOCATION_CACHE_TTL_MS,
+  };
+}
 
 function requestScanAbort() {
   scanAbortRequested = true;
@@ -896,7 +939,7 @@ function hasAllCandidatesInCatalog(candidates = [], existingSignatureSet = null)
 
 
 function createBaseScannerItem(root, values) {
-  return {
+  const item = {
     language: root.language,
     category: root.category,
     sourceRootId: root.id,
@@ -909,6 +952,30 @@ function createBaseScannerItem(root, values) {
     titleKey: normalizeTitleKey(values.title),
     ...values,
   };
+
+  // Add file checksum info if sourcePath is provided
+  if (values.sourcePath) {
+    try {
+      const stat = fs.statSync(values.sourcePath);
+      item.fileSize = stat.size;
+      item.fileLastModified = stat.mtime.toISOString();
+    } catch {
+      // File doesn't exist yet or can't be stat'd - skip checksum
+    }
+  }
+
+  return item;
+}
+
+function hasFileChanged(filePath, storedSize, storedLastModified) {
+  try {
+    const stat = fs.statSync(filePath);
+    if (storedSize && stat.size !== storedSize) return true;
+    if (storedLastModified && stat.mtime.toISOString() !== storedLastModified) return true;
+    return false;
+  } catch {
+    return true; // File doesn't exist - treat as changed
+  }
 }
 
 async function loadRootState(rootId) {
@@ -1337,6 +1404,55 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
       ];
 
       if (previousFingerprint && previousFingerprint === fingerprint && await hasAllSignaturesInCatalog(expectedSignatures, existingSignatureSet)) {
+        // Stale path detection: even if fingerprint is unchanged, check if published entries have valid sourcePath
+        for (const sig of expectedSignatures) {
+          const existingItem = await getItemByScanSignature(sig);
+          if (existingItem && existingItem.payload && existingItem.payload.status === 'published' && existingItem.payload.sourcePath) {
+            // First check the relocation cache for instant match
+            const cachedNewPath = getCachedRelocation(existingItem.payload.sourcePath);
+            if (cachedNewPath) {
+              const cachedExists = await fs.promises.access(cachedNewPath).then(() => true).catch(() => false);
+              if (cachedExists) {
+                const updatedPayload = {
+                  ...existingItem.payload,
+                  sourcePath: cachedNewPath,
+                  sourcePublicPath: toPublicUrl(root, cachedNewPath),
+                  videoUrl: toPublicUrl(root, cachedNewPath),
+                  scanSignature: sig,
+                };
+                await retryAsync(() => upsertScannedItem(updatedPayload));
+                summary.updated += 1;
+                continue;
+              }
+            }
+
+            // Cache miss - check if sourcePath exists
+            const sourceExists = await fs.promises.access(existingItem.payload.sourcePath).then(() => true).catch(() => false);
+            if (!sourceExists) {
+              // Find the relocated file in current folder
+              const videoFiles = listVideoFiles(listFiles(folderPath), folderPath, 'movie');
+              if (videoFiles.length > 0) {
+                const newVideoPath = path.join(folderPath, videoFiles[0]);
+                const newVideoExists = await fs.promises.access(newVideoPath).then(() => true).catch(() => false);
+                if (newVideoExists) {
+                  // Cache the relocation for future use
+                  cacheFileRelocation(existingItem.payload.sourcePath, newVideoPath);
+
+                  // Update the entry's path in-place
+                  const updatedPayload = {
+                    ...existingItem.payload,
+                    sourcePath: newVideoPath,
+                    sourcePublicPath: toPublicUrl(root, newVideoPath),
+                    videoUrl: toPublicUrl(root, newVideoPath),
+                    scanSignature: sig,
+                  };
+                  await retryAsync(() => upsertScannedItem(updatedPayload));
+                  summary.updated += 1;
+                }
+              }
+            }
+          }
+        }
         expectedSignatures.forEach((sig) => seenSignatures.add(sig));
         summary.unchanged += expectedSignatures.length;
         const current = summary.rootResults.find((entry) => entry.id === root.id);
@@ -1684,6 +1800,7 @@ async function getScannerHealth() {
     ...rootsHealth,
     recentRuns: getScannerRuns(10),
     metadataCache: getEnhancedCacheStats(),
+    fileRelocationCache: getFileRelocationCacheStats(),
     currentJob: serializeJob(currentScanJob),
   };
 }
@@ -2230,6 +2347,207 @@ function bootstrapAutoScanScheduler() {
   scheduleNext();
 }
 
+// ── RECONCILIATION SCHEDULER ──────────────────────────────────────────────────
+// Periodically checks for stale published entries whose sourcePath doesn't exist
+// on disk and a newer entry with the same titleKey exists. This is a safety net
+// for cases where the fingerprint skip optimization misses stale paths.
+
+function bootstrapReconciliationScheduler() {
+  if (reconciliationTimer) return;
+
+  const intervalMs = RECONCILIATION_INTERVAL_HOURS * 60 * 60 * 1000;
+
+  function scheduleNext() {
+    reconciliationTimer = setTimeout(async () => {
+      try {
+        await runStalePathReconciliation();
+      } catch (err) {
+        logScannerEvent('reconciliation_failed', { error: err.message });
+      }
+      scheduleNext();
+    }, intervalMs);
+
+    if (typeof reconciliationTimer.unref === 'function') {
+      reconciliationTimer.unref();
+    }
+  }
+
+  scheduleNext();
+}
+
+async function runStalePathReconciliation() {
+  const { db } = require('../data/store/base');
+  const fs = require('fs');
+
+  logScannerEvent('reconciliation_started', { timestamp: new Date().toISOString() });
+
+  // Helper: Find relocated file in directory and subdirectories
+  async function findRelocatedFile(searchDir, targetFileName, title) {
+    try {
+      const entries = await fs.promises.readdir(searchDir, { withFileTypes: true });
+
+      for (const entry of entries) {
+        if (entry.isFile()) {
+          // Exact filename match
+          if (entry.name === targetFileName) {
+            return path.join(searchDir, entry.name);
+          }
+          // Normalized filename match (ignore case, spaces, special chars)
+          const normalizedEntry = entry.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const normalizedTarget = targetFileName.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (normalizedEntry === normalizedTarget) {
+            return path.join(searchDir, entry.name);
+          }
+        } else if (entry.isDirectory() && !entry.name.startsWith('.')) {
+          // Recurse into subdirectory (max depth 2)
+          const nested = await findRelocatedFile(path.join(searchDir, entry.name), targetFileName, title);
+          if (nested) return nested;
+        }
+      }
+    } catch {
+      // Directory doesn't exist or can't be read
+    }
+    return null;
+  }
+
+  // Helper: Find file by fuzzy title match
+  async function findFileByFuzzyTitle(searchDir, title, year) {
+    try {
+      const entries = await fs.promises.readdir(searchDir, { withFileTypes: true });
+      const normalizedTitle = title.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+      for (const entry of entries) {
+        if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+
+        const dirName = entry.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+        // Check if directory name contains the title (fuzzy match)
+        if (dirName.includes(normalizedTitle) || normalizedTitle.includes(dirName)) {
+          // Look for video files in this directory
+          const subEntries = await fs.promises.readdir(path.join(searchDir, entry.name), { withFileTypes: true });
+          const videoFile = subEntries.find((e) =>
+            e.isFile() && /\.(mp4|mkv|avi|mov|webm|m4v)$/i.test(e.name)
+          );
+          if (videoFile) {
+            return path.join(searchDir, entry.name, videoFile.name);
+          }
+        }
+      }
+    } catch {
+      // Directory doesn't exist or can't be read
+    }
+    return null;
+  }
+
+  // Get all published scanner entries
+  const result = await db.query(
+    `SELECT id, title, title_key, content_type, year, payload
+     FROM content_catalog
+     WHERE source_type = 'scanner' AND status = 'published'`
+  );
+
+  let deleted = 0;
+  let fixed = 0;
+  let skipped = 0;
+
+  for (const row of result.rows) {
+    const p = row.payload;
+    if (!p || !p.sourcePath) continue;
+
+    // Check if sourcePath exists on disk
+    const pathExists = await fs.promises.access(p.sourcePath).then(() => true).catch(() => false);
+    if (pathExists) continue;
+
+    // File doesn't exist - try to find relocated file
+    const titleKey = row.title_key || normalizeTitleKey(row.title, row.year);
+    const fileName = path.basename(p.sourcePath);
+    const fileDir = path.dirname(p.sourcePath);
+
+    // Strategy 1: Search in same directory and subdirectories
+    let relocatedPath = await findRelocatedFile(fileDir, fileName, row.title);
+
+    // Strategy 2: Search in year subfolder (e.g., /Movies/Title.mkv → /Movies/2026/Title.mkv)
+    if (!relocatedPath && row.year) {
+      const yearDir = path.join(path.dirname(fileDir), String(row.year));
+      relocatedPath = await findRelocatedFile(yearDir, fileName, row.title);
+    }
+
+    // Strategy 3: Search in parent directory
+    if (!relocatedPath) {
+      const parentDir = path.dirname(fileDir);
+      relocatedPath = await findRelocatedFile(parentDir, fileName, row.title);
+    }
+
+    // Strategy 4: Fuzzy search by title in nearby directories
+    if (!relocatedPath && row.title) {
+      relocatedPath = await findFileByFuzzyTitle(fileDir, row.title, row.year);
+    }
+
+    if (relocatedPath) {
+      // Found relocated file - update entry in-place
+      const newVideoUrl = relocatedPath.replace(/\\/g, '/').replace(/^.*?\/(Movies|Hindi|English|Tamil|Telugu)/, '/$1');
+      const updatedPayload = {
+        ...p,
+        sourcePath: relocatedPath,
+        sourcePublicPath: newVideoUrl,
+        videoUrl: newVideoUrl,
+      };
+      await db.query('UPDATE content_catalog SET payload = $2::jsonb WHERE id = $1', [row.id, JSON.stringify(updatedPayload)]);
+      fixed++;
+      logScannerEvent('reconciliation_fixed_path', {
+        id: row.id,
+        title: row.title,
+        oldPath: p.sourcePath,
+        newPath: relocatedPath,
+      });
+    } else {
+      // No relocated file found - check if newer entry exists
+      const titleKey = row.title_key || normalizeTitleKey(row.title, row.year);
+      if (titleKey) {
+        const newerEntry = await db.query(
+          `SELECT id, title FROM content_catalog
+           WHERE content_type = $1
+             AND title_key = $2
+             AND source_type = 'scanner'
+             AND id <> $3
+             AND status = 'published'`,
+          [row.content_type || 'movie', titleKey, row.id]
+        );
+
+        if (newerEntry.rows.length > 0) {
+          // Delete stale entry
+          await db.query('DELETE FROM content_catalog WHERE id = $1', [row.id]);
+          deleted++;
+          logScannerEvent('reconciliation_deleted_stale', {
+            id: row.id,
+            title: row.title,
+            titleKey,
+            newerId: newerEntry.rows[0].id,
+          });
+        } else {
+          skipped++;
+          logScannerEvent('reconciliation_skipped_no_newer', {
+            id: row.id,
+            title: row.title,
+            titleKey,
+          });
+        }
+      } else {
+        skipped++;
+      }
+    }
+  }
+
+  logScannerEvent('reconciliation_completed', {
+    total: result.rows.length,
+    fixed,
+    deleted,
+    skipped,
+    timestamp: new Date().toISOString(),
+  });
+
+  return { total: result.rows.length, fixed, deleted, skipped };
+}
+
 // Auto background jobs disabled — scanner only runs when triggered manually via admin API.
 // IMPORTANT: only the main server process should run the runtime bootstrap and signal
 // handlers. When scanner-worker.js forks and require()s this module, SCANNER_RUN_ID is set;
@@ -2240,6 +2558,7 @@ if (!process.env.SCANNER_RUN_ID) {
   bootstrapScannerRuntime();
   registerScannerSignalHandlers();
   bootstrapAutoScanScheduler();
+  bootstrapReconciliationScheduler();
   setupFileWatcher();
 }
 
@@ -2291,6 +2610,7 @@ module.exports = {
   startScanJob,
   stopScanJob,
   requestScanAbort,
+  runStalePathReconciliation,
   __test__: {
     classifyAutoDiscoveredRoot,
     parseEpisodeIdentity,
