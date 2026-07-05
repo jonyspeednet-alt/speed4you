@@ -1419,8 +1419,10 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
                   videoUrl: toPublicUrl(root, cachedNewPath),
                   scanSignature: sig,
                 };
-                await retryAsync(() => upsertScannedItem(updatedPayload));
-                summary.updated += 1;
+                const relocationResult = await retryAsync(() => upsertScannedItem(updatedPayload));
+                if (relocationResult.updated) {
+                  summary.updated += 1;
+                }
                 continue;
               }
             }
@@ -1445,8 +1447,10 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
                     videoUrl: toPublicUrl(root, newVideoPath),
                     scanSignature: sig,
                   };
-                  await retryAsync(() => upsertScannedItem(updatedPayload));
-                  summary.updated += 1;
+                  const relocationResult = await retryAsync(() => upsertScannedItem(updatedPayload));
+                  if (relocationResult.updated) {
+                    summary.updated += 1;
+                  }
                 }
               }
             }
