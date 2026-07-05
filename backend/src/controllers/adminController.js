@@ -13,7 +13,7 @@ const {
   recalculateDuplicateCounts,
   cleanupOrphanedRootItems,
 } = require('../data/store');
-const { getCurrentScanJob, getScannerHealth, listScannerRoots, startScanJob, stopScanJob } = require('../services/scanner');
+const { getCurrentScanJob, getScannerHealth, listScannerRoots, startScanJob, stopScanJob, runStalePathReconciliation } = require('../services/scanner');
 const { loadScannerRoots, saveScannerRoots, refreshScannerCaches, loadScannerState, saveScannerState } = require('../data/store');
 const { fetchMetadataByTmdbId, fetchMetadataByImdbId } = require('../services/metadata-enricher');
 const { clearMetadataCache, getEnhancedCacheStats } = require('../services/scanner-enhanced-metadata');
@@ -119,17 +119,46 @@ function withSummaryResult(result, summaryRequested) {
 }
 
 exports.getDashboard = async (req, res) => {
-  const [stats, recentContent, allUsers, scannerHealth] = await Promise.all([
+  const [stats, recentContent, allUsers, scannerHealth, stalePathsResult] = await Promise.all([
     getStats(),
     getRecentItems(8),
     listUsers(),
     getScannerHealth(),
+    db.query(
+      `SELECT COUNT(*) as stale_count FROM content_catalog
+       WHERE source_type = 'scanner' AND status = 'published'
+       AND payload->>'sourcePath' IS NOT NULL
+       AND payload->>'sourcePath' <> ''`
+    ).then(async (result) => {
+      const total = Number(result.rows[0]?.stale_count || 0);
+      // Quick check: sample first 50 to estimate stale count
+      const sample = await db.query(
+        `SELECT payload FROM content_catalog
+         WHERE source_type = 'scanner' AND status = 'published'
+         AND payload->>'sourcePath' IS NOT NULL
+         AND payload->>'sourcePath' <> ''
+         LIMIT 50`
+      );
+      const fs = require('fs');
+      let staleInSample = 0;
+      for (const row of sample.rows) {
+        const sp = row.payload?.sourcePath;
+        if (sp) {
+          try { await fs.promises.access(sp); } catch { staleInSample++; }
+        }
+      }
+      const estimatedStale = sample.rows.length > 0
+        ? Math.round((staleInSample / sample.rows.length) * total)
+        : 0;
+      return { total, estimatedStale };
+    }),
   ]);
 
   res.json({
     stats: {
       ...stats,
       totalAdminUsers: allUsers.length,
+      stalePaths: stalePathsResult,
     },
     recentContent,
     scannerHealth: {
@@ -340,6 +369,15 @@ exports.runScanner = async (req, res) => {
 exports.stopScanner = (req, res) => {
   const job = stopScanJob();
   res.status(202).json({ job });
+};
+
+exports.runReconciliation = async (req, res) => {
+  try {
+    const result = await runStalePathReconciliation();
+    res.json({ ok: true, ...result });
+  } catch (error) {
+    res.status(500).json({ error: error.message || 'Reconciliation failed.' });
+  }
 };
 
 exports.getDbHealth = async (req, res) => {
@@ -898,6 +936,39 @@ exports.deleteScannerRoot = async (req, res) => {
   }
 
   res.json({ ok: true, deleted: rootToDelete.label || rootId });
+};
+
+exports.getStalePaths = async (req, res) => {
+  const result = await db.query(
+    `SELECT id, title, title_key, content_type, year, payload
+     FROM content_catalog
+     WHERE source_type = 'scanner' AND status = 'published'`
+  );
+
+  const staleEntries = [];
+
+  for (const row of result.rows) {
+    const sourcePath = row.payload?.sourcePath;
+    if (!sourcePath) continue;
+
+    try {
+      await fs.promises.access(sourcePath);
+    } catch {
+      staleEntries.push({
+        id: row.id,
+        title: row.title,
+        titleKey: row.title_key || '',
+        sourcePath,
+        year: row.year || null,
+      });
+    }
+  }
+
+  res.json({
+    total: result.rows.length,
+    staleCount: staleEntries.length,
+    staleEntries,
+  });
 };
 
 exports.cleanupStaleScannerRoots = async (req, res) => {

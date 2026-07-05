@@ -66,6 +66,10 @@ router.post('/maintenance/cleanup-orphan-roots', asyncRoute(adminController.clea
 router.post('/upload/poster', upload.single('file'), asyncRoute(adminController.uploadPoster));
 router.post('/upload/banner', upload.single('file'), asyncRoute(adminController.uploadBanner));
 
+// Stale paths check
+router.get('/stale-paths', asyncRoute(adminController.getStalePaths));
+router.post('/reconcile-stale-paths', asyncRoute(adminController.runReconciliation));
+
 // Scanner
 router.get('/scanner/roots', adminController.getScannerRoots);
 router.delete('/scanner/roots/:id', asyncRoute(adminController.deleteScannerRoot));
