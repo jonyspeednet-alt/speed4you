@@ -420,7 +420,7 @@ async function upsertScannedItem(payload) {
     || item.sourceRootId  !== (current.sourceRootId || '')
     || item.seasonCount  !== (current.seasonCount ?? 0)
     || item.episodeCount !== (current.episodeCount ?? 0)
-    || item.lastScanRunId !== (current.lastScanRunId || '')
+    || item.status       !== current.status
     || (shouldUpdateMetadata && item.metadataStatus !== current.metadataStatus);
 
   if (!scanFieldsChanged) {
