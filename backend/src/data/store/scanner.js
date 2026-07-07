@@ -1,3 +1,4 @@
+const fs = require('fs');
 const { db, appStateCache, ensureContentStore, setAppState } = require('./base');
 const { MAX_SCANNER_RUNS } = require('./constants');
 const { toSafeInteger, rowToScannerRoot, rowToScannerRun, normalizeItem, normalizeTitleKey, titlesFuzzyMatch, extractTypedColumns, attachDuplicateMetadata } = require('./helpers');
@@ -158,6 +159,25 @@ async function syncDuplicateCountColumn(itemId, duplicateCount) {
   await db.query('UPDATE content_catalog SET duplicate_count = $2 WHERE id = $1', [itemId, duplicateCount]);
 }
 
+// The titleKey/fuzzy fallback below exists to catch legitimate relocations (root
+// renamed, file moved) where the old sourcePath is gone. If the existing item's
+// sourcePath is set, differs from the incoming candidate, and still exists on disk,
+// this is two live folders sharing a title (a real duplicate), not a relocation —
+// matching them would make the scanner ping-pong one DB row between both folders
+// every scan. Skip the fallback match in that case so a separate item is created.
+function isLiveDistinctSourcePath(existingPayload, incomingPayload) {
+  const existingPath = existingPayload?.sourcePath;
+  const incomingPath = incomingPayload?.sourcePath;
+  if (!existingPath || !incomingPath || existingPath === incomingPath) {
+    return false;
+  }
+  try {
+    return fs.existsSync(existingPath);
+  } catch {
+    return false;
+  }
+}
+
 async function upsertScannedItem(payload) {
   const now = new Date().toISOString();
   if (!payload || !['movie', 'series'].includes(String(payload.type || '').toLowerCase())) {
@@ -210,6 +230,12 @@ async function upsertScannedItem(payload) {
          LIMIT 1`,
         [String(payload.type || '').toLowerCase(), computedTitleKey],
       );
+      if (titleKeyMatch.rows[0] && isLiveDistinctSourcePath(titleKeyMatch.rows[0].payload, payload)) {
+        // Two live folders share this title (a real duplicate on disk, not a
+        // relocation). Leave the already-catalogued folder alone instead of
+        // spawning a second visible card or overwriting it back and forth.
+        return { item: normalizeItem(titleKeyMatch.rows[0].payload), created: false, updated: false };
+      }
       if (titleKeyMatch.rows[0]) {
         current = titleKeyMatch.rows[0].payload;
         payload = {
@@ -241,6 +267,9 @@ async function upsertScannedItem(payload) {
             // Also check year match if both have years
             const yearMatch = !payload.year || !existingYear || payload.year === existingYear;
             if (yearMatch) {
+              if (isLiveDistinctSourcePath(row.payload, payload)) {
+                return { item: normalizeItem(row.payload), created: false, updated: false };
+              }
               current = row.payload;
               payload = {
                 ...payload,
