@@ -178,6 +178,49 @@ function isLiveDistinctSourcePath(existingPayload, incomingPayload) {
   }
 }
 
+// A second, noisily-named copy of an already-published movie (e.g. a backup/archive
+// folder with release-group tags in its name) often can't be cleaned enough for the
+// title_key/fuzzy checks above to recognize it — that noise is exactly why TMDb itself
+// returned metadataStatus 'not_found'. Left alone, every scan re-discovers the folder,
+// fails to match it again, and creates a fresh unmatched draft with a new id (deleting
+// those drafts doesn't help — the file is still there, so the next scan just recreates
+// one). Catch this narrow case: if the published title is a whole-word prefix of the
+// candidate's cleaned title and the published item's own file still exists elsewhere,
+// treat the candidate as a known duplicate instead of manufacturing draft noise.
+async function findDuplicateOfPublishedByPrefix(payload) {
+  const normalize = (value) => String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const probe = normalize(payload.parsedTitle || payload.title);
+  if (!probe) return null;
+  const probeWords = probe.split(' ');
+  if (!probeWords.length) return null;
+
+  const candidates = await db.query(
+    `SELECT payload FROM content_catalog
+     WHERE content_type = $1 AND status = 'published' AND title ILIKE $2
+     LIMIT 50`,
+    [String(payload.type || '').toLowerCase(), `${probeWords[0]}%`],
+  );
+
+  for (const row of candidates.rows) {
+    const existingTitle = normalize(row.payload?.title);
+    const existingWords = existingTitle.split(' ').filter(Boolean);
+    if (!existingWords.length || existingWords.length >= probeWords.length) continue;
+    if (probeWords.slice(0, existingWords.length).join(' ') !== existingTitle) continue;
+
+    const existingYear = row.payload?.year || null;
+    if (payload.year && existingYear && payload.year !== existingYear) continue;
+
+    if (isLiveDistinctSourcePath(row.payload, payload)) {
+      return row.payload;
+    }
+  }
+  return null;
+}
+
 async function upsertScannedItem(payload) {
   const now = new Date().toISOString();
   if (!payload || !['movie', 'series'].includes(String(payload.type || '').toLowerCase())) {
@@ -283,6 +326,16 @@ async function upsertScannedItem(payload) {
           }
         }
       }
+    }
+  }
+
+  // A candidate TMDb couldn't identify might still be a known movie under a messier
+  // filename — check whether it's actually a duplicate of something already published
+  // before manufacturing a permanent-looking "not_found" draft for it.
+  if (!current && payload.metadataStatus === 'not_found') {
+    const duplicateOfPublished = await findDuplicateOfPublishedByPrefix(payload);
+    if (duplicateOfPublished) {
+      return { item: normalizeItem(duplicateOfPublished), created: false, updated: false };
     }
   }
 
