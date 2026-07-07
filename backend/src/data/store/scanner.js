@@ -212,7 +212,11 @@ async function findDuplicateOfPublishedByPrefix(payload) {
   );
 
   for (const row of candidates.rows) {
-    const existingTitle = normalize(row.payload?.title);
+    // Some older published titles still carry their own leftover tags, e.g.
+    // "Venom: The Last Dance (2024)  {Dual Audio}" — truncate at the first
+    // bracket/paren/brace so that noise doesn't break the prefix comparison.
+    const existingTitleCore = String(row.payload?.title || '').split(/[([{]/)[0];
+    const existingTitle = normalize(existingTitleCore);
     const existingWords = existingTitle.split(' ').filter(Boolean);
     if (!existingWords.length || existingWords.length >= probeWords.length) continue;
     if (probeWords.slice(0, existingWords.length).join(' ') !== existingTitle) continue;
