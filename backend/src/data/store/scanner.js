@@ -195,7 +195,9 @@ async function findDuplicateOfPublishedByPrefix(payload) {
     .trim();
   const probe = normalize(payload.parsedTitle || payload.title);
   if (!probe) return null;
-  const probeWords = probe.split(' ');
+  // Drop a leading standalone number (a collection/disc index like "3. Venom - ...")
+  // so the real title, not the index, lines up with the published prefix check below.
+  const probeWords = probe.replace(/^\d+\s+/, '').split(' ');
   if (!probeWords.length) return null;
 
   // Order by title length (ascending) and cap generously: a common leading word
