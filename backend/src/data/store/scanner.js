@@ -198,10 +198,14 @@ async function findDuplicateOfPublishedByPrefix(payload) {
   const probeWords = probe.split(' ');
   if (!probeWords.length) return null;
 
+  // Order by title length (ascending) and cap generously: a common leading word
+  // ("The", "A") can match hundreds of published titles, and without ordering,
+  // an unordered LIMIT can cut off the very short exact-prefix title we want.
   const candidates = await db.query(
     `SELECT payload FROM content_catalog
      WHERE content_type = $1 AND status = 'published' AND title ILIKE $2
-     LIMIT 50`,
+     ORDER BY length(title) ASC
+     LIMIT 500`,
     [String(payload.type || '').toLowerCase(), `${probeWords[0]}%`],
   );
 
