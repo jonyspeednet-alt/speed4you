@@ -93,3 +93,9 @@ frontend/apk/
 **/task_history.json
 **/ui_messages.json
 **/conversation_*.json
+
+# Secret files - NEVER commit
+secrets-to-remove.txt
+secrets*.txt
+*password*.txt
+*secret*.txt
