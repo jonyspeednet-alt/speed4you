@@ -1,0 +1,5 @@
+# Gitleaks ignore file
+# Ignore example tokens in documentation
+
+docs/API_REFERENCE.md:127
+docs/API_REFERENCE.md:221
