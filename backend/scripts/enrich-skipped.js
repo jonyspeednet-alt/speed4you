@@ -3,7 +3,7 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const { enrichItemWithMetadata } = require('../src/services/scanner-enhanced-metadata');
 const { normalizeItem } = require('../src/data/store/helpers');
-const client = new Client({ host: 'localhost', port: 5432, database: 'isp_entertainment', user: 'postgres', ***REMOVED***: 'postgres' });
+const client = new Client({ host: 'localhost', port: 5432, database: 'isp_entertainment', user: process.env.DB_USER || 'postgres', ***REMOVED***: process.env.DB_PASSWORD || 'postgres' });
 async function run() {
   await client.connect();
   const { rows } = await client.query("SELECT id, payload FROM content_catalog WHERE payload->>'metadataStatus' = 'skipped' AND payload->>'scanSignature' IS NOT NULL AND payload->>'scanSignature' != '' ORDER BY id");

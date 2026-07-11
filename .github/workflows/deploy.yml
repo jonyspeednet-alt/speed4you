@@ -229,8 +229,13 @@ jobs:
               CORS="${CORS},http://localhost"
             fi
 
-            # Use OMDB_API_KEY from ***REMOVED***, fallback to hardcoded key if not set (remove once ***REMOVED*** is configured)
-            OMDB_KEY="${OMDB_API_KEY:-***REMOVED***}"
+            # Use OMDB_API_KEY from ***REMOVED*** - must be configured in GitHub Secrets
+            if [ -z "$OMDB_API_KEY" ]; then
+              echo "WARNING: OMDB_API_KEY ***REMOVED*** not configured. OMDB lookups will fail."
+              OMDB_KEY=""
+            else
+              OMDB_KEY="$OMDB_API_KEY"
+            fi
             # Ensure Extra_Storage directories exist (for caches, nginx temp, etc.)
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p /var/www/html/Extra_Storage/nginx-tmp/proxy
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p /var/www/html/Extra_Storage/scanner-cache

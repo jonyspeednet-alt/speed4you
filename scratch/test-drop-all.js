@@ -2,11 +2,11 @@ const { Client } = require('../backend/node_modules/pg');
 
 async function main() {
   const client = new Client({
-    host: 'localhost',
-    port: 5432,
-    database: 'isp_entertainment',
-    user: 'postgres',
-    ***REMOVED***: 'postgres',
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '5432'),
+    database: process.env.DB_NAME || 'isp_entertainment',
+    user: process.env.DB_USER || 'postgres',
+    ***REMOVED***: process.env.DB_PASSWORD || 'postgres',
   });
 
   await client.connect();

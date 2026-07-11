@@ -5,10 +5,15 @@ const isProduction = nodeEnv === 'production';
 
 if (isProduction) {
   if (!process.env.DB_USER || !process.env.DB_PASSWORD) {
-    throw new Error('DB_USER and DB_PASSWORD must be set in production.');
+    throw new Error('DB_USER and DB_PASSWORD must be set in production. Configure them in your .env file.');
   }
   if (!process.env.DB_NAME) {
-    throw new Error('DB_NAME must be set in production.');
+    throw new Error('DB_NAME must be set in production. Configure it in your .env file.');
+  }
+} else {
+  // Development: require explicit DB credentials or use in-memory store
+  if (!process.env.DB_USER || !process.env.DB_PASSWORD) {
+    console.warn('[database] DB_USER/DB_PASSWORD not set. Using in-memory store for development.');
   }
 }
 

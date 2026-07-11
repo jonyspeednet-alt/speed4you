@@ -1,9 +1,12 @@
 # scripts/run-local.ps1
 $BackendPort = 3001
 $FrontendPort = 4173
-$RemoteHost = "***REMOVED***"
-$RemoteSSHPort = 2973
 $DBPort = 5432
+
+# Read from environment or prompt
+$RemoteHost = if ($env:DEPLOY_HOST) { $env:DEPLOY_HOST } else { Read-Host "Enter remote host (e.g., ***REMOVED***)" }
+$RemoteSSHPort = if ($env:DEPLOY_PORT) { $env:DEPLOY_PORT } else { Read-Host "Enter SSH port (e.g., 2973)" }
+$SSHKeyPath = if ($env:DEPLOY_SSH_KEY_PATH) { $env:DEPLOY_SSH_KEY_PATH } else { Read-Host "Enter path to SSH private key" }
 
 function Kill-PortProcess($Port) {
   $connections = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue
@@ -24,7 +27,7 @@ Write-Host "Checking SSH Tunnel to Production Database..." -ForegroundColor Cyan
 $tunnel = Get-NetTCPConnection -LocalPort $DBPort -ErrorAction SilentlyContinue | Where-Object { $_.State -eq 'Listen' }
 if (-not $tunnel) {
   Write-Host "Starting SSH Tunnel via plink..." -ForegroundColor Yellow
-  Start-Process plink -ArgumentList "-hostkey 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIL+eak04klnhd45aow1QDKLZO990Z7fdUmtAvPnO8mAf' -P $RemoteSSHPort -pw ***REMOVED*** -L $DBPort:localhost:$DBPort -N speed4you@$RemoteHost" -WindowStyle Hidden
+  Start-Process plink -ArgumentList "-hostkey 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIL+eak04klnhd45aow1QDKLZO990Z7fdUmtAvPnO8mAf' -P $RemoteSSHPort -i `"$SSHKeyPath`" -L $DBPort:localhost:$DBPort -N speed4you@$RemoteHost" -WindowStyle Hidden
   Start-Sleep -Seconds 3
 } else {
   Write-Host "SSH Tunnel is already running." -ForegroundColor Green
@@ -37,7 +40,6 @@ Kill-PortProcess $FrontendPort
 
 # 3. Start Backend and Frontend in Dev Mode
 Write-Host "Starting Portal in Development Mode..." -ForegroundColor Cyan
-# We use 'npm.cmd' on Windows to avoid "not a valid Win32 application" error
 Start-Process npm.cmd -ArgumentList "run dev" -NoNewWindow
 Write-Host "Waiting for portal to initialize..." -ForegroundColor Yellow
 

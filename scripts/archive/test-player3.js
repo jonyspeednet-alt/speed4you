@@ -1,8 +1,10 @@
 const { chromium } = require('playwright');
 const { Client } = require('pg');
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
 // First find a working item with a direct videoUrl from scanned roots
 async function findWorkingItem() {
-  const c = new Client({ host:'localhost',port:5432,database:'isp_entertainment',user:'postgres',***REMOVED***:'postgres' });
+  const c = new Client({ host:'localhost',port:5432,database:'isp_entertainment',user:process.env.DB_USER || 'postgres',***REMOVED***:process.env.DB_PASSWORD || 'postgres' });
   await c.connect();
   const r = await c.query("SELECT id, payload->>'title' as t, payload->>'videoUrl' as v, payload->>'sourcePath' as s, payload->>'sourceRootId' as root FROM content_catalog WHERE payload->>'videoUrl' LIKE '/English_Movies%' AND payload->>'videoUrl' != '' AND payload->>'status' = 'published' LIMIT 1");
   if (r.rows.length) {

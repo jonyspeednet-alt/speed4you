@@ -1,5 +1,7 @@
 const { Client } = require('pg');
-const c = new Client({ host:'localhost',port:5432,database:'isp_entertainment',user:'postgres',***REMOVED***:'postgres' });
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
+const c = new Client({ host:'localhost',port:5432,database:'isp_entertainment',user:process.env.DB_USER || 'postgres',***REMOVED***:process.env.DB_PASSWORD || 'postgres' });
 c.connect().then(async()=>{
   const r1=await c.query("SELECT value FROM app_state WHERE key='scanner_roots'");
   console.log('scanner_roots:', JSON.stringify(r1.rows[0].value, null, 2));

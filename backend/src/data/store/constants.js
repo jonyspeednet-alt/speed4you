@@ -13,7 +13,11 @@ const MIN_MOVIE_SIZE = Number(process.env.SCANNER_MIN_MOVIE_SIZE || 104857600); 
 const MIN_EPISODE_SIZE = Number(process.env.SCANNER_MIN_EPISODE_SIZE || 31457280); // 30MB
 const JUNK_REGEX = /sample|trailer|extras|promo|short|clip|preview|teaser/i;
 const DEFAULT_ADMIN_USERNAME = process.env.ADMIN_USERNAME || (IS_PRODUCTION ? '' : 'admin');
-const DEFAULT_ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || (IS_PRODUCTION ? '' : '***REMOVED***');
+const DEFAULT_ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || (IS_PRODUCTION ? '' : '');
+
+if (!DEFAULT_ADMIN_PASSWORD_HASH && !IS_PRODUCTION) {
+  console.warn('[store] ADMIN_PASSWORD_HASH not set. Admin login will not work until you set it in your .env file.');
+}
 
 const APP_STATE_DEFAULTS = {
   scanner_roots: [],

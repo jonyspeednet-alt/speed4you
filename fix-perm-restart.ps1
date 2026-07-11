@@ -1,23 +1,29 @@
 Write-Host "=== Kill old normalizer ==="
-$plink = '& "C:\Program Files\PuTTY\plink.exe" -ssh speed4you@***REMOVED*** -P 2973 -pw "***REMOVED***" -hostkey "ssh-ed25519 255 SHA256:RVa4r61dsjHbh52j0eIllF0yCj6rJebnPKnj7x3JXco" -batch '
+$deployHost = if ($env:DEPLOY_HOST) { $env:DEPLOY_HOST } else { throw "DEPLOY_HOST environment variable not set" }
+$deployPort = if ($env:DEPLOY_PORT) { $env:DEPLOY_PORT } else { throw "DEPLOY_PORT environment variable not set" }
+$deployUser = if ($env:DEPLOY_USER) { $env:DEPLOY_USER } else { throw "DEPLOY_USER environment variable not set" }
+$sudoPassword = if ($env:DEPLOY_SUDO_PASSWORD) { $env:DEPLOY_SUDO_PASSWORD } else { throw "DEPLOY_SUDO_PASSWORD environment variable not set" }
+$sshKeyPath = if ($env:DEPLOY_SSH_KEY_PATH) { $env:DEPLOY_SSH_KEY_PATH } else { throw "DEPLOY_SSH_KEY_PATH environment variable not set" }
+
+$plink = '& "C:\Program Files\PuTTY\plink.exe" -ssh {0}@{1} -P {2} -i "{3}" -hostkey "ssh-ed25519 255 SHA256:RVa4r61dsjHbh52j0eIllF0yCj6rJebnPKnj7x3JXco" -batch ' -f $deployUser, $deployHost, $deployPort, $sshKeyPath
 Invoke-Expression ($plink + '"kill 888473 2>/dev/null; sleep 1"')
 Start-Sleep -Seconds 2
 
 Write-Host "=== Check all scanner directories and fix permissions ==="
-$script = @'
+$script = @"
 sudo_fix() {
-  echo '***REMOVED***' | sudo -S chmod g+w "$1" 2>/dev/null
+  echo '$sudoPassword' | sudo -S chmod g+w "\$1" 2>/dev/null
 }
 fix_dir() {
-  if [ -d "$1" ]; then
-    perms=$(ls -ld "$1" | awk '{print $1}')
-    echo "$1: $perms"
-    case "$perms" in
+  if [ -d "\$1" ]; then
+    perms=\$(ls -ld "\$1" | awk '{print \$1}')
+    echo "\$1: \$perms"
+    case "\$perms" in
       drwxrwsr-x*) echo "  OK" ;;
-      *) echo "  FIXING..." && sudo_fix "$1" && ls -ld "$1" | awk '{print "  -> "$1}' ;;
+      *) echo "  FIXING..." && sudo_fix "\$1" && ls -ld "\$1" | awk '{print "  -> "\$1}' ;;
     esac
   else
-    echo "MISSING: $1"
+    echo "MISSING: \$1"
   fi
 }
 echo "--- Main media directories ---"
@@ -40,8 +46,8 @@ echo "=== Restart normalizer ==="
 export NODE_PATH=/home/speed4you/portal-app/backend/node_modules
 cd /home/speed4you/portal-app/backend
 nohup node scripts/normalize-media-library.js </dev/null >/tmp/normalizer.log 2>&1 &
-echo "PID: $!"
+echo "PID: \$!"
 sleep 3
 tail -5 /tmp/normalizer.log
-'@
+"@
 Invoke-Expression ($plink + '"' + $script.Replace('"', '\"') + '"')

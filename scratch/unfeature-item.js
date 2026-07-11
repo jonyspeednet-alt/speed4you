@@ -34,7 +34,7 @@ async function main() {
     path: '/portal-api/auth/login',
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-  }, JSON.stringify({ username: 'admin', ***REMOVED***: '***REMOVED***' }));
+  }, JSON.stringify({ username: 'admin', ***REMOVED***: process.env.ADMIN_PASSWORD }));
 
   if (loginRes.status !== 200 || !loginRes.body?.token) {
     console.error('Login failed:', loginRes.status, loginRes.body);
