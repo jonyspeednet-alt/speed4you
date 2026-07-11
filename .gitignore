@@ -29,6 +29,9 @@ coverage/
 deploy_key
 deploy_key.pub
 DEPLOYMENT-SECRETS.md
+.env
+.env.local
+.env.*.local
 
 # Backup and scratch files
 *.backup
