@@ -5,6 +5,7 @@ server-deploy/**/dist/
 .env
 .env.*
 .env.*.local
+!.env.example
 *.log
 .DS_Store
 Thumbs.db

@@ -7,14 +7,16 @@ function getJwtSecret() {
 
   if (!***REMOVED***) {
     if (getNodeEnv() === 'production') {
-      throw new Error('JWT_SECRET must be configured in production.');
+      throw new Error('JWT_SECRET must be configured in production. Set it in your .env file.');
     }
-    // Warn loudly in non-production so developers notice
+    // In development, generate a random ***REMOVED*** for this session
+    const crypto = require('crypto');
+    const sessionSecret = crypto.randomBytes(64).toString('hex');
     console.warn(
-      '[auth] WARNING: JWT_SECRET is not set. Using an insecure fallback. ' +
-      'Set JWT_SECRET before deploying to production.'
+      '[auth] WARNING: JWT_SECRET is not set. Generated a random ***REMOVED*** for this session. ' +
+      'Set JWT_SECRET in your .env file for persistent sessions.'
     );
-    return '***REMOVED***';
+    return sessionSecret;
   }
 
   if (***REMOVED***.length < 32) {

@@ -22,14 +22,25 @@ const crypto = require('crypto');
 const { exec } = require('child_process');
 const path = require('path');
 
-// Configuration
-const PORT = 3000;
-const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '***REMOVED***';
+// Configuration - all values must come from environment variables
+const PORT = process.env.PORT || 3000;
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
 const DEPLOY_SCRIPT = path.join(__dirname, 'scripts', 'deploy.sh');
-const SSH_HOST = '***REMOVED***';
-const SSH_PORT = 2973;
-const SSH_USER = 'speed4you';
-const SSH_KEY = path.join(__dirname, 'deploy_key');
+const SSH_HOST = process.env.DEPLOY_HOST;
+const SSH_PORT = process.env.DEPLOY_PORT || 22;
+const SSH_USER = process.env.DEPLOY_USER;
+const SSH_KEY = process.env.DEPLOY_SSH_KEY_PATH || path.join(__dirname, 'deploy_key');
+
+// Validate required environment variables
+if (!WEBHOOK_SECRET) {
+  console.error('ERROR: WEBHOOK_SECRET environment variable is required.');
+  console.error('Usage: WEBHOOK_SECRET=your-***REMOVED*** node local-deploy-webhook.js');
+  process.exit(1);
+}
+if (!SSH_HOST || !SSH_USER) {
+  console.error('ERROR: DEPLOY_HOST and DEPLOY_USER environment variables are required.');
+  process.exit(1);
+}
 
 // Colors for console output
 const colors = {
