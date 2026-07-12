@@ -515,15 +515,7 @@ function TopNav() {
                 >
                   {user.name || user.email || 'My Profile'}
                 </Link>
-              ) : (
-                <Link
-                  to="/login"
-                  className="top-nav-mobile-menu-item"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  Login / Sign Up
-                </Link>
-              )}
+              ) : null}
               <Link
                 to="/watchlist"
                 className="top-nav-mobile-menu-item"

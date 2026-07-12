@@ -10,7 +10,15 @@ const { AppError } = require('../utils/error');
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts. Please try again later.' },
+});
+
+const adminLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 50,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many login attempts. Please try again later.' },
@@ -26,22 +34,21 @@ function extractBearerToken(headerValue) {
   return header.slice(7).trim();
 }
 
-
 const loginSchema = Joi.object({
   username: Joi.string().trim().alphanum().min(2).max(64).required(),
-  ***REMOVED***: Joi.string().min(1).max(256).required(),
+  password: Joi.string().min(1).max(256).required(),
 });
 
-router.post('/login', loginLimiter, validateBody(loginSchema), async (req, res, next) => {
+async function handleLogin(req, res, next) {
   try {
-    const { username, ***REMOVED*** } = req.validatedBody;
+    const { username, password } = req.validatedBody;
 
     const admin = await findAdminByUsername(username);
     if (!admin) {
       throw new AppError('Invalid credentials', 401, 'UNAUTHORIZED');
     }
 
-    const valid = await bcrypt.compare(***REMOVED***, admin.***REMOVED***_hash);
+    const valid = await bcrypt.compare(password, admin.password_hash);
     if (!valid) {
       throw new AppError('Invalid credentials', 401, 'UNAUTHORIZED');
     }
@@ -54,12 +61,24 @@ router.post('/login', loginLimiter, validateBody(loginSchema), async (req, res, 
       { expiresIn: JWT_EXPIRES_IN }
     );
 
-
     res.json({ token, user: { id: admin.id, username: admin.username, role: admin.role } });
   } catch (error) {
     next(error);
   }
-});
+}
+
+router.post('/login', loginLimiter, validateBody(loginSchema), handleLogin);
+
+const adminAccessKey = (process.env.ADMIN_ACCESS_KEY || '').trim();
+router.post('/admin-login', adminLoginLimiter, (req, res, next) => {
+  if (adminAccessKey) {
+    const provided = String(req.headers['x-admin-access'] || '').trim();
+    if (provided !== adminAccessKey) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+  }
+  next();
+}, validateBody(loginSchema), handleLogin);
 
 function verifyToken(req, res, next) {
   const token = extractBearerToken(req.headers.authorization);
@@ -67,7 +86,6 @@ function verifyToken(req, res, next) {
   if (!token) {
     return next(new AppError('No token provided', 401, 'UNAUTHORIZED'));
   }
-
 
   try {
     const decoded = jwt.verify(token, getJwtSecret());
@@ -91,16 +109,14 @@ router.post('/refresh', (req, res, next) => {
     return next(new AppError('No token provided', 401, 'UNAUTHORIZED'));
   }
 
-
   try {
-    const ***REMOVED*** = getJwtSecret();
-    const decoded = jwt.verify(token, ***REMOVED***);
+    const secret = getJwtSecret();
+    const decoded = jwt.verify(token, secret);
     const refreshedToken = jwt.sign(
       { id: decoded.id, username: decoded.username, role: decoded.role },
-      ***REMOVED***,
+      secret,
       { expiresIn: JWT_EXPIRES_IN }
     );
-
 
     return res.json({
       token: refreshedToken,
