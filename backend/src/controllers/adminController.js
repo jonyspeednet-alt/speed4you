@@ -403,8 +403,8 @@ exports.listAdminUsers = async (req, res) => {
 };
 
 exports.createAdminUser = async (req, res) => {
-  const { username, ***REMOVED***, role } = req.body || {};
-  res.status(201).json(await createUser(username, ***REMOVED***, role));
+  const { username, password, role } = req.body || {};
+  res.status(201).json(await createUser(username, password, role));
 };
 
 exports.updateAdminUser = async (req, res) => {
