@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
 import HeroCarousel from '../features/home/components/HeroCarousel';
 import ContentRail from '../features/home/components/ContentRail';
 import TrendingBento from '../features/home/components/TrendingBento';
@@ -400,12 +399,8 @@ function HomePage() {
       {!isLoggedIn ? (
         <div style={styles.guestPrompt}>
           <div style={styles.guestPromptContent}>
-            <h3 style={styles.guestPromptTitle}>Sign in for a better experience</h3>
-            <p style={styles.guestPromptText}>Track your progress, get recommendations, and pick up where you left off.</p>
-            <div style={styles.guestPromptActions}>
-              <Link to="/login" style={styles.guestPromptBtn}>Sign In</Link>
-              <Link to="/register" style={styles.guestPromptBtnSecondary}>Create Account</Link>
-            </div>
+            <h3 style={styles.guestPromptTitle}>Welcome to Speed4You</h3>
+            <p style={styles.guestPromptText}>Browse our collection of movies, series, and live TV. No account needed.</p>
           </div>
         </div>
       ) : null}
@@ -503,33 +498,6 @@ const styles = {
     fontSize: '0.95rem',
     lineHeight: '1.6',
     marginBottom: '24px',
-  },
-  guestPromptActions: {
-    display: 'flex',
-    gap: '12px',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
-  },
-  guestPromptBtn: {
-    padding: '12px 32px',
-    borderRadius: '999px',
-    background: 'var(--accent-cyan)',
-    color: '#050c16',
-    fontSize: '0.9rem',
-    fontWeight: '900',
-    textDecoration: 'none',
-    letterSpacing: '0.04em',
-  },
-  guestPromptBtnSecondary: {
-    padding: '12px 32px',
-    borderRadius: '999px',
-    background: 'rgba(255,255,255,0.08)',
-    border: '1px solid rgba(255,255,255,0.15)',
-    color: '#fff',
-    fontSize: '0.9rem',
-    fontWeight: '700',
-    textDecoration: 'none',
-    letterSpacing: '0.04em',
   },
 };
 
