@@ -1,9 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import HeroCarousel from '../features/home/components/HeroCarousel';
 import ContentRail from '../features/home/components/ContentRail';
 import TrendingBento from '../features/home/components/TrendingBento';
 import ContinueWatchingRail from '../features/continueWatching/components/ContinueWatchingRail';
 import { HeroBannerSkeleton, RailSkeleton } from '../components/feedback/Skeleton';
+import EmptyState from '../components/feedback/EmptyState';
+import BackToTop from '../components/ui/BackToTop';
 import { contentService } from '../services';
 import { progressService } from '../services/apiClient';
 import { useBreakpoint, useRecentlyViewed, useTVMode } from '../hooks';
@@ -148,18 +151,25 @@ function buildHomepageContent({
     : pickFeatured(featured, featuredPool, [], []);
   const featuredIds = featuredItems.slice(0, 5).map(item => item.id);
 
-  const excludeIds = [...featuredIds];
+  let seenIds = [...featuredIds];
+
+  function dedupedRail(items, opts) {
+    const rail = buildRail(items, { ...opts, excludeIds: seenIds });
+    const ids = (rail || []).map((item) => String(item.id)).filter(Boolean);
+    seenIds = [...new Set([...seenIds, ...ids])];
+    return rail;
+  }
 
   return {
     featured: featuredItems,
-    recommendations: buildRail(recommendationsItems, { seed: createRotationSeed('recommendations'), size: RAIL_SIZE, excludeIds }),
-    localTrending: buildRail(localTrendingItems, { seed: createRotationSeed('local-trending'), size: RAIL_SIZE, excludeIds, pinnedCount: 2 }),
-    trending: buildRail(trendingItems, { seed: createRotationSeed('trending'), size: RAIL_SIZE, excludeIds, pinnedCount: 3 }),
-    latest: buildRail(latestItems, { seed: createRotationSeed('latest'), size: RAIL_SIZE, excludeIds, pinnedCount: 4 }),
-    popular: buildRail(popularItems, { seed: createRotationSeed('popular'), size: RAIL_SIZE, excludeIds, pinnedCount: 2 }),
-    movies: buildRail(moviePool, { seed: createRotationSeed('movies'), size: RAIL_SIZE, excludeIds, pinnedCount: 2 }),
-    series: buildRail(seriesPool, { seed: createRotationSeed('series'), size: RAIL_SIZE, excludeIds, pinnedCount: 2 }),
-    bengali: buildRail(bengaliPool, { seed: createRotationSeed('bengali'), size: RAIL_SIZE, excludeIds, pinnedCount: 2 }),
+    recommendations: dedupedRail(recommendationsItems, { seed: createRotationSeed('recommendations'), size: RAIL_SIZE }),
+    localTrending: dedupedRail(localTrendingItems, { seed: createRotationSeed('local-trending'), size: RAIL_SIZE, pinnedCount: 2 }),
+    trending: dedupedRail(trendingItems, { seed: createRotationSeed('trending'), size: RAIL_SIZE, pinnedCount: 3 }),
+    latest: dedupedRail(latestItems, { seed: createRotationSeed('latest'), size: RAIL_SIZE, pinnedCount: 4 }),
+    popular: dedupedRail(popularItems, { seed: createRotationSeed('popular'), size: RAIL_SIZE, pinnedCount: 2 }),
+    movies: dedupedRail(moviePool, { seed: createRotationSeed('movies'), size: RAIL_SIZE, pinnedCount: 2 }),
+    series: dedupedRail(seriesPool, { seed: createRotationSeed('series'), size: RAIL_SIZE, pinnedCount: 2 }),
+    bengali: dedupedRail(bengaliPool, { seed: createRotationSeed('bengali'), size: RAIL_SIZE, pinnedCount: 2 }),
   };
 }
 
@@ -169,8 +179,8 @@ function readHomepageCache() {
     const raw = sessionStorage.getItem(HOMEPAGE_CACHE_KEY);
     if (!raw) return null;
     const cache = JSON.parse(raw);
-    // Basic cache validation
-    if (Date.now() - new Date(cache.generatedAt).getTime() > 4 * 60 * 60 * 1000) {
+    // Basic cache validation (30 min TTL)
+    if (Date.now() - new Date(cache.generatedAt).getTime() > 30 * 60 * 1000) {
       sessionStorage.removeItem(HOMEPAGE_CACHE_KEY);
       return null;
     }
@@ -200,6 +210,18 @@ function HomePage() {
   const [cwLoading, setCwLoading] = useState(false);
   const isLoggedIn = typeof localStorage !== 'undefined' && !!localStorage.getItem('token');
 
+  // Invalidate cache on auth state change
+  useEffect(() => {
+    const cache = readHomepageCache();
+    if (cache && 'isLoggedIn' in cache && cache.isLoggedIn !== isLoggedIn) {
+      sessionStorage.removeItem(HOMEPAGE_CACHE_KEY);
+      setContent({});
+      setLoading(true);
+      fetchHomepageData();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn]);
+
   const fetchHomepageData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -220,7 +242,7 @@ function HomePage() {
       });
 
       setContent(nextContent);
-      writeHomepageCache({ content: nextContent, generatedAt: new Date().toISOString() });
+      writeHomepageCache({ content: nextContent, generatedAt: new Date().toISOString(), isLoggedIn });
     } catch (err) {
       console.error('Failed to fetch homepage data:', err);
       setError(err);
@@ -235,6 +257,10 @@ function HomePage() {
   }, [fetchHomepageData]);
 
   useEffect(() => {
+    document.title = 'Home — Speed4You Portal';
+  }, []);
+
+  useEffect(() => {
     if (!isLoggedIn) return;
     setCwLoading(true);
     progressService.getContinueWatching()
@@ -244,6 +270,16 @@ function HomePage() {
   }, [isLoggedIn]);
 
   const hasFeaturedHero = Array.isArray(content.featured) && content.featured.length > 0;
+
+  const hasAnyContent = hasFeaturedHero ||
+    content.movies?.length > 0 ||
+    content.series?.length > 0 ||
+    content.latest?.length > 0 ||
+    content.popular?.length > 0 ||
+    content.bengali?.length > 0 ||
+    content.trending?.length > 0 ||
+    content.recommendations?.length > 0 ||
+    content.localTrending?.length > 0;
 
   if (loading) {
     return (
@@ -274,13 +310,30 @@ function HomePage() {
     );
   }
 
+  if (!loading && !error && !hasAnyContent) {
+    return (
+      <div style={{ ...styles.page, ...styles.pageWithoutHero }}>
+        <div style={styles.emptyPage}>
+          <EmptyState
+            icon="content"
+            title="Welcome to the Portal"
+            message="No content is available right now. Check back soon or browse our library."
+            actionLabel="Browse Library"
+            actionHref="/browse"
+            size="large"
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ ...styles.page, ...(!hasFeaturedHero ? styles.pageWithoutHero : {}) }}>
       {hasFeaturedHero ? <HeroCarousel items={content.featured} /> : null}
 
       {(isLoggedIn && (cwLoading || continueWatching.length > 0)) ? (
         <div style={{ padding: '0 max(48px, calc((100vw - 1720px) / 2))', marginTop: hasFeaturedHero ? '-20px' : '0' }}>
-          <ContinueWatchingRail items={continueWatching} isLoading={cwLoading} />
+          <ContinueWatchingRail items={[...continueWatching].sort((a, b) => (b.updatedAt || b.progress || 0) - (a.updatedAt || a.progress || 0))} isLoading={cwLoading} />
         </div>
       ) : null}
 
@@ -309,12 +362,14 @@ function HomePage() {
           <ContentRail
             title="Recently Viewed"
             subtitle="Pick up where you left off"
-            items={recentlyViewed.map(item => ({
-              ...item,
-              poster: item.poster || `${import.meta.env.BASE_URL}assets/poster-placeholder.svg`,
-              genre: item.genre || 'Featured',
-              language: item.language || 'Mixed',
-            }))}
+            items={recentlyViewed
+              .filter(item => !continueWatching.some(cw => String(cw.id) === String(item.id)))
+              .map(item => ({
+                ...item,
+                poster: item.poster || `${import.meta.env.BASE_URL}assets/poster-placeholder.svg`,
+                genre: item.genre || 'Featured',
+                language: item.language || 'Mixed',
+              }))}
           />
         ) : null}
 
@@ -341,6 +396,21 @@ function HomePage() {
         ) : null}
 
       </div>
+
+      {!isLoggedIn ? (
+        <div style={styles.guestPrompt}>
+          <div style={styles.guestPromptContent}>
+            <h3 style={styles.guestPromptTitle}>Sign in for a better experience</h3>
+            <p style={styles.guestPromptText}>Track your progress, get recommendations, and pick up where you left off.</p>
+            <div style={styles.guestPromptActions}>
+              <Link to="/login" style={styles.guestPromptBtn}>Sign In</Link>
+              <Link to="/register" style={styles.guestPromptBtnSecondary}>Create Account</Link>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <BackToTop />
     </div>
   );
 }
@@ -402,6 +472,64 @@ const styles = {
   contentMobile: {
     gap: 'var(--spacing-xl)',
     marginTop: '-30px',
+  },
+  emptyPage: {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 'var(--nav-occupied-desktop)',
+  },
+  guestPrompt: {
+    padding: '60px max(48px, calc((100vw - 1720px) / 2))',
+    textAlign: 'center',
+  },
+  guestPromptContent: {
+    maxWidth: '480px',
+    margin: '0 auto',
+    padding: '40px 32px',
+    borderRadius: '24px',
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid rgba(255,255,255,0.07)',
+  },
+  guestPromptTitle: {
+    color: 'var(--text-primary)',
+    fontSize: '1.4rem',
+    fontWeight: '800',
+    marginBottom: '12px',
+  },
+  guestPromptText: {
+    color: 'var(--text-secondary)',
+    fontSize: '0.95rem',
+    lineHeight: '1.6',
+    marginBottom: '24px',
+  },
+  guestPromptActions: {
+    display: 'flex',
+    gap: '12px',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+  },
+  guestPromptBtn: {
+    padding: '12px 32px',
+    borderRadius: '999px',
+    background: 'var(--accent-cyan)',
+    color: '#050c16',
+    fontSize: '0.9rem',
+    fontWeight: '900',
+    textDecoration: 'none',
+    letterSpacing: '0.04em',
+  },
+  guestPromptBtnSecondary: {
+    padding: '12px 32px',
+    borderRadius: '999px',
+    background: 'rgba(255,255,255,0.08)',
+    border: '1px solid rgba(255,255,255,0.15)',
+    color: '#fff',
+    fontSize: '0.9rem',
+    fontWeight: '700',
+    textDecoration: 'none',
+    letterSpacing: '0.04em',
   },
 };
 

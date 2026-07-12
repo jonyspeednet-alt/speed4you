@@ -14,7 +14,7 @@ export default function UsersPage() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editUser, setEditUser] = useState(null);
-  const [form, setForm] = useState({ username: '', ***REMOVED***: '', role: 'admin' });
+  const [form, setForm] = useState({ username: '', password: '', role: 'admin' });
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['admin', 'users'],
@@ -37,11 +37,11 @@ export default function UsersPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'users'] }),
   });
 
-  function resetForm() { setForm({ username: '', ***REMOVED***: '', role: 'admin' }); }
+  function resetForm() { setForm({ username: '', password: '', role: 'admin' }); }
 
   function openEdit(user) {
     setEditUser(user);
-    setForm({ username: user.username, ***REMOVED***: '', role: user.role });
+    setForm({ username: user.username, password: '', role: user.role });
     setShowForm(true);
   }
 
@@ -56,7 +56,7 @@ export default function UsersPage() {
     if (editUser) {
       const data = {};
       if (form.username !== editUser.username) data.username = form.username;
-      if (form.***REMOVED***) data.***REMOVED*** = form.***REMOVED***;
+      if (form.password) data.password = form.password;
       if (form.role !== editUser.role) data.role = form.role;
       if (Object.keys(data).length) updateMutation.mutate({ id: editUser.id, data });
     } else {
@@ -92,8 +92,8 @@ export default function UsersPage() {
                 style={{ padding: '10px 12px', borderRadius: '8px', background: SURFACE2, color: TEXT, border: `1px solid ${BORDER}`, fontSize: '0.85rem', outline: 'none' }} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <label style={{ fontSize: '0.78rem', color: TEXT2, fontWeight: '600' }}>{editUser ? 'New ***REMOVED*** (leave blank to keep)' : 'Password'}</label>
-              <input type="***REMOVED***" value={form.***REMOVED***} onChange={e => setForm(p => ({ ...p, ***REMOVED***: e.target.value }))}
+              <label style={{ fontSize: '0.78rem', color: TEXT2, fontWeight: '600' }}>{editUser ? 'New password (leave blank to keep)' : 'Password'}</label>
+              <input type="password" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
                 required={!editUser} minLength={editUser ? 0 : 4}
                 style={{ padding: '10px 12px', borderRadius: '8px', background: SURFACE2, color: TEXT, border: `1px solid ${BORDER}`, fontSize: '0.85rem', outline: 'none' }} />
             </div>
