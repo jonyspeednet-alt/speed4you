@@ -36,7 +36,9 @@ function HeroCarousel({ content, items }) {
     const touchStartRef = useRef(0);
 
     const [activeIndex, setActiveIndex] = useState(0);
+    const [backdropVisible, setBackdropVisible] = useState(true);
     const [isAutoPlay, setIsAutoPlay] = useState(true);
+    const [isPaused, setIsPaused] = useState(false);
     const [isHovering, setIsHovering] = useState(false);
     const slideTimerRef = useRef(null);
 
@@ -50,18 +52,34 @@ function HeroCarousel({ content, items }) {
         setActiveIndex(prev => Math.min(prev, contentItems.length - 1 || 0));
     }, [contentItems.length]);
 
+    // Reset backdrop visibility for crossfade on src change
+    useEffect(() => {
+        setBackdropVisible(false);
+    }, [backdrop]);
+
     const moveToSlide = useCallback((index) => {
         if (contentItems.length === 0) return;
         const normalizedIndex = (index + contentItems.length) % contentItems.length;
         setActiveIndex(normalizedIndex);
 
+        if (isPaused) return;
+
         setIsAutoPlay(false);
         if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
         resumeTimerRef.current = setTimeout(() => setIsAutoPlay(true), AUTO_PLAY_RESUME_DELAY);
-    }, [contentItems.length]);
+    }, [contentItems.length, isPaused]);
+
+    const handleTogglePause = useCallback(() => {
+        setIsPaused((prev) => {
+            if (prev) {
+                setIsAutoPlay(true);
+            }
+            return !prev;
+        });
+    }, []);
 
     useEffect(() => {
-        if (!isAutoPlay || contentItems.length <= 1) {
+        if (!isAutoPlay || contentItems.length <= 1 || isPaused) {
             if (slideTimerRef.current) clearTimeout(slideTimerRef.current);
             return;
         }
@@ -73,7 +91,7 @@ function HeroCarousel({ content, items }) {
         return () => {
             if (slideTimerRef.current) clearTimeout(slideTimerRef.current);
         };
-    }, [isAutoPlay, contentItems.length, activeIndex, moveToSlide]);
+    }, [isAutoPlay, contentItems.length, activeIndex, moveToSlide, isPaused]);
 
     // Parallax scroll effect for the background
     useEffect(() => {
@@ -173,12 +191,12 @@ function HeroCarousel({ content, items }) {
                 {backdrop ? (
                     <img
                         ref={bgRef}
-                        key={activeIndex} // Force re-render for transition
                         src={backdrop.includes('image.tmdb.org') ? backdrop.replace(/\/t\/p\/[^/]+\//, '/t/p/w1280/') : backdrop}
                         srcSet={backdrop.includes('image.tmdb.org') ? backdrop.replace(/\/t\/p\/[^/]+\//, '/t/p/w780/') + ' 780w, ' + backdrop.replace(/\/t\/p\/[^/]+\//, '/t/p/w1280/') + ' 1280w' : undefined}
                         alt={title}
-                        className={styles.bgImage}
+                        className={`${styles.bgImage} ${backdropVisible ? styles.bgImageVisible : ''}`}
                         loading="eager" fetchPriority="high" decoding="async" sizes="100vw"
+                        onLoad={() => setBackdropVisible(true)}
                     />
                 ) : null}
                 <div className={`${styles.auroraOrb} ${styles.orb1}`} />
@@ -215,26 +233,57 @@ function HeroCarousel({ content, items }) {
                         ))}
                     </div>
 
-                    {!isPlaceholder && id && (
-                        <div className={styles.actions}>
+                    {contentItems.length > 1 && (
+                        <div className={styles.dotsRow}>
+                            {contentItems.slice(0, 12).map((item, i) => (
+                                <button
+                                    key={item.id || i}
+                                    onClick={() => moveToSlide(i)}
+                                    className={`${styles.dot} ${i === activeIndex ? styles.dotActive : ''}`}
+                                    aria-label={`Go to slide ${i + 1}: ${item.title || 'Untitled'}`}
+                                    type="button"
+                                />
+                            ))}
+                            {contentItems.length > 12 ? (
+                                <span className={styles.dotsMore}>+{contentItems.length - 12}</span>
+                            ) : null}
+                        </div>
+                    )}
+
+                    <div className={styles.actions}>
+                        {!isPlaceholder && id ? (
+                            <>
+                                <Link
+                                    to={isSeries ? `/series/${id}` : `/movies/${id}`}
+                                    className={`${styles.button} ${styles.buttonPrimary}`}
+                                >
+                                    <span className={styles.buttonIcon}>
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                            <path d="M8 5v14l11-7z" />
+                                        </svg>
+                                    </span>
+                                    Watch Now
+                                </Link>
+                                <WatchlistButton
+                                    contentType={isSeries ? 'series' : 'movie'}
+                                    contentId={id}
+                                    title={title}
+                                />
+                            </>
+                        ) : (
                             <Link
-                                to={isSeries ? `/series/${id}` : `/movies/${id}`}
+                                to="/browse"
                                 className={`${styles.button} ${styles.buttonPrimary}`}
                             >
                                 <span className={styles.buttonIcon}>
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                        <path d="M8 5v14l11-7z" />
+                                        <path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z" />
                                     </svg>
                                 </span>
-                                Watch Now
+                                Browse Library
                             </Link>
-                            <WatchlistButton
-                                contentType={isSeries ? 'series' : 'movie'}
-                                contentId={id}
-                                title={title}
-                            />
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
 
                 {!isTVMode && (
@@ -308,8 +357,28 @@ function HeroCarousel({ content, items }) {
                         </div>
                     )}
 
-                    <div className={styles.progressBarContainer}>
-                        <div className={styles.progressBar} style={{ animationDuration: `${AUTO_PLAY_DURATION}ms`, animationPlayState: isAutoPlay ? 'running' : 'paused' }} />
+                    <div className={`${styles.progressBarContainer} ${isPaused ? styles.progressBarPaused : ''}`}>
+                        <div className={styles.progressBar} style={{ animationDuration: `${AUTO_PLAY_DURATION}ms`, animationPlayState: isAutoPlay && !isPaused ? 'running' : 'paused' }} />
+                        <div className={styles.progressControls}>
+                            <button
+                                onClick={handleTogglePause}
+                                className={styles.pauseBtn}
+                                aria-label={isPaused ? 'Resume autoplay' : 'Pause autoplay'}
+                                type="button"
+                            >
+                                {isPaused ? (
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                        <path d="M8 5v14l11-7z" />
+                                    </svg>
+                                ) : (
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                        <rect x="6" y="4" width="4" height="16" />
+                                        <rect x="14" y="4" width="4" height="16" />
+                                    </svg>
+                                )}
+                            </button>
+                            <span className={styles.slideCounter}>{activeIndex + 1} / {contentItems.length}</span>
+                        </div>
                     </div>
                 </>
             )}

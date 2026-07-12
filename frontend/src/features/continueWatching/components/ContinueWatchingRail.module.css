@@ -11,12 +11,51 @@
   }
 }
 
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--page-padding);
+  margin-bottom: var(--spacing-md);
+}
+
 .title {
   font-size: 1.5rem;
   font-weight: 700;
   color: var(--text-primary);
-  margin-bottom: var(--spacing-md);
-  padding: 0 var(--page-padding);
+  margin: 0;
+}
+
+.scrollControls {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.scrollBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background 200ms ease, color 200ms ease, border-color 200ms ease;
+}
+
+.scrollBtn:hover:not(.scrollBtnDisabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  border-color: rgba(255,255,255,0.14);
+}
+
+.scrollBtnDisabled {
+  opacity: 0.25;
+  cursor: default;
+  pointer-events: none;
 }
 
 .rail {

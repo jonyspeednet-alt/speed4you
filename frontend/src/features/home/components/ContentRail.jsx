@@ -18,10 +18,14 @@ function ContentRail({
   const [rightHovered, setRightHovered] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
+  const [isFocused, setIsFocused] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef({ x: 0, scrollLeft: 0 });
+  const isDraggingRef = useRef(false);
 
-  const accent = title.includes("Bengali")
+  const accent = subtitle === "Local language highlights"
     ? "var(--accent-violet)"
-    : title.includes("Trending")
+    : subtitle === "Most watched this week" || subtitle === "Viral Hits" || subtitle === "Popular in your area"
       ? "var(--accent-pink)"
       : "var(--accent-cyan)";
 
@@ -118,6 +122,64 @@ function ContentRail({
     [applyScrollLeft, getScrollDistance, scheduleScrollIndicatorUpdate],
   );
 
+  const handleKeyDown = useCallback((event) => {
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      scroll('left');
+    } else if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      scroll('right');
+    }
+  }, [scroll]);
+
+  const handleMouseDown = useCallback((event) => {
+    if (event.button !== 0) return;
+    const element = scrollRef.current;
+    if (!element) return;
+    isDraggingRef.current = true;
+    setIsDragging(true);
+    dragStartRef.current = { x: event.clientX, scrollLeft: element.scrollLeft };
+    element.style.cursor = 'grabbing';
+    element.style.userSelect = 'none';
+  }, []);
+
+  const handleMouseMove = useCallback((event) => {
+    if (!isDraggingRef.current) return;
+    event.preventDefault();
+    const element = scrollRef.current;
+    if (!element) return;
+    const { x, scrollLeft } = dragStartRef.current;
+    const walk = (event.clientX - x) * 1.2;
+    element.scrollLeft = scrollLeft - walk;
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    if (!isDraggingRef.current) return;
+    isDraggingRef.current = false;
+    setIsDragging(false);
+    const element = scrollRef.current;
+    if (element) {
+      element.style.cursor = '';
+      element.style.userSelect = '';
+    }
+    updateScrollIndicators();
+  }, [updateScrollIndicators]);
+
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+
+    element.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      element.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [handleMouseDown, handleMouseMove, handleMouseUp]);
+
   useEffect(() => {
     const element = scrollRef.current;
     if (!element) return;
@@ -176,7 +238,7 @@ function ContentRail({
                 ...(isMobile ? styles.viewAllMobile : {}),
               }}
             >
-              Open shelf
+              View All
             </Link>
           ) : null}
           <div
@@ -256,12 +318,17 @@ function ContentRail({
           ...styles.rail,
           ...(!isMobile && items.length <= 5 ? styles.railCompactSet : {}),
           ...(isTVMode ? styles.railTV : isMobile ? styles.railMobile : {}),
+          ...(isFocused ? styles.railFocused : {}),
+          cursor: isDragging ? 'grabbing' : 'grab',
         }}
         ref={scrollRef}
         role="region"
         aria-label={`${title} content rail`}
+        tabIndex={0}
+        onKeyDown={handleKeyDown}
+        onFocus={() => { setIsFocused(true); scheduleScrollIndicatorUpdate(); }}
+        onBlur={() => setIsFocused(false)}
         onMouseEnter={scheduleScrollIndicatorUpdate}
-        onFocus={scheduleScrollIndicatorUpdate}
       >
         {items.map((item, index) => (
           <ContentCard
@@ -463,6 +530,11 @@ const styles = {
     margin: "0",
     padding: "6px max(48px, calc((100vw - 1720px) / 2)) 16px",
     scrollPaddingLeft: "max(48px, calc((100vw - 1720px) / 2))",
+  },
+  railFocused: {
+    outline: '2px solid var(--accent-cyan)',
+    outlineOffset: '-2px',
+    borderRadius: '8px',
   },
 };
 
