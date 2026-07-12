@@ -33,6 +33,7 @@ jobs:
         working-directory: frontend
         env:
           VITE_APP_BASE: /
+          VITE_ADMIN_ACCESS_KEY: ${{ secrets.ADMIN_ACCESS_KEY }}
 
       - name: Record frontend bundle fingerprint
         id: frontend_bundle
@@ -59,10 +60,10 @@ jobs:
       - name: Check server disk space
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ ***REMOVED***s.DEPLOY_HOST }}
-          username: ${{ ***REMOVED***s.DEPLOY_USER }}
-          key: ${{ ***REMOVED***s.DEPLOY_SSH_KEY }}
-          port: ${{ ***REMOVED***s.DEPLOY_PORT }}
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
           script: |
             echo "=== Disk space ==="
             df -h /var/www/html/ /home/speed4you/ / 2>/dev/null || df -h
@@ -74,12 +75,12 @@ jobs:
       - name: Backup production data files
         uses: appleboy/ssh-action@v1.2.0
         env:
-          SUDO_PASSWORD: ${{ ***REMOVED***s.SUDO_PASSWORD }}
+          SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}
         with:
-          host: ${{ ***REMOVED***s.DEPLOY_HOST }}
-          username: ${{ ***REMOVED***s.DEPLOY_USER }}
-          key: ${{ ***REMOVED***s.DEPLOY_SSH_KEY }}
-          port: ${{ ***REMOVED***s.DEPLOY_PORT }}
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
           envs: SUDO_PASSWORD
           script: |
             BACKEND=/home/speed4you/portal-app/backend
@@ -97,10 +98,10 @@ jobs:
       - name: Deploy frontend via SCP
         uses: appleboy/scp-action@v1
         with:
-          host: ${{ ***REMOVED***s.DEPLOY_HOST }}
-          username: ${{ ***REMOVED***s.DEPLOY_USER }}
-          key: ${{ ***REMOVED***s.DEPLOY_SSH_KEY }}
-          port: ${{ ***REMOVED***s.DEPLOY_PORT }}
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
           source: "frontend/dist/"
           target: /home/speed4you/portal-frontend-staging
           strip_components: 2
@@ -109,12 +110,12 @@ jobs:
       - name: Apply frontend to web root
         uses: appleboy/ssh-action@v1.2.0
         env:
-          SUDO_PASSWORD: ${{ ***REMOVED***s.SUDO_PASSWORD }}
+          SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}
         with:
-          host: ${{ ***REMOVED***s.DEPLOY_HOST }}
-          username: ${{ ***REMOVED***s.DEPLOY_USER }}
-          key: ${{ ***REMOVED***s.DEPLOY_SSH_KEY }}
-          port: ${{ ***REMOVED***s.DEPLOY_PORT }}
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
           envs: SUDO_PASSWORD
           script: |
             SRC=/home/speed4you/portal-frontend-staging
@@ -133,12 +134,12 @@ jobs:
       - name: Copy backend to app directory
         uses: appleboy/ssh-action@v1.2.0
         env:
-          SUDO_PASSWORD: ${{ ***REMOVED***s.SUDO_PASSWORD }}
+          SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}
         with:
-          host: ${{ ***REMOVED***s.DEPLOY_HOST }}
-          username: ${{ ***REMOVED***s.DEPLOY_USER }}
-          key: ${{ ***REMOVED***s.DEPLOY_SSH_KEY }}
-          port: ${{ ***REMOVED***s.DEPLOY_PORT }}
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
           envs: SUDO_PASSWORD
           script: |
             SRC=/home/speed4you/actions-runner/_work/speed4you/speed4you/backend
@@ -171,31 +172,32 @@ jobs:
       - name: Install deps, write .env, restart, health check
         uses: appleboy/ssh-action@v1.2.0
         env:
-          TMDB_API_KEY: ${{ ***REMOVED***s.TMDB_API_KEY }}
-          OMDB_API_KEY: ${{ ***REMOVED***s.OMDB_API_KEY }}
-          JWT_SECRET: ${{ ***REMOVED***s.JWT_SECRET }}
-          SUDO_PASSWORD: ${{ ***REMOVED***s.SUDO_PASSWORD }}
-          CORS_ALLOWED_ORIGINS: ${{ ***REMOVED***s.CORS_ALLOWED_ORIGINS }}
-          PLAYER_CACHE_ROOT: ${{ ***REMOVED***s.PLAYER_CACHE_ROOT }}
-          DB_HOST: ${{ ***REMOVED***s.DB_HOST }}
-          DB_PORT: ${{ ***REMOVED***s.DB_PORT }}
-          DB_NAME: ${{ ***REMOVED***s.DB_NAME }}
-          DB_USER: ${{ ***REMOVED***s.DB_USER }}
-          DB_PASSWORD: ${{ ***REMOVED***s.DB_PASSWORD }}
-          ADMIN_USERNAME: ${{ ***REMOVED***s.ADMIN_USERNAME }}
-          ADMIN_PASSWORD_HASH: ${{ ***REMOVED***s.ADMIN_PASSWORD_HASH }}
-          PUBLIC_API_PER_IP_LIMIT: ${{ ***REMOVED***s.PUBLIC_API_PER_IP_LIMIT }}
-          DB_POOL_MAX: ${{ ***REMOVED***s.DB_POOL_MAX }}
-          PLAYER_MAX_CONCURRENT_LIVE_STREAMS: ${{ ***REMOVED***s.PLAYER_MAX_CONCURRENT_LIVE_STREAMS }}
-          TV_PORTAL_BASE_URL: ${{ ***REMOVED***s.TV_PORTAL_BASE_URL }}
-          TV_ALLOWED_HOSTS: ${{ ***REMOVED***s.TV_ALLOWED_HOSTS }}
-          TV_ALLOWED_PORTS: ${{ ***REMOVED***s.TV_ALLOWED_PORTS }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}
+          CORS_ALLOWED_ORIGINS: ${{ secrets.CORS_ALLOWED_ORIGINS }}
+          PLAYER_CACHE_ROOT: ${{ secrets.PLAYER_CACHE_ROOT }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+          ADMIN_PASSWORD_HASH: ${{ secrets.ADMIN_PASSWORD_HASH }}
+          PUBLIC_API_PER_IP_LIMIT: ${{ secrets.PUBLIC_API_PER_IP_LIMIT }}
+          DB_POOL_MAX: ${{ secrets.DB_POOL_MAX }}
+          PLAYER_MAX_CONCURRENT_LIVE_STREAMS: ${{ secrets.PLAYER_MAX_CONCURRENT_LIVE_STREAMS }}
+          TV_PORTAL_BASE_URL: ${{ secrets.TV_PORTAL_BASE_URL }}
+          TV_ALLOWED_HOSTS: ${{ secrets.TV_ALLOWED_HOSTS }}
+          TV_ALLOWED_PORTS: ${{ secrets.TV_ALLOWED_PORTS }}
+          ADMIN_ACCESS_KEY: ${{ secrets.ADMIN_ACCESS_KEY }}
         with:
-          host: ${{ ***REMOVED***s.DEPLOY_HOST }}
-          username: ${{ ***REMOVED***s.DEPLOY_USER }}
-          key: ${{ ***REMOVED***s.DEPLOY_SSH_KEY }}
-          port: ${{ ***REMOVED***s.DEPLOY_PORT }}
-          envs: TMDB_API_KEY,OMDB_API_KEY,JWT_SECRET,SUDO_PASSWORD,CORS_ALLOWED_ORIGINS,PLAYER_CACHE_ROOT,DB_HOST,DB_PORT,DB_NAME,DB_USER,DB_PASSWORD,ADMIN_USERNAME,ADMIN_PASSWORD_HASH,PUBLIC_API_PER_IP_LIMIT,DB_POOL_MAX,PLAYER_MAX_CONCURRENT_LIVE_STREAMS,TV_PORTAL_BASE_URL,TV_ALLOWED_HOSTS,TV_ALLOWED_PORTS
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          envs: TMDB_API_KEY,OMDB_API_KEY,JWT_SECRET,SUDO_PASSWORD,CORS_ALLOWED_ORIGINS,PLAYER_CACHE_ROOT,DB_HOST,DB_PORT,DB_NAME,DB_USER,DB_PASSWORD,ADMIN_USERNAME,ADMIN_PASSWORD_HASH,PUBLIC_API_PER_IP_LIMIT,DB_POOL_MAX,PLAYER_MAX_CONCURRENT_LIVE_STREAMS,TV_PORTAL_BASE_URL,TV_ALLOWED_HOSTS,TV_ALLOWED_PORTS,ADMIN_ACCESS_KEY
           script: |
             set -e
             BACKEND=/home/speed4you/portal-app/backend
@@ -275,6 +277,7 @@ jobs:
             SCANNER_AUTO_SCAN_INTERVAL_MINUTES=10
             SCANNER_MIN_MOVIE_SIZE=524288000
             SCANNER_MIN_EPISODE_SIZE=104857600
+            ADMIN_ACCESS_KEY=${ADMIN_ACCESS_KEY}
             EOF
 
             echo "Ensuring new metadata routes exist in admin.js..."
@@ -524,12 +527,12 @@ jobs:
       - name: Setup data portal on data.speed4you.net
         uses: appleboy/ssh-action@v1.2.0
         env:
-          SUDO_PASSWORD: ${{ ***REMOVED***s.SUDO_PASSWORD }}
+          SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}
         with:
-          host: ${{ ***REMOVED***s.DEPLOY_HOST }}
-          username: ${{ ***REMOVED***s.DEPLOY_USER }}
-          key: ${{ ***REMOVED***s.DEPLOY_SSH_KEY }}
-          port: ${{ ***REMOVED***s.DEPLOY_PORT }}
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
           envs: SUDO_PASSWORD
           script: |
             CONF=/etc/nginx/sites-enabled/data.speed4you.net
@@ -723,12 +726,12 @@ jobs:
       - name: Configure speed4you.net nginx HTTP/2 & gzip
         uses: appleboy/ssh-action@v1.2.0
         env:
-          SUDO_PASSWORD: ${{ ***REMOVED***s.SUDO_PASSWORD }}
+          SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}
         with:
-          host: ${{ ***REMOVED***s.DEPLOY_HOST }}
-          username: ${{ ***REMOVED***s.DEPLOY_USER }}
-          key: ${{ ***REMOVED***s.DEPLOY_SSH_KEY }}
-          port: ${{ ***REMOVED***s.DEPLOY_PORT }}
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
           envs: SUDO_PASSWORD
           script: |
             set -e
