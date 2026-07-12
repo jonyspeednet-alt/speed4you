@@ -9,7 +9,7 @@ function LoginPage() {
   const { isMobile } = useBreakpoint();
   const isTVMode = useTVMode();
   const [username, setUsername] = useState("");
-  const [***REMOVED***, setPassword] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
@@ -20,7 +20,7 @@ function LoginPage() {
     setLoading(true);
 
     try {
-      const response = await authService.login(username, ***REMOVED***);
+      const response = await authService.login(username, password);
       localStorage.setItem("token", response.token);
       localStorage.setItem("user", JSON.stringify(response.user));
       // Only allow relative paths to prevent open redirect attacks
@@ -76,22 +76,22 @@ function LoginPage() {
           </div>
 
           <div style={styles.field}>
-            <label style={styles.label} htmlFor="login-***REMOVED***">
+            <label style={styles.label} htmlFor="login-password">
               Password
             </label>
             <input
-              id="login-***REMOVED***"
-              type="***REMOVED***"
-              value={***REMOVED***}
+              id="login-password"
+              type="password"
+              value={password}
               onChange={(event) => setPassword(event.target.value)}
               style={{
                 ...styles.input,
-                ...(focusedField === "***REMOVED***" ? styles.inputFocused : {}),
+                ...(focusedField === "password" ? styles.inputFocused : {}),
               }}
-              placeholder="Enter ***REMOVED***"
-              onFocus={() => setFocusedField("***REMOVED***")}
+              placeholder="Enter password"
+              onFocus={() => setFocusedField("password")}
               onBlur={() => setFocusedField(null)}
-              autoComplete="current-***REMOVED***"
+              autoComplete="current-password"
             />
           </div>
 

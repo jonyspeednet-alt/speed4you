@@ -48,11 +48,13 @@ function ContentCard({
   const isLandscape = type === "continue";
   const [hovered, setHovered] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgError, setImgError] = useState(false);
   const genre = String(item.genre || "Featured")
     .split(",")[0]
     .trim();
   const itemRating = item.rating || null;
   const displayDate = formatReleaseDate(item.releasedAt) || item.year || null;
+  const isNew = item.releasedAt && (Date.now() - new Date(item.releasedAt).getTime() < 7 * 24 * 60 * 60 * 1000);
   const isAdmin = useMemo(() => {
     try {
       const u = JSON.parse(localStorage.getItem('user') || 'null');
@@ -90,8 +92,8 @@ function ContentCard({
           const targetPath = isSeries ? `/series/${item.id}` : `/movies/${item.id}`;
           navigate(targetPath);
         }}
-        onFocus={() => tv && setHovered(true)}
-        onBlur={() => tv && setHovered(false)}
+        onFocus={() => setHovered(true)}
+        onBlur={() => setHovered(false)}
       >
         <div
           style={{
@@ -111,32 +113,36 @@ function ContentCard({
                 : "rgba(255,255,255,0.08)",
           }}
         >
-          {!imgLoaded ? (
+          {(!imgLoaded || imgError) ? (
             <div style={styles.posterPlaceholder}>
-              <div style={styles.posterShimmer} />
+              {!imgError ? <div style={styles.posterShimmer} /> : null}
             </div>
           ) : null}
-          <img
-            src={getTmdbPosterSrc(item.poster, compact ? 'w185' : 'w342')}
-            srcSet={getTmdbSrcSet(item.poster)}
-            sizes={compact ? '(max-width: 480px) 148px, 156px' : '(max-width: 1024px) 196px, 220px'}
-            alt={item.title}
-            loading={eager ? "eager" : "lazy"}
-            decoding="async"
-            fetchPriority={eager ? "high" : "low"}
-            style={{
-              ...styles.poster,
-              opacity: imgLoaded ? 1 : 0,
-              transform: hovered && !compact ? "scale(1.06)" : "scale(1)",
-            }}
-            onLoad={() => setImgLoaded(true)}
-          />
+          {!imgError ? (
+            <img
+              src={getTmdbPosterSrc(item.poster, compact ? 'w185' : 'w342')}
+              srcSet={getTmdbSrcSet(item.poster)}
+              sizes={compact ? '(max-width: 480px) 148px, 156px' : '(max-width: 1024px) 196px, 220px'}
+              alt={item.title}
+              loading={eager ? "eager" : "lazy"}
+              decoding="async"
+              fetchPriority={eager ? "high" : "low"}
+              style={{
+                ...styles.poster,
+                opacity: imgLoaded ? 1 : 0,
+                transform: hovered && !compact ? "scale(1.06)" : "scale(1)",
+              }}
+              onLoad={() => setImgLoaded(true)}
+              onError={() => setImgError(true)}
+            />
+          ) : null}
           <div style={styles.posterOverlay} />
 
           <div style={styles.topBadges}>
             <span style={styles.typeBadge}>
               {isSeries ? "Series" : "Movie"}
             </span>
+            {isNew ? <span style={styles.newBadge}>New</span> : null}
             <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
               {isAdmin ? (
                 <Link
@@ -326,6 +332,16 @@ const styles = {
     textTransform: "uppercase",
     letterSpacing: "0.12em",
     border: "1px solid rgba(255, 255, 255, 0.1)",
+  },
+  newBadge: {
+    padding: "4px 8px",
+    borderRadius: "6px",
+    background: "var(--accent-pink)",
+    color: "#fff",
+    fontSize: "0.55rem",
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
   },
   editBadge: {
     padding: "5px 7px",

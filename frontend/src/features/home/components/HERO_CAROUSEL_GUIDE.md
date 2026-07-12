@@ -14,7 +14,7 @@ function MyPage() {
     {
       id: '1',
       title: 'Inception',
-      description: 'A thief who steals corporate ***REMOVED***s through dream-sharing technology.',
+      description: 'A thief who steals corporate secrets through dream-sharing technology.',
       backdrop: '/images/inception-backdrop.jpg',
       poster: '/images/inception-poster.jpg',
       type: 'movie',
