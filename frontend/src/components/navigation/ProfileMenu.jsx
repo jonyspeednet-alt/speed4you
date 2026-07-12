@@ -32,11 +32,7 @@ function ProfileMenu({ user, compact = false }) {
   }, [isOpen]);
 
   if (!user) {
-    return (
-      <Link to="/login" style={{ ...styles.loginLink, ...(compact ? styles.loginLinkCompact : {}) }}>
-        Sign In
-      </Link>
-    );
+    return null;
   }
 
   const initial = user.username?.charAt(0).toUpperCase() || 'U';
@@ -225,20 +221,6 @@ const styles = {
   itemDanger: {
     background: 'rgba(239,68,68,0.1)',
     color: '#f87171',
-  },
-  loginLink: {
-    padding: '10px 18px',
-    borderRadius: '999px',
-    background: 'rgba(255,255,255,0.06)',
-    border: '1px solid rgba(255,255,255,0.1)',
-    color: 'var(--text-primary)',
-    fontWeight: '700',
-    fontSize: '0.88rem',
-    transition: 'background 150ms ease',
-  },
-  loginLinkCompact: {
-    padding: '10px 14px',
-    fontSize: '0.82rem',
   },
 };
 
