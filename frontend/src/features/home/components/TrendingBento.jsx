@@ -15,7 +15,9 @@ export default function TrendingBento({ items }) {
   const isTVMode = useTVMode();
   const displayItems = items.slice(0, 5);
 
-  if (displayItems.length < 5 && !isMobile) return null;
+  if (displayItems.length < 3 && !isMobile) return null;
+
+  const isCompact = !isMobile && displayItems.length < 5;
 
   return (
     <section style={{
@@ -28,19 +30,20 @@ export default function TrendingBento({ items }) {
           <span style={styles.eyebrow}>Viral Hits</span>
           <h2 style={styles.title}>Trending Right Now</h2>
         </div>
-        <Link to="/browse?sort=trending" style={styles.viewAll}>Open shelf</Link>
+        <Link to="/browse?sort=trending" style={styles.viewAll}>View All</Link>
       </div>
 
       <div style={{
         ...styles.grid,
         ...(isTVMode ? styles.gridTV : isMobile ? styles.gridMobile : isTablet ? styles.gridTablet : {}),
+        ...(isCompact ? { gridTemplateColumns: `repeat(${displayItems.length}, 1fr)`, gridTemplateRows: '220px' } : {}),
       }}>
         {displayItems.map((item, index) => (
           <BentoItem
             key={item.id}
             item={item}
             index={index}
-            isLarge={index === 0 && !isMobile && !isTVMode}
+            isLarge={index === 0 && !isMobile && !isTVMode && !isCompact}
             tv={isTVMode}
             mobile={isMobile}
           />
