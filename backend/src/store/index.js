@@ -24,7 +24,7 @@ async function ensureContentStore() {
     const port = Number(process.env.DB_PORT) || 5432;
     const database = process.env.DB_NAME;
     const user = process.env.DB_USER;
-    const ***REMOVED*** = process.env.DB_PASSWORD;
+    const password = process.env.DB_PASSWORD;
     const max = Number(process.env.PGPOOL_MAX) || 10;
 
     if (!host || !database || !user) {
@@ -33,7 +33,7 @@ async function ensureContentStore() {
       return;
     }
 
-    pool = new Pool({ host, port, database, user, ***REMOVED***, max, idleTimeoutMillis: 30000 });
+    pool = new Pool({ host, port, database, user, password, max, idleTimeoutMillis: 30000 });
 
     // Quick connectivity check
     await pool.query('SELECT 1');

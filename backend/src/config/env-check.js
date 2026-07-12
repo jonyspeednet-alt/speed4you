@@ -20,11 +20,11 @@ const RECOMMENDED_NON_PROD_VARS = [
 ];
 
 const WEAK_JWT_SECRETS = new Set([
-  'fallback-***REMOVED***-change-me',
-  '***REMOVED***',
-  '***REMOVED***',
-  '***REMOVED***',
-  '***REMOVED***',
+  'fallback-secret-change-me',
+  'secret',
+  'password',
+  'changeme',
+  '123456',
 ]);
 
 function hasValue(value) {
