@@ -10,13 +10,13 @@ async function listUsers() {
   return listAdminUsers();
 }
 
-async function createUser(username, ***REMOVED***, role) {
+async function createUser(username, password, role) {
   if (!username || username.length < 2) {
     const err = new Error('Username must be at least 2 characters');
     err.statusCode = 400;
     throw err;
   }
-  if (!***REMOVED*** || ***REMOVED***.length < 4) {
+  if (!password || password.length < 4) {
     const err = new Error('Password must be at least 4 characters');
     err.statusCode = 400;
     throw err;
@@ -28,8 +28,8 @@ async function createUser(username, ***REMOVED***, role) {
   }
   const validRoles = ['admin', 'super_admin'];
   const finalRole = validRoles.includes(role) ? role : 'admin';
-  const ***REMOVED***Hash = await bcrypt.hash(***REMOVED***, 10);
-  return createAdminUser(username, ***REMOVED***Hash, finalRole);
+  const passwordHash = await bcrypt.hash(password, 10);
+  return createAdminUser(username, passwordHash, finalRole);
 }
 
 async function updateUser(id, updates) {
@@ -42,13 +42,13 @@ async function updateUser(id, updates) {
     }
     fields.username = updates.username;
   }
-  if (updates.***REMOVED*** !== undefined) {
-    if (updates.***REMOVED***.length < 4) {
+  if (updates.password !== undefined) {
+    if (updates.password.length < 4) {
       const err = new Error('Password must be at least 4 characters');
       err.statusCode = 400;
       throw err;
     }
-    fields.***REMOVED***_hash = await bcrypt.hash(updates.***REMOVED***, 10);
+    fields.password_hash = await bcrypt.hash(updates.password, 10);
   }
   if (updates.role !== undefined) {
     if (!['admin', 'super_admin'].includes(updates.role)) {

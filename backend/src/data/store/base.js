@@ -167,7 +167,7 @@ async function ensureContentStore() {
         CREATE TABLE IF NOT EXISTS admin_users (
           id BIGSERIAL PRIMARY KEY,
           username TEXT NOT NULL UNIQUE,
-          ***REMOVED***_hash TEXT NOT NULL,
+          password_hash TEXT NOT NULL,
           role TEXT NOT NULL DEFAULT 'admin',
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -258,9 +258,9 @@ async function ensureContentStore() {
         throw new Error('ADMIN_USERNAME and ADMIN_PASSWORD_HASH must be configured in production.');
       }
       await db.query(`
-        INSERT INTO admin_users (username, ***REMOVED***_hash, role, updated_at)
+        INSERT INTO admin_users (username, password_hash, role, updated_at)
         VALUES ($1, $2, 'super_admin', NOW())
-        ON CONFLICT (username) DO UPDATE SET ***REMOVED***_hash = EXCLUDED.***REMOVED***_hash, updated_at = NOW()
+        ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash, updated_at = NOW()
       `, [DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASSWORD_HASH]);
 
       const stateResult = await db.query(`SELECT value FROM app_state WHERE key = 'catalog_meta' LIMIT 1`);

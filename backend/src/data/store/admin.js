@@ -15,7 +15,7 @@ async function getRecentItems(limit = 10) {
 
 async function findAdminByUsername(username) {
   await ensureContentStore();
-  const result = await db.query('SELECT id, username, ***REMOVED***_hash, role, created_at, updated_at, last_login FROM admin_users WHERE username = $1 LIMIT 1', [String(username || '').trim()]);
+  const result = await db.query('SELECT id, username, password_hash, role, created_at, updated_at, last_login FROM admin_users WHERE username = $1 LIMIT 1', [String(username || '').trim()]);
   return result.rows[0] || null;
 }
 
@@ -33,12 +33,12 @@ async function listAdminUsers() {
   return result.rows;
 }
 
-async function createAdminUser(username, ***REMOVED***Hash, role) {
+async function createAdminUser(username, passwordHash, role) {
   await ensureContentStore();
   const result = await db.query(
-    `INSERT INTO admin_users (username, ***REMOVED***_hash, role) VALUES ($1, $2, $3)
+    `INSERT INTO admin_users (username, password_hash, role) VALUES ($1, $2, $3)
      RETURNING id, username, role, created_at, updated_at, last_login`,
-    [String(username).trim(), ***REMOVED***Hash, role || 'admin'],
+    [String(username).trim(), passwordHash, role || 'admin'],
   );
   return result.rows[0] || null;
 }
@@ -49,7 +49,7 @@ async function updateAdminUser(id, fields) {
   const vals = [];
   let idx = 1;
   if (fields.username !== undefined) { sets.push(`username = $${idx++}`); vals.push(String(fields.username).trim()); }
-  if (fields.***REMOVED***_hash !== undefined) { sets.push(`***REMOVED***_hash = $${idx++}`); vals.push(fields.***REMOVED***_hash); }
+  if (fields.password_hash !== undefined) { sets.push(`password_hash = $${idx++}`); vals.push(fields.password_hash); }
   if (fields.role !== undefined) { sets.push(`role = $${idx++}`); vals.push(fields.role); }
   if (!sets.length) return null;
   sets.push(`updated_at = NOW()`);

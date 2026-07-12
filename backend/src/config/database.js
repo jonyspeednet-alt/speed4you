@@ -23,7 +23,7 @@ const connectionConfig = {
   port: Number(process.env.DB_PORT) || 5432,
   database: process.env.DB_NAME || 'isp_entertainment',
   user: process.env.DB_USER || 'postgres',
-  ***REMOVED***: process.env.DB_PASSWORD || 'postgres',
+  password: process.env.DB_PASSWORD || 'postgres',
   max: Number(process.env.DB_POOL_MAX || DEFAULT_DB_POOL_MAX),
   idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS || 30000),
   connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT_MS || 10000),
