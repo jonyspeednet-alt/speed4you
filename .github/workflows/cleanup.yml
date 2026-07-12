@@ -10,12 +10,12 @@ jobs:
       - name: Run cleanup on server
         uses: appleboy/ssh-action@v1.2.0
         env:
-          SUDO_PASSWORD: ${{ ***REMOVED***s.SUDO_PASSWORD }}
+          SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}
         with:
-          host: ${{ ***REMOVED***s.DEPLOY_HOST }}
-          username: ${{ ***REMOVED***s.DEPLOY_USER }}
-          key: ${{ ***REMOVED***s.DEPLOY_SSH_KEY }}
-          port: ${{ ***REMOVED***s.DEPLOY_PORT }}
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
           envs: SUDO_PASSWORD
           command_timeout: 5m
           script: |
@@ -25,7 +25,7 @@ jobs:
             echo "=== Finding Batman entries with Sonic paths ==="
             node -e "
               const { Pool } = require('pg');
-              const pool = new Pool({ host: process.env.DB_HOST || 'localhost', port: Number(process.env.DB_PORT) || 5432, database: process.env.DB_NAME || 'isp_entertainment', user: process.env.DB_USER || 'postgres', ***REMOVED***: process.env.DB_PASSWORD });
+              const pool = new Pool({ host: process.env.DB_HOST || 'localhost', port: Number(process.env.DB_PORT) || 5432, database: process.env.DB_NAME || 'isp_entertainment', user: process.env.DB_USER || 'postgres', password: process.env.DB_PASSWORD });
               (async () => {
                 // Find Batman entries
                 const r1 = await pool.query(\"SELECT id, title, payload->>'sourcePath' AS sp, payload->>'sourcePublicPath' AS spp, payload->>'videoUrl' AS vu, status FROM content_catalog WHERE title ILIKE '%batman%' ORDER BY id\");
