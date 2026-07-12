@@ -55,7 +55,7 @@ function HeroCarousel({ content, items }) {
     // Reset backdrop visibility for crossfade on src change
     useEffect(() => {
         setBackdropVisible(false);
-    }, [backdrop]);
+    }, [contentItems[activeIndex]?.backdrop]);
 
     const moveToSlide = useCallback((index) => {
         if (contentItems.length === 0) return;
