@@ -198,7 +198,15 @@ async function listItems(filters = {}, offset = 0, limit = null, sort = 'latest'
   } else if (sort === 'rating') {
     orderClause = 'ORDER BY rating DESC NULLS LAST, id DESC';
   } else if (sort === 'trending') {
-    orderClause = 'ORDER BY trending_score DESC, id DESC';
+    orderClause = `ORDER BY (
+      COALESCE(trending_score, 0) * 0.6
+      + (1.0 / (1.0 + EXTRACT(EPOCH FROM (NOW() - COALESCE(released_at, published_at, updated_at, created_at))) / 86400.0)) * 10.0
+      + (random() * 3.0)
+    ) DESC, id DESC`;
+  } else if (sort === 'new-this-week') {
+    orderClause = `ORDER BY CASE WHEN published_at >= NOW() - INTERVAL '7 days' THEN 1 ELSE 0 END DESC, published_at DESC NULLS LAST, id DESC`;
+  } else if (sort === 'hidden-gems') {
+    orderClause = `ORDER BY (COALESCE(rating, 0) * 10 - COALESCE(view_count, 0) * 0.1 + COALESCE(trending_score, 0) * 0.3) DESC NULLS LAST, id DESC`;
   } else if (sort === 'featured') {
     orderClause = 'ORDER BY featured_order DESC NULLS LAST, CASE WHEN featured THEN 1 ELSE 0 END DESC, id DESC';
   } else if (sort === 'released') {
@@ -339,10 +347,10 @@ async function createItem(payload) {
        id, payload, created_at, updated_at,
        status, content_type, title, title_key, language, category, collection,
        source_type, source_root_id, last_scan_run_id, year, rating, featured,
-       featured_order, trending_score, duplicate_count, metadata_status,
+       featured_order, trending_score, view_count, duplicate_count, metadata_status,
        published_at, released_at
-     ) VALUES ($1, $2::jsonb, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)`,
-    [item.id, JSON.stringify(item), now, now, cols.status, cols.content_type, cols.title, cols.title_key, cols.language, cols.category, cols.collection, cols.source_type, cols.source_root_id, cols.last_scan_run_id, cols.year, cols.rating, cols.featured, cols.featured_order, cols.trending_score, cols.duplicate_count, cols.metadata_status, cols.published_at, cols.released_at]
+     ) VALUES ($1, $2::jsonb, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)`,
+    [item.id, JSON.stringify(item), now, now, cols.status, cols.content_type, cols.title, cols.title_key, cols.language, cols.category, cols.collection, cols.source_type, cols.source_root_id, cols.last_scan_run_id, cols.year, cols.rating, cols.featured, cols.featured_order, cols.trending_score, cols.view_count, cols.duplicate_count, cols.metadata_status, cols.published_at, cols.released_at]
   );
   invalidateDuplicateCache();
   // Sync duplicate counts for the whole title-key group
@@ -357,8 +365,8 @@ async function updateItem(id, payload) {
   const updated = normalizeItem({ ...current, ...payload, id: current.id, titleKey: normalizeTitleKey(payload.title || current.title, payload.year || current.year), updatedAt: new Date().toISOString() });
   const cols = extractTypedColumns(updated);
   await db.query(
-    `UPDATE content_catalog SET payload = $2::jsonb, updated_at = NOW(), status = $3, content_type = $4, title = $5, title_key = $6, language = $7, category = $8, collection = $9, source_type = $10, source_root_id = $11, last_scan_run_id = $12, year = $13, rating = $14, featured = $15, featured_order = $16, trending_score = $17, duplicate_count = $18, metadata_status = $19, published_at = $20, released_at = $21 WHERE id = $1`,
-    [updated.id, JSON.stringify(updated), cols.status, cols.content_type, cols.title, cols.title_key, cols.language, cols.category, cols.collection, cols.source_type, cols.source_root_id, cols.last_scan_run_id, cols.year, cols.rating, cols.featured, cols.featured_order, cols.trending_score, cols.duplicate_count, cols.metadata_status, cols.published_at, cols.released_at]
+    `UPDATE content_catalog SET payload = $2::jsonb, updated_at = NOW(), status = $3, content_type = $4, title = $5, title_key = $6, language = $7, category = $8, collection = $9, source_type = $10, source_root_id = $11, last_scan_run_id = $12, year = $13, rating = $14, featured = $15, featured_order = $16, trending_score = $17, view_count = $18, duplicate_count = $19, metadata_status = $20, published_at = $21, released_at = $22 WHERE id = $1`,
+    [updated.id, JSON.stringify(updated), cols.status, cols.content_type, cols.title, cols.title_key, cols.language, cols.category, cols.collection, cols.source_type, cols.source_root_id, cols.last_scan_run_id, cols.year, cols.rating, cols.featured, cols.featured_order, cols.trending_score, cols.view_count, cols.duplicate_count, cols.metadata_status, cols.published_at, cols.released_at]
   );
   invalidateDuplicateCache();
   // Sync old group (if title key changed) and new group
@@ -645,6 +653,69 @@ async function cleanupOrphanedRootItems() {
   return { deletedCount: Number.isFinite(deletedCount) ? Math.floor(deletedCount) : 0, orphanedRootIds };
 }
 
+async function incrementViewCount(contentId, amount = 1) {
+  await ensureContentStore();
+  const id = Number(contentId);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  const viewBoost = Math.min(amount, 10);
+  await db.query(
+    `UPDATE content_catalog SET
+       view_count = view_count + $2,
+       trending_score = LEAST(100, trending_score + $3),
+       payload = jsonb_set(
+         jsonb_set(payload, '{viewCount}', to_jsonb(COALESCE((payload->>'viewCount')::bigint, 0) + $2)),
+         '{trendingScore}', to_jsonb(LEAST(100, COALESCE((payload->>'trendingScore')::int, 0) + $3))
+       )
+     WHERE id = $1`,
+    [id, amount, viewBoost]
+  );
+  return getItemById(id);
+}
+
+async function boostTrendingScore(contentId, amount = 5) {
+  await ensureContentStore();
+  const id = Number(contentId);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  await db.query(
+    `UPDATE content_catalog SET
+       trending_score = LEAST(100, trending_score + $2),
+       payload = jsonb_set(payload, '{trendingScore}', to_jsonb(LEAST(100, COALESCE((payload->>'trendingScore')::int, 0) + $2)))
+     WHERE id = $1`,
+    [id, amount]
+  );
+  return getItemById(id);
+}
+
+async function recalculateTrendingScores() {
+  await ensureContentStore();
+  await db.query(`
+    UPDATE content_catalog SET
+      trending_score = LEAST(100, GREATEST(0, ROUND(
+        COALESCE(rating, 0) * 8
+        + LN(1.0 + COALESCE(view_count, 0)) * 15
+        + CASE WHEN published_at >= NOW() - INTERVAL '7 days' THEN 20
+               WHEN published_at >= NOW() - INTERVAL '30 days' THEN 10
+               ELSE 0 END
+        + CASE WHEN duplicate_count > 0 THEN -12 ELSE 0 END
+        + CASE WHEN metadata_status = 'needs_review' THEN -18
+               WHEN metadata_status = 'not_found' THEN -28 ELSE 0 END
+      ))),
+      payload = jsonb_set(payload, '{trendingScore}', to_jsonb(
+        LEAST(100, GREATEST(0, ROUND(
+          COALESCE(rating, 0) * 8
+          + LN(1.0 + COALESCE(view_count, 0)) * 15
+          + CASE WHEN published_at >= NOW() - INTERVAL '7 days' THEN 20
+                 WHEN published_at >= NOW() - INTERVAL '30 days' THEN 10
+                 ELSE 0 END
+          + CASE WHEN duplicate_count > 0 THEN -12 ELSE 0 END
+          + CASE WHEN metadata_status = 'needs_review' THEN -18
+                 WHEN metadata_status = 'not_found' THEN -28 ELSE 0 END
+        ))))
+    WHERE status = 'published'
+  `);
+  return { success: true };
+}
+
 module.exports = {
   allocateNextCatalogId,
   getItems,
@@ -665,4 +736,7 @@ module.exports = {
   cleanupOrphanedRootItems,
   recalculateDuplicateCounts,
   syncDuplicateCountsForTitleKey,
+  incrementViewCount,
+  boostTrendingScore,
+  recalculateTrendingScores,
 };
