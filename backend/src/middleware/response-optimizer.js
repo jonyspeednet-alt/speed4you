@@ -182,9 +182,9 @@ function setApiCacheHeaders(res, endpoint) {
   if (endpoint.includes('/auth/')) {
     res.setHeader('Cache-Control', 'private, no-store');
   } else if (endpoint.includes('/content/homepage') || endpoint.includes('/content/featured')) {
-    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+    res.setHeader('Cache-Control', 'public, max-age=15, stale-while-revalidate=60');
   } else if (endpoint.includes('/content')) {
-    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=120');
+    res.setHeader('Cache-Control', 'public, max-age=10, stale-while-revalidate=30');
   } else {
     res.setHeader('Cache-Control', 'public, max-age=10');
   }
