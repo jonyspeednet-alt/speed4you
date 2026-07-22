@@ -134,6 +134,7 @@ async function ensureContentStore() {
       await db.query(`ALTER TABLE content_catalog ADD COLUMN IF NOT EXISTS featured BOOLEAN NOT NULL DEFAULT FALSE`);
       await db.query(`ALTER TABLE content_catalog ADD COLUMN IF NOT EXISTS featured_order INT NOT NULL DEFAULT 0`);
       await db.query(`ALTER TABLE content_catalog ADD COLUMN IF NOT EXISTS trending_score INT NOT NULL DEFAULT 0`);
+      await db.query(`ALTER TABLE content_catalog ADD COLUMN IF NOT EXISTS view_count BIGINT NOT NULL DEFAULT 0`);
       await db.query(`ALTER TABLE content_catalog ADD COLUMN IF NOT EXISTS duplicate_count INT NOT NULL DEFAULT 0`);
       await db.query(`ALTER TABLE content_catalog ADD COLUMN IF NOT EXISTS metadata_status TEXT NOT NULL DEFAULT 'pending'`);
       await db.query(`ALTER TABLE content_catalog ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ`);
@@ -155,6 +156,7 @@ async function ensureContentStore() {
       await db.query('CREATE INDEX IF NOT EXISTS idx_content_catalog_collection ON content_catalog (collection)');
       await db.query('CREATE INDEX IF NOT EXISTS idx_content_catalog_duplicates ON content_catalog (content_type, title_key)');
       await db.query("CREATE INDEX IF NOT EXISTS idx_content_catalog_updated_at ON content_catalog (updated_at DESC)");
+      await db.query("CREATE INDEX IF NOT EXISTS idx_content_catalog_view_count ON content_catalog (view_count DESC)");
 
       await db.query(`
         CREATE TABLE IF NOT EXISTS app_state (

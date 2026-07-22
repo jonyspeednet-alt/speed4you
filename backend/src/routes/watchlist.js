@@ -6,6 +6,7 @@ const {
   getItemsByIds,
   getWatchlistEntries,
   removeWatchlistEntry,
+  boostTrendingScore,
 } = require('../data/store');
 const { resolveUserId, requireStateUser } = require('../middleware/resolve-user-id');
 const { AppError } = require('../utils/error');
@@ -85,6 +86,8 @@ router.post('/', requireStateUser, async (req, res, next) => {
     if (!created) {
       throw new AppError('Already in watchlist', 409, 'CONFLICT');
     }
+
+    boostTrendingScore(numericContentId, 5).catch(() => {});
 
     res.status(201).json({ success: true });
   } catch (error) {
