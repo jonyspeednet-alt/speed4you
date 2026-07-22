@@ -3,6 +3,7 @@ import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { moviesService } from '../services/moviesService';
 import { seriesService } from '../services/seriesService';
 import { progressService } from '../services/apiClient';
+import { contentService } from '../services';
 import { toPlayableSrc } from '../utils/mediaUrl';
 import '../styles/videoPlayer.css';
 
@@ -81,6 +82,7 @@ export default function VideoPlayerPage() {
   }, [type, item, seasonNum, episodeNum]);
 
   const lastSavedRef = useRef(0);
+  const viewTrackedRef = useRef(false);
   const saveProgress = useCallback(() => {
     const v = videoRef.current;
     if (!v || !v.duration || !type || !id) return;
@@ -89,6 +91,10 @@ export default function VideoPlayerPage() {
     if (position < 5) return;
     progressService.update(type, id, position, dur).catch((err) => console.error('Progress save failed:', err));
     lastSavedRef.current = position;
+    if (!viewTrackedRef.current && position >= 10) {
+      viewTrackedRef.current = true;
+      contentService.trackView(id).catch(() => {});
+    }
     if (position / dur >= 0.95) {
       progressService.markComplete(type, id).catch((err) => console.error('Progress markComplete failed:', err));
     }

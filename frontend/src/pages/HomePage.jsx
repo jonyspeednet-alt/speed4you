@@ -12,8 +12,8 @@ import { useBreakpoint, useRecentlyViewed, useTVMode } from '../hooks';
 
 const posterFallback = `${import.meta.env.BASE_URL}assets/poster-placeholder.svg`;
 const RAIL_SIZE = 10;
-const HOMEPAGE_POOL_LIMIT = 40;
-const HOMEPAGE_CACHE_KEY = 'portal-homepage-cache-v2'; // Cache key updated
+const HOMEPAGE_POOL_LIMIT = 60;
+const HOMEPAGE_CACHE_KEY = 'portal-homepage-cache-v3';
 
 // ... (rest of the helper functions remain the same) ...
 
@@ -44,8 +44,8 @@ function uniqueById(items) {
 
 function createRotationSeed(namespace) {
   const now = new Date();
-  const rotationSlot = Math.floor(now.getHours() / 4); // Rotate more frequently
-  return `${namespace}-${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}-${rotationSlot}`;
+  const rotationSlot = Math.floor(now.getMinutes() / 30); // Rotate every 30 minutes
+  return `${namespace}-${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}-${now.getHours()}-${rotationSlot}`;
 }
 
 function hashSeed(value) {
@@ -118,7 +118,8 @@ function pickFeatured(explicitFeatured, latestItems, popularItems, trendingItems
 
 function buildHomepageContent({
   featured, latest, popular, trending, series,
-  recommendations, localTrending
+  recommendations, localTrending, newThisWeek, hiddenGems, action, comedy,
+  topRated, hindi, english, horror, drama, thriller, lateNight, weekendBinge
 }) {
   const latestItems = (latest || []).map(normalizeItem);
   const popularItems = (popular || []).map(normalizeItem);
@@ -126,6 +127,18 @@ function buildHomepageContent({
   const homepageSeriesItems = (series || []).map(normalizeItem);
   const recommendationsItems = (recommendations || []).map(normalizeItem);
   const localTrendingItems = (localTrending || []).map(normalizeItem);
+  const newThisWeekItems = (newThisWeek || []).map(normalizeItem);
+  const hiddenGemsItems = (hiddenGems || []).map(normalizeItem);
+  const actionItems = (action || []).map(normalizeItem);
+  const comedyItems = (comedy || []).map(normalizeItem);
+  const topRatedItems = (topRated || []).map(normalizeItem);
+  const hindiItems = (hindi || []).map(normalizeItem);
+  const englishItems = (english || []).map(normalizeItem);
+  const horrorItems = (horror || []).map(normalizeItem);
+  const dramaItems = (drama || []).map(normalizeItem);
+  const thrillerItems = (thriller || []).map(normalizeItem);
+  const lateNightItems = (lateNight || []).map(normalizeItem);
+  const weekendBingeItems = (weekendBinge || []).map(normalizeItem);
 
   const moviePool = mergePools(
     latestItems.filter(item => item.type !== 'series'),
@@ -148,7 +161,7 @@ function buildHomepageContent({
   const featuredItems = Array.isArray(featured) && featured.length
     ? shuffleArray(featured.map(normalizeItem))
     : pickFeatured(featured, featuredPool, [], []);
-  const featuredIds = featuredItems.slice(0, 5).map(item => item.id);
+  const featuredIds = featuredItems.slice(0, 15).map(item => item.id);
 
   let seenIds = [...featuredIds];
 
@@ -163,12 +176,24 @@ function buildHomepageContent({
     featured: featuredItems,
     recommendations: dedupedRail(recommendationsItems, { seed: createRotationSeed('recommendations'), size: RAIL_SIZE }),
     localTrending: dedupedRail(localTrendingItems, { seed: createRotationSeed('local-trending'), size: RAIL_SIZE, pinnedCount: 2 }),
-    trending: dedupedRail(trendingItems, { seed: createRotationSeed('trending'), size: RAIL_SIZE, pinnedCount: 3 }),
-    latest: dedupedRail(latestItems, { seed: createRotationSeed('latest'), size: RAIL_SIZE, pinnedCount: 4 }),
+    trending: dedupedRail(trendingItems, { seed: createRotationSeed('trending'), size: RAIL_SIZE, pinnedCount: 1 }),
+    latest: dedupedRail(latestItems, { seed: createRotationSeed('latest'), size: RAIL_SIZE, pinnedCount: 0 }),
     popular: dedupedRail(popularItems, { seed: createRotationSeed('popular'), size: RAIL_SIZE, pinnedCount: 2 }),
     movies: dedupedRail(moviePool, { seed: createRotationSeed('movies'), size: RAIL_SIZE, pinnedCount: 2 }),
     series: dedupedRail(seriesPool, { seed: createRotationSeed('series'), size: RAIL_SIZE, pinnedCount: 2 }),
     bengali: dedupedRail(bengaliPool, { seed: createRotationSeed('bengali'), size: RAIL_SIZE, pinnedCount: 2 }),
+    newThisWeek: dedupedRail(newThisWeekItems, { seed: createRotationSeed('new-this-week'), size: RAIL_SIZE, pinnedCount: 0 }),
+    hiddenGems: dedupedRail(hiddenGemsItems, { seed: createRotationSeed('hidden-gems'), size: RAIL_SIZE, pinnedCount: 0 }),
+    action: dedupedRail(actionItems, { seed: createRotationSeed('action'), size: RAIL_SIZE, pinnedCount: 0 }),
+    comedy: dedupedRail(comedyItems, { seed: createRotationSeed('comedy'), size: RAIL_SIZE, pinnedCount: 0 }),
+    topRated: dedupedRail(topRatedItems, { seed: createRotationSeed('top-rated'), size: RAIL_SIZE, pinnedCount: 0 }),
+    hindi: dedupedRail(hindiItems, { seed: createRotationSeed('hindi'), size: RAIL_SIZE, pinnedCount: 0 }),
+    english: dedupedRail(englishItems, { seed: createRotationSeed('english'), size: RAIL_SIZE, pinnedCount: 0 }),
+    horror: dedupedRail(horrorItems, { seed: createRotationSeed('horror'), size: RAIL_SIZE, pinnedCount: 0 }),
+    drama: dedupedRail(dramaItems, { seed: createRotationSeed('drama'), size: RAIL_SIZE, pinnedCount: 0 }),
+    thriller: dedupedRail(thrillerItems, { seed: createRotationSeed('thriller'), size: RAIL_SIZE, pinnedCount: 0 }),
+    lateNight: dedupedRail(lateNightItems, { seed: createRotationSeed('late-night'), size: RAIL_SIZE, pinnedCount: 0 }),
+    weekendBinge: dedupedRail(weekendBingeItems, { seed: createRotationSeed('weekend-binge'), size: RAIL_SIZE, pinnedCount: 2 }),
   };
 }
 
@@ -178,8 +203,8 @@ function readHomepageCache() {
     const raw = sessionStorage.getItem(HOMEPAGE_CACHE_KEY);
     if (!raw) return null;
     const cache = JSON.parse(raw);
-    // Basic cache validation (30 min TTL)
-    if (Date.now() - new Date(cache.generatedAt).getTime() > 30 * 60 * 1000) {
+    // Basic cache validation (5 min TTL)
+    if (Date.now() - new Date(cache.generatedAt).getTime() > 5 * 60 * 1000) {
       sessionStorage.removeItem(HOMEPAGE_CACHE_KEY);
       return null;
     }
@@ -278,7 +303,19 @@ function HomePage() {
     content.bengali?.length > 0 ||
     content.trending?.length > 0 ||
     content.recommendations?.length > 0 ||
-    content.localTrending?.length > 0;
+    content.localTrending?.length > 0 ||
+    content.newThisWeek?.length > 0 ||
+    content.hiddenGems?.length > 0 ||
+    content.action?.length > 0 ||
+    content.comedy?.length > 0 ||
+    content.topRated?.length > 0 ||
+    content.hindi?.length > 0 ||
+    content.english?.length > 0 ||
+    content.horror?.length > 0 ||
+    content.drama?.length > 0 ||
+    content.thriller?.length > 0 ||
+    content.lateNight?.length > 0 ||
+    content.weekendBinge?.length > 0;
 
   if (loading) {
     return (
@@ -392,6 +429,54 @@ function HomePage() {
           <TrendingBento items={content.trending} />
         ) : content.trending?.length >= 3 ? (
           <ContentRail title="Trending Right Now" subtitle="Most watched this week" items={content.trending} viewAllLink="/browse?sort=trending" priorityCount={4} />
+        ) : null}
+
+        {content.newThisWeek?.length >= 3 ? (
+          <ContentRail title="New This Week" subtitle="Freshly added" items={content.newThisWeek} viewAllLink="/browse?sort=latest" priorityCount={3} />
+        ) : null}
+
+        {content.hiddenGems?.length >= 3 ? (
+          <ContentRail title="Hidden Gems" subtitle="Highly rated, underrated" items={content.hiddenGems} viewAllLink="/browse?sort=hidden-gems" priorityCount={3} />
+        ) : null}
+
+        {content.action?.length >= 3 ? (
+          <ContentRail title="Action Hits" subtitle="Non-stop thrills" items={content.action} viewAllLink="/browse?genre=action" />
+        ) : null}
+
+        {content.comedy?.length >= 3 ? (
+          <ContentRail title="Comedy Spotlight" subtitle="Laugh out loud" items={content.comedy} viewAllLink="/browse?genre=comedy" />
+        ) : null}
+
+        {content.topRated?.length >= 3 ? (
+          <ContentRail title="Top Rated" subtitle="Audience favorites" items={content.topRated} viewAllLink="/browse?sort=rating" priorityCount={3} />
+        ) : null}
+
+        {content.hindi?.length >= 3 ? (
+          <ContentRail title="Hindi Picks" subtitle="Bollywood & Hindi dubbed" items={content.hindi} viewAllLink="/browse?language=Hindi" />
+        ) : null}
+
+        {content.english?.length >= 3 ? (
+          <ContentRail title="English Picks" subtitle="Hollywood & international" items={content.english} viewAllLink="/browse?language=English" />
+        ) : null}
+
+        {content.horror?.length >= 3 ? (
+          <ContentRail title="Horror Hits" subtitle="If you dare" items={content.horror} viewAllLink="/browse?genre=horror" />
+        ) : null}
+
+        {content.drama?.length >= 3 ? (
+          <ContentRail title="Drama Central" subtitle="Stories that move you" items={content.drama} viewAllLink="/browse?genre=drama" />
+        ) : null}
+
+        {content.thriller?.length >= 3 ? (
+          <ContentRail title="Thriller Zone" subtitle="Edge of your seat" items={content.thriller} viewAllLink="/browse?genre=thriller" />
+        ) : null}
+
+        {content.weekendBinge?.length >= 3 ? (
+          <ContentRail title="Weekend Binge" subtitle="Perfect for a marathon" items={content.weekendBinge} viewAllLink="/browse?type=series&sort=popular" type="series" />
+        ) : null}
+
+        {content.lateNight?.length >= 3 ? (
+          <ContentRail title="Late Night Picks" subtitle="For the night owls" items={content.lateNight} viewAllLink="/browse?genre=horror" />
         ) : null}
 
       </div>

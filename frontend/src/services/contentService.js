@@ -42,6 +42,12 @@ export const contentService = {
   fetchRecommendations: (seedContentId, limit = 10) => apiClient(`/content/recommendations?seed=${seedContentId}&limit=${limit}`),
   // Local trending: geo-subnet localized trending
   fetchLocalTrending: (limit = 10) => apiClient(`/content/local-trending?limit=${limit}`),
+  // Track content view for trending score
+  trackView: (contentId, amount = 1) => apiClient(`/content/${contentId}/view`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount }),
+  }),
 };
 
 export default contentService;

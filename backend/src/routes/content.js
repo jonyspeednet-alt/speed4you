@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { listItems, searchItems, getItemById, toCardItem } = require('../data/store');
+const { listItems, searchItems, getItemById, toCardItem, incrementViewCount, recalculateTrendingScores } = require('../data/store');
 const { setApiCacheHeaders } = require('../middleware/response-optimizer');
 const HOMEPAGE_LIMIT = 10;
 
@@ -76,22 +76,60 @@ function normalizePositiveInt(value, defaultValue, { min = 1, max = Number.MAX_S
 
 async function buildHomepagePayload(limit = HOMEPAGE_LIMIT) {
   const FEATURED_POOL = 30;
-  const [featuredPool, latest, popular, trending, series] = await Promise.all([
+  const TRENDING_POOL = 30;
+  const hour = new Date().getHours();
+  const isWeekend = [0, 6].includes(new Date().getDay());
+
+  const queries = [
     getPublishedItems({}, 0, FEATURED_POOL, 'released'),
     getPublishedItems({ type: 'movie' }, 0, limit, 'latest'),
     getPublishedItems({}, 0, limit, 'popular'),
-    getPublishedItems({}, 0, limit, 'trending'),
-    getPublishedItems({ type: 'series' }, 0, limit, 'latest')
-  ]);
+    getPublishedItems({}, 0, TRENDING_POOL, 'trending'),
+    getPublishedItems({ type: 'series' }, 0, limit, 'latest'),
+    getPublishedItems({}, 0, 15, 'new-this-week'),
+    getPublishedItems({}, 0, 15, 'hidden-gems'),
+    getPublishedItems({ genre: 'action' }, 0, 10, 'trending').catch(() => []),
+    getPublishedItems({ genre: 'comedy' }, 0, 10, 'trending').catch(() => []),
+    getPublishedItems({}, 0, 15, 'rating'),
+    getPublishedItems({ language: 'Hindi' }, 0, 10, 'trending').catch(() => []),
+    getPublishedItems({ language: 'English' }, 0, 10, 'trending').catch(() => []),
+    getPublishedItems({ genre: 'horror' }, 0, 10, 'trending').catch(() => []),
+    getPublishedItems({ genre: 'drama' }, 0, 10, 'trending').catch(() => []),
+    getPublishedItems({ genre: 'thriller' }, 0, 10, 'trending').catch(() => []),
+  ];
 
-  return {
-    featured: featuredPool.map(toCardItem),
-    latest: latest.map(toCardItem),
-    popular: popular.map(toCardItem),
-    trending: trending.map(toCardItem),
-    series: series.map(toCardItem),
+  if (hour >= 21 || hour < 5) {
+    queries.push(getPublishedItems({ genre: 'horror' }, 0, 10, 'trending').catch(() => []));
+  }
+  if (isWeekend) {
+    queries.push(getPublishedItems({ type: 'series' }, 0, 15, 'popular').catch(() => []));
+  }
+
+  const results = await Promise.all(queries);
+  let idx = 0;
+
+  const payload = {
+    featured: results[idx++].map(toCardItem),
+    latest: results[idx++].map(toCardItem),
+    popular: results[idx++].map(toCardItem),
+    trending: results[idx++].map(toCardItem),
+    series: results[idx++].map(toCardItem),
+    newThisWeek: results[idx++].map(toCardItem),
+    hiddenGems: results[idx++].map(toCardItem),
+    action: results[idx++].map(toCardItem),
+    comedy: results[idx++].map(toCardItem),
+    topRated: results[idx++].map(toCardItem),
+    hindi: results[idx++].map(toCardItem),
+    english: results[idx++].map(toCardItem),
+    horror: results[idx++].map(toCardItem),
+    drama: results[idx++].map(toCardItem),
+    thriller: results[idx++].map(toCardItem),
+    lateNight: (hour >= 21 || hour < 5) ? results[idx++].map(toCardItem) : (idx++, []),
+    weekendBinge: isWeekend ? results[idx++].map(toCardItem) : (idx++, []),
     generatedAt: new Date().toISOString(),
   };
+
+  return payload;
 }
 
 router.get('/featured', asyncRoute(async (req, res) => {
@@ -135,7 +173,7 @@ router.get('/popular', asyncRoute(async (req, res) => {
 }));
 
 router.get('/trending', asyncRoute(async (req, res) => {
-  const limit = normalizePositiveInt(req.query.limit, 10, { min: 1, max: 100 });
+  const limit = normalizePositiveInt(req.query.limit, 30, { min: 1, max: 100 });
   const items = await getPublishedItems({}, 0, limit, 'trending');
   setApiCacheHeaders(res, req.originalUrl);
   res.json({ items: items.map(toCardItem) });
@@ -283,8 +321,15 @@ router.get('/recommendations', asyncRoute(async (req, res) => {
   res.json(scoredRecommendations.map(toCardItem));
 }));
 
+let lastTrendingRecalc = 0;
+
 router.get('/homepage', asyncRoute(async (req, res) => {
   const limit = normalizePositiveInt(req.query.limit, HOMEPAGE_LIMIT, { min: 1, max: 100 });
+  const now = Date.now();
+  if (now - lastTrendingRecalc > 300000) {
+    lastTrendingRecalc = now;
+    recalculateTrendingScores().catch(() => {});
+  }
   setApiCacheHeaders(res, req.originalUrl);
   res.json(await buildHomepagePayload(limit));
 }));
@@ -328,6 +373,19 @@ router.get('/browse', asyncRoute(async (req, res) => {
     nextPage: offset + items.length < total ? page + 1 : null,
     hasMore: offset + items.length < total,
   });
+}));
+
+router.post('/:id/view', asyncRoute(async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id) || id <= 0) {
+    return res.status(400).json({ error: 'Invalid content ID' });
+  }
+  const amount = Number(req.body.amount) || 1;
+  const updated = await incrementViewCount(id, Math.min(Math.max(amount, 1), 100));
+  if (!updated) {
+    return res.status(404).json({ error: 'Content not found' });
+  }
+  res.json({ viewCount: updated.viewCount || 0 });
 }));
 
 module.exports = router;
