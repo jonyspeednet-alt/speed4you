@@ -1,5 +1,6 @@
 function normalizeTitleKey(value, year) {
-  const normalized = String(value || '')
+  const raw = String(value || '').trim();
+  const normalized = raw
     .toLowerCase()
     .replace(/\b(1080p|720p|480p|2160p|4k|8k)\b/g, '')
     .replace(/\b(web[- ]?dl|webrip|bluray|brrip|dvdrip|hdrip|hdtc|hdcam|cam|hqrip|dvdscr|screener|ts|tc)\b/g, '')
@@ -11,7 +12,10 @@ function normalizeTitleKey(value, year) {
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  const key = normalized || String(value || '').toLowerCase().replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[^\p{L}\p{N}]+/gu, ' ').replace(/\s+/g, ' ').trim();
+  let key = normalized || raw.toLowerCase().replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[^\p{L}\p{N}]+/gu, ' ').replace(/\s+/g, ' ').trim();
+  if (!key) {
+    key = raw.toLowerCase().replace(/[^a-z0-9\p{L}]/gu, '').trim() || 'untitled-item';
+  }
   if (year) return `${key}-${year}`;
   return key;
 }
