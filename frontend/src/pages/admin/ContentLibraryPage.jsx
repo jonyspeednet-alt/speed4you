@@ -276,6 +276,13 @@ function ContentLibraryPage() {
   const allVisibleSelected = allVisibleIds.length > 0 && allVisibleIds.every((id) => selectedContentIds.includes(id));
   const toggleSelectAllVisible = () => setSelectedContentIds((c) => allVisibleSelected ? c.filter((id) => !allVisibleIds.includes(id)) : [...new Set([...c, ...allVisibleIds])]);
 
+  const handleRowClick = (item) => (event) => {
+    if (event.defaultPrevented) return;
+    const interactive = event.target.closest('a, button, input, select, textarea, label');
+    if (interactive) return;
+    navigate(getPublicPath(item));
+  };
+
   const handlePublish = useCallback(async (id) => {
     const item = await adminService.publishContent(id);
     setAllContent((c) => mergeContentItem(c, item));
@@ -721,7 +728,7 @@ function ContentLibraryPage() {
               if (entry.kind === 'item') {
                 const item = entry.item;
                 return [(
-                  <tr key={item.id} style={styles.row}>
+                  <tr key={item.id} style={{ ...styles.row, ...styles.clickableRow }} onClick={handleRowClick(item)}>
                     <td style={styles.tdCheck}>
                       <input type="checkbox" checked={selectedContentIds.includes(item.id)}
                         onChange={() => toggleContentSelection(item.id)} />
@@ -804,9 +811,9 @@ function ContentLibraryPage() {
               const rows = [];
 
               rows.push(
-                <tr key={`g-${entry.key}`} style={styles.groupRow}>
+                <tr key={`g-${entry.key}`} style={{ ...styles.groupRow, ...styles.clickableRow }} onClick={handleRowClick(entry.items[0])}>
                   <td style={styles.tdCheck}>
-                    <button type="button" onClick={() => toggleGroup(entry.key)} style={styles.expandBtn}
+                    <button type="button" onClick={(e) => { e.stopPropagation(); toggleGroup(entry.key); }} style={styles.expandBtn}
                       title={isExpanded ? 'Collapse' : 'Expand'}>
                       {isExpanded ? '▾' : '▸'}
                     </button>
@@ -841,7 +848,7 @@ function ContentLibraryPage() {
                   for (const season of seasons) {
                     const seasonKey = `${seasonItem.id}-s${season.number}`;
                     rows.push(
-                      <tr key={seasonKey} style={styles.seasonRow}>
+                      <tr key={seasonKey} style={{ ...styles.seasonRow, ...styles.clickableRow }} onClick={handleRowClick(seasonItem)}>
                         <td style={styles.tdCheck}>
                           <input type="checkbox" checked={selectedContentIds.includes(seasonItem.id)}
                             onChange={() => toggleContentSelection(seasonItem.id)} />
@@ -903,7 +910,7 @@ function ContentLibraryPage() {
 
               return rows;
             }) : allContent.map((item) => (
-              <tr key={item.id} style={styles.row}>
+              <tr key={item.id} style={{ ...styles.row, ...styles.clickableRow }} onClick={handleRowClick(item)}>
                 <td style={styles.tdCheck}>
                   <input type="checkbox" checked={selectedContentIds.includes(item.id)}
                     onChange={() => toggleContentSelection(item.id)} />
@@ -1215,6 +1222,7 @@ const styles = {
   thCheck: { width: '40px', padding: '10px 8px 10px 14px', background: '#0d1116', borderBottom: `1px solid ${border}` },
   thRight: { textAlign: 'right', color: text3, textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: '0.7rem', fontWeight: '700', padding: '10px 14px', background: '#0d1116', borderBottom: `1px solid ${border}` },
   row: { background: 'transparent', transition: 'background 120ms' },
+  clickableRow: { cursor: 'pointer' },
   td: { padding: '12px', borderBottom: `1px solid ${border}`, verticalAlign: 'middle', color: text2 },
   tdCheck: { padding: '10px 6px 10px 14px', borderBottom: `1px solid ${border}`, width: '32px' },
   tdActions: { padding: '12px', borderBottom: `1px solid ${border}`, verticalAlign: 'middle', textAlign: 'right' },
