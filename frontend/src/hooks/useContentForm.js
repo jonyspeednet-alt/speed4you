@@ -25,17 +25,26 @@ const AUTOSAVE_KEY = 'speed4you_content_draft';
 const AUTOSAVE_INTERVAL = 30000;
 const MAX_HISTORY = 50;
 
+function coerceNumeric(value, fallback = null) {
+  if (value === '' || value === undefined || value === null) return fallback;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 function buildSubmissionData(formData, itemMeta, overrides = {}) {
   return {
     ...formData,
+    year: coerceNumeric(formData.year),
+    editorialScore: coerceNumeric(formData.editorialScore, 0),
+    featuredOrder: coerceNumeric(formData.featuredOrder, 0),
     ...overrides,
     ...(itemMeta ? {
-      tmdbId: itemMeta.tmdbId || null,
+      tmdbId: coerceNumeric(itemMeta.tmdbId),
       imdbId: itemMeta.imdbId || '',
       originalTitle: itemMeta.originalTitle || '',
       originalLanguage: itemMeta.originalLanguage || '',
       metadataStatus: itemMeta.metadataStatus || 'matched',
-      metadataConfidence: itemMeta.metadataConfidence ?? 100,
+      metadataConfidence: coerceNumeric(itemMeta.metadataConfidence, 100),
       metadataProvider: itemMeta.metadataProvider || 'tmdb',
       metadataUpdatedAt: itemMeta.metadataUpdatedAt || new Date().toISOString(),
       metadataError: itemMeta.metadataError || '',
@@ -172,7 +181,11 @@ function useContentForm(id) {
   }, [formData, loadingItem, pushHistory]);
 
   const handleChange = useCallback((event) => {
-    const { name, value } = event.target;
+    const { name, value, type: inputType } = event.target;
+    let coerced = value;
+    if (inputType === 'number' || name === 'year' || name === 'editorialScore' || name === 'featuredOrder' || name === 'rating' || name === 'duration') {
+      coerced = value === '' ? '' : (Number(value) || value);
+    }
     setFormData((prev) => {
       if (name === 'type') {
         if (value === 'series' && (!Array.isArray(prev.seasons) || prev.seasons.length === 0)) {
@@ -198,7 +211,7 @@ function useContentForm(id) {
           return { ...prev, type: 'movie', seasons: [] };
         }
       }
-      return { ...prev, [name]: value };
+      return { ...prev, [name]: coerced };
     });
     setIsDirty(true);
   }, []);
