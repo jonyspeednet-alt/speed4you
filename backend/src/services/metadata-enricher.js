@@ -16,6 +16,7 @@ const NOISE_PATTERNS = [
   /\b(nf|netflix|hdtv|hdtvrip|bdrip|10bit|10-bit|8bit|hdr10?|hdr|sdr)\b/gi,
   /\b(ddp?[+-]?\d([.\s]*\d)?|ddp?|dolby|atmos|ac3|dts|aac|mp3|truehd|he-aac)\b/gi,
   /\b(katmoviehd|psa|yts|yify|rarbg|fgt|pahe|galaxyrg|tgx|qxr|sartre|tomboc|joy|etrg|juggs|axxo|shaanig)\b/gi,
+  /\b(old|repack|proper|v\d+|temp|sample|copy)\b/gi,
   /\[[^\]]+\]/g,
   /\{[^}]+\}/g,
 ];
@@ -514,9 +515,9 @@ async function enrichItemWithMetadata(item) {
       originalTitle: details.originalTitle,
       originalLanguage: details.originalLanguage,
       language: resolvedLanguage,
-      // If TMDb match confidence is 80% or greater, auto-publish directly to website
-      status: confidence >= 80 ? 'published' : 'draft',
-      metadataStatus: confidence >= 60 ? 'matched' : 'needs_review',
+      // If TMDb match confidence is 70% or greater, auto-publish directly to website
+      status: confidence >= 70 ? 'published' : 'draft',
+      metadataStatus: confidence >= 50 ? 'matched' : 'needs_review',
       metadataProvider: 'tmdb',
       metadataConfidence: confidence,
       metadataUpdatedAt: new Date().toISOString(),
