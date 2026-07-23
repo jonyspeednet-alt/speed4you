@@ -1010,3 +1010,44 @@ exports.cleanupStaleScannerRoots = async (req, res) => {
 
   res.json({ ok: true, ...results });
 };
+
+exports.purgeAndRescanSeries = async (req, res) => {
+  const fs = require('fs');
+  const { startScanJob } = require('../services/scanner');
+  const force = req.query.force === 'true' || req.body?.force === true;
+
+  const queryResult = await db.query(
+    `SELECT id, payload FROM content_catalog WHERE content_type = 'series' AND source_type = 'scanner'`
+  );
+  let deletedCount = 0;
+  for (const row of queryResult.rows) {
+    const payload = row.payload || {};
+    let isStale = false;
+    if (payload.sourcePath && !fs.existsSync(payload.sourcePath)) {
+      isStale = true;
+    } else if (Array.isArray(payload.seasons)) {
+      for (const season of payload.seasons) {
+        for (const ep of (season.episodes || [])) {
+          if (ep.sourcePath && !fs.existsSync(ep.sourcePath)) {
+            isStale = true;
+            break;
+          }
+        }
+        if (isStale) break;
+      }
+    }
+    if (isStale || force) {
+      await db.query(`DELETE FROM content_catalog WHERE id = $1`, [row.id]);
+      deletedCount++;
+    }
+  }
+
+  const job = await startScanJob([]);
+  res.json({
+    ok: true,
+    deletedStaleSeries: deletedCount,
+    totalSeriesChecked: queryResult.rows.length,
+    job,
+  });
+};
+
