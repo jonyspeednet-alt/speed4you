@@ -26,7 +26,7 @@ function LoginPage() {
       // Only allow relative paths to prevent open redirect attacks
       const next = searchParams.get("next") || "";
       const safePath =
-        next.startsWith("/") && !next.startsWith("//") ? next : "/admin";
+        next.startsWith("/") && !next.startsWith("//") ? next : "/admin/content";
       navigate(safePath);
     } catch (loginError) {
       setError(loginError.message || "Invalid credentials.");
