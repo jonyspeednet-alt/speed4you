@@ -34,6 +34,7 @@ const NAV = [
   },
   {
     path: "/admin/content/new",
+    exact: true,
     label: "Add Content",
     icon: (
       <svg
@@ -259,15 +260,18 @@ function AdminLayout() {
         {/* Nav */}
         <nav style={s.nav} aria-label="Admin navigation">
           {NAV.map((item) => {
-            const active = item.exact
+            const isExactDashboard = item.exact && location.pathname === "/admin";
+            const hasMoreSpecificMatch = NAV.some(
+              (other) =>
+                other.path !== item.path &&
+                location.pathname.startsWith(other.path) &&
+                other.path.length > item.path.length,
+            );
+
+            const isActive = item.exact
               ? location.pathname === item.path
-              : location.pathname.startsWith(item.path) &&
-                item.path !== "/admin";
-            const isExactDashboard =
-              item.exact && location.pathname === "/admin";
-            const isActive =
-              isExactDashboard ||
-              (!item.exact && location.pathname.startsWith(item.path));
+              : location.pathname === item.path ||
+                (location.pathname.startsWith(`${item.path}/`) && !hasMoreSpecificMatch);
 
             return (
               <Link
