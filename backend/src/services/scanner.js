@@ -1914,8 +1914,9 @@ async function scanSelectedRoots(selectedRootIds = [], progressCallback, options
   // Invalidate the duplicate group cache: scan added/updated many items
   // and stale cached groups will misreport duplicate counts on subsequent reads.
   try {
-    const { invalidateDuplicateCache } = require('../data/store/content');
+    const { invalidateDuplicateCache, recalculateDuplicateCounts } = require('../data/store/content');
     invalidateDuplicateCache();
+    await recalculateDuplicateCounts().catch(() => {});
   } catch (e) {
     // safe to ignore — cache will expire on TTL anyway
   }
