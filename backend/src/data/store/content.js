@@ -283,6 +283,12 @@ async function getItemsByIds(ids = [], { includeDuplicates = true } = {}) {
  * This ensures the DB column stays in sync when items are added/removed from a group.
  */
 async function syncDuplicateCountsForTitleKey(contentType, titleKey) {
+  if (!titleKey || String(titleKey).trim() === '') {
+    await db.query(
+      "UPDATE content_catalog SET duplicate_count = 0, payload = jsonb_set(payload, '{duplicateCount}', '0') WHERE title_key = '' OR title_key IS NULL",
+    );
+    return;
+  }
   const result = await db.query(
     'SELECT id, payload FROM content_catalog WHERE content_type = $1 AND title_key = $2',
     [contentType, titleKey],
