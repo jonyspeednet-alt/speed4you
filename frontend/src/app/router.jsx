@@ -14,6 +14,7 @@ const SeriesDetailsPage = lazy(() => import('../pages/SeriesDetailsPage'));
 const VideoPlayerPage = lazy(() => import('../pages/VideoPlayerPage'));
 const AccessPage = lazy(() => import('../pages/AccessPage'));
 const LoginPage = lazy(() => import('../pages/LoginPage'));
+const WatchlistPage = lazy(() => import('../pages/WatchlistPage'));
 const AdminDashboard = lazy(() => import('../pages/admin/AdminDashboard'));
 const AddContentPage = lazy(() => import('../pages/admin/AddContentPage'));
 const ContentLibraryPage = lazy(() => import('../pages/admin/ContentLibraryPage'));
@@ -102,6 +103,10 @@ const router = createBrowserRouter([
       {
         path: 'series',
         element: withRouteFallback(<BrowsePage type="series" />, 'browse'),
+      },
+      {
+        path: 'watchlist',
+        element: withRouteFallback(<WatchlistPage />, 'browse'),
       },
       {
         path: 'search',
