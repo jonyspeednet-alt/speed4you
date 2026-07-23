@@ -173,7 +173,33 @@ function useContentForm(id) {
 
   const handleChange = useCallback((event) => {
     const { name, value } = event.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => {
+      if (name === 'type') {
+        if (value === 'series' && (!Array.isArray(prev.seasons) || prev.seasons.length === 0)) {
+          return {
+            ...prev,
+            type: 'series',
+            seasons: [{
+              id: `${Date.now()}-s1`,
+              number: 1,
+              title: '',
+              poster: '',
+              episodes: [{
+                id: `${Date.now()}-s1-e1`,
+                number: 1,
+                title: '',
+                description: '',
+                videoUrl: '',
+              }],
+            }],
+          };
+        }
+        if (value === 'movie') {
+          return { ...prev, type: 'movie', seasons: [] };
+        }
+      }
+      return { ...prev, [name]: value };
+    });
     setIsDirty(true);
   }, []);
 
@@ -183,6 +209,56 @@ function useContentForm(id) {
       seasons: (prev.seasons || []).map((season, index) => (
         index === seasonIndex ? { ...season, [field]: value } : season
       )),
+    }));
+    setIsDirty(true);
+  }, []);
+
+  const handleAddSeason = useCallback(() => {
+    setFormData((prev) => {
+      const nextSeasonNumber = (prev.seasons?.length || 0) + 1;
+      return {
+        ...prev,
+        seasons: [
+          ...(prev.seasons || []),
+          {
+            id: `${Date.now()}-s${nextSeasonNumber}`,
+            number: nextSeasonNumber,
+            title: '',
+            poster: '',
+            episodes: [{
+              id: `${Date.now()}-s${nextSeasonNumber}-e1`,
+              number: 1,
+              title: '',
+              description: '',
+              videoUrl: '',
+            }],
+          },
+        ],
+      };
+    });
+    setIsDirty(true);
+  }, []);
+
+  const handleAddEpisode = useCallback((seasonIndex) => {
+    setFormData((prev) => ({
+      ...prev,
+      seasons: (prev.seasons || []).map((season, index) => {
+        if (index !== seasonIndex) return season;
+        const nextEpisodeNumber = (season.episodes?.length || 0) + 1;
+        return {
+          ...season,
+          episodes: [
+            ...(season.episodes || []),
+            {
+              id: `${Date.now()}-s${season.number || seasonIndex + 1}-e${nextEpisodeNumber}`,
+              number: nextEpisodeNumber,
+              title: '',
+              description: '',
+              videoUrl: '',
+            },
+          ],
+        };
+      }),
     }));
     setIsDirty(true);
   }, []);
@@ -363,6 +439,8 @@ function useContentForm(id) {
     handleChange,
     handleSeasonChange,
     handleEpisodeChange,
+    handleAddSeason,
+    handleAddEpisode,
     handleAssetUpload,
     handleSubmit,
     handleSaveAndPublish,
