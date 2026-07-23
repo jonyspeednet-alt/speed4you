@@ -233,22 +233,6 @@ function HeroCarousel({ content, items }) {
                         ))}
                     </div>
 
-                    {contentItems.length > 1 && (
-                        <div className={styles.dotsRow}>
-                            {contentItems.slice(0, 12).map((item, i) => (
-                                <button
-                                    key={item.id || i}
-                                    onClick={() => moveToSlide(i)}
-                                    className={`${styles.dot} ${i === activeIndex ? styles.dotActive : ''}`}
-                                    aria-label={`Go to slide ${i + 1}: ${item.title || 'Untitled'}`}
-                                    type="button"
-                                />
-                            ))}
-                            {contentItems.length > 12 ? (
-                                <span className={styles.dotsMore}>+{contentItems.length - 12}</span>
-                            ) : null}
-                        </div>
-                    )}
 
                     <div className={styles.actions}>
                         {!isPlaceholder && id ? (
