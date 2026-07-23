@@ -109,5 +109,6 @@ router.post('/metadata/tmdb', asyncRoute(adminController.fetchTmdbMetadata));
 router.post('/metadata/rematch',      asyncRoute(adminController.rematchMetadata));
 router.post('/metadata/fix-missing-posters', asyncRoute(adminController.fixMissingPosters));
 router.post('/metadata/cleanup-season-duplicates', asyncRoute(adminController.cleanupSeasonDuplicates));
+router.post('/scanner/purge-and-rescan-series', asyncRoute(adminController.purgeAndRescanSeries));
 
 module.exports = router;
