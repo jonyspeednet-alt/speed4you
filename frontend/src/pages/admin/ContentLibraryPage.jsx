@@ -728,11 +728,15 @@ function ContentLibraryPage() {
                     </td>
                     <td style={styles.td}>
                       <div style={styles.titleCell}>
-                        <ContentPoster src={resolvePoster(item)} alt={item.title}
-                          style={styles.poster} fallbackText="" />
+                        <Link to={getPublicPath(item)} style={styles.posterLink}>
+                          <ContentPoster src={resolvePoster(item)} alt={item.title}
+                            style={styles.poster} fallbackText="" />
+                        </Link>
                         <div style={{ minWidth: 0 }}>
                           <div style={styles.titleRow}>
-                            <strong style={styles.titleText}>{item.title}</strong>
+                            <Link to={getPublicPath(item)} style={styles.titleLink}>
+                              <strong style={styles.titleText}>{item.title}</strong>
+                            </Link>
                             <TypeBadge type={item.type} />
                             {Number(item.duplicateCount || 0) > 0 && (
                               <span style={styles.dupBadge}>{item.duplicateCount} dup</span>
@@ -778,6 +782,7 @@ function ContentLibraryPage() {
                     {visibleColumns.actions && (
                       <td style={styles.tdActions}>
                         <div style={styles.actionGroup}>
+                          <Link to={getPublicPath(item)} style={styles.miniBtn}>View</Link>
                           {item.videoUrl && <span style={styles.miniBtn}>Has Video</span>}
                           <Link to={`/admin/content/${item.id}/edit`} style={styles.miniBtn}>Edit</Link>
                           {item.status === 'published' ? (
@@ -812,7 +817,9 @@ function ContentLibraryPage() {
                         style={styles.poster} fallbackText="" />
                       <div style={{ minWidth: 0 }}>
                         <div style={styles.titleRow}>
-                          <strong style={styles.titleText}>{entry.title}</strong>
+                          <Link to={getPublicPath(entry.items[0])} style={styles.titleLink}>
+                            <strong style={styles.titleText}>{entry.title}</strong>
+                          </Link>
                           <TypeBadge type="series" />
                           <span style={styles.groupMeta}>{entry.items.length} seasons · {totalEpisodes} episodes</span>
                         </div>
@@ -843,7 +850,9 @@ function ContentLibraryPage() {
                           <div style={styles.seasonCell}>
                             <div style={styles.titleRow}>
                               <span style={styles.seasonBadge}>S{season.number}</span>
-                              <span style={{ ...styles.titleText, fontSize: '0.8rem' }}>{season.title || seasonItem.title}</span>
+                              <Link to={getPublicPath(seasonItem)} style={styles.titleLink}>
+                                <span style={{ ...styles.titleText, fontSize: '0.8rem' }}>{season.title || seasonItem.title}</span>
+                              </Link>
                               <span style={styles.groupMeta}>{season.episodeCount} eps</span>
                             </div>
                             {seasonItem.sourcePath && <div style={styles.pathLine}>{seasonItem.sourcePath}</div>}
@@ -874,6 +883,7 @@ function ContentLibraryPage() {
                         {visibleColumns.actions && (
                           <td style={styles.tdActions}>
                             <div style={styles.actionGroup}>
+                              <Link to={getPublicPath(seasonItem)} style={styles.miniBtn}>View</Link>
                               <Link to={`/admin/content/${seasonItem.id}/edit`} style={styles.miniBtn}>Edit</Link>
                               {seasonItem.status === 'published' ? (
                                 <button type="button" onClick={() => handleUnpublish(seasonItem.id)} style={styles.miniBtn}>Unpub</button>
@@ -1142,6 +1152,12 @@ function resolvePoster(item) {
   return item?.poster || item?.backdrop || '';
 }
 
+function getPublicPath(item) {
+  if (!item) return '/';
+  const slugOrId = item.slug || item.id;
+  return item.type === 'series' ? `/series/${slugOrId}` : `/movies/${slugOrId}`;
+}
+
 const surface2 = 'var(--surface-2, #181b22)';
 const border = 'var(--border, rgba(255,255,255,0.07))';
 const text = 'var(--text, #f1f5f9)';
@@ -1234,6 +1250,8 @@ const styles = {
   presetDel: { width: '18px', height: '18px', borderRadius: '3px', background: 'rgba(239,68,68,0.1)', color: '#f87171', fontWeight: '700', fontSize: '0.68rem', lineHeight: 1, cursor: 'pointer', border: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
   groupRow: { background: 'rgba(99,102,241,0.04)', transition: 'background 120ms', cursor: 'pointer' },
   groupRowHover: { background: 'rgba(99,102,241,0.08)' },
+  posterLink: { display: 'inline-block', textDecoration: 'none' },
+  titleLink: { color: 'inherit', textDecoration: 'none' },
   seasonRow: { background: 'transparent', transition: 'background 120ms' },
   seasonRowHover: { background: 'rgba(255,255,255,0.02)' },
   seasonCell: { display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '16px' },
