@@ -68,7 +68,7 @@ function ProfileMenu({ user, compact = false }) {
 
           {(user.role === 'admin' || user.role === 'super_admin') && (
             <Link
-              to="/admin"
+              to="/admin/content"
               role="menuitem"
               style={{
                 ...styles.item,
