@@ -32,7 +32,7 @@ jobs:
           npm run build
         working-directory: frontend
         env:
-          VITE_APP_BASE: /portal/
+          VITE_APP_BASE: /
           VITE_ADMIN_ACCESS_KEY: ${{ secrets.ADMIN_ACCESS_KEY }}
 
       - name: Record frontend bundle fingerprint
