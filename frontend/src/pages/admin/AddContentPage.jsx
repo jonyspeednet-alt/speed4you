@@ -231,6 +231,21 @@ function AddContentPage() {
 
               {form.formData.type === 'series' && (
                 <section id="section-episodes" data-section style={S.section}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                    <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: '#f1f5f9' }}>Series Episodes</h2>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <button type="button" onClick={form.handleAddSeason} style={{ ...S.secondaryBtn, padding: '10px 14px' }}>
+                        + Add Season
+                      </button>
+                      <button type="button" onClick={() => {
+                        if (form.formData.seasons?.length) {
+                          form.handleAddEpisode(form.formData.seasons.length - 1);
+                        }
+                      }} disabled={!form.formData.seasons?.length} style={{ ...S.secondaryBtn, padding: '10px 14px' }}>
+                        + Add Episode
+                      </button>
+                    </div>
+                  </div>
                   <EpisodeEditor
                     formData={form.formData}
                     episodesExpanded={episodesExpanded}
