@@ -17,6 +17,9 @@ function useTmdbImport(setFormField, setItemMeta) {
     if (metadata.genre) setFormField('genre', metadata.genre);
     if (metadata.poster) setFormField('poster', metadata.poster);
     if (metadata.backdrop) setFormField('backdrop', metadata.backdrop);
+    if (Array.isArray(metadata.seasons) && metadata.seasons.length > 0) {
+      setFormField('seasons', metadata.seasons);
+    }
 
     setItemMeta((current) => ({
       ...(current || {}),
