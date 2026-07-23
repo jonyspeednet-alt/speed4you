@@ -463,6 +463,63 @@ async function enrichItemWithMetadata(item) {
       results = multiResults.filter((r) => r.media_type === mediaType || r.media_type === (mediaType === 'movie' ? 'movie' : 'tv'));
     }
 
+    // Strategy 5: Try searching TMDb with language=bn-BD or language=hi-IN if language is Bengali/Hindi
+    if (!results.length) {
+      const lang = inferOriginalLanguage(item);
+      if (lang === 'bn' || lang === 'hi') {
+        try {
+          const langResp = await tmdbFetchJson(`/search/${mediaType}`, {
+            query: parsedTitle,
+            language: lang === 'bn' ? 'bn-BD' : 'hi-IN'
+          });
+          results = Array.isArray(langResp.results) ? langResp.results : [];
+        } catch {}
+      }
+    }
+
+    // Strategy 6: Try searching OMDB by title if TMDb found no results and OMDB key is set
+    if (!results.length && hasOmdbKey()) {
+      try {
+        const omdbSearchUrl = new URL('https://www.omdbapi.com/');
+        omdbSearchUrl.searchParams.set('s', parsedTitle);
+        if (rawYear) omdbSearchUrl.searchParams.set('y', String(rawYear));
+        omdbSearchUrl.searchParams.set('apikey', process.env.OMDB_API_KEY);
+        const omdbRes = await fetch(omdbSearchUrl);
+        if (omdbRes.ok) {
+          const omdbData = await omdbRes.json();
+          if (omdbData.Response === 'True' && Array.isArray(omdbData.Search) && omdbData.Search.length > 0) {
+            const topMatch = omdbData.Search[0];
+            if (topMatch.imdbID) {
+              const fullOmdb = await fetchMetadataFromOmdb(topMatch.imdbID);
+              return {
+                ...enrichedItem,
+                ...fullOmdb,
+                metadataStatus: 'matched',
+                metadataProvider: 'omdb',
+                metadataConfidence: 85,
+                metadataUpdatedAt: new Date().toISOString()
+              };
+            }
+          }
+        }
+      } catch {}
+    }
+
+    // Strategy 7: Try searching with parent folder name from sourcePath if file title is non-English or failed
+    if (!results.length && item.sourcePath) {
+      const pathParts = String(item.sourcePath).split(/[/\\]/).filter(Boolean);
+      if (pathParts.length >= 2) {
+        const parentFolder = pathParts[pathParts.length - 2];
+        const cleanParent = cleanSearchTitle(parentFolder);
+        if (cleanParent && cleanParent !== parsedTitle) {
+          try {
+            const parentResp = await tmdbFetchJson(`/search/${mediaType}`, { query: cleanParent });
+            results = Array.isArray(parentResp.results) ? parentResp.results : [];
+          } catch {}
+        }
+      }
+    }
+
     if (!results.length) {
       return {
         ...enrichedItem,
