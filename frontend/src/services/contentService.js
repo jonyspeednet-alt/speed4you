@@ -47,6 +47,8 @@ export const contentService = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ amount }),
   }),
+  // Live online user count
+  getOnlineCount: () => apiClient('/content/online-count'),
 };
 
 export default contentService;
