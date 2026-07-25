@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { listItems, searchItems, getItemById, toCardItem, incrementViewCount, recalculateTrendingScores } = require('../data/store');
+const { getActiveUserCount } = require('../data/store/activeUsers');
 const { setApiCacheHeaders } = require('../middleware/response-optimizer');
 const HOMEPAGE_LIMIT = 10;
 
@@ -137,6 +138,18 @@ router.get('/featured', asyncRoute(async (req, res) => {
   const featured = items[0] || (await getPublishedItems({}, 0, 1))[0] || null;
   setApiCacheHeaders(res, req.originalUrl);
   res.json(featured);
+}));
+
+let lastOnlineCount = { count: 0, ts: 0 };
+
+router.get('/online-count', asyncRoute(async (req, res) => {
+  const now = Date.now();
+  if (now - lastOnlineCount.ts < 15000) {
+    return res.json({ count: lastOnlineCount.count, timestamp: new Date().toISOString() });
+  }
+  const count = getActiveUserCount();
+  lastOnlineCount = { count, ts: now };
+  res.json({ count, timestamp: new Date().toISOString() });
 }));
 
 router.get('/', asyncRoute(async (req, res) => {
