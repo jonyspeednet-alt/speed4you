@@ -1,0 +1,52 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md"],
+  "references": {
+    "backend": {
+      "path": "backend",
+      "description": "Use for backend API routes, database store, and server logic"
+    },
+    "frontend": {
+      "path": "frontend",
+      "description": "Use for React frontend components, pages, and services"
+    },
+    "env": {
+      "path": ".env.example",
+      "description": "Environment variable template with DB, API keys, and server config"
+    },
+    "deploy": {
+      "path": ".github/workflows/deploy.yml",
+      "description": "Full deployment workflow - SSH host, deploy steps, and server setup"
+    }
+  },
+  "command": {
+    "deploy": {
+      "description": "Build frontend, copy backend, restart server, and run post-deploy tasks",
+      "template": "Run git push to main — the GitHub Actions deploy workflow handles: 1) npm ci + build frontend, 2) SCP dist to server, 3) copy backend, 4) npm ci --omit=dev, 5) write .env from secrets, 6) restart systemd service, 7) health check, 8) nginx reload. Full pipeline: .github/workflows/deploy.yml"
+    },
+    "ssh": {
+      "description": "SSH into the production server",
+      "template": "Connect via SSH: ssh -p $DEPLOY_PORT $DEPLOY_USER@$DEPLOY_HOST (credentials in GitHub Secrets / your local SSH config)"
+    },
+    "db-query": {
+      "description": "Run a SQL query on the production database",
+      "template": "SSH into server and run: PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -c \"$ARGUMENTS\""
+    },
+    "db-psql": {
+      "description": "Open interactive psql shell on the production database",
+      "template": "SSH into server and run: PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME"
+    },
+    "logs": {
+      "description": "View backend server logs",
+      "template": "SSH into server and run: journalctl -u isp-portal.service --no-pager -n 100"
+    },
+    "restart": {
+      "description": "Restart the backend service on the server",
+      "template": "SSH into server and run: sudo systemctl restart isp-portal.service && sleep 3 && curl -fs http://127.0.0.1:4100/health"
+    },
+    "health": {
+      "description": "Check backend health on the server",
+      "template": "SSH into server and run: curl -fs http://127.0.0.1:4100/health"
+    }
+  }
+}
