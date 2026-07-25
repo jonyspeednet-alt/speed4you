@@ -415,9 +415,10 @@ function shouldSkipDiscoveryDir(name) {
   if (!normalized) {
     return true;
   }
-  if (isBlockedAutoRootName(normalized)) {
-    return true;
-  }
+  // NOTE: isBlockedAutoRootName is NOT checked here — blocked folders (TV_Series,
+  // Movies, etc.) must enter the main discover loop so their contents (series/movie
+  // subfolders) can be classified as auto-roots. The isBlocked path in
+  // discoverScannerRoots() handles depth-limited traversal of these containers.
   if (SKIP_DISCOVERY_NAMES.has(normalized)) {
     return true;
   }
@@ -584,13 +585,40 @@ function discoverScannerRoots() {
     return [];
   }
 
-  const queue = [{ folderPath: DEFAULT_MEDIA_LIBRARY_ROOT, depth: 0 }];
+  const MAX_BLOCKED_DEPTH = AUTO_DISCOVER_MAX_DEPTH + 6;
+  const startTime = Date.now();
+  const MAX_DISCOVER_MS = 30000;
+  const queue = [{ folderPath: DEFAULT_MEDIA_LIBRARY_ROOT, depth: 0, insideBlocked: false }];
   const discovered = [];
   const seenPaths = new Set();
+  const videoCheckCache = new Map();
+
+  function hasVideoNearby(dirPath) {
+    if (videoCheckCache.has(dirPath)) return videoCheckCache.get(dirPath);
+    try {
+      const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isFile() && VIDEO_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
+          videoCheckCache.set(dirPath, true);
+          return true;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    videoCheckCache.set(dirPath, false);
+    return false;
+  }
 
   while (queue.length) {
+    if (Date.now() - startTime > MAX_DISCOVER_MS) {
+      logScannerEvent('discover_roots_timeout', { elapsedMs: Date.now() - startTime, found: discovered.length });
+      break;
+    }
+
     const current = queue.shift();
-    for (const dirName of listDirectories(current.folderPath)) {
+    const dirs = listDirectories(current.folderPath);
+    for (const dirName of dirs) {
       if (shouldSkipDiscoveryDir(dirName)) {
         continue;
       }
@@ -624,13 +652,28 @@ function discoverScannerRoots() {
 
       const isBlocked = isBlockedAutoRootName(dirName);
       if (isBlocked) {
-        queue.push({ folderPath: absolutePath, depth: current.depth });
-      } else if (hasVideoInTree(absolutePath, 5)) {
-        queue.push({ folderPath: absolutePath, depth: current.depth + 1 });
+        if (current.depth < MAX_BLOCKED_DEPTH) {
+          queue.push({ folderPath: absolutePath, depth: current.depth + 1, insideBlocked: true });
+        }
+      } else if (current.insideBlocked && current.depth < MAX_BLOCKED_DEPTH) {
+        // Inside a blocked subtree (e.g., TV_Series/TV_Web_Series-0-9_A-E/F-J/):
+        // The current folder failed classification but lives under a blocked root.
+        // It is likely an organizational container (e.g., "F-J") whose children are
+        // actual series folders.  Explore one level deeper so those children get
+        // classified — but use a cheap shallow video check to avoid paying for an
+        // expensive deep traversal of hundreds of series subdirectories here.
+        if (hasVideoNearby(absolutePath) || listDirectories(absolutePath).length > 0) {
+          queue.push({ folderPath: absolutePath, depth: current.depth + 1, insideBlocked: true });
+        }
+      } else if (current.depth < AUTO_DISCOVER_MAX_DEPTH) {
+        if (hasVideoInTree(absolutePath, 2)) {
+          queue.push({ folderPath: absolutePath, depth: current.depth + 1, insideBlocked: false });
+        }
       }
     }
   }
 
+  logScannerEvent('discover_roots_completed', { elapsedMs: Date.now() - startTime, found: discovered.length });
   return discovered;
 }
 
