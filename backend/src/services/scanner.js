@@ -61,6 +61,7 @@ const ENABLE_AUTO_DISCOVER_ROOTS = process.env.SCANNER_AUTO_DISCOVER_ROOTS !== '
 const AUTO_DISCOVER_MAX_DEPTH = Math.max(1, Number(process.env.SCANNER_AUTO_DISCOVER_MAX_DEPTH || 3));
 const AUTO_SCAN_INTERVAL_MINUTES = Math.max(0, Number(process.env.SCANNER_AUTO_SCAN_INTERVAL_MINUTES || 0));
 const RECONCILIATION_INTERVAL_HOURS = Math.max(1, Number(process.env.SCANNER_RECONCILIATION_INTERVAL_HOURS || 6));
+const RECONCILIATION_SEARCH_DEPTH = Math.max(1, Number(process.env.SCANNER_RECONCILIATION_SEARCH_DEPTH || 5));
 const SCANNER_AUTO_RESUME_ON_RESTART = process.env.SCANNER_AUTO_RESUME_ON_RESTART !== 'false';
 const SCANNER_AUTO_RESUME_DELAY_MS = Math.max(1000, Number(process.env.SCANNER_AUTO_RESUME_DELAY_MS || 5000));
 // Opt-in only. A transient SMB/NFS mount hiccup makes a configured root look "missing"; with
@@ -2456,7 +2457,7 @@ async function runStalePathReconciliation() {
   logScannerEvent('reconciliation_started', { timestamp: new Date().toISOString() });
 
   // Helper: Find relocated file in directory and subdirectories
-  async function findRelocatedFile(searchDir, targetFileName, title) {
+  async function findRelocatedFile(searchDir, targetFileName, title, maxDepth = RECONCILIATION_SEARCH_DEPTH) {
     try {
       const entries = await fs.promises.readdir(searchDir, { withFileTypes: true });
 
@@ -2472,9 +2473,8 @@ async function runStalePathReconciliation() {
           if (normalizedEntry === normalizedTarget) {
             return path.join(searchDir, entry.name);
           }
-        } else if (entry.isDirectory() && !entry.name.startsWith('.')) {
-          // Recurse into subdirectory (max depth 2)
-          const nested = await findRelocatedFile(path.join(searchDir, entry.name), targetFileName, title);
+        } else if (entry.isDirectory() && !entry.name.startsWith('.') && maxDepth > 0) {
+          const nested = await findRelocatedFile(path.join(searchDir, entry.name), targetFileName, title, maxDepth - 1);
           if (nested) return nested;
         }
       }
@@ -2512,6 +2512,28 @@ async function runStalePathReconciliation() {
     return null;
   }
 
+  // Helper: Find a directory by name anywhere under root (for directory-move detection)
+  async function findDirectoryInRoot(searchDir, targetDirName, maxDepth) {
+    try {
+      const entries = await fs.promises.readdir(searchDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+        const normalizedEntry = entry.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const normalizedTarget = targetDirName.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (normalizedEntry === normalizedTarget) {
+          return path.join(searchDir, entry.name);
+        }
+        if (maxDepth > 0) {
+          const nested = await findDirectoryInRoot(path.join(searchDir, entry.name), targetDirName, maxDepth - 1);
+          if (nested) return nested;
+        }
+      }
+    } catch {
+      // Directory doesn't exist or can't be read
+    }
+    return null;
+  }
+
   // Get all published scanner entries
   const result = await db.query(
     `SELECT id, title, title_key, content_type, year, payload
@@ -2522,8 +2544,66 @@ async function runStalePathReconciliation() {
   let deleted = 0;
   let fixed = 0;
   let skipped = 0;
+  let dirMoved = 0;
+
+  // ── Directory-move detection pre-pass ─────────────────────────────────────────
+  // Group entries by parent directory so that if an entire directory (e.g., a TV
+  // series folder) has been relocated, we can bulk-update all child entries in a
+  // single batch instead of failing per-entry lookups.
+  const dirGroups = new Map();
+  for (const row of result.rows) {
+    const sp = row.payload?.sourcePath;
+    if (!sp) continue;
+    const dir = path.dirname(sp);
+    if (!dirGroups.has(dir)) dirGroups.set(dir, []);
+    dirGroups.get(dir).push(row);
+  }
+
+  const handledIds = new Set();
+  for (const [dirPath, entries] of dirGroups) {
+    if (entries.length < 2) continue;
+
+    const dirExists = await fs.promises.access(dirPath).then(() => true).catch(() => false);
+    if (dirExists) continue;
+
+    const dirName = path.basename(dirPath);
+    let relocatedDir = null;
+
+    if (relocatedDir === null && DEFAULT_MEDIA_LIBRARY_ROOT) {
+      const found = await findDirectoryInRoot(DEFAULT_MEDIA_LIBRARY_ROOT, dirName, RECONCILIATION_SEARCH_DEPTH + 3);
+      if (found) relocatedDir = found;
+    }
+
+    if (relocatedDir) {
+      const updates = [];
+      for (const entry of entries) {
+        const sp = entry.payload.sourcePath;
+        const relativePath = sp.startsWith(dirPath) ? sp.slice(dirPath.length).replace(/^[\\\/]/, '') : path.basename(sp);
+        const newSourcePath = path.join(relocatedDir, relativePath);
+        const newSourcePublicPath = newSourcePath.replace(/\\/g, '/').replace(/^.*?\/(Movies|Movies_Archive|New_Collection|Others|Requested|Hindi|English|Tamil|Telugu|TV_Series|Web_Series)/, '/$1');
+        updates.push({
+          id: entry.id,
+          sourcePath: newSourcePath,
+          videoUrl: newSourcePublicPath,
+        });
+      }
+      for (const u of updates) {
+        const newPayload = { ...entries.find(e => e.id === u.id).payload, sourcePath: u.sourcePath, sourcePublicPath: u.videoUrl, videoUrl: u.videoUrl };
+        await db.query('UPDATE content_catalog SET payload = $2::jsonb WHERE id = $1', [u.id, JSON.stringify(newPayload)]);
+        handledIds.add(u.id);
+        fixed++;
+        dirMoved++;
+      }
+      logScannerEvent('reconciliation_dir_moved', {
+        dir: dirPath,
+        newDir: relocatedDir,
+        fixed: updates.length,
+      });
+    }
+  }
 
   for (const row of result.rows) {
+    if (handledIds.has(row.id)) continue;
     const p = row.payload;
     if (!p || !p.sourcePath) continue;
 
@@ -2556,9 +2636,17 @@ async function runStalePathReconciliation() {
       relocatedPath = await findFileByFuzzyTitle(fileDir, row.title, row.year);
     }
 
+    // Strategy 5: Full-root fallback search across the entire media root
+    if (!relocatedPath && DEFAULT_MEDIA_LIBRARY_ROOT) {
+      relocatedPath = await findRelocatedFile(DEFAULT_MEDIA_LIBRARY_ROOT, fileName, row.title, RECONCILIATION_SEARCH_DEPTH + 3);
+    }
+    if (!relocatedPath && row.title && DEFAULT_MEDIA_LIBRARY_ROOT) {
+      relocatedPath = await findFileByFuzzyTitle(DEFAULT_MEDIA_LIBRARY_ROOT, row.title, row.year);
+    }
+
     if (relocatedPath) {
       // Found relocated file - update entry in-place
-      const newVideoUrl = relocatedPath.replace(/\\/g, '/').replace(/^.*?\/(Movies|Hindi|English|Tamil|Telugu)/, '/$1');
+      const newVideoUrl = relocatedPath.replace(/\\/g, '/').replace(/^.*?\/(Movies|Movies_Archive|New_Collection|Others|Requested|Hindi|English|Tamil|Telugu|TV_Series|Web_Series)/, '/$1');
       const updatedPayload = {
         ...p,
         sourcePath: relocatedPath,
@@ -2616,10 +2704,11 @@ async function runStalePathReconciliation() {
     fixed,
     deleted,
     skipped,
+    dirMoved,
     timestamp: new Date().toISOString(),
   });
 
-  return { total: result.rows.length, fixed, deleted, skipped };
+  return { total: result.rows.length, fixed, deleted, skipped, dirMoved };
 }
 
 // Auto background jobs disabled — scanner only runs when triggered manually via admin API.
