@@ -78,6 +78,11 @@ const SCANNER_STOP_GRACE_MS = Math.max(2000, Number(process.env.SCANNER_STOP_GRA
 // Generous default so a slow root (infrequent progress heartbeats) isn't falsely stolen.
 const SCANNER_LOCK_TTL_MS = Math.max(60000, Number(process.env.SCANNER_LOCK_TTL_MS || 5 * 60 * 1000));
 const SCANNER_INSTANCE_ID = `${require('os').hostname()}:${process.pid}`;
+// Cap the number of newly-discovered auto-roots processed per scan so that the
+// first scan after a discovery fix doesn't try to process 500+ roots at once.
+// Already-scanned roots (those with existing DB signatures) are always included;
+// this cap only applies to brand-new roots with zero DB signatures.
+const MAX_NEW_ROOTS_PER_SCAN = Math.max(10, Number(process.env.SCANNER_MAX_NEW_ROOTS_PER_SCAN || 30));
 const SKIP_DISCOVERY_NAMES = new Set(['portal', 'uploads', 'assets', 'css', 'js', 'api']);
 const SKIP_DISCOVERY_PATTERNS = [
   /\bcache\b/i,
@@ -1897,9 +1902,46 @@ async function getScannerHealth() {
 
 async function scanSelectedRoots(selectedRootIds = [], progressCallback, options = {}) {
   const effectiveRoots = getEffectiveRoots();
-  const roots = selectedRootIds.length
+  const allRoots = selectedRootIds.length
     ? effectiveRoots.filter((root) => selectedRootIds.includes(root.id))
     : effectiveRoots;
+
+  // ── New-root cap ─────────────────────────────────────────────────────────────
+  // Auto-discovered roots (id starts with "auto-") that have zero DB signatures
+  // are brand-new.  Cap how many of these we process per scan so a discovery fix
+  // that finds 500+ roots doesn't block the scan for hours.  Already-scanned
+  // roots (those with existing signatures) are always included.
+  const autoRoots = allRoots.filter((r) => String(r.id || '').startsWith('auto-'));
+  const manualRoots = allRoots.filter((r) => !String(r.id || '').startsWith('auto-'));
+
+  // Batch-check which auto-roots already have DB content
+  const existingAutoRootIds = new Set();
+  for (const root of autoRoots) {
+    try {
+      const sigs = await retryAsync(() => getScanSignaturesByRootId(root.id));
+      if (sigs.length > 0) {
+        existingAutoRootIds.add(root.id);
+      }
+    } catch {
+      // treat as new
+    }
+  }
+
+  const alreadyScannedAutoRoots = autoRoots.filter((r) => existingAutoRootIds.has(r.id));
+  const newAutoRoots = autoRoots.filter((r) => !existingAutoRootIds.has(r.id));
+  const cappedNewAutoRoots = newAutoRoots.slice(0, MAX_NEW_ROOTS_PER_SCAN);
+  const deferredNewAutoRoots = newAutoRoots.slice(MAX_NEW_ROOTS_PER_SCAN);
+
+  const roots = [...manualRoots, ...alreadyScannedAutoRoots, ...cappedNewAutoRoots];
+
+  if (deferredNewAutoRoots.length > 0) {
+    logScannerEvent('new_roots_capped', {
+      totalNew: newAutoRoots.length,
+      processed: cappedNewAutoRoots.length,
+      deferred: deferredNewAutoRoots.length,
+      cap: MAX_NEW_ROOTS_PER_SCAN,
+    });
+  }
 
   scanAbortRequested = false;
   const summary = createSummary(roots);
