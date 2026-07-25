@@ -101,6 +101,12 @@ const BLOCKED_AUTO_ROOT_PATTERNS = [
   /\bdownloads?\b/i,
   /\bimports?\b/i,
   /\bstaging\b/i,
+  /\bTV[_\s]?Series\b/i,
+  /\bTV[_\s]?Shows?\b/i,
+  /\bTV[_\s]?Web[_\s]?Series\b/i,
+  /\bWeb[_\s]?Series\b/i,
+  /^Movies(?:_Archive)?$/i,
+  /^Series$/i,
 ];
 
 let currentScanJob = null;
@@ -609,8 +615,9 @@ function discoverScannerRoots() {
         continue;
       }
 
-      if (current.depth < AUTO_DISCOVER_MAX_DEPTH && hasVideoInTree(absolutePath, 2)) {
-        queue.push({ folderPath: absolutePath, depth: current.depth + 1 });
+      const isBlocked = isBlockedAutoRootName(dirName);
+      if (isBlocked || (current.depth < AUTO_DISCOVER_MAX_DEPTH && hasVideoInTree(absolutePath, 2))) {
+        queue.push({ folderPath: absolutePath, depth: isBlocked ? current.depth : current.depth + 1 });
       }
     }
   }
