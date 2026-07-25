@@ -674,6 +674,23 @@ function discoverScannerRoots() {
 
       const classification = classifyAutoDiscoveredRoot(absolutePath);
       if (classification) {
+        // Inside blocked subtrees, distinguish organizational containers from
+        // individual series.  An organizational container (like "F-J") has
+        // subdirectories that are series names (non-season dirs).  An individual
+        // series (like "12 Monkeys") has subdirectories that are seasons.
+        // Only organizational containers should be roots — processSeriesRoot()
+        // treats root children as series.
+        if (current.insideBlocked && classification.type === 'series') {
+          const childDirs = listDirectories(absolutePath);
+          const seasonChildCount = childDirs.filter((c) => looksLikeSeasonFolder(c)).length;
+          const hasMostlySeasons = childDirs.length > 0 && seasonChildCount >= childDirs.length * 0.5;
+          if (hasMostlySeasons) {
+            // This is an individual series, not a container of series.
+            // Don't add as root — skip (the parent root will discover it).
+            continue;
+          }
+        }
+
         const relativePath = path.relative(DEFAULT_MEDIA_LIBRARY_ROOT, absolutePath).split(path.sep).join('/');
         const publicPath = relativePath.split('/').map((segment) => encodeURIComponent(segment)).join('/');
         const autoId = `auto-${slugify(relativePath)}`;
