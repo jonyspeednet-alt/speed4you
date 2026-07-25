@@ -75,6 +75,14 @@
     "content-detail": {
       "description": "Get full details of a content item by ID",
       "template": "Fetch from API: https://speed4you.net/portal-api/api/content/$ARGUMENTS"
+    },
+    "scan-summary": {
+      "description": "View the last scan summary (created/updated/deleted counts)",
+      "template": "Fetch from API: https://speed4you.net/portal-api/api/webhook/last-scan"
+    },
+    "webhook-scan": {
+      "description": "Trigger a scan remotely via webhook",
+      "template": "POST to https://speed4you.net/portal-api/api/webhook/scan with header x-webhook-secret (configured in .env as WEBHOOK_SECRET)"
     }
   }
 }
