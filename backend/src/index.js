@@ -212,10 +212,9 @@ apiRouter.use('/tv', publicContentLimiter, publicPerIpLimiter, require('./routes
 apiRouter.use('/watchlist', require('./routes/watchlist'));
 apiRouter.use('/admin', require('./routes/admin'));
 
-// Mount at both /api (legacy/dev), / (proxied production), and /portal-api/api (Vite-configured prefix)
+// Mount at /api (legacy/dev) and /portal-api/api (Vite-configured prefix)
 app.use('/api', apiRouter);
 app.use('/portal-api/api', apiRouter);
-app.use('/', apiRouter);
 
 if (fs.existsSync(frontendDistPath)) {
   // Serve static assets from the frontend build

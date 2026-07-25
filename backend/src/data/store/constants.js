@@ -112,12 +112,14 @@ const DEVELOPMENT_SEED_ITEMS = [
     genre: 'Thriller',
     year: 2024,
     language: 'English',
-    poster: 'https://images.unsplash.com/photo-1574609644844-fcf46c1e1e2c?w=400',
-    backdrop: 'https://images.unsplash.com/photo-1574609644844-fcf46c1e1e2c?w=1200',
+    poster: 'https://images.unsplash.com/photo-1574609644844-fcf46c1e1c2?w=400',
+    backdrop: 'https://images.unsplash.com/photo-1574609644844-fcf46c1e1c2?w=1200',
     rating: 8.5,
     description: 'Follow the rise of ambitious tech entrepreneurs in Silicon Valley.',
-    seasons: 2,
-    episodes: 24,
+    seasons: [
+      { id: 1, number: 1, episodes: Array.from({ length: 12 }, (_, i) => ({ id: i + 1, number: i + 1, title: 'Tech Titans S1 E' + (i + 1) })) },
+      { id: 2, number: 2, episodes: Array.from({ length: 12 }, (_, i) => ({ id: i + 13, number: i + 1, title: 'Tech Titans S2 E' + (i + 1) })) },
+    ],
     trendingScore: 98,
   },
   {
@@ -132,8 +134,9 @@ const DEVELOPMENT_SEED_ITEMS = [
     backdrop: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1200',
     rating: 8.3,
     description: 'A group of friends must solve the mysteries of an uncharted island.',
-    seasons: 1,
-    episodes: 10,
+    seasons: [
+      { id: 1, number: 1, episodes: Array.from({ length: 10 }, (_, i) => ({ id: i + 1, number: i + 1, title: 'Mystery Island S1 E' + (i + 1) })) },
+    ],
     trendingScore: 86,
   },
   {
@@ -148,8 +151,11 @@ const DEVELOPMENT_SEED_ITEMS = [
     backdrop: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1200',
     rating: 8.1,
     description: 'High-stakes legal battles and personal drama in a prestigious law firm.',
-    seasons: 3,
-    episodes: 36,
+    seasons: [
+      { id: 1, number: 1, episodes: Array.from({ length: 12 }, (_, i) => ({ id: i + 1, number: i + 1, title: 'Legal Minds S1 E' + (i + 1) })) },
+      { id: 2, number: 2, episodes: Array.from({ length: 12 }, (_, i) => ({ id: i + 13, number: i + 1, title: 'Legal Minds S2 E' + (i + 1) })) },
+      { id: 3, number: 3, episodes: Array.from({ length: 12 }, (_, i) => ({ id: i + 25, number: i + 1, title: 'Legal Minds S3 E' + (i + 1) })) },
+    ],
     trendingScore: 83,
   },
 ];

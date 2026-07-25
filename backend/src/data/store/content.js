@@ -11,10 +11,12 @@ async function allocateNextCatalogId() {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const [stateResult, maxIdResult] = await Promise.all([
-      client.query(`SELECT value FROM app_state WHERE key = 'catalog_meta' LIMIT 1 FOR UPDATE`),
-      client.query('SELECT COALESCE(MAX(id), 0)::bigint AS max_id FROM content_catalog'),
-    ]);
+    const stateResult = await client.query(
+      `SELECT value FROM app_state WHERE key = 'catalog_meta' LIMIT 1 FOR UPDATE`,
+    );
+    const maxIdResult = await client.query(
+      'SELECT COALESCE(MAX(id), 0)::bigint AS max_id FROM content_catalog FOR UPDATE',
+    );
     const currentMeta = stateResult.rows[0]?.value || { nextId: 1 };
     const currentNextId = Number(currentMeta.nextId || 1);
     const maxId = Number(maxIdResult.rows[0]?.max_id || 0);
