@@ -132,6 +132,7 @@ let signalHandlersRegistered = false;
 // Cooperative abort: set (e.g. by the worker's SIGTERM handler) to stop the scan between roots
 // so it can finalize cleanly instead of being killed mid-DB-write.
 let scanAbortRequested = false;
+let scannerLogWriteCount = 0;
 
 // ── FILE RELOCATION CACHE ─────────────────────────────────────────────────────
 // Cache file moves (old path → new path) to speed up future scans.
@@ -1191,11 +1192,50 @@ function normalizeRuntimeJob(job) {
 }
 
 function logScannerEvent(event, payload = {}) {
+  const line = (() => {
+    try {
+      return JSON.stringify({ event, timestamp: new Date().toISOString(), ...payload });
+    } catch {
+      return String(event);
+    }
+  })();
+
+  // Always log to stdout (journalctl)
   try {
-    console.info('[scanner]', JSON.stringify({ event, timestamp: new Date().toISOString(), ...payload }));
-  } catch {
-    console.info('[scanner]', event);
-  }
+    console.info('[scanner]', line);
+  } catch {}
+
+  // Also write to dedicated scanner log file (~1 hour retention)
+  try {
+    const logDir = process.env.SCANNER_CACHE_DIR || '/var/www/html/Extra_Storage/scanner-cache';
+    const logFile = path.join(logDir, 'scanner.log');
+    fs.appendFileSync(logFile, line + '\n');
+
+    // Periodic rotation: trim entries older than 1 hour (check every 100 writes)
+    scannerLogWriteCount = (scannerLogWriteCount || 0) + 1;
+    if (scannerLogWriteCount >= 100) {
+      scannerLogWriteCount = 0;
+      try {
+        const content = fs.readFileSync(logFile, 'utf8');
+        const cutoff = Date.now() - 60 * 60 * 1000; // 1 hour ago
+        const trimmed = content
+          .split('\n')
+          .filter((row) => {
+            if (!row.trim()) return false;
+            try {
+              const parsed = JSON.parse(row);
+              return parsed.timestamp && new Date(parsed.timestamp).getTime() >= cutoff;
+            } catch {
+              return true; // keep non-JSON lines
+            }
+          })
+          .join('\n');
+        fs.writeFileSync(logFile, trimmed + (trimmed.endsWith('\n') ? '' : '\n'));
+      } catch {
+        // rotation failed — not critical
+      }
+    }
+  } catch {}
 }
 
 function coerceDeletedCount(rawValue, context = '') {
