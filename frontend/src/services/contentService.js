@@ -22,7 +22,7 @@ export const contentService = {
   // Local trending: geo-subnet localized trending
   getLocalTrending: (limit = 10) => apiClient(`/content/local-trending?limit=${limit}`),
   browse: (params) => apiClient(`/content/browse?${toQueryString(params)}`),
-  getHomepage: () => apiClient('/content/homepage'),
+  getHomepage: (limit) => apiClient(`/content/homepage${limit ? `?limit=${limit}` : ''}`),
   // Query-friendly methods for React Query
   fetchBrowsePage: async ({ pageParam = 1, ...filters }) => {
     const params = { ...filters, page: pageParam, limit: 24 };
@@ -34,7 +34,6 @@ export const contentService = {
     };
   },
   fetchContent: (endpoint, params = {}) => apiClient(`${endpoint}?${toQueryString(params)}`),
-  fetchHomepage: () => apiClient('/content/homepage'),
   fetchLatest: (limit = 10) => apiClient(`/content/latest?limit=${limit}`),
   fetchPopular: (limit = 10) => apiClient(`/content/popular?limit=${limit}`),
   fetchTrending: (limit = 10) => apiClient(`/content/trending?limit=${limit}`),

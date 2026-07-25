@@ -179,7 +179,7 @@ function setStaticCacheHeaders(res, filePath) {
 }
 
 function setApiCacheHeaders(res, endpoint) {
-  if (endpoint.includes('/auth/')) {
+  if (endpoint.includes('/auth/') || endpoint.includes('/admin/')) {
     res.setHeader('Cache-Control', 'private, no-store');
   } else if (endpoint.includes('/content/homepage') || endpoint.includes('/content/featured')) {
     res.setHeader('Cache-Control', 'public, max-age=15, stale-while-revalidate=60');
