@@ -67,6 +67,14 @@
     "server-download": {
       "description": "Download a file from the remote server to local temp directory",
       "template": "SSH into server and run: cat $ARGUMENTS (then pipe output to local file)"
+    },
+    "search-content": {
+      "description": "Search for content on the site by title keyword",
+      "template": "Fetch from API: https://speed4you.net/portal-api/api/content/browse?q=$ARGUMENTS&limit=5"
+    },
+    "content-detail": {
+      "description": "Get full details of a content item by ID",
+      "template": "Fetch from API: https://speed4you.net/portal-api/api/content/$ARGUMENTS"
     }
   }
 }
