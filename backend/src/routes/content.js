@@ -124,8 +124,8 @@ async function buildHomepagePayload(limit = HOMEPAGE_LIMIT) {
     horror: results[idx++].map(toCardItem),
     drama: results[idx++].map(toCardItem),
     thriller: results[idx++].map(toCardItem),
-    lateNight: (hour >= 21 || hour < 5) ? results[idx++].map(toCardItem) : (idx++, []),
-    weekendBinge: isWeekend ? results[idx++].map(toCardItem) : (idx++, []),
+    lateNight: (hour >= 21 || hour < 5) ? results[idx++].map(toCardItem) : [],
+    weekendBinge: isWeekend ? results[idx++].map(toCardItem) : [],
     generatedAt: new Date().toISOString(),
   };
 
@@ -375,11 +375,19 @@ router.get('/browse', asyncRoute(async (req, res) => {
   });
 }));
 
+const recentViews = new Map();
+setInterval(() => recentViews.clear(), 60000);
+
 router.post('/:id/view', asyncRoute(async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id) || id <= 0) {
     return res.status(400).json({ error: 'Invalid content ID' });
   }
+  const viewKey = `${req.ip}:${id}`;
+  if (recentViews.has(viewKey)) {
+    return res.status(429).json({ error: 'Too many views. Please slow down.' });
+  }
+  recentViews.set(viewKey, Date.now());
   const amount = Number(req.body.amount) || 1;
   const updated = await incrementViewCount(id, Math.min(Math.max(amount, 1), 100));
   if (!updated) {
