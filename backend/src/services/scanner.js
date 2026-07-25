@@ -6,6 +6,7 @@ const {
   deleteScannerItemsNotInSignatures,
   getAppState,
   getItemByScanSignature,
+  getRootIdsWithContent,
   getScanSignaturesByRootId,
   getScannerRunById,
   getScannerRuns,
@@ -1914,17 +1915,12 @@ async function scanSelectedRoots(selectedRootIds = [], progressCallback, options
   const autoRoots = allRoots.filter((r) => String(r.id || '').startsWith('auto-'));
   const manualRoots = allRoots.filter((r) => !String(r.id || '').startsWith('auto-'));
 
-  // Batch-check which auto-roots already have DB content
-  const existingAutoRootIds = new Set();
-  for (const root of autoRoots) {
-    try {
-      const sigs = await retryAsync(() => getScanSignaturesByRootId(root.id));
-      if (sigs.length > 0) {
-        existingAutoRootIds.add(root.id);
-      }
-    } catch {
-      // treat as new
-    }
+  // Batch-check which auto-roots already have DB content (single query, not N queries)
+  let existingAutoRootIds = new Set();
+  try {
+    existingAutoRootIds = await getRootIdsWithContent(autoRoots.map((r) => r.id));
+  } catch {
+    // treat all as new if batch query fails
   }
 
   const alreadyScannedAutoRoots = autoRoots.filter((r) => existingAutoRootIds.has(r.id));
