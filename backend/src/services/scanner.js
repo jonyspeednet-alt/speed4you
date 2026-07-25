@@ -65,6 +65,7 @@ const RECONCILIATION_INTERVAL_HOURS = Math.max(1, Number(process.env.SCANNER_REC
 const RECONCILIATION_SEARCH_DEPTH = Math.max(1, Number(process.env.SCANNER_RECONCILIATION_SEARCH_DEPTH || 5));
 const SCANNER_AUTO_RESUME_ON_RESTART = process.env.SCANNER_AUTO_RESUME_ON_RESTART !== 'false';
 const SCANNER_AUTO_RESUME_DELAY_MS = Math.max(1000, Number(process.env.SCANNER_AUTO_RESUME_DELAY_MS || 5000));
+const SCANNER_DISCOVER_TIMEOUT_MS = Math.max(30000, Number(process.env.SCANNER_DISCOVER_TIMEOUT_MS || 120000));
 // Opt-in only. A transient SMB/NFS mount hiccup makes a configured root look "missing"; with
 // this on it would be permanently deleted from persistence mid-scan. Default off so a flaky
 // network mount never destroys a legitimately-configured root.
@@ -617,7 +618,7 @@ function discoverScannerRoots() {
 
   const MAX_BLOCKED_DEPTH = AUTO_DISCOVER_MAX_DEPTH + 6;
   const startTime = Date.now();
-  const MAX_DISCOVER_MS = 30000;
+  const MAX_DISCOVER_MS = SCANNER_DISCOVER_TIMEOUT_MS;
   const queue = [{ folderPath: DEFAULT_MEDIA_LIBRARY_ROOT, depth: 0, insideBlocked: false }];
   const discovered = [];
   const seenPaths = new Set();
