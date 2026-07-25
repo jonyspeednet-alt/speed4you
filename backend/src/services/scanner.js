@@ -611,120 +611,100 @@ function classifyAutoDiscoveredRoot(dirPath) {
   };
 }
 
+function isMovieCategoryDirName(dirName) {
+  return /\w+[_\s-]?Movies\b/i.test(String(dirName || ''))
+    || /^Movies(?:_Archive)?$/i.test(String(dirName || ''));
+}
+
+function isTvSeriesContainerDirName(dirName) {
+  const normalized = String(dirName || '');
+  return /\bTV[_\s-]?(Series|Shows?)\b/i.test(normalized)
+    && !/\bTV[_\s-]?Web[_\s-]?Series\b/i.test(normalized);
+}
+
+function isTvWebSeriesRangeDirName(dirName) {
+  return /\bTV[_\s-]?Web[_\s-]?Series\b/i.test(String(dirName || ''));
+}
+
+function buildAutoDiscoveredRootRecord(absolutePath, dirName, type, mediaLibraryRoot = DEFAULT_MEDIA_LIBRARY_ROOT) {
+  const relativePath = path.relative(mediaLibraryRoot, absolutePath).split(path.sep).join('/');
+  const publicPath = relativePath.split('/').map((segment) => encodeURIComponent(segment)).join('/');
+  return {
+    id: `auto-${slugify(relativePath)}`,
+    label: `Auto: ${cleanTitle(dirName)}`,
+    type,
+    scanPath: absolutePath,
+    publicBaseUrl: `/${publicPath}`.replace(/%2F/g, '/'),
+    language: type === 'series' ? 'English' : 'Unknown',
+    category: type === 'series' ? 'TV Series' : 'Auto Movies',
+    maxDepth: type === 'movie' ? DEFAULT_MOVIE_DEPTH : 1,
+    batchSize: type === 'movie' ? 40 : 30,
+    discovered: true,
+  };
+}
+
 function discoverScannerRoots() {
-  if (!ENABLE_AUTO_DISCOVER_ROOTS || !fs.existsSync(DEFAULT_MEDIA_LIBRARY_ROOT)) {
+  const mediaLibraryRoot = process.env.SCANNER_MEDIA_ROOT || DEFAULT_MEDIA_LIBRARY_ROOT;
+  if (!ENABLE_AUTO_DISCOVER_ROOTS || !fs.existsSync(mediaLibraryRoot)) {
     return [];
   }
 
-  const MAX_BLOCKED_DEPTH = AUTO_DISCOVER_MAX_DEPTH + 6;
   const startTime = Date.now();
-  const MAX_DISCOVER_MS = SCANNER_DISCOVER_TIMEOUT_MS;
-  const queue = [{ folderPath: DEFAULT_MEDIA_LIBRARY_ROOT, depth: 0, insideBlocked: false }];
   const discovered = [];
   const seenPaths = new Set();
-  const videoCheckCache = new Map();
 
-  function hasVideoNearby(dirPath) {
-    if (videoCheckCache.has(dirPath)) return videoCheckCache.get(dirPath);
-    try {
-      const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.isFile() && VIDEO_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
-          videoCheckCache.set(dirPath, true);
-          return true;
-        }
-      }
-    } catch {
-      // ignore
+  function addRootIfNew(absolutePath, dirName, type) {
+    const normalizedPath = normalizePathForCompare(absolutePath);
+    if (seenPaths.has(normalizedPath)) {
+      return;
     }
-    videoCheckCache.set(dirPath, false);
-    return false;
+    if (!hasVideoInTree(absolutePath, 4)) {
+      return;
+    }
+    seenPaths.add(normalizedPath);
+    discovered.push(buildAutoDiscoveredRootRecord(absolutePath, dirName, type, mediaLibraryRoot));
   }
 
-  while (queue.length) {
-    if (Date.now() - startTime > MAX_DISCOVER_MS) {
+  for (const dirName of listDirectories(mediaLibraryRoot)) {
+    if (Date.now() - startTime > SCANNER_DISCOVER_TIMEOUT_MS) {
       logScannerEvent('discover_roots_timeout', { elapsedMs: Date.now() - startTime, found: discovered.length });
       break;
     }
+    if (shouldSkipDiscoveryDir(dirName)) {
+      continue;
+    }
 
-    const current = queue.shift();
-    const dirs = listDirectories(current.folderPath);
-    for (const dirName of dirs) {
-      if (shouldSkipDiscoveryDir(dirName)) {
-        continue;
-      }
+    const absolutePath = path.join(mediaLibraryRoot, dirName);
 
-      const absolutePath = path.join(current.folderPath, dirName);
-      const normalizedPath = normalizePathForCompare(absolutePath);
-      if (seenPaths.has(normalizedPath)) {
-        continue;
-      }
-      seenPaths.add(normalizedPath);
+    // Top-level movie libraries (English_Movies, Bangla_Movies, 3D_Movies, …) are
+    // roots themselves — subfolders (year buckets, individual titles) are scanned
+    // recursively by processMovieRoot(), not registered as separate roots.
+    if (isMovieCategoryDirName(dirName)) {
+      addRootIfNew(absolutePath, dirName, 'movie');
+      continue;
+    }
 
-      const isBlocked = isBlockedAutoRootName(dirName);
-
-      // Blocked folders (TV_Series, Movies, TV_Web_Series-0-9_A-E, etc.) are
-      // organizational containers, NOT content roots.  Skip classification and
-      // push into the queue for depth-limited exploration of their children.
-      if (isBlocked) {
-        if (current.depth < MAX_BLOCKED_DEPTH) {
-          queue.push({ folderPath: absolutePath, depth: current.depth + 1, insideBlocked: true });
+    // TV_Series is a container; only its TV_Web_Series-* letter-range folders
+    // become series roots (matching the manually configured layout).
+    if (isTvSeriesContainerDirName(dirName)) {
+      for (const subName of listDirectories(absolutePath)) {
+        if (shouldSkipDiscoveryDir(subName) || !isTvWebSeriesRangeDirName(subName)) {
+          continue;
         }
-        continue;
+        addRootIfNew(path.join(absolutePath, subName), subName, 'series');
       }
+      continue;
+    }
 
-      const classification = classifyAutoDiscoveredRoot(absolutePath);
-      if (classification) {
-        // Inside blocked subtrees, distinguish organizational containers from
-        // individual series.  An organizational container (like "F-J") has
-        // subdirectories that are series names (non-season dirs).  An individual
-        // series (like "12 Monkeys") has subdirectories that are seasons.
-        // Only organizational containers should be roots — processSeriesRoot()
-        // treats root children as series.
-        if (current.insideBlocked && classification.type === 'series') {
-          const childDirs = listDirectories(absolutePath);
-          const seasonChildCount = childDirs.filter((c) => looksLikeSeasonFolder(c)).length;
-          const hasMostlySeasons = childDirs.length > 0 && seasonChildCount >= childDirs.length * 0.5;
-          if (hasMostlySeasons) {
-            // This is an individual series, not a container of series.
-            // Don't add as root — skip (the parent root will discover it).
-            continue;
-          }
-        }
+    // A TV_Web_Series-* folder sitting directly under the media root.
+    if (isTvWebSeriesRangeDirName(dirName)) {
+      addRootIfNew(absolutePath, dirName, 'series');
+      continue;
+    }
 
-        const relativePath = path.relative(DEFAULT_MEDIA_LIBRARY_ROOT, absolutePath).split(path.sep).join('/');
-        const publicPath = relativePath.split('/').map((segment) => encodeURIComponent(segment)).join('/');
-        const autoId = `auto-${slugify(relativePath)}`;
-        discovered.push({
-          id: autoId,
-          label: `Auto: ${cleanTitle(dirName)}`,
-          type: classification.type,
-          scanPath: absolutePath,
-          publicBaseUrl: `/${publicPath}`.replace(/%2F/g, '/'),
-          language: classification.type === 'series' ? 'English' : 'Unknown',
-          category: classification.type === 'series' ? 'TV Series' : 'Auto Movies',
-          maxDepth: classification.type === 'movie' ? DEFAULT_MOVIE_DEPTH : 2,
-          batchSize: classification.type === 'movie' ? 40 : 30,
-          discovered: true,
-        });
-        continue;
-      }
-
-      if (current.insideBlocked && current.depth < MAX_BLOCKED_DEPTH) {
-        // Inside a blocked subtree (e.g., TV_Series/TV_Web_Series-0-9_A-E/F-J/):
-        // The current folder failed classification but lives under a blocked root.
-        // It is likely an organizational container (e.g., "F-J") whose children are
-        // actual series folders.  Explore one level deeper so those children get
-        // classified — but use a cheap shallow video check to avoid paying for an
-        // expensive deep traversal of hundreds of series subdirectories here.
-        if (hasVideoNearby(absolutePath) || listDirectories(absolutePath).length > 0) {
-          queue.push({ folderPath: absolutePath, depth: current.depth + 1, insideBlocked: true });
-        }
-      } else if (current.depth < AUTO_DISCOVER_MAX_DEPTH) {
-        if (hasVideoInTree(absolutePath, 2)) {
-          queue.push({ folderPath: absolutePath, depth: current.depth + 1, insideBlocked: false });
-        }
-      }
+    const classification = classifyAutoDiscoveredRoot(absolutePath);
+    if (classification) {
+      addRootIfNew(absolutePath, dirName, classification.type);
     }
   }
 
@@ -2911,6 +2891,10 @@ module.exports = {
   runStalePathReconciliation,
   __test__: {
     classifyAutoDiscoveredRoot,
+    discoverScannerRoots,
+    isMovieCategoryDirName,
+    isTvSeriesContainerDirName,
+    isTvWebSeriesRangeDirName,
     parseEpisodeIdentity,
     detectSeriesFolder,
     assignScannerTaxonomy,
