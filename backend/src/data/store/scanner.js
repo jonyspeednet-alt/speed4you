@@ -128,6 +128,17 @@ async function getScanSignaturesByRootId(sourceRootId) {
     .filter(Boolean);
 }
 
+async function getRootIdsWithContent(rootIds = []) {
+  await ensureContentStore();
+  const ids = (rootIds || []).map((id) => String(id || '').trim()).filter(Boolean);
+  if (!ids.length) return new Set();
+  const result = await db.query(
+    `SELECT DISTINCT source_root_id FROM content_catalog WHERE source_type = $1 AND source_root_id = ANY($2::text[])`,
+    ['scanner', ids],
+  );
+  return new Set(result.rows.map((row) => row.source_root_id));
+}
+
 
 async function deleteItemsByScanSignatures(scanSignatures = []) {
   const signatures = new Set((scanSignatures || []).filter(Boolean));
@@ -687,6 +698,7 @@ module.exports = {
   getScannerRunById,
   getItemByScanSignature,
   getScanSignaturesByRootId,
+  getRootIdsWithContent,
   deleteItemsByScanSignatures,
   upsertScannedItem,
   deleteScannerItemsNotInSignatures,
