@@ -183,7 +183,16 @@ function isLiveDistinctSourcePath(existingPayload, incomingPayload) {
     return false;
   }
   try {
-    return fs.existsSync(existingPath);
+    if (!fs.existsSync(existingPath)) return false;
+    // If both files exist and have the same size, they are likely the same
+    // file that was renamed between scans (e.g., release tag removed).
+    // Treat them as the same item to prevent duplicate creation.
+    const existingSize = existingPayload?.fileSize || 0;
+    const incomingSize = incomingPayload?.fileSize || 0;
+    if (existingSize > 0 && incomingSize > 0 && existingSize === incomingSize) {
+      return false;
+    }
+    return true;
   } catch {
     return false;
   }
@@ -357,6 +366,32 @@ async function upsertScannedItem(payload) {
     const duplicateOfPublished = await findDuplicateOfPublishedByPrefix(payload);
     if (duplicateOfPublished) {
       return { item: normalizeItem(duplicateOfPublished), created: false, updated: false };
+    }
+  }
+
+  // ── FILE SIZE DEDUP (prevents duplicates from renamed files) ────────────
+  // When a file is renamed between scans (e.g., release tags removed), the
+  // scanSignature changes and titleKey may also change (if metadata enrichment
+  // gave a wrong title). Fall back to matching by fileSize + source_root_id:
+  // same file size in the same root = same file, just renamed.
+  if (!current && payload.fileSize && payload.fileSize > 0 && payload.sourceRootId) {
+    const sizeMatch = await db.query(
+      `SELECT id, payload FROM content_catalog
+       WHERE content_type = $1 AND source_type = 'scanner'
+         AND source_root_id = $2
+         AND payload->>'fileSize' = $3
+       LIMIT 1`,
+      [String(payload.type || '').toLowerCase(), payload.sourceRootId, String(payload.fileSize)],
+    );
+    if (sizeMatch.rows[0]) {
+      current = sizeMatch.rows[0].payload;
+      payload = {
+        ...payload,
+        title: payload.title || current.title,
+        seasons: payload.seasons || current.seasons || [],
+        seasonCount: payload.seasonCount ?? current.seasonCount ?? 0,
+        episodeCount: payload.episodeCount ?? current.episodeCount ?? 0,
+      };
     }
   }
 
