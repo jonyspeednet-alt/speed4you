@@ -745,8 +745,12 @@ function getEffectiveRoots() {
   const merged = [...configured];
   for (const root of discovered) {
     const discoveredPath = normalizePathForCompare(root.scanPath);
-    const overlapsConfiguredRoot = configured.some((configuredRoot) => pathsOverlap(configuredRoot.scanPath, root.scanPath));
-    if (!configuredPathSet.has(discoveredPath) && !overlapsConfiguredRoot) {
+    // Don't filter auto-discovered roots that overlap with a configured root.
+    // The configured root (e.g. /var/www/html) is typically too broad to scan
+    // deep organizational containers like TV_Series/F-J/.  The auto-discovered
+    // roots target specific sub-trees and the fingerprint/signature system
+    // prevents duplicate DB entries.
+    if (!configuredPathSet.has(discoveredPath)) {
       merged.push(root);
     }
   }
