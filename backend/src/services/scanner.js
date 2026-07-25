@@ -622,8 +622,10 @@ function discoverScannerRoots() {
       }
 
       const isBlocked = isBlockedAutoRootName(dirName);
-      if (isBlocked || (current.depth < AUTO_DISCOVER_MAX_DEPTH && hasVideoInTree(absolutePath, 2))) {
-        queue.push({ folderPath: absolutePath, depth: isBlocked ? current.depth : current.depth + 1 });
+      if (isBlocked) {
+        queue.push({ folderPath: absolutePath, depth: current.depth });
+      } else if (hasVideoInTree(absolutePath, 5)) {
+        queue.push({ folderPath: absolutePath, depth: current.depth + 1 });
       }
     }
   }
