@@ -15,7 +15,7 @@ async function allocateNextCatalogId() {
       `SELECT value FROM app_state WHERE key = 'catalog_meta' LIMIT 1 FOR UPDATE`,
     );
     const maxIdResult = await client.query(
-      'SELECT COALESCE(MAX(id), 0)::bigint AS max_id FROM content_catalog FOR UPDATE',
+      'SELECT COALESCE(MAX(id), 0)::bigint AS max_id FROM content_catalog',
     );
     const currentMeta = stateResult.rows[0]?.value || { nextId: 1 };
     const currentNextId = Number(currentMeta.nextId || 1);
