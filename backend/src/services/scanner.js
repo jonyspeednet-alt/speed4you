@@ -1459,36 +1459,44 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
         });
         seenSignatures.add(item.scanSignature);
 
-        const enrichedItem = await renameMediaForItem(assignScannerTaxonomy(await enrichItemWithMetadata(item)));
-        const result = await retryAsync(() => upsertScannedItem(enrichedItem));
+        try {
+          const enrichedItem = await renameMediaForItem(assignScannerTaxonomy(await enrichItemWithMetadata(item)));
+          const result = await retryAsync(() => upsertScannedItem(enrichedItem));
 
-        // Save fingerprint AFTER enrichment so crash doesn't permanently skip this item
-        nextRootState.folders[relativeFolder] = {
-          fingerprint,
-          scanSignature: item.scanSignature,
-          title: enrichedItem.title,
-          updatedAt: new Date().toISOString(),
-        };
+          // Save fingerprint AFTER enrichment so crash doesn't permanently skip this item
+          nextRootState.folders[relativeFolder] = {
+            fingerprint,
+            scanSignature: item.scanSignature,
+            title: enrichedItem.title,
+            updatedAt: new Date().toISOString(),
+          };
 
-        if (result.created) {
-          summary.created += 1;
-        }
-        if (result.updated) {
-          summary.updated += 1;
-        }
-        if (result.item.duplicateCount > 0) {
-          summary.duplicateDrafts += 1;
-        }
-        summary.drafts.push(result.item);
-        if (summary.drafts.length > 100) summary.drafts.shift();
+          if (result.created) {
+            summary.created += 1;
+          }
+          if (result.updated) {
+            summary.updated += 1;
+          }
+          if (result.item.duplicateCount > 0) {
+            summary.duplicateDrafts += 1;
+          }
+          summary.drafts.push(result.item);
+          if (summary.drafts.length > 100) summary.drafts.shift();
 
-        const current = summary.rootResults.find((entry) => entry.id === root.id);
-        updateRootProgress(summary, root.id, {
-          discovered: (current?.discovered || 0) + 1,
-          created: (current?.created || 0) + (result.created ? 1 : 0),
-          updated: (current?.updated || 0) + (result.updated ? 1 : 0),
-          duplicateDrafts: (current?.duplicateDrafts || 0) + (result.item.duplicateCount > 0 ? 1 : 0),
-        });
+          const current = summary.rootResults.find((entry) => entry.id === root.id);
+          updateRootProgress(summary, root.id, {
+            discovered: (current?.discovered || 0) + 1,
+            created: (current?.created || 0) + (result.created ? 1 : 0),
+            updated: (current?.updated || 0) + (result.updated ? 1 : 0),
+            duplicateDrafts: (current?.duplicateDrafts || 0) + (result.item.duplicateCount > 0 ? 1 : 0),
+          });
+        } catch (itemErr) {
+          logScannerEvent('item_processing_error', { rootId: root.id, folder: relativeFolder, error: itemErr.message });
+          const rootEntry = summary.rootResults.find((entry) => entry.id === root.id);
+          if (rootEntry) {
+            rootEntry.errors.push(`[${relativeFolder}] ${itemErr.message}`);
+          }
+        }
         continue;
       }
 
@@ -1559,7 +1567,11 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
         continue;
       }
 
-      await retryAsync(() => deleteItemsByScanSignatures(getLegacyMovieSignatures(root, relativeFolder, folderPath, movieCandidates)));
+      try {
+        await retryAsync(() => deleteItemsByScanSignatures(getLegacyMovieSignatures(root, relativeFolder, folderPath, movieCandidates)));
+      } catch (deleteErr) {
+        logScannerEvent('legacy_signature_delete_error', { rootId: root.id, folder: relativeFolder, error: deleteErr.message });
+      }
 
       for (const candidate of movieCandidates) {
         if (seenSignatures.has(candidate.scanSignature)) {
@@ -1567,74 +1579,90 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
         }
         seenSignatures.add(candidate.scanSignature);
 
-        const item = createBaseScannerItem(root, {
-          title: cleanTitle(candidate.titleSource),
-          slug: slugify(candidate.slugSource),
-          type: 'movie',
-          year: candidate.year,
-          poster: pickPoster(root, folderPath, files),
-          backdrop: pickBackdrop(root, folderPath, files),
-          videoUrl: candidate.videoUrl,
-          sourcePath: candidate.sourcePath,
-          sourcePublicPath: candidate.sourcePublicPath,
-          scanSignature: candidate.scanSignature,
-          lastScanRunId: scanContext.runId,
-          lastScanRunAt: scanContext.startedAt,
-        });
+        try {
+          const item = createBaseScannerItem(root, {
+            title: cleanTitle(candidate.titleSource),
+            slug: slugify(candidate.slugSource),
+            type: 'movie',
+            year: candidate.year,
+            poster: pickPoster(root, folderPath, files),
+            backdrop: pickBackdrop(root, folderPath, files),
+            videoUrl: candidate.videoUrl,
+            sourcePath: candidate.sourcePath,
+            sourcePublicPath: candidate.sourcePublicPath,
+            scanSignature: candidate.scanSignature,
+            lastScanRunId: scanContext.runId,
+            lastScanRunAt: scanContext.startedAt,
+          });
 
-        const enrichedItem = await renameMediaForItem(assignScannerTaxonomy(await enrichItemWithMetadata(item)));
-        const result = await retryAsync(() => upsertScannedItem(enrichedItem));
+          const enrichedItem = await renameMediaForItem(assignScannerTaxonomy(await enrichItemWithMetadata(item)));
+          const result = await retryAsync(() => upsertScannedItem(enrichedItem));
 
-        if (result.created) {
-          summary.created += 1;
-        }
-        if (result.updated) {
-          summary.updated += 1;
-        }
-        if (result.item.duplicateCount > 0) {
-          summary.duplicateDrafts += 1;
-        }
-        summary.drafts.push(result.item);
-        if (summary.drafts.length > 100) summary.drafts.shift();
+          if (result.created) {
+            summary.created += 1;
+          }
+          if (result.updated) {
+            summary.updated += 1;
+          }
+          if (result.item.duplicateCount > 0) {
+            summary.duplicateDrafts += 1;
+          }
+          summary.drafts.push(result.item);
+          if (summary.drafts.length > 100) summary.drafts.shift();
 
-        const current = summary.rootResults.find((entry) => entry.id === root.id);
-        updateRootProgress(summary, root.id, {
-          discovered: (current?.discovered || 0) + 1,
-          created: (current?.created || 0) + (result.created ? 1 : 0),
-          updated: (current?.updated || 0) + (result.updated ? 1 : 0),
-          duplicateDrafts: (current?.duplicateDrafts || 0) + (result.item.duplicateCount > 0 ? 1 : 0),
-        });
+          const current = summary.rootResults.find((entry) => entry.id === root.id);
+          updateRootProgress(summary, root.id, {
+            discovered: (current?.discovered || 0) + 1,
+            created: (current?.created || 0) + (result.created ? 1 : 0),
+            updated: (current?.updated || 0) + (result.updated ? 1 : 0),
+            duplicateDrafts: (current?.duplicateDrafts || 0) + (result.item.duplicateCount > 0 ? 1 : 0),
+          });
+        } catch (itemErr) {
+          logScannerEvent('item_processing_error', { rootId: root.id, folder: relativeFolder, signature: candidate.scanSignature, error: itemErr.message });
+          const rootEntry = summary.rootResults.find((entry) => entry.id === root.id);
+          if (rootEntry) {
+            rootEntry.errors.push(`[${candidate.scanSignature}] ${itemErr.message}`);
+          }
+        }
       }
 
       for (const [showName, showFiles] of seriesGroups.entries()) {
-        const item = buildSeriesFromSingleFiles(root, showName, showFiles, folderPath, relativeFolder, scanContext);
-        if (seenSignatures.has(item.scanSignature)) {
-          continue;
-        }
-        seenSignatures.add(item.scanSignature);
+        try {
+          const item = buildSeriesFromSingleFiles(root, showName, showFiles, folderPath, relativeFolder, scanContext);
+          if (seenSignatures.has(item.scanSignature)) {
+            continue;
+          }
+          seenSignatures.add(item.scanSignature);
 
-        const enrichedItem = await renameMediaForItem(assignScannerTaxonomy(await enrichItemWithMetadata(item)));
-        const result = await retryAsync(() => upsertScannedItem(enrichedItem));
+          const enrichedItem = await renameMediaForItem(assignScannerTaxonomy(await enrichItemWithMetadata(item)));
+          const result = await retryAsync(() => upsertScannedItem(enrichedItem));
 
-        if (result.created) {
-          summary.created += 1;
-        }
-        if (result.updated) {
-          summary.updated += 1;
-        }
-        if (result.item.duplicateCount > 0) {
-          summary.duplicateDrafts += 1;
-        }
-        summary.drafts.push(result.item);
-        if (summary.drafts.length > 100) summary.drafts.shift();
+          if (result.created) {
+            summary.created += 1;
+          }
+          if (result.updated) {
+            summary.updated += 1;
+          }
+          if (result.item.duplicateCount > 0) {
+            summary.duplicateDrafts += 1;
+          }
+          summary.drafts.push(result.item);
+          if (summary.drafts.length > 100) summary.drafts.shift();
 
-        const current = summary.rootResults.find((entry) => entry.id === root.id);
-        updateRootProgress(summary, root.id, {
-          discovered: (current?.discovered || 0) + 1,
-          created: (current?.created || 0) + (result.created ? 1 : 0),
-          updated: (current?.updated || 0) + (result.updated ? 1 : 0),
-          duplicateDrafts: (current?.duplicateDrafts || 0) + (result.item.duplicateCount > 0 ? 1 : 0),
-        });
+          const current = summary.rootResults.find((entry) => entry.id === root.id);
+          updateRootProgress(summary, root.id, {
+            discovered: (current?.discovered || 0) + 1,
+            created: (current?.created || 0) + (result.created ? 1 : 0),
+            updated: (current?.updated || 0) + (result.updated ? 1 : 0),
+            duplicateDrafts: (current?.duplicateDrafts || 0) + (result.item.duplicateCount > 0 ? 1 : 0),
+          });
+        } catch (itemErr) {
+          logScannerEvent('item_processing_error', { rootId: root.id, folder: relativeFolder, showName, error: itemErr.message });
+          const rootEntry = summary.rootResults.find((entry) => entry.id === root.id);
+          if (rootEntry) {
+            rootEntry.errors.push(`[${showName}] ${itemErr.message}`);
+          }
+        }
       }
 
       nextRootState.folders[relativeFolder] = {
@@ -1657,12 +1685,17 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
     progressCallback(buildProgressPayload(summary, { activeRootId: root.id }));
   }
 
-  const deletedCount = Number(
-    coerceDeletedCount(
-      await retryAsync(() => deleteScannerItemsNotInSignatures(root.id, [...seenSignatures])),
-      `movie:${root.id}`,
-    ),
-  );
+  let deletedCount = 0;
+  try {
+    deletedCount = Number(
+      coerceDeletedCount(
+        await retryAsync(() => deleteScannerItemsNotInSignatures(root.id, [...seenSignatures])),
+        `movie:${root.id}`,
+      ),
+    );
+  } catch (deleteErr) {
+    logScannerEvent('stale_item_cleanup_error', { rootId: root.id, error: deleteErr.message });
+  }
   addToSummary(summary, 'deleted', deletedCount);
   const current = summary.rootResults.find((entry) => entry.id === root.id);
   updateRootProgress(summary, root.id, {
@@ -1753,33 +1786,41 @@ async function processSeriesRoot(root, summary, progressCallback, scanContext, e
       });
       seenSignatures.add(item.scanSignature);
 
-      const enrichedItem = await renameMediaForItem(assignScannerTaxonomy(await enrichItemWithMetadata(item)));
-      const result = await retryAsync(() => upsertScannedItem(enrichedItem));
-      nextRootState.folders[relativeFolder] = {
-        fingerprint,
-        scanSignature: enrichedItem.scanSignature,
-        title: enrichedItem.title,
-        updatedAt: new Date().toISOString(),
-      };
+      try {
+        const enrichedItem = await renameMediaForItem(assignScannerTaxonomy(await enrichItemWithMetadata(item)));
+        const result = await retryAsync(() => upsertScannedItem(enrichedItem));
+        nextRootState.folders[relativeFolder] = {
+          fingerprint,
+          scanSignature: enrichedItem.scanSignature,
+          title: enrichedItem.title,
+          updatedAt: new Date().toISOString(),
+        };
 
-      if (result.created) {
-        summary.created += 1;
-      }
-      if (result.updated) {
-        summary.updated += 1;
-      }
-      if (result.item.duplicateCount > 0) {
-        summary.duplicateDrafts += 1;
-      }
+        if (result.created) {
+          summary.created += 1;
+        }
+        if (result.updated) {
+          summary.updated += 1;
+        }
+        if (result.item.duplicateCount > 0) {
+          summary.duplicateDrafts += 1;
+        }
         summary.drafts.push(result.item);
         if (summary.drafts.length > 100) summary.drafts.shift();
-      const currentSer = summary.rootResults.find((entry) => entry.id === root.id);
-      updateRootProgress(summary, root.id, {
-        discovered: (currentSer?.discovered || 0) + 1,
-        created: (currentSer?.created || 0) + (result.created ? 1 : 0),
-        updated: (currentSer?.updated || 0) + (result.updated ? 1 : 0),
-        duplicateDrafts: (currentSer?.duplicateDrafts || 0) + (result.item.duplicateCount > 0 ? 1 : 0),
-      });
+        const currentSer = summary.rootResults.find((entry) => entry.id === root.id);
+        updateRootProgress(summary, root.id, {
+          discovered: (currentSer?.discovered || 0) + 1,
+          created: (currentSer?.created || 0) + (result.created ? 1 : 0),
+          updated: (currentSer?.updated || 0) + (result.updated ? 1 : 0),
+          duplicateDrafts: (currentSer?.duplicateDrafts || 0) + (result.item.duplicateCount > 0 ? 1 : 0),
+        });
+      } catch (itemErr) {
+        logScannerEvent('item_processing_error', { rootId: root.id, folder: relativeFolder, error: itemErr.message });
+        const rootEntry = summary.rootResults.find((entry) => entry.id === root.id);
+        if (rootEntry) {
+          rootEntry.errors.push(`[${folderName}] ${itemErr.message}`);
+        }
+      }
     }
 
     if (progressCallback) {
@@ -1796,12 +1837,17 @@ async function processSeriesRoot(root, summary, progressCallback, scanContext, e
     progressCallback(buildProgressPayload(summary, { activeRootId: root.id }));
   }
 
-  const deletedCount = Number(
-    coerceDeletedCount(
-      await retryAsync(() => deleteScannerItemsNotInSignatures(root.id, [...seenSignatures])),
-      `series:${root.id}`,
-    ),
-  );
+  let deletedCount = 0;
+  try {
+    deletedCount = Number(
+      coerceDeletedCount(
+        await retryAsync(() => deleteScannerItemsNotInSignatures(root.id, [...seenSignatures])),
+        `series:${root.id}`,
+      ),
+    );
+  } catch (deleteErr) {
+    logScannerEvent('stale_item_cleanup_error', { rootId: root.id, error: deleteErr.message });
+  }
   addToSummary(summary, 'deleted', deletedCount);
   const current = summary.rootResults.find((entry) => entry.id === root.id);
   updateRootProgress(summary, root.id, {
