@@ -101,11 +101,17 @@ const BLOCKED_AUTO_ROOT_PATTERNS = [
   /\bdownloads?\b/i,
   /\bimports?\b/i,
   /\bstaging\b/i,
-  /\bTV[_\s]?Series\b/i,
-  /\bTV[_\s]?Shows?\b/i,
-  /\bTV[_\s]?Web[_\s]?Series\b/i,
-  /\bWeb[_\s]?Series\b/i,
+  // Organizational media library folders (not content themselves)
+  /\bTV[_\s-]?(Series|Shows?)\b/i,
+  /\bTV[_\s-]?Web[_\s-]?Series\b/i,
+  /\bWeb[_\s-]?Series\b/i,
+  /\w+[_\s-]?Movies\b/i,
   /^Movies(?:_Archive)?$/i,
+  /^\w+_Archive$/i,
+  /^New_Collection$/i,
+  /^(Others|Requested)$/i,
+  /^Extra_Storage(?:_\d+)?$/i,
+  /^(Games|PS4_Games|Games_Archive)$/i,
   /^Series$/i,
 ];
 
