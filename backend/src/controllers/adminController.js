@@ -342,6 +342,34 @@ exports.getScannerLogs = (req, res) => {
   res.json({ items: runs, total: runs.length });
 };
 
+exports.getScannerEventLog = (req, res) => {
+  const fs = require('fs');
+  const path = require('path');
+  const logDir = process.env.SCANNER_CACHE_DIR || '/var/www/html/Extra_Storage/scanner-cache';
+  const logFile = path.join(logDir, 'scanner.log');
+  const limit = Math.min(Number(req.query.limit || 200), 1000);
+  const eventFilter = req.query.event || '';
+
+  try {
+    if (!fs.existsSync(logFile)) {
+      return res.json({ lines: [], total: 0, file: logFile });
+    }
+    const content = fs.readFileSync(logFile, 'utf8');
+    let lines = content.split('\n').filter(Boolean);
+    if (eventFilter) {
+      lines = lines.filter((row) => {
+        try { return JSON.parse(row).event === eventFilter; } catch { return false; }
+      });
+    }
+    const total = lines.length;
+    const sliced = lines.slice(-limit);
+    const parsed = sliced.map((row) => { try { return JSON.parse(row); } catch { return { raw: row }; } });
+    res.json({ lines: parsed, total, file: logFile });
+  } catch (err) {
+    res.json({ lines: [], total: 0, error: err.message });
+  }
+};
+
 exports.getScannerHealth = async (req, res) => {
   res.json(await getScannerHealth());
 };

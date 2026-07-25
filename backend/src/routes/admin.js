@@ -76,6 +76,7 @@ router.delete('/scanner/roots/:id', asyncRoute(adminController.deleteScannerRoot
 router.post('/scanner/roots/cleanup', asyncRoute(adminController.cleanupStaleScannerRoots));
 router.get('/scanner/drafts', asyncRoute(adminController.getScannerDrafts));
 router.get('/scanner/logs', adminController.getScannerLogs);
+router.get('/scanner/event-log', asyncRoute(adminController.getScannerEventLog));
 router.get('/scanner/health', asyncRoute(adminController.getScannerHealth));
 router.post('/scanner/cache/clear', asyncRoute(adminController.clearScannerMetadataCache));
 router.get('/scanner/jobs/current', adminController.getCurrentScannerJob);
