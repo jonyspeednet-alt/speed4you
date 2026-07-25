@@ -211,6 +211,7 @@ apiRouter.use('/player', require('./routes/player'));
 apiRouter.use('/tv', publicContentLimiter, publicPerIpLimiter, require('./routes/tv'));
 apiRouter.use('/watchlist', require('./routes/watchlist'));
 apiRouter.use('/admin', require('./routes/admin'));
+apiRouter.use('/webhook', require('./routes/webhook'));
 
 // Mount at /api (legacy/dev) and /portal-api/api (Vite-configured prefix)
 app.use('/api', apiRouter);

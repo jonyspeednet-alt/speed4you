@@ -1964,6 +1964,10 @@ async function scanSelectedRoots(selectedRootIds = [], progressCallback, options
     errors: normalizedSummary.errors.length,
   });
 
+  setImmediate(() => {
+    runPostScanTasks(normalizedSummary).catch(() => {});
+  });
+
   return normalizedSummary;
 }
 
@@ -2008,6 +2012,10 @@ function attachChildHandlers(child) {
         summary: normalizeSummary(message.summary),
       };
       logScannerEvent('worker_completed', { runId: currentScanJob?.id || '' });
+      const summary = normalizeSummary(message.summary);
+      setImmediate(() => {
+        runPostScanTasks(summary).catch(() => {});
+      });
       void refreshScannerCaches().catch(() => {}).finally(() => {
         updateRuntimeJob(currentScanJob).catch((err) => logScannerEvent('runtime_persist_failed', { error: err.message }));
       });
@@ -2066,6 +2074,56 @@ async function isScanLockedByOtherInstance() {
     // On DB error, don't block scanning — fall back to the in-process guard only.
     logScannerEvent('scan_lock_check_failed', { error: err.message });
     return false;
+  }
+}
+
+async function runPostScanTasks(summary) {
+  try {
+    const { db } = require('../data/store/base');
+    const pool = await db.getPool();
+    const result = await pool.query(
+      `SELECT id, payload FROM content_catalog
+       WHERE status = 'published'
+         AND (payload->>'poster' IS NULL OR payload->>'poster' = ''
+           OR payload->>'backdrop' IS NULL OR payload->>'backdrop' = ''
+           OR payload->>'description' IS NULL OR payload->>'description' = '')
+       ORDER BY id LIMIT 20`,
+    );
+    let fixed = 0;
+    for (const row of result.rows) {
+      try {
+        const enriched = await enrichItemWithMetadata(row.payload);
+        if (enriched && (enriched.poster || enriched.backdrop || enriched.description)) {
+          const { updateItem } = require('../data/store/content');
+          await updateItem(row.id, enriched);
+          fixed++;
+        }
+      } catch {
+        // skip failed items
+      }
+    }
+    const scanSummary = {
+      completedAt: summary.completedAt || new Date().toISOString(),
+      created: summary.created || 0,
+      updated: summary.updated || 0,
+      deleted: summary.deleted || 0,
+      errors: (summary.errors || []).length,
+      missingPostersFixed: fixed,
+    };
+    try {
+      const pool2 = await db.getPool();
+      await pool2.query(
+        `INSERT INTO app_state (key, value, updated_at)
+         VALUES ('last_scan_summary', $1::jsonb, NOW())
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+        [JSON.stringify(scanSummary)],
+      );
+    } catch {
+      // non-critical
+    }
+    logScannerEvent('post_scan_tasks_completed', { missingPostersFixed: fixed, totalChecked: result.rows.length });
+  } catch (err) {
+    logScannerEvent('post_scan_tasks_failed', { error: err.message });
   }
 }
 
