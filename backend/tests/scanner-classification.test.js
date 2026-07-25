@@ -187,3 +187,75 @@ test('does not classify blocked mixed-content utility directories as scanner roo
   assert.equal(result, null);
   fs.rmSync(tempRoot, { recursive: true, force: true });
 });
+
+test('auto-discovery only registers top-level movie libraries, not nested title folders', () => {
+  const previousRoot = process.env.SCANNER_MEDIA_ROOT;
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'scanner-discover-movies-'));
+  const movieLibrary = path.join(tempRoot, 'Bangla_Movies');
+  const titleFolder = path.join(movieLibrary, 'Bonolota Express (2026)');
+  fs.mkdirSync(titleFolder, { recursive: true });
+  fs.writeFileSync(path.join(titleFolder, 'Bonolota.Express.2026.1080p.Bangla.mkv'), Buffer.alloc(40 * 1024 * 1024));
+
+  process.env.SCANNER_MEDIA_ROOT = tempRoot;
+  try {
+    const { discoverScannerRoots } = scannerService.__test__;
+    const roots = discoverScannerRoots();
+    assert.equal(roots.length, 1);
+    assert.equal(roots[0].type, 'movie');
+    assert.equal(path.basename(roots[0].scanPath), 'Bangla_Movies');
+  } finally {
+    if (previousRoot === undefined) {
+      delete process.env.SCANNER_MEDIA_ROOT;
+    } else {
+      process.env.SCANNER_MEDIA_ROOT = previousRoot;
+    }
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('auto-discovery registers TV_Web_Series letter-range folders under TV_Series', () => {
+  const previousRoot = process.env.SCANNER_MEDIA_ROOT;
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'scanner-discover-series-'));
+  const seriesRoot = path.join(tempRoot, 'TV_Series', 'TV_Web_Series-0-9_A-E', 'Crashh', 'Season 01');
+  fs.mkdirSync(seriesRoot, { recursive: true });
+  fs.writeFileSync(path.join(seriesRoot, 'Crashh.S01E01.mkv'), Buffer.alloc(40 * 1024 * 1024));
+
+  process.env.SCANNER_MEDIA_ROOT = tempRoot;
+  try {
+    const { discoverScannerRoots } = scannerService.__test__;
+    const roots = discoverScannerRoots();
+    assert.equal(roots.length, 1);
+    assert.equal(roots[0].type, 'series');
+    assert.match(roots[0].scanPath, /TV_Web_Series-0-9_A-E$/);
+  } finally {
+    if (previousRoot === undefined) {
+      delete process.env.SCANNER_MEDIA_ROOT;
+    } else {
+      process.env.SCANNER_MEDIA_ROOT = previousRoot;
+    }
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('auto-discovery does not register individual series folders as roots', () => {
+  const previousRoot = process.env.SCANNER_MEDIA_ROOT;
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'scanner-discover-no-series-title-'));
+  const showPath = path.join(tempRoot, 'English_Movies', '2024', 'Smile 2 (2024)');
+  fs.mkdirSync(showPath, { recursive: true });
+  fs.writeFileSync(path.join(showPath, 'Smile.2.2024.mkv'), Buffer.alloc(40 * 1024 * 1024));
+
+  process.env.SCANNER_MEDIA_ROOT = tempRoot;
+  try {
+    const { discoverScannerRoots } = scannerService.__test__;
+    const roots = discoverScannerRoots();
+    assert.equal(roots.length, 1);
+    assert.equal(path.basename(roots[0].scanPath), 'English_Movies');
+  } finally {
+    if (previousRoot === undefined) {
+      delete process.env.SCANNER_MEDIA_ROOT;
+    } else {
+      process.env.SCANNER_MEDIA_ROOT = previousRoot;
+    }
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
