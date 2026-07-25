@@ -410,15 +410,39 @@ function pathsOverlap(left, right) {
     || normalizedRight.startsWith(`${normalizedLeft}/`);
 }
 
+// Folders that are in BLOCKED_AUTO_ROOT_PATTERNS but contain NO media content
+// whatsoever.  We skip them at the discovery-entry level so the scanner never
+// wastes time inside ebook/software/tutorial/docs/games/extra_storage trees.
+const NON_MEDIA_BLOCKED_PATTERNS = [
+  /\bebook\b/i,
+  /\bsoftware\b/i,
+  /\btutorial\b/i,
+  /\bdocs?\b/i,
+  /\bdocumentary\b/i,
+  /\binbox\b/i,
+  /\bpending\b/i,
+  /\bqueue\b/i,
+  /\bdownloads?\b/i,
+  /\bimports?\b/i,
+  /\bstaging\b/i,
+  /^(Games|PS4_Games|Games_Archive)$/i,
+  /^Extra_Storage(?:_\d+)?$/i,
+];
+
 function shouldSkipDiscoveryDir(name) {
   const normalized = String(name || '').trim().toLowerCase();
   if (!normalized) {
     return true;
   }
-  // NOTE: isBlockedAutoRootName is NOT checked here — blocked folders (TV_Series,
-  // Movies, etc.) must enter the main discover loop so their contents (series/movie
-  // subfolders) can be classified as auto-roots. The isBlocked path in
-  // discoverScannerRoots() handles depth-limited traversal of these containers.
+  // Non-media blocked folders (games, extra_storage, ebooks …) are skipped here
+  // so they never enter the discover loop at all.
+  if (NON_MEDIA_BLOCKED_PATTERNS.some((p) => p.test(normalized))) {
+    return true;
+  }
+  // NOTE: isBlockedAutoRootName is NOT checked here — media organizational folders
+  // (TV_Series, Movies, Web_Series, language folders…) must enter the main discover
+  // loop so their contents (series/movie subfolders) can be classified as auto-roots.
+  // The isBlocked path in discoverScannerRoots() handles depth-limited traversal.
   if (SKIP_DISCOVERY_NAMES.has(normalized)) {
     return true;
   }
@@ -630,6 +654,18 @@ function discoverScannerRoots() {
       }
       seenPaths.add(normalizedPath);
 
+      const isBlocked = isBlockedAutoRootName(dirName);
+
+      // Blocked folders (TV_Series, Movies, TV_Web_Series-0-9_A-E, etc.) are
+      // organizational containers, NOT content roots.  Skip classification and
+      // push into the queue for depth-limited exploration of their children.
+      if (isBlocked) {
+        if (current.depth < MAX_BLOCKED_DEPTH) {
+          queue.push({ folderPath: absolutePath, depth: current.depth + 1, insideBlocked: true });
+        }
+        continue;
+      }
+
       const classification = classifyAutoDiscoveredRoot(absolutePath);
       if (classification) {
         const relativePath = path.relative(DEFAULT_MEDIA_LIBRARY_ROOT, absolutePath).split(path.sep).join('/');
@@ -650,12 +686,7 @@ function discoverScannerRoots() {
         continue;
       }
 
-      const isBlocked = isBlockedAutoRootName(dirName);
-      if (isBlocked) {
-        if (current.depth < MAX_BLOCKED_DEPTH) {
-          queue.push({ folderPath: absolutePath, depth: current.depth + 1, insideBlocked: true });
-        }
-      } else if (current.insideBlocked && current.depth < MAX_BLOCKED_DEPTH) {
+      if (current.insideBlocked && current.depth < MAX_BLOCKED_DEPTH) {
         // Inside a blocked subtree (e.g., TV_Series/TV_Web_Series-0-9_A-E/F-J/):
         // The current folder failed classification but lives under a blocked root.
         // It is likely an organizational container (e.g., "F-J") whose children are
