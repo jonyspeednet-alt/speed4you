@@ -44,7 +44,6 @@ frontend/dist.zip
 
 # AI coding agent configs — never commit, agents create these locally.
 # Each tool has its own convention; if a new agent appears, add its pattern here.
-AGENTS.md
 AGENTS.local.md
 AGENTS.override.md
 CLAUDE.md
