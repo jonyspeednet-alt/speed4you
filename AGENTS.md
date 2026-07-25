@@ -1,0 +1,84 @@
+# Speed4You Portal — Project Overview
+
+## Stack
+- **Frontend**: React 18 + Vite 4 + React Router 6 + TanStack React Query 5
+- **Backend**: Node.js + Express 4
+- **Database**: PostgreSQL (primary) / pg-mem in-memory (dev fallback)
+- **Deploy**: GitHub Actions → self-hosted runner → SSH + systemd
+
+## Project Structure
+```
+speed4you/
+├── frontend/          # React SPA
+│   └── src/
+│       ├── pages/     # Route pages (HomePage, BrowsePage, etc.)
+│       ├── services/  # API client + content service
+│       └── components/
+├── backend/           # Express API
+│   └── src/
+│       ├── routes/    # API route handlers
+│       ├── data/store/ # Database queries + seed data
+│       ├── config/    # Database, env-check
+│       └── middleware/ # Auth, rate-limit, caching
+├── .github/workflows/ # CI/CD pipelines
+├── opencode.json      # opencode AI config
+└── AGENTS.md          # This file
+```
+
+## Key Files
+
+| Purpose | Path |
+|---------|------|
+| Backend entry | `backend/src/index.js` |
+| Content routes | `backend/src/routes/content.js` |
+| Database queries | `backend/src/data/store/content.js` |
+| DB init + seed | `backend/src/data/store/base.js` |
+| Seed data | `backend/src/data/store/constants.js` |
+| Homepage component | `frontend/src/pages/HomePage.jsx` |
+| Content service | `frontend/src/services/contentService.js` |
+| API client | `frontend/src/services/apiClient.js` |
+| Env template | `.env.example` |
+| Deploy workflow | `.github/workflows/deploy.yml` |
+
+## Server Access
+- **Host**: GitHub Secret `DEPLOY_HOST`
+- **User**: GitHub Secret `DEPLOY_USER`
+- **Port**: GitHub Secret `DEPLOY_PORT`
+- **SSH Key**: GitHub Secret `DEPLOY_SSH_KEY`
+- **Backend dir**: `/home/speed4you/portal-app/backend`
+- **Frontend dir**: `/var/www/speed4you.net/`
+- **Service**: `isp-portal.service` (systemd)
+
+## Database
+- **Host**: GitHub Secret `DB_HOST`
+- **Port**: GitHub Secret `DB_PORT` (5432)
+- **Name**: GitHub Secret `DB_NAME` (isp_entertainment)
+- **User**: GitHub Secret `DB_USER`
+- **Password**: GitHub Secret `DB_PASSWORD`
+- **Pool max**: GitHub Secret `DB_POOL_MAX` (50)
+
+## Available Commands (via opencode.json)
+- `deploy` — Push to main triggers auto-deploy
+- `ssh` — SSH into production server
+- `db-query <SQL>` — Run SQL query
+- `db-psql` — Open interactive psql
+- `logs` — View backend logs
+- `restart` — Restart backend service
+- `health` — Check backend health
+
+## Deployment
+- Auto-deploys on push to `main` via GitHub Actions
+- Workflow: `.github/workflows/deploy.yml`
+- Runs on self-hosted runner on the server
+- Post-deploy: cleanup season duplicates → rematch metadata → fix missing posters
+
+## Known Issues (already fixed)
+- Homepage 500 on weekends (lateNight/weekendBinge index mismatch) — **FIXED**
+- getHomepage ignoring limit param — **FIXED**
+- Admin API public caching — **FIXED**
+- allocateNextCatalogId race condition — **FIXED**
+- View count abuse (no dedup) — **FIXED**
+- API root mount conflicting with SPA routes — **FIXED**
+- Seed series seasons format — **FIXED**
+- Dead code (fetchHomepage duplicate) — **REMOVED**
+- secret-scanning workflow — **DISABLED** (manual only)
