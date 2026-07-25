@@ -65,7 +65,7 @@ const RECONCILIATION_INTERVAL_HOURS = Math.max(1, Number(process.env.SCANNER_REC
 const RECONCILIATION_SEARCH_DEPTH = Math.max(1, Number(process.env.SCANNER_RECONCILIATION_SEARCH_DEPTH || 5));
 const SCANNER_AUTO_RESUME_ON_RESTART = process.env.SCANNER_AUTO_RESUME_ON_RESTART !== 'false';
 const SCANNER_AUTO_RESUME_DELAY_MS = Math.max(1000, Number(process.env.SCANNER_AUTO_RESUME_DELAY_MS || 5000));
-const SCANNER_DISCOVER_TIMEOUT_MS = Math.max(30000, Number(process.env.SCANNER_DISCOVER_TIMEOUT_MS || 120000));
+const SCANNER_DISCOVER_TIMEOUT_MS = Math.max(30000, Number(process.env.SCANNER_DISCOVER_TIMEOUT_MS || 60000));
 // Opt-in only. A transient SMB/NFS mount hiccup makes a configured root look "missing"; with
 // this on it would be permanently deleted from persistence mid-scan. Default off so a flaky
 // network mount never destroys a legitimately-configured root.
@@ -746,12 +746,13 @@ function getEffectiveRoots() {
   const merged = [...configured];
   for (const root of discovered) {
     const discoveredPath = normalizePathForCompare(root.scanPath);
-    // Don't filter auto-discovered roots that overlap with a configured root.
-    // The configured root (e.g. /var/www/html) is typically too broad to scan
-    // deep organizational containers like TV_Series/F-J/.  The auto-discovered
-    // roots target specific sub-trees and the fingerprint/signature system
-    // prevents duplicate DB entries.
-    if (!configuredPathSet.has(discoveredPath)) {
+    const overlappingConfig = configured.find((configuredRoot) => pathsOverlap(configuredRoot.scanPath, root.scanPath));
+    if (!configuredPathSet.has(discoveredPath) && !overlappingConfig) {
+      merged.push(root);
+    } else if (overlappingConfig && overlappingConfig.type !== root.type) {
+      // Allow auto-roots of a DIFFERENT type than the configured root they
+      // overlap with.  E.g., a configured movie root scanning /var/www/html
+      // shouldn't block auto-discovered series roots inside TV_Series/.
       merged.push(root);
     }
   }
