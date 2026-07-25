@@ -65,6 +65,12 @@ speed4you/
 - `logs` — View backend logs
 - `restart` — Restart backend service
 - `health` — Check backend health
+- `server-ls <path>` — List files on server
+- `server-cat <path>` — View file on server
+- `server-disk` — Check server disk usage
+- `server-find <args>` — Find files on server
+- `search-content <keyword>` — Search content on the site (via public API)
+- `content-detail <id>` — Get content details by ID (via public API)
 
 ## Deployment
 - Auto-deploys on push to `main` via GitHub Actions
