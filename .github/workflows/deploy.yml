@@ -246,6 +246,11 @@ jobs:
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown speed4you:speed4you /var/www/html/Extra_Storage/portal-media-cache
 
             SCANNER_CACHE_DIR=/var/www/html/Extra_Storage/scanner-cache
+            # Generate WEBHOOK_SECRET if not provided via GitHub secret
+            if [ -z "${WEBHOOK_SECRET}" ]; then
+              WEBHOOK_SECRET=$(openssl rand -hex 32)
+              echo "WEBHOOK_SECRET not set in GitHub secrets — generated random: $WEBHOOK_SECRET"
+            fi
             cat > .env <<EOF
             PORT=4100
             JWT_SECRET=${JWT_SECRET}
@@ -278,6 +283,7 @@ jobs:
             SCANNER_MIN_MOVIE_SIZE=524288000
             SCANNER_MIN_EPISODE_SIZE=104857600
             ADMIN_ACCESS_KEY=${ADMIN_ACCESS_KEY}
+            WEBHOOK_SECRET=${WEBHOOK_SECRET}
             EOF
 
             echo "Ensuring new metadata routes exist in admin.js..."
