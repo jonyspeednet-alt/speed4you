@@ -6,6 +6,7 @@ import ContinueWatchingRail from '../features/continueWatching/components/Contin
 import { HeroBannerSkeleton, RailSkeleton } from '../components/feedback/Skeleton';
 import EmptyState from '../components/feedback/EmptyState';
 import BackToTop from '../components/ui/BackToTop';
+import LiveUserBadge from '../components/ui/LiveUserBadge';
 import { contentService } from '../services';
 import { progressService } from '../services/apiClient';
 import { useBreakpoint, useRecentlyViewed, useTVMode } from '../hooks';
@@ -366,6 +367,10 @@ function HomePage() {
   return (
     <div style={{ ...styles.page, ...(!hasFeaturedHero ? styles.pageWithoutHero : {}) }}>
       {hasFeaturedHero ? <HeroCarousel items={content.featured} /> : null}
+
+      <div style={{ padding: '0 max(48px, calc((100vw - 1720px) / 2))', marginTop: hasFeaturedHero ? '-32px' : '16px', position: 'relative', zIndex: 5 }}>
+        <LiveUserBadge />
+      </div>
 
       {(isLoggedIn && (cwLoading || continueWatching.length > 0)) ? (
         <div style={{ padding: '0 max(48px, calc((100vw - 1720px) / 2))', marginTop: hasFeaturedHero ? '-20px' : '0' }}>

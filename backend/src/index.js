@@ -11,6 +11,8 @@ const { getScannerHealth } = require('./services/scanner');
 
 const { compressionMiddleware, setStaticCacheHeaders } = require('./middleware/response-optimizer');
 const { ensureContentStore, closePool } = require('./data/store');
+const trackActiveUserMiddleware = require('./middleware/trackActiveUsers');
+const { startActiveUserCleanup, stopActiveUserCleanup } = require('./data/store/activeUsers');
 const logger = require('./utils/logger');
 const checkEnv = require('./config/env-check');
 
@@ -172,6 +174,9 @@ app.use((req, res, next) => {
   }
   next();
 });
+// Track active users for live count display
+app.use(trackActiveUserMiddleware);
+
 // Track active connections and in-flight requests for graceful shutdown
 let activeConnections = new Set();
 let activeRequests = 0;
@@ -307,6 +312,7 @@ async function startServer() {
 
   const server = app.listen(PORT, () => {
     logger.info(`Server running on port ${PORT} [${nodeEnv}] (PID: ${process.pid})`);
+    startActiveUserCleanup();
   });
 
   server.on('error', (error) => {
@@ -327,6 +333,7 @@ async function startServer() {
   const shutdown = async (signal) => {
     logger.info(`Received ${signal}. Starting graceful shutdown...`);
     shuttingDown = true;
+    stopActiveUserCleanup();
 
     const forceTimeout = setTimeout(() => {
       logger.error('Graceful shutdown timeout — force closing');
