@@ -47,6 +47,26 @@
     "health": {
       "description": "Check backend health on the server",
       "template": "SSH into server and run: curl -fs http://127.0.0.1:4100/health"
+    },
+    "server-ls": {
+      "description": "List files/directories on the remote server at a given path",
+      "template": "SSH into server and run: ls -la $ARGUMENTS"
+    },
+    "server-cat": {
+      "description": "View the contents of a file on the remote server",
+      "template": "SSH into server and run: cat $ARGUMENTS"
+    },
+    "server-disk": {
+      "description": "Check disk usage on the remote server",
+      "template": "SSH into server and run: df -h && echo '---' && du -sh /home/speed4you/* /var/www/* 2>/dev/null"
+    },
+    "server-find": {
+      "description": "Find files on the remote server matching a pattern",
+      "template": "SSH into server and run: find $ARGUMENTS"
+    },
+    "server-download": {
+      "description": "Download a file from the remote server to local temp directory",
+      "template": "SSH into server and run: cat $ARGUMENTS (then pipe output to local file)"
     }
   }
 }
