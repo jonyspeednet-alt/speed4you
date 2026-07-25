@@ -514,11 +514,6 @@ jobs:
                 POSTER_RESP=$(curl -s -X POST http://127.0.0.1:4100/api/admin/metadata/fix-missing-posters \
                   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"batchSize":10}' 2>&1)
                 echo "Fix-missing-posters response: $(echo "$POSTER_RESP" | head -c 500)"
-
-                echo "--- Step 5: Purging stale series entries & triggering fresh rescan ---"
-                RESCAN_RESP=$(curl -s -X POST "http://127.0.0.1:4100/api/admin/scanner/purge-and-rescan-series?force=true" \
-                  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" 2>&1)
-                echo "Purge and rescan response: $(echo "$RESCAN_RESP" | head -c 500)"
               else
                 echo "Could not generate JWT token"
                 curl -s http://127.0.0.1:4100/health 2>/dev/null | head -c 200 || echo "health failed"
