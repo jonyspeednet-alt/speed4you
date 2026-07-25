@@ -361,6 +361,16 @@ async function fetchMetadataByImdbId(imdbId, mediaType = 'movie') {
 async function enrichItemWithMetadata(item) {
   const parsedTitle = cleanSearchTitle(item.title);
 
+  // Skip re-enrichment for items already matched with complete metadata
+  if (
+    item.metadataStatus === 'matched' &&
+    isGoodUrl(item.poster) &&
+    item.description &&
+    item.description.trim().length > 0
+  ) {
+    return { ...item, parsedTitle };
+  }
+
   // If OMDB key is available and IMDb ID is provided, try OMDB first for items not found on TMDb
   if (item.imdbId && hasOmdbKey()) {
     try {
