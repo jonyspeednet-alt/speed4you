@@ -72,6 +72,11 @@ speed4you/
 - `search-content <keyword>` — Search content on the site (via public API)
 - `content-detail <id>` — Get content details by ID (via public API)
 
+## Post-Scan Features
+- **Auto-fix missing posters**: Every scan automatically retries metadata enrichment for items with missing poster/backdrop/description (up to 20 items per scan)
+- **Scan summary stored**: Last scan result stored in `app_state` key `last_scan_summary`
+- **Webhook endpoint**: `POST /portal-api/api/webhook/scan` with header `x-webhook-secret` to trigger a scan remotely
+
 ## Deployment
 - Auto-deploys on push to `main` via GitHub Actions
 - Workflow: `.github/workflows/deploy.yml`
