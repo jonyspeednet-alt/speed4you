@@ -36,6 +36,7 @@ async function findSelectedMedia(req) {
   const item = await getItemById(id);
   if (!item) return { error: { status: 404, message: 'Content not found' } };
   if (requestedType && item.type !== requestedType) return { error: { status: 404, message: 'Content not found' } };
+  if (item.status !== 'published') return { error: { status: 404, message: 'Content not found' } };
 
   const selectedSeason = item.type === 'series'
     ? (item.seasons || []).find((season, index) => toPositiveInt(season?.number ?? season?.id, index + 1) === seasonNumber)
