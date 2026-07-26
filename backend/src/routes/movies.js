@@ -41,7 +41,7 @@ router.get('/', validateQuery(moviesQuerySchema), async (req, res, next) => {
 router.get('/:id', async (req, res, next) => {
   try {
     const movie = await getItemById(req.params.id);
-    if (!movie || movie.type !== 'movie') {
+    if (!movie || movie.type !== 'movie' || movie.status !== 'published') {
       throw new AppError('Movie not found', 404, 'NOT_FOUND');
     }
     res.json(movie);
