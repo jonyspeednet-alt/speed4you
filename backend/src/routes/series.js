@@ -41,7 +41,7 @@ router.get('/', validateQuery(seriesQuerySchema), async (req, res, next) => {
 router.get('/:id', async (req, res, next) => {
   try {
     const show = await getItemById(req.params.id);
-    if (!show || show.type !== 'series') {
+    if (!show || show.type !== 'series' || show.status !== 'published') {
       throw new AppError('Series not found', 404, 'NOT_FOUND');
     }
     res.json(show);
@@ -53,7 +53,7 @@ router.get('/:id', async (req, res, next) => {
 router.get('/:id/seasons', async (req, res, next) => {
   try {
     const show = await getItemById(req.params.id);
-    if (!show || show.type !== 'series') {
+    if (!show || show.type !== 'series' || show.status !== 'published') {
       throw new AppError('Series not found', 404, 'NOT_FOUND');
     }
     res.json({
@@ -72,7 +72,7 @@ router.get('/:id/seasons', async (req, res, next) => {
 router.get('/:id/seasons/:seasonId/episodes', async (req, res, next) => {
   try {
     const show = await getItemById(req.params.id);
-    if (!show || show.type !== 'series') {
+    if (!show || show.type !== 'series' || show.status !== 'published') {
       throw new AppError('Series not found', 404, 'NOT_FOUND');
     }
     const season = (show.seasons || []).find((item) => String(item.id) === req.params.seasonId || String(item.number) === req.params.seasonId);

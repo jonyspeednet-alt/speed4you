@@ -4,6 +4,7 @@ const NOISE_PATTERNS = [
   /\b(480p|720p|1080p|2160p|4k)\b/gi,
   /\b(web[- ]?dl|webrip|bluray|brrip|hdrip|dvdrip|x264|x265|h\.?264|h\.?265|hevc)\b/gi,
   /\b(dual audio|multi audio|english|hindi|bangla|bengali|japanese|korean|french|spanish|dubbed|subbed|esub|msub|engsub|subs?|eng|hin)\b/gi,
+  /\b(complete|full|uncut|uncensored|extended|directors?\.?\s*cut)\b/gi,
   /\b(complete|full)\s+(series|season)\b/gi,
   /\bseason\s*\d{1,2}\b/gi,
   /\bs\d{1,2}\s*[-_. ]*e\d{1,3}\b/gi,
