@@ -36,6 +36,7 @@ const {
   isExplicitSeriesFile,
   parseShowNameFromFilename,
   safeDecodeURIComponent,
+  stripSeasonSuffix,
 } = require('./scanner-series-parser');
 
 const VIDEO_EXTENSIONS = new Set(
@@ -1759,106 +1760,204 @@ async function processSeriesRoot(root, summary, progressCallback, scanContext, e
     folders: { ...(rootState.folders || {}) },
     lastCompletedAt: '',
   };
-  const seriesFolders = listDirectories(root.scanPath);
+  const rawFolders = listDirectories(root.scanPath);
+
+  // Group sibling folders that share a base show name (differing only by season suffix)
+  // e.g. "The Adventures Of Tintin S01", "S02", "S03" -> grouped under "The Adventures Of Tintin"
+  const folderGroups = new Map();
+  for (const folderName of rawFolders) {
+    const baseName = stripSeasonSuffix(folderName);
+    if (!folderGroups.has(baseName)) {
+      folderGroups.set(baseName, []);
+    }
+    folderGroups.get(baseName).push(folderName);
+  }
+
+  // Build a flat list of processing entries: single folders stay as-is, grouped folders are merged
+  const processEntries = [];
+  for (const [baseName, groupFolders] of folderGroups.entries()) {
+    if (groupFolders.length === 1) {
+      processEntries.push({ type: 'single', folderName: groupFolders[0] });
+    } else {
+      processEntries.push({ type: 'group', baseName, folderNames: groupFolders });
+    }
+  }
+
   const seenSignatures = new Set();
+  const totalCandidates = processEntries.length;
 
   updateRootProgress(summary, root.id, {
     status: 'running',
-    totalCandidates: seriesFolders.length,
+    totalCandidates,
   });
   if (progressCallback) {
     progressCallback(buildProgressPayload(summary, { activeRootId: root.id }));
   }
 
-  for (let start = 0; start < seriesFolders.length; start += root.batchSize || DEFAULT_BATCH_SIZE) {
-    const batch = seriesFolders.slice(start, start + (root.batchSize || DEFAULT_BATCH_SIZE));
+  for (let start = 0; start < processEntries.length; start += root.batchSize || DEFAULT_BATCH_SIZE) {
+    const batch = processEntries.slice(start, start + (root.batchSize || DEFAULT_BATCH_SIZE));
 
-    for (const [offset, folderName] of batch.entries()) {
-      const seriesPath = path.join(root.scanPath, folderName);
-      const relativeFolder = folderName;
-      const fingerprint = getFolderFingerprint(seriesPath);
-      const previousFingerprint = rootState.folders?.[relativeFolder]?.fingerprint;
-      const seriesFiles = listFiles(seriesPath);
-      const processedCount = Math.min(start + offset + 1, seriesFolders.length);
+    for (const [offset, entry] of batch.entries()) {
+      const processedCount = Math.min(start + offset + 1, totalCandidates);
       updateRootProgress(summary, root.id, {
         processed: processedCount,
       });
-      if (progressCallback && (processedCount === seriesFolders.length || processedCount % PROGRESS_EMIT_INTERVAL === 0)) {
+      if (progressCallback && (processedCount === totalCandidates || processedCount % PROGRESS_EMIT_INTERVAL === 0)) {
         progressCallback(buildProgressPayload(summary, { activeRootId: root.id }));
       }
 
+      if (entry.type === 'single') {
+        // ── Single folder (existing logic) ──
+        const folderName = entry.folderName;
+        const seriesPath = path.join(root.scanPath, folderName);
+        const relativeFolder = folderName;
+        const fingerprint = getFolderFingerprint(seriesPath);
+        const previousFingerprint = rootState.folders?.[relativeFolder]?.fingerprint;
+        const seriesFiles = listFiles(seriesPath);
 
-      const seriesSignature = `${root.id}:${folderName}`;
-      const alreadyExists = existingSignatureSet instanceof Set
-        ? existingSignatureSet.has(seriesSignature)
-        : await getItemByScanSignature(seriesSignature);
+        const seriesSignature = `${root.id}:${folderName}`;
+        const alreadyExists = existingSignatureSet instanceof Set
+          ? existingSignatureSet.has(seriesSignature)
+          : await getItemByScanSignature(seriesSignature);
 
-      if (previousFingerprint && previousFingerprint === fingerprint && alreadyExists) {
-        seenSignatures.add(seriesSignature);
-        summary.unchanged += 1;
-        const current = summary.rootResults.find((entry) => entry.id === root.id);
-        updateRootProgress(summary, root.id, { unchanged: (current?.unchanged || 0) + 1 });
-        continue;
-      }
-
-
-      const { seasons } = buildSeriesSeasons(root, folderName, seriesPath);
-
-      if (!seasons.length) {
-        continue;
-      }
-
-      const item = createBaseScannerItem(root, {
-        title: cleanTitle(folderName),
-        slug: slugify(folderName),
-        type: 'series',
-        year: extractYear(folderName),
-        poster: pickPoster(root, seriesPath, seriesFiles),
-        backdrop: pickBackdrop(root, seriesPath, seriesFiles),
-        seasonCount: seasons.length,
-        episodeCount: seasons.reduce((sum, season) => sum + season.episodes.length, 0),
-        seasons,
-        sourcePath: seriesPath,
-        sourcePublicPath: toPublicUrl(root, seriesPath),
-        scanSignature: `${root.id}:${folderName}`,
-        lastScanRunId: scanContext.runId,
-        lastScanRunAt: scanContext.startedAt,
-      });
-      seenSignatures.add(item.scanSignature);
-
-      try {
-        const enrichedItem = await renameMediaForItem(assignScannerTaxonomy(await enrichItemWithMetadata(item)));
-        const result = await retryAsync(() => upsertScannedItem(enrichedItem));
-        nextRootState.folders[relativeFolder] = {
-          fingerprint,
-          scanSignature: enrichedItem.scanSignature,
-          title: enrichedItem.title,
-          updatedAt: new Date().toISOString(),
-        };
-
-        if (result.created) {
-          summary.created += 1;
+        if (previousFingerprint && previousFingerprint === fingerprint && alreadyExists) {
+          seenSignatures.add(seriesSignature);
+          summary.unchanged += 1;
+          const current = summary.rootResults.find((entry) => entry.id === root.id);
+          updateRootProgress(summary, root.id, { unchanged: (current?.unchanged || 0) + 1 });
+          continue;
         }
-        if (result.updated) {
-          summary.updated += 1;
-        }
-        if (result.item.duplicateCount > 0) {
-          summary.duplicateDrafts += 1;
-        }
-        summary.drafts.push(result.item);
-        if (summary.drafts.length > 100) summary.drafts.shift();
-        const currentSer = summary.rootResults.find((entry) => entry.id === root.id);
-        updateRootProgress(summary, root.id, {
-          discovered: (currentSer?.discovered || 0) + 1,
-          created: (currentSer?.created || 0) + (result.created ? 1 : 0),
-          updated: (currentSer?.updated || 0) + (result.updated ? 1 : 0),
-          duplicateDrafts: (currentSer?.duplicateDrafts || 0) + (result.item.duplicateCount > 0 ? 1 : 0),
+
+        const { seasons } = buildSeriesSeasons(root, folderName, seriesPath);
+        if (!seasons.length) continue;
+
+        const item = createBaseScannerItem(root, {
+          title: cleanTitle(folderName),
+          slug: slugify(folderName),
+          type: 'series',
+          year: extractYear(folderName),
+          poster: pickPoster(root, seriesPath, seriesFiles),
+          backdrop: pickBackdrop(root, seriesPath, seriesFiles),
+          seasonCount: seasons.length,
+          episodeCount: seasons.reduce((sum, season) => sum + season.episodes.length, 0),
+          seasons,
+          sourcePath: seriesPath,
+          sourcePublicPath: toPublicUrl(root, seriesPath),
+          scanSignature: seriesSignature,
+          lastScanRunId: scanContext.runId,
+          lastScanRunAt: scanContext.startedAt,
         });
-      } catch (itemErr) {
-        logScannerEvent('item_processing_error', { rootId: root.id, folder: relativeFolder, error: itemErr.message });
-        const rootEntry = summary.rootResults.find((entry) => entry.id === root.id);
-        if (rootEntry) {
-          rootEntry.errors.push(`[${folderName}] ${itemErr.message}`);
+        seenSignatures.add(item.scanSignature);
+
+        try {
+          const enrichedItem = await renameMediaForItem(assignScannerTaxonomy(await enrichItemWithMetadata(item)));
+          const result = await retryAsync(() => upsertScannedItem(enrichedItem));
+          nextRootState.folders[relativeFolder] = {
+            fingerprint,
+            scanSignature: enrichedItem.scanSignature,
+            title: enrichedItem.title,
+            updatedAt: new Date().toISOString(),
+          };
+
+          if (result.created) summary.created += 1;
+          if (result.updated) summary.updated += 1;
+          if (result.item.duplicateCount > 0) summary.duplicateDrafts += 1;
+          summary.drafts.push(result.item);
+          if (summary.drafts.length > 100) summary.drafts.shift();
+          const currentSer = summary.rootResults.find((e) => e.id === root.id);
+          updateRootProgress(summary, root.id, {
+            discovered: (currentSer?.discovered || 0) + 1,
+            created: (currentSer?.created || 0) + (result.created ? 1 : 0),
+            updated: (currentSer?.updated || 0) + (result.updated ? 1 : 0),
+            duplicateDrafts: (currentSer?.duplicateDrafts || 0) + (result.item.duplicateCount > 0 ? 1 : 0),
+          });
+        } catch (itemErr) {
+          logScannerEvent('item_processing_error', { rootId: root.id, folder: relativeFolder, error: itemErr.message });
+          const rootEntry = summary.rootResults.find((entry) => entry.id === root.id);
+          if (rootEntry) {
+            rootEntry.errors.push(`[${folderName}] ${itemErr.message}`);
+          }
+        }
+      } else if (entry.type === 'group') {
+        // ── Grouped sibling season folders ──
+        const { baseName, folderNames } = entry;
+        const groupSignature = `${root.id}:${baseName}`;
+        const groupFingerprint = folderNames.map((f) => getFolderFingerprint(path.join(root.scanPath, f))).join('|');
+        const previousFingerprint = rootState.folders?.[baseName]?.fingerprint;
+        const alreadyExists = existingSignatureSet instanceof Set
+          ? existingSignatureSet.has(groupSignature)
+          : await getItemByScanSignature(groupSignature);
+
+        if (previousFingerprint && previousFingerprint === groupFingerprint && alreadyExists) {
+          seenSignatures.add(groupSignature);
+          summary.unchanged += 1;
+          const current = summary.rootResults.find((e) => e.id === root.id);
+          updateRootProgress(summary, root.id, { unchanged: (current?.unchanged || 0) + 1 });
+          continue;
+        }
+
+        // Merge seasons from all sibling folders
+        const allSeasons = [];
+        let mergedPoster = '';
+        let mergedBackdrop = '';
+        for (const folderName of folderNames) {
+          const seriesPath = path.join(root.scanPath, folderName);
+          const seriesFiles = listFiles(seriesPath);
+          if (!mergedPoster) mergedPoster = pickPoster(root, seriesPath, seriesFiles);
+          if (!mergedBackdrop) mergedBackdrop = pickBackdrop(root, seriesPath, seriesFiles);
+          const { seasons } = buildSeriesSeasons(root, folderName, seriesPath);
+          allSeasons.push(...seasons);
+        }
+
+        if (!allSeasons.length) continue;
+
+        const mergedPath = path.join(root.scanPath, folderNames[0]);
+        const item = createBaseScannerItem(root, {
+          title: cleanTitle(baseName),
+          slug: slugify(baseName),
+          type: 'series',
+          year: extractYear(baseName),
+          poster: mergedPoster,
+          backdrop: mergedBackdrop,
+          seasonCount: allSeasons.length,
+          episodeCount: allSeasons.reduce((sum, season) => sum + season.episodes.length, 0),
+          seasons: allSeasons,
+          sourcePath: mergedPath,
+          sourcePublicPath: toPublicUrl(root, mergedPath),
+          scanSignature: groupSignature,
+          lastScanRunId: scanContext.runId,
+          lastScanRunAt: scanContext.startedAt,
+        });
+        seenSignatures.add(groupSignature);
+
+        try {
+          const enrichedItem = await renameMediaForItem(assignScannerTaxonomy(await enrichItemWithMetadata(item)));
+          const result = await retryAsync(() => upsertScannedItem(enrichedItem));
+          nextRootState.folders[baseName] = {
+            fingerprint: groupFingerprint,
+            scanSignature: enrichedItem.scanSignature,
+            title: enrichedItem.title,
+            updatedAt: new Date().toISOString(),
+          };
+
+          if (result.created) summary.created += 1;
+          if (result.updated) summary.updated += 1;
+          if (result.item.duplicateCount > 0) summary.duplicateDrafts += 1;
+          summary.drafts.push(result.item);
+          if (summary.drafts.length > 100) summary.drafts.shift();
+          const currentSer = summary.rootResults.find((e) => e.id === root.id);
+          updateRootProgress(summary, root.id, {
+            discovered: (currentSer?.discovered || 0) + 1,
+            created: (currentSer?.created || 0) + (result.created ? 1 : 0),
+            updated: (currentSer?.updated || 0) + (result.updated ? 1 : 0),
+            duplicateDrafts: (currentSer?.duplicateDrafts || 0) + (result.item.duplicateCount > 0 ? 1 : 0),
+          });
+        } catch (itemErr) {
+          logScannerEvent('item_processing_error', { rootId: root.id, folder: baseName, error: itemErr.message });
+          const rootEntry = summary.rootResults.find((entry) => entry.id === root.id);
+          if (rootEntry) {
+            rootEntry.errors.push(`[${baseName}] ${itemErr.message}`);
+          }
         }
       }
     }
@@ -1871,7 +1970,7 @@ async function processSeriesRoot(root, summary, progressCallback, scanContext, e
 
   updateRootProgress(summary, root.id, {
     status: 'finalizing',
-    processed: seriesFolders.length,
+    processed: totalCandidates,
   });
   if (progressCallback) {
     progressCallback(buildProgressPayload(summary, { activeRootId: root.id }));
@@ -1898,7 +1997,7 @@ async function processSeriesRoot(root, summary, progressCallback, scanContext, e
   await saveRootState(root.id, nextRootState);
   updateRootProgress(summary, root.id, {
     status: 'completed',
-    processed: seriesFolders.length,
+    processed: totalCandidates,
   });
   if (progressCallback) {
     progressCallback(buildProgressPayload(summary, { activeRootId: root.id }));

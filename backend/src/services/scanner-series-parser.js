@@ -126,10 +126,19 @@ function parseEpisodeNumber(filename, fallbackNumber) {
   return fallbackNumber;
 }
 
+function stripSeasonSuffix(folderName) {
+  const cleaned = cleanTitle(folderName);
+  return cleaned
+    .replace(/\s+[-_]?\s*S(?:eason)?\s*\d{1,3}\s*$/i, '')
+    .replace(/\s+[-_]?\s*Season\s*\d{1,3}\s*$/i, '')
+    .replace(/\s+[-_]?\s*Series\s*\d{1,3}\s*$/i, '')
+    .trim();
+}
+
 function looksLikeSeasonFolder(folderName) {
   const normalized = cleanTitle(folderName).toLowerCase();
   return /\bseason\b/.test(normalized)
-    || /^s\d{1,2}$/i.test(String(folderName || '').trim())
+    || /\bs(?:eason)?\s*\d{1,3}\b/i.test(cleanTitle(folderName))
     || /^\d{1,2}$/.test(String(folderName || '').trim())
     || /\bspecials?\b/i.test(normalized);
 }
@@ -361,4 +370,5 @@ module.exports = {
   isExplicitSeriesFile,
   parseShowNameFromFilename,
   safeDecodeURIComponent,
+  stripSeasonSuffix,
 };
