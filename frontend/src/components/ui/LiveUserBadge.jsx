@@ -17,48 +17,11 @@ function LiveUserBadge() {
   if (count === 0) return null;
 
   return (
-    <div style={styles.badge}>
-      <span style={styles.dot} />
-      <span style={styles.count}>{count}</span>
-      <span style={styles.text}>users online</span>
-    </div>
+    <span className="top-nav-live-chip" style={{ cursor: 'default' }}>
+      <span className="top-nav-live-dot" />
+      <span>{count} online</span>
+    </span>
   );
 }
-
-const styles = {
-  badge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '8px 16px',
-    borderRadius: '999px',
-    background: 'rgba(0, 255, 170, 0.08)',
-    border: '1px solid rgba(0, 255, 170, 0.2)',
-    fontSize: '0.82rem',
-    fontWeight: 700,
-    color: 'rgba(255, 255, 255, 0.85)',
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)',
-    whiteSpace: 'nowrap',
-  },
-  dot: {
-    width: '8px',
-    height: '8px',
-    borderRadius: '50%',
-    background: '#00ffaa',
-    boxShadow: '0 0 8px #00ffaa',
-    animation: 'livePulse 2s ease-in-out infinite',
-    flexShrink: 0,
-  },
-  count: {
-    color: '#00ffaa',
-    fontWeight: 900,
-    fontVariantNumeric: 'tabular-nums',
-  },
-  text: {
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: '0.78rem',
-  },
-};
 
 export default LiveUserBadge;
