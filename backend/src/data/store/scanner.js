@@ -176,6 +176,11 @@ async function syncDuplicateCountColumn(itemId, duplicateCount) {
 // this is two live folders sharing a title (a real duplicate), not a relocation —
 // matching them would make the scanner ping-pong one DB row between both folders
 // every scan. Skip the fallback match in that case so a separate item is created.
+//
+// HOWEVER: if the files live in DIFFERENT scanner roots, they are likely the same
+// movie in different directories (e.g. Requested/Movies vs Other_Foreign_Movies,
+// or Hindi_Dubbed_Movies vs English_Movies). In that case, treat them as the same
+// item to prevent duplicate creation across roots.
 function isLiveDistinctSourcePath(existingPayload, incomingPayload) {
   const existingPath = existingPayload?.sourcePath;
   const incomingPath = incomingPayload?.sourcePath;
@@ -190,6 +195,13 @@ function isLiveDistinctSourcePath(existingPayload, incomingPayload) {
     const existingSize = existingPayload?.fileSize || 0;
     const incomingSize = incomingPayload?.fileSize || 0;
     if (existingSize > 0 && incomingSize > 0 && existingSize === incomingSize) {
+      return false;
+    }
+    // Cross-root duplicates: if files are in different scanner roots but share
+    // the same title, treat them as duplicates (e.g. Requested vs Other_Foreign).
+    const existingRoot = existingPayload?.sourceRootId || '';
+    const incomingRoot = incomingPayload?.sourceRootId || '';
+    if (existingRoot && incomingRoot && existingRoot !== incomingRoot) {
       return false;
     }
     return true;
@@ -374,6 +386,7 @@ async function upsertScannedItem(payload) {
   // scanSignature changes and titleKey may also change (if metadata enrichment
   // gave a wrong title). Fall back to matching by fileSize + source_root_id:
   // same file size in the same root = same file, just renamed.
+  // Also check across roots when title matches (cross-root duplicates).
   if (!current && payload.fileSize && payload.fileSize > 0 && payload.sourceRootId) {
     const sizeMatch = await db.query(
       `SELECT id, payload FROM content_catalog
@@ -385,6 +398,30 @@ async function upsertScannedItem(payload) {
     );
     if (sizeMatch.rows[0]) {
       current = sizeMatch.rows[0].payload;
+      payload = {
+        ...payload,
+        title: payload.title || current.title,
+        seasons: payload.seasons || current.seasons || [],
+        seasonCount: payload.seasonCount ?? current.seasonCount ?? 0,
+        episodeCount: payload.episodeCount ?? current.episodeCount ?? 0,
+      };
+    }
+  }
+
+  // Cross-root fileSize dedup: if no same-root match found, check other roots
+  // but only if the title also matches (to avoid false positives from coincidental size matches).
+  if (!current && payload.fileSize && payload.fileSize > 0 && payload.sourceRootId && payload.title) {
+    const crossRootMatch = await db.query(
+      `SELECT id, payload FROM content_catalog
+       WHERE content_type = $1 AND source_type = 'scanner'
+         AND source_root_id != $2
+         AND payload->>'fileSize' = $3
+         AND title ILIKE $4
+       LIMIT 1`,
+      [String(payload.type || '').toLowerCase(), payload.sourceRootId, String(payload.fileSize), payload.title],
+    );
+    if (crossRootMatch.rows[0]) {
+      current = crossRootMatch.rows[0].payload;
       payload = {
         ...payload,
         title: payload.title || current.title,
