@@ -20,7 +20,7 @@ function cleanTitle(name, type = 'series') {
   }
 
   cleaned = cleaned
-    .replace(/[^a-zA-Z0-9\s]/g, ' ') // Remove special chars but preserve spaces
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ') // Remove special chars but preserve Unicode letters + spaces
     .replace(/\s+/g, ' ')
     .trim();
 
