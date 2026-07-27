@@ -238,79 +238,178 @@ These files exist in Requested/ on disk but have no matching DB entry.
 
 ---
 
-## Summary
-- **179 DB entries** point to deleted files (152 movies + 27 series)
-- **121 orphaned files** on disk with no DB entry (~111GB)
-- **Cause**: `sudo rm -rf /var/www/html/Requested/Movies /var/www/html/Requested/Series` was run during duplicate cleanup session
-- **Recovery**: Not possible (no backup, `rm -rf` is permanent on Linux)
+## Summary (Updated: 2026-07-26 14:45)
+- **179 original DB entries** had deleted files (152 movies + 27 series)
+- **96 entries deleted from DB** during cleanup/dedup (no longer in database)
+- **83 entries still in DB** but files were deleted
+
+### Recovery Status
+
+| Category | Count | Status |
+|----------|:-----:|--------|
+| Movies recovered (DB entry + file on disk) | **29** | ✅ Working |
+| Series recovered (DB entry + episodes on disk) | **12** | ✅ Working (151 episodes) |
+| Movies unrecovered (DB entry exists, no file) | **54** | ❌ Still missing |
+| Series unrecovered (DB entry exists, no file) | **3** | ❌ Still missing |
+| **Total recovered** | **41** | **23% of 179** |
+| **Total still missing** | **57** | **32% of 179** |
+| Deleted from DB entirely (during cleanup) | **96** | ⚠️ Cannot recover from DB |
+| Orphaned files on disk (no DB entry) | **~30** | Can be linked if titles match |
+
+### Cause
+`sudo rm -rf /var/www/html/Requested/Movies /var/www/html/Requested/Series` was run during duplicate cleanup session
 
 ---
 
-## SECTION 3: Available on CTGMovies for Re-download (45 items)
+## SECTION 3: Recovery Sources Used
 
-### Movies (29 found)
+### CTGMovies.com — 29 movies + 12 series recovered
 
-| # | Title | CTGMovies URL |
-|---|---|---|
-| 1 | Main Vaapas Aaunga | /movies/main-vaapas-aaunga |
-| 2 | Bharat Bhhagya Viddhaata | /movies/bharat-bhhagya-viddhaata |
-| 3 | Con City | /movies/con-city |
-| 4 | The India Story | /movies/the-india-story |
-| 5 | Desert Warrior | /movies/desert-warrior |
-| 6 | Disclosure Day | /movies/disclosure-day |
-| 7 | The Odyssey | /movies/the-odyssey |
-| 8 | Royal (Red, White & Royal Blue) | /movies/royal |
-| 9 | Ek Din | /movies/ek-din |
-| 10 | Mukhbir: The Story of a Spy | /movies/mukhbir-the-story-of-a-spy-the-movie |
-| 11 | Dose | /movies/dose |
-| 12 | Evil Dead Burn | /movies/evil-dead-burn |
-| 13 | Ikka | /movies/ikka |
-| 14 | Dhamaal 4 | /movies/dhamaal-4 |
-| 15 | Balti | /movies/balti |
-| 16 | The Furious | /movies/the-furious |
-| 17 | Passenger | /movies/passenger |
-| 18 | Satluj | /movies/satluj |
-| 19 | Daadi Ki Shaadi | /movies/daadi-ki-shaadi |
-| 20 | Mollywood Times | /movies/mollywood-times |
-| 21 | Peddi | /movies/peddi |
-| 22 | Tavvai | /movies/tavvai |
-| 23 | Obsession | /movies/obsession |
-| 24 | Blast | /movies/blast |
-| 25 | Enola Holmes 3 | /movies/enola-holmes-3 |
-| 26 | Dridam | /movies/dridam |
-| 27 | Bandar | /movies/bandar |
-| 28 | Maa Behen | /movies/maa-behen |
-| 29 | Do Deewane Seher Mein | /movies/do-deewane-seher-mein |
+**Movies recovered from CTGMovies (29):**
 
-### Series (16 found)
+| # | Title | Source |
+|---|-------|--------|
+| 1 | Main Vaapas Aaunga | CTGMovies |
+| 2 | Bharat Bhhagya Viddhaata | CTGMovies |
+| 3 | Con City | CTGMovies |
+| 4 | The India Story | CTGMovies |
+| 5 | Desert Warrior | CTGMovies |
+| 6 | Disclosure Day | CTGMovies |
+| 7 | The Odyssey | CTGMovies |
+| 8 | Royal (Red, White & Royal Blue) | CTGMovies |
+| 9 | Ek Din | CTGMovies |
+| 10 | Mukhbir: The Story of a Spy | CTGMovies |
+| 11 | Dose | CTGMovies |
+| 12 | Evil Dead Burn | CTGMovies |
+| 13 | Ikka | CTGMovies |
+| 14 | Dhamaal 4 | CTGMovies |
+| 15 | Balti | CTGMovies |
+| 16 | Passenger | CTGMovies |
+| 17 | Satluj | CTGMovies |
+| 18 | Daadi Ki Shaadi | CTGMovies |
+| 19 | Mollywood Times | CTGMovies |
+| 20 | Peddi | CTGMovies |
+| 21 | Tavvai | CTGMovies |
+| 22 | Obsession | CTGMovies |
+| 23 | Blast | CTGMovies |
+| 24 | Enola Holmes 3 | CTGMovies |
+| 25 | Dridam | CTGMovies |
+| 26 | Bandar | CTGMovies |
+| 27 | Maa Behen | CTGMovies |
+| 28 | Do Deewane Seher Mein | CTGMovies |
+| 29 | Deliver Us from Evil | CTGMovies |
 
-| # | Title | CTGMovies URL |
-|---|---|---|
-| 1 | House of the Dragon | /tv/house-of-the-dragon |
-| 2 | The East Palace | /tv/the-east-palace |
-| 3 | Widow's Bay | /tv/widow-s-bay |
-| 4 | Super Subbu | /tv/super-subbu |
-| 5 | Pritam and Pedro | /tv/pritam-and-pedro |
-| 6 | Isakapatnam | /tv/isakapatnam |
-| 7 | Raakh | /tv/raakh |
-| 8 | INVINCIBLE | /tv/invincible |
-| 9 | Maamla Legal Hai | /tv/maamla-legal-hai |
-| 10 | Matka King | /tv/matka-king |
-| 11 | Glory | /tv/glory |
-| 12 | Off Campus | /tv/off-campus |
-| 13 | Kaattaan | /tv/muthu-alias-kaattaan |
-| 14 | Kohrra | /tv/kohrra |
-| 15 | 13th: Some Lessons Aren't Taught in Classrooms | /tv/13th-some-lessons-aren-t-taught-in-classrooms |
-| 16 | Search: The Naina Murder Case | /tv/search-the-naina-murder-case |
+**Series recovered from CTGMovies (12 series, 151 episodes):**
+
+| # | Title | Episodes | Status |
+|---|-------|:--------:|--------|
+| 1 | House of the Dragon | 22 (S1-S3) | ✅ Complete |
+| 2 | The East Palace | 7 | ✅ Complete |
+| 3 | Widow's Bay | 9 | ✅ Complete |
+| 4 | Super Subbu | 6 | ✅ Complete |
+| 5 | Pritam and Pedro | 5 | ✅ Complete |
+| 6 | Isakapatnam | 6 | ✅ Complete |
+| 7 | Raakh | 6 (+1 error) | ⚠️ Missing S01E02 |
+| 8 | INVINCIBLE | 31 (S1-S5) | ✅ Complete |
+| 9 | Maamla Legal Hai | 15 (S1-S2) | ✅ Complete |
+| 10 | Matka King | 7 | ✅ Complete |
+| 11 | Glory | 6 | ✅ Complete |
+| 12 | Off Campus | 7 | ✅ Complete |
+| 13 | Kaattaan | 9 | ✅ Complete |
+| 14 | Kohrra | 6 | ✅ Complete |
+| 15 | 13th: Some Lessons | 4 | ✅ Complete |
+| 16 | Search: Naina Murder Case | 5 | ✅ Complete |
+
+### Bokasoka.net NAS — 8 movies recovered
+
+| # | Title | Size | Source |
+|---|-------|------|--------|
+| 1 | The Green Mile | 4.4 GB | bokasoka NAS |
+| 2 | Spirited Away | 2.1 GB | bokasoka NAS |
+| 3 | Pan's Labyrinth | 3.0 GB | bokasoka NAS |
+| 4 | Toy Story | 1.4 GB | bokasoka NAS |
+| 5 | The Martian | 1.9 GB | bokasoka NAS (orphan) |
+| 6 | The Night Crew | 802 MB | bokasoka NAS (orphan) |
+| 7 | Deliver Us from Evil | 868 MB | bokasoka NAS |
+| 8 | Alaap | 3.9 GB | bokasoka NAS (orphan) |
 
 ---
 
-## NOT found on CTGMovies (134 items)
-Older/classic movies like Perfect Days, Spirited Away, The Green Mile, Toy Story, The Martian, Oculus, Meet Joe Black, The Host, Pan's Labyrinth, Big Fish, etc.
+## SECTION 4: Still Missing (54 movies + 3 series)
+
+### Movies still missing (54)
+
+| ID | Title | Notes |
+|----|-------|-------|
+| 28022 | Fool's Day | Not on CTGMovies |
+| 28042 | DNA | Not on CTGMovies |
+| 28049 | Exit 8 | Not on CTGMovies |
+| 28057 | Ten Hours | Not on CTGMovies |
+| 28059 | U-Turn | Not on CTGMovies |
+| 28062 | The Host | Not on CTGMovies |
+| 28068 | Mayasabha: The Hall of Illusion | Not on CTGMovies |
+| 28074 | Tourist Family | Not on CTGMovies |
+| 28076 | Level Cross | Not on CTGMovies |
+| 28079 | Sufiyum Sujatayum | Bokasoka NAS (dir not accessible) |
+| 28083 | Manorama Six Feet Under | Not on CTGMovies |
+| 28084 | 7th Day | Not on CTGMovies |
+| 28086 | Mumbai Police | Not on CTGMovies |
+| 28088 | Yavarum Nalam | Not on CTGMovies |
+| 28090 | Gulaal | Not on CTGMovies |
+| 28091 | Traffic | Not on CTGMovies |
+| 28093 | Pizza | Not on CTGMovies |
+| 28097 | Euphoria | Not on CTGMovies |
+| 28145 | Bugonia | Not on CTGMovies |
+| 28146 | Fighting Spirit: Champion Road | Not on CTGMovies |
+| 28147 | Immortal Combat | Not on CTGMovies |
+| 28148 | Julius Caesar | Not on CTGMovies |
+| 28149 | Dominion of Darkness | Not on CTGMovies |
+| 28150 | Metro... In Dino | Not on CTGMovies |
+| 28151 | Mrigaya: The Hunt | Not on CTGMovies |
+| 28152 | Next Door Neighbour | Not on CTGMovies |
+| 28154 | No Other Choice | Not on CTGMovies |
+| 28155 | Peaky Blinders: The Immortal Man | Not on CTGMovies |
+| 28156 | Send Help | Not on CTGMovies |
+| 28157 | Varane Avashyamund | Bokasoka NAS (dir not accessible) |
+| 28158 | Yadang: The Snitch | Not on CTGMovies |
+| 28167 | Big Fish | Not on CTGMovies |
+| 28169 | My Client's Wife | Not on CTGMovies |
+| 28172 | Nagabandham: The Secret Treasure | Not on CTGMovies |
+| 28177 | Rahasya | Not on CTGMovies |
+| 28180 | Everybody Loves Sohrab Handa | Not on CTGMovies |
+| 28181 | Interrogation | Not on CTGMovies |
+| 28189 | Oculus | Not on CTGMovies |
+| 28197 | Snowden | Not on CTGMovies |
+| 28198 | Into the Mirror | Not on CTGMovies |
+| 28200 | Look Away | Not on CTGMovies |
+| 28205 | Others | Not on CTGMovies |
+| 28211 | Chand Mera Dil | Not on CTGMovies |
+| 28229 | Saptadingar Guptodhon | Not on CTGMovies |
+| 28234 | Aajo Ardhangini | Not on CTGMovies |
+| 28238 | Salmokji: Whispering Water | Not on CTGMovies |
+| 28241 | Phutaniganjer Mahesh | Not on CTGMovies |
+| 28244 | Rockstar | Not on CTGMovies |
+| 28253 | Horrorcane | Not on CTGMovies |
+| 28254 | Abar Hawa Bodol | Not on CTGMovies |
+| 28778 | Maiin Haan | Not on CTGMovies |
+| 29633 | Maa Behen | CTGMovies (already downloaded, DB updated) |
+| 32303 | Alaap | Bokasoka NAS (orphaned, no DB entry) |
+
+### Series still missing (3)
+
+| ID | Title | Notes |
+|----|-------|-------|
+| 32858 | Ayyana Mane | Not on CTGMovies |
+| 32859 | Abhay | Not on CTGMovies |
+| 32860 | Candy | Not on CTGMovies |
+
+### NOT found on any source (50 items)
+Older/classic movies like Perfect Days, Meet Joe Black, Big Fish, Oculus, Manorama Six Feet Under, Mumbai Police, etc. — these would need alternative sources.
 
 ---
 
 ## Recovery Plan
-- **45 items** can be re-downloaded from CTGMovies.com
-- **134 items** are not available on CTGMovies — need alternative source
-- **121 orphaned files** (~111GB) on disk — can be linked to DB entries if titles match
+- **41 items recovered** (29 movies + 12 series) from CTGMovies + bokasoka
+- **57 items still missing** (54 movies + 3 series) — need alternative source
+- **96 items deleted from DB** during cleanup — cannot recover without re-adding manually
+- **~30 orphaned files** on disk — can be linked to DB entries if titles match

@@ -1,0 +1,18 @@
+UPDATE content_catalog SET payload = jsonb_set(payload, '{sourcePath}', '"/Requested/Movies/The Grand Budapest Hotel.mkv"') WHERE id = 335;
+UPDATE content_catalog SET payload = jsonb_set(payload, '{sourcePath}', '"/Requested/Movies/Hacksaw Ridge.mkv"') WHERE id = 408;
+UPDATE content_catalog SET payload = jsonb_set(payload, '{sourcePath}', '"/Requested/Movies/Mad Max Fury Road.mkv"') WHERE id = 393;
+UPDATE content_catalog SET payload = jsonb_set(payload, '{sourcePath}', '"/Requested/Movies/Inside Out.mkv"') WHERE id = 390;
+UPDATE content_catalog SET payload = jsonb_set(payload, '{sourcePath}', '"/Requested/Movies/Room.mkv"') WHERE id = 362;
+UPDATE content_catalog SET payload = jsonb_set(payload, '{sourcePath}', '"/Requested/Movies/Spotlight.mkv"') WHERE id = 370;
+UPDATE content_catalog SET payload = jsonb_set(payload, '{sourcePath}', '"/Requested/Movies/Birdman.mkv"') WHERE id = 341;
+UPDATE content_catalog SET payload = jsonb_set(payload, '{sourcePath}', '"/Requested/Movies/Edge of Tomorrow.mkv"') WHERE id = 333;
+UPDATE content_catalog SET payload = jsonb_set(payload, '{sourcePath}', '"/Requested/Movies/Nightcrawler.mkv"') WHERE id = 348;
+UPDATE content_catalog SET payload = jsonb_set(payload, '{sourcePath}', '"/Requested/Movies/The Man from U.N.C.L.E..mkv"') WHERE id = 316;
+UPDATE content_catalog SET payload = jsonb_set(payload, '{sourcePath}', '"/Requested/Movies/Focus.mkv"') WHERE id = 319;
+UPDATE content_catalog SET payload = jsonb_set(payload, '{sourcePath}', '"/Requested/Movies/Brooklyn.mkv"') WHERE id = 366;
+UPDATE content_catalog SET payload = jsonb_set(payload, '{sourcePath}', '"/Requested/Movies/Creed.mkv"') WHERE id = 386;
+UPDATE content_catalog SET payload = jsonb_set(payload, '{sourcePath}', '"/Requested/Movies/Bridge of Spies.mkv"') WHERE id = 387;
+UPDATE content_catalog SET payload = jsonb_set(payload, '{sourcePath}', '"/Requested/Movies/The Martian.mkv"') WHERE id = 381;
+UPDATE content_catalog SET payload = jsonb_set(payload, '{sourcePath}', '"/Requested/Movies/The Hateful Eight.mkv"') WHERE id = 360;
+UPDATE content_catalog SET payload = jsonb_set(payload, '{sourcePath}', '"/Requested/Movies/The Revenant.mkv"') WHERE id = 369;
+UPDATE content_catalog SET payload = jsonb_set(payload, '{sourcePath}', '"/Requested/Movies/The Big Short.mkv"') WHERE id = 372;
