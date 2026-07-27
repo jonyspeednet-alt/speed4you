@@ -105,6 +105,9 @@ router.post('/series/cleanup-episodes', asyncRoute(adminController.cleanupOrphan
 // Series metadata fix — re-enrich all series with skipped/failed/not_found metadata using correct show titles
 router.post('/series/fix-metadata', asyncRoute(adminController.fixSeriesMetadata));
 
+// File browser for scanner roots (used when manually adding content)
+router.get('/roots/:rootId/browse', asyncRoute(adminController.browseScannerRoot));
+
 // Metadata
 router.post('/metadata/tmdb', asyncRoute(adminController.fetchTmdbMetadata));
 router.post('/metadata/rematch',      asyncRoute(adminController.rematchMetadata));
