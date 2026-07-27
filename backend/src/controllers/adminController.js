@@ -139,7 +139,8 @@ exports.getDashboard = async (req, res) => {
          AND payload->>'sourcePath' <> ''
          LIMIT 50`
       );
-      const fs = require('fs');
+const fs = require('fs');
+const path = require('path');
       let staleInSample = 0;
       for (const row of sample.rows) {
         const sp = row.payload?.sourcePath;
@@ -229,15 +230,17 @@ exports.getContentById = async (req, res) => {
 };
 
 exports.createContent = async (req, res) => {
-  const { title, type = 'movie' } = req.body;
+  const { title, type = 'movie', sourceRootId } = req.body;
   if (!title) throw new AppError('Title is required', 400, 'BAD_REQUEST');
 
   const sanitizedPayload = sanitizeManualContentPayload(req.body);
+  const hasRoot = Boolean(sourceRootId && String(sourceRootId).trim());
   const item = await createItem({
     ...sanitizedPayload,
+    sourceRootId: hasRoot ? String(sourceRootId).trim() : '',
     slug: req.body.slug || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
     type,
-    sourceType: 'manual',
+    sourceType: hasRoot ? 'scanner' : 'manual',
   });
   return res.status(201).json(item);
 };
@@ -1076,6 +1079,68 @@ exports.purgeAndRescanSeries = async (req, res) => {
     deletedStaleSeries: deletedCount,
     totalSeriesChecked: queryResult.rows.length,
     job,
+  });
+};
+
+exports.browseScannerRoot = (req, res) => {
+  const roots = listScannerRoots();
+  const root = roots.find((r) => r.id === req.params.rootId);
+  if (!root) throw new AppError('Scanner root not found', 404, 'NOT_FOUND');
+
+  const subPath = String(req.query.path || '').trim();
+  const basePath = root.scanPath;
+  let targetPath = basePath;
+  if (subPath) {
+    const clean = subPath.replace(/^\/+|\/+$/g, '').split('/').map(decodeURIComponent);
+    if (clean.some((seg) => seg === '..' || seg === '.')) {
+      throw new AppError('Invalid path', 400, 'BAD_REQUEST');
+    }
+    targetPath = path.resolve(basePath, ...clean);
+    if (!targetPath.startsWith(path.resolve(basePath))) {
+      throw new AppError('Path traversal denied', 403, 'FORBIDDEN');
+    }
+    if (!fs.existsSync(targetPath) || !fs.statSync(targetPath).isDirectory()) {
+      throw new AppError('Directory not found', 404, 'NOT_FOUND');
+    }
+  }
+
+  const entries = fs.readdirSync(targetPath, { withFileTypes: true });
+  const dirs = [];
+  const files = [];
+  for (const entry of entries) {
+    const fullPath = path.join(targetPath, entry.name);
+    const stat = fs.statSync(fullPath);
+    const relPath = path.relative(basePath, fullPath).replace(/\\/g, '/');
+    if (entry.isDirectory()) {
+      dirs.push({ name: entry.name, path: relPath, type: 'dir' });
+    } else if (entry.isFile()) {
+      const ext = path.extname(entry.name).toLowerCase();
+      const videoExts = new Set(['.mp4', '.m4v', '.webm', '.mkv', '.avi', '.mov', '.wmv', '.mpg', '.mpeg', '.ts', '.m2ts']);
+      files.push({
+        name: entry.name,
+        path: relPath,
+        type: 'file',
+        size: stat.size,
+        isVideo: videoExts.has(ext),
+      });
+    }
+  }
+
+  dirs.sort((a, b) => a.name.localeCompare(b.name));
+  files.sort((a, b) => a.name.localeCompare(b.name));
+
+  // Build public URL prefix from root config
+  let publicUrlPrefix = '';
+  if (root.publicBaseUrl) {
+    publicUrlPrefix = root.publicBaseUrl;
+  }
+
+  res.json({
+    root: { id: root.id, label: root.label, scanPath: root.scanPath, publicBaseUrl: root.publicBaseUrl },
+    currentPath: subPath || '',
+    publicUrlPrefix,
+    dirs,
+    files,
   });
 };
 

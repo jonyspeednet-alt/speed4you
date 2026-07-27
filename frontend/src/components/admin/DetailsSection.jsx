@@ -1,4 +1,29 @@
-function DetailsSection({ formData, handleChange, styles: S }) {
+import { useState, useEffect, useCallback } from 'react';
+import { adminService } from '../../services';
+
+function DetailsSection({ formData, handleChange, styles: S, onBrowseRoot }) {
+  const [roots, setRoots] = useState([]);
+  const [loadingRoots, setLoadingRoots] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingRoots(true);
+    adminService.getScannerRoots()
+      .then((data) => { if (!cancelled) setRoots(data.items || []); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoadingRoots(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleRootChange = useCallback((e) => {
+    const selectedId = e.target.value;
+    handleChange({ target: { name: 'sourceRootId', value: selectedId } });
+    const root = roots.find((r) => r.id === selectedId);
+    if (root && root.scanPath && !formData.sourcePath) {
+      handleChange({ target: { name: 'sourcePath', value: root.scanPath } });
+    }
+  }, [roots, handleChange, formData.sourcePath]);
+
   return (
     <>
       <span style={S.sectionEyebrow}>Details</span>
@@ -29,7 +54,17 @@ function DetailsSection({ formData, handleChange, styles: S }) {
           </select>
         </div>
       </div>
-      <div style={S.row3}>
+      <div style={S.row4}>
+        <div style={S.field}>
+          <label style={S.label}>Scanner Root</label>
+          <select name="sourceRootId" value={formData.sourceRootId || ''} onChange={handleRootChange} style={S.select}>
+            <option value="">-- None (manual) --</option>
+            {roots.map((root) => (
+              <option key={root.id} value={root.id}>{root.label || root.id} ({root.type})</option>
+            ))}
+          </select>
+          {loadingRoots && <span style={{ fontSize: '0.55rem', color: '#94a3b8' }}>Loading...</span>}
+        </div>
         <div style={S.field}>
           <label style={S.label}>Category</label>
           <input type="text" name="category" value={formData.category} onChange={handleChange} style={S.input} placeholder="English Movies..." />
@@ -61,6 +96,13 @@ function DetailsSection({ formData, handleChange, styles: S }) {
           <input type="text" name="adminNotes" value={formData.adminNotes} onChange={handleChange} style={S.input} placeholder="Internal note..." />
         </div>
       </div>
+      {formData.sourceRootId && (
+        <div style={{ marginTop: '4px' }}>
+          <button type="button" onClick={() => onBrowseRoot(formData.sourceRootId, '')} style={S.miniBtn}>
+            Browse Files
+          </button>
+        </div>
+      )}
     </>
   );
 }
