@@ -77,6 +77,11 @@ speed4you/
 - **Scan summary stored**: Last scan result stored in `app_state` key `last_scan_summary`
 - **Webhook endpoint**: `POST /portal-api/api/webhook/scan` with header `x-webhook-secret` to trigger a scan remotely
 
+## Webhook
+- **Secret**: `72e92581146914e2e57744787297f460d2f61c75eaa85619c2715cf1735b9576`
+- **Endpoint**: `POST /portal-api/api/webhook/scan` (header `x-webhook-secret`)
+- 🔄 Webhook secret is auto-rotated by deploy workflow — re-check `.env` if it fails
+
 ## Deployment
 - Auto-deploys on push to `main` via GitHub Actions
 - Workflow: `.github/workflows/deploy.yml`
@@ -93,3 +98,11 @@ speed4you/
 - Seed series seasons format — **FIXED**
 - Dead code (fetchHomepage duplicate) — **REMOVED**
 - secret-scanning workflow — **DISABLED** (manual only)
+- Scanner season grouping: `stripSeasonSuffix` + `groupSiblingSeasonFolders` in `scanner.js` `processSeriesRoot` — **DONE**
+- Missing poster auto-fix: metadata enricher noise patterns updated — **DONE**
+- Draft/undefined content blocking: status check added to `/series`, `/movies`, `/player` routes — **DONE**
+- Orphan items (no slug/root_id) set to `draft` on 2026-07-27 — **DONE**
+
+## Special Notes
+- Scanner auto-discovers directories under `/var/www/html/` with IDs prefixed `auto-`. These can override manually created roots with the same ID. Use unique non-`auto-` prefix IDs for manual roots.
+- Webhook secret checked from `.env`; may rotate on deploy — always re-read before use.
