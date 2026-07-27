@@ -18,6 +18,7 @@ const emptyForm = {
   adminNotes: '',
   editorialScore: 0,
   featuredOrder: 0,
+  sourceRootId: '',
   seasons: [],
 };
 
@@ -52,7 +53,8 @@ function buildSubmissionData(formData, itemMeta, overrides = {}) {
     } : {}),
     tags: typeof formData.tags === 'string'
       ? formData.tags.split(',').map(tag => tag.trim()).filter(Boolean)
-      : formData.tags
+      : formData.tags,
+    sourceRootId: formData.sourceRootId || '',
   };
 }
 
@@ -142,6 +144,7 @@ function useContentForm(id) {
           tags: Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || ''),
           adminNotes: item.adminNotes || '',
           editorialScore: item.editorialScore || 0,
+          sourceRootId: item.sourceRootId || '',
           featuredOrder: item.featuredOrder || 0,
           seasons: Array.isArray(item.seasons)
             ? item.seasons.map((season, seasonIndex) => ({
@@ -438,6 +441,7 @@ function useContentForm(id) {
       formData.poster,
       formData.backdrop,
       formData.videoUrl,
+      formData.sourceRootId,
       formData.category,
       formData.language,
       formData.year,

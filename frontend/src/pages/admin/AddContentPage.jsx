@@ -3,6 +3,7 @@ import { useNavigate, Link, useParams, useBlocker } from 'react-router-dom';
 import { adminService } from '../../services';
 import ConfirmDialog from '../../components/overlays/ConfirmDialog';
 import EpisodeEditor from '../../components/admin/EpisodeEditor';
+import FileBrowser, { titleFromFilename } from '../../components/admin/FileBrowser';
 import MetadataSection from '../../components/admin/MetadataSection';
 import DetailsSection from '../../components/admin/DetailsSection';
 import ArtworkSection from '../../components/admin/ArtworkSection';
@@ -29,6 +30,9 @@ function AddContentPage() {
   const [uploadingBackdrop, setUploadingBackdrop] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
+  const [showFileBrowser, setShowFileBrowser] = useState(false);
+  const [browseRootId, setBrowseRootId] = useState('');
+  const [browsePath, setBrowsePath] = useState('');
 
   const duplicateCandidates = liveDuplicates ?? (form.itemMeta?.duplicateCandidates || []);
   const hasDuplicateWarning = duplicateCandidates.length > 0;
@@ -131,8 +135,71 @@ function AddContentPage() {
         const nn = String(num).padStart(2, '0');
         const url = pattern.replace(/\{NN\}/g, nn).replace(/\{N\}/g, String(num));
         form.handleEpisodeChange(si, ei, 'videoUrl', url);
+        // Auto-extract title from filename if episode has no title yet
+        if (!ep.title) {
+          const filename = url.split('/').pop() || '';
+          const title = titleFromFilename(filename);
+          if (title) {
+            form.handleEpisodeChange(si, ei, 'title', title);
+          }
+        }
       });
     });
+  }, [form.formData.seasons, form.handleEpisodeChange]);
+
+  const handleExtractEpisodeTitles = useCallback(() => {
+    const seasons = form.formData.seasons || [];
+    seasons.forEach((season, si) => {
+      (season.episodes || []).forEach((ep, ei) => {
+        const url = ep.videoUrl || '';
+        const filename = url.split('/').pop() || '';
+        const title = titleFromFilename(filename);
+        if (title) form.handleEpisodeChange(si, ei, 'title', title);
+      });
+    });
+  }, [form.formData.seasons, form.handleEpisodeChange]);
+
+  const handleBrowseRoot = useCallback((rootId, path) => {
+    setBrowseRootId(rootId);
+    setBrowsePath(path || '');
+    setShowFileBrowser(true);
+  }, []);
+
+  const handleSelectFile = useCallback((file, data) => {
+    // Build the relative URL path
+    const publicUrl = data.publicUrlPrefix
+      ? `${data.publicUrlPrefix}/${file.path}`
+      : `/${file.path}`;
+    const encodedUrl = publicUrl.split('/').map(seg => encodeURIComponent(decodeURIComponent(seg))).join('/');
+
+    // Try to place it in the right season/episode
+    const seasons = form.formData.seasons || [];
+    if (seasons.length === 1) {
+      const season = seasons[0];
+      const epNum = (season.episodes || []).findIndex((ep) => !ep.videoUrl);
+      if (epNum >= 0) {
+        form.handleEpisodeChange(0, epNum, 'videoUrl', encodedUrl);
+        if (!season.episodes[epNum].title) {
+          form.handleEpisodeChange(0, epNum, 'title', titleFromFilename(file.name));
+        }
+        return;
+      }
+    }
+    // Fallback: set in the first empty slot across all seasons
+    for (let si = 0; si < seasons.length; si++) {
+      const eps = seasons[si].episodes || [];
+      for (let ei = 0; ei < eps.length; ei++) {
+        if (!eps[ei].videoUrl) {
+          form.handleEpisodeChange(si, ei, 'videoUrl', encodedUrl);
+          if (!eps[ei].title) {
+            form.handleEpisodeChange(si, ei, 'title', titleFromFilename(file.name));
+          }
+          return;
+        }
+      }
+    }
+    // No empty slot found — do nothing silently
+    setShowFileBrowser(false);
   }, [form.formData.seasons, form.handleEpisodeChange]);
 
   const handleDuplicate = useCallback(async () => {
@@ -226,6 +293,7 @@ function AddContentPage() {
                   formData={form.formData}
                   handleChange={form.handleChange}
                   styles={S}
+                  onBrowseRoot={handleBrowseRoot}
                 />
               </section>
 
@@ -243,6 +311,10 @@ function AddContentPage() {
                         }
                       }} disabled={!form.formData.seasons?.length} style={{ ...S.secondaryBtn, padding: '10px 14px' }}>
                         + Add Episode
+                      </button>
+                      <button type="button" onClick={handleExtractEpisodeTitles}
+                        disabled={!form.formData.seasons?.length} style={{ ...S.secondaryBtn, padding: '10px 14px' }}>
+                        Extract Titles
                       </button>
                     </div>
                   </div>
@@ -305,6 +377,15 @@ function AddContentPage() {
             </div>
           </div>
         </form>
+      )}
+
+      {showFileBrowser && (
+        <FileBrowser
+          rootId={browseRootId}
+          currentPath={browsePath}
+          onSelectFile={handleSelectFile}
+          onClose={() => setShowFileBrowser(false)}
+        />
       )}
 
       <ConfirmDialog

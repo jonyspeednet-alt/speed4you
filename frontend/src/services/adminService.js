@@ -116,6 +116,9 @@ export const adminService = {
     body: JSON.stringify({ batchSize: opts.batchSize || 10, status: opts.status || 'published' }),
   }).finally(clearAdminCache),
 
+  // Browse files under a scanner root (for manual content creation)
+  browseRoot: (rootId, path = '') => cachedGet(`/admin/roots/${rootId}/browse`, path ? { path } : {}),
+
   // Rematch metadata for skipped/failed/not_found items
   rematchMetadata: (opts = {}) => apiClient('/admin/metadata/rematch', {
     method: 'POST',
