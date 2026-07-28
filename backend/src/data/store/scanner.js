@@ -434,7 +434,9 @@ async function upsertScannedItem(payload) {
 
   // ── NEW ITEM (truly new) ────────────────────────────────────────────────
   if (!current) {
-    const shouldAutoPublish = payload.metadataStatus === 'matched' || payload.metadataStatus === 'skipped';
+    const metadataConfidence = payload.metadataConfidence ?? 0;
+    const shouldAutoPublish = (payload.metadataStatus === 'matched' && metadataConfidence >= 70)
+      || payload.metadataStatus === 'skipped';
     const nextStatus = payload.status
       || (shouldAutoPublish ? (process.env.SCANNER_DEFAULT_STATUS || 'published') : 'draft');
     const nextPublishedAt = nextStatus === 'published' ? (payload.publishedAt || now) : '';
@@ -555,11 +557,11 @@ async function upsertScannedItem(payload) {
   const item = normalizeItem({
     ...current,
     // scan-derived fields (always refreshed)
-    title:            payload.title            || current.title,
+    title:            (!shouldUpdateMetadata && (current.title || '')) || payload.title || current.title,
     titleKey:         normalizeTitleKey(payload.title || current.title, payload.year || current.year),
-    slug:             payload.slug             || current.slug || '',
-    poster:           payload.poster           || current.poster || '',
-    backdrop:         payload.backdrop         || current.backdrop || '',
+    slug:             (!shouldUpdateMetadata && (current.slug || '')) || payload.slug || current.slug || '',
+    poster:           (!shouldUpdateMetadata && (current.poster || '')) || payload.poster || current.poster || '',
+    backdrop:         (!shouldUpdateMetadata && (current.backdrop || '')) || payload.backdrop || current.backdrop || '',
     videoUrl:         payload.videoUrl         || current.videoUrl || '',
     sourcePath:       payload.sourcePath       || current.sourcePath || '',
     sourcePublicPath: payload.sourcePublicPath || current.sourcePublicPath || '',
