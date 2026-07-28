@@ -88,7 +88,10 @@ function ContentLibraryPage() {
   const [bulkUpdateLoading, setBulkUpdateLoading] = useState(false);
   const [bulkStatusLoading, setBulkStatusLoading] = useState(false);
   const [bulkEditor, setBulkEditor] = useState({ collection: '', tags: '', adminNotes: '', featuredOrder: '' });
-  const [filters, setFilters] = useState({ search: '', status: '', source: '', language: '', category: '', collection: '', tag: '', sourceRootId: '', duplicatesOnly: false, metadataStatus: '' });
+  const [filters, setFilters] = useState(() => {
+    const p = new URLSearchParams(window.location.search);
+    return { search: p.get('search')||'', status: p.get('status')||'', source: p.get('source')||'', language: p.get('language')||'', category: p.get('category')||'', collection: p.get('collection')||'', tag: p.get('tag')||'', sourceRootId: p.get('sourceRootId')||'', duplicatesOnly: p.get('duplicatesOnly')==='true', metadataStatus: p.get('metadataStatus')||'' };
+  });
   const [searchInput, setSearchInput] = useState('');
   const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0 });
   const [pageInput, setPageInput] = useState('1');
@@ -99,6 +102,8 @@ function ContentLibraryPage() {
   const [organization, setOrganization] = useState(null);
   const [groupBySeries, setGroupBySeries] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState(() => new Set());
+  const [publishingIds, setPublishingIds] = useState([]);
+  const [confirmBulkAction, setConfirmBulkAction] = useState(null); // { type: 'publish'|'unpublish' }
 
   useEffect(() => {
     setFilters((c) => ({ ...c, status: '' }));
@@ -181,6 +186,9 @@ function ContentLibraryPage() {
     }
   }, [apiParams, sectionType]);
 
+  const loadContentRef = useRef(loadContent);
+  useEffect(() => { loadContentRef.current = loadContent; }, [loadContent]);
+
   useEffect(() => { loadContent(); }, [loadContent]);
 
   useEffect(() => {
@@ -201,18 +209,16 @@ function ContentLibraryPage() {
     return () => clearTimeout(t);
   }, [loadOrganization]);
 
-  useEffect(() => { setPagination((c) => ({ ...c, page: 1 })); }, [
+  const filterChangeDeps = [
     filters.search, filters.status, filters.source, filters.language,
     filters.category, filters.collection, filters.tag, filters.sourceRootId, filters.duplicatesOnly, filters.metadataStatus,
-  ]);
-
+  ];
   useEffect(() => {
-    const t = setTimeout(() => loadContent(), 50);
+    setPagination((c) => ({ ...c, page: 1 }));
+    const t = setTimeout(() => loadContentRef.current(), 50);
     return () => clearTimeout(t);
-  }, [
-    filters.search, filters.status, filters.source, filters.language,
-    filters.category, filters.collection, filters.tag, filters.sourceRootId, filters.duplicatesOnly, filters.metadataStatus,
-  ]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, filterChangeDeps);
 
   const filterOptions = useMemo(() => ({
     languages: [...new Set(allContent.map((i) => i.language).filter(Boolean))].sort(),
@@ -258,8 +264,27 @@ function ContentLibraryPage() {
     });
   }, []);
 
-  const updateFilter = (key, value) => setFilters((c) => ({ ...c, [key]: value }));
-  const resetFilters = () => setFilters({ search: '', status: '', source: '', language: '', category: '', collection: '', tag: '', sourceRootId: '', duplicatesOnly: false, metadataStatus: '' });
+  const syncFiltersToUrl = (f) => {
+    const p = new URLSearchParams();
+    Object.entries(f).forEach(([k, v]) => { if (v && v !== false) p.set(k, v); });
+    const qs = p.toString();
+    window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : ''));
+  };
+  const updateFilter = (key, value) => setFilters((c) => { const n = { ...c, [key]: value }; syncFiltersToUrl(n); return n; });
+  const resetFilters = () => { const d = { search: '', status: '', source: '', language: '', category: '', collection: '', tag: '', sourceRootId: '', duplicatesOnly: false, metadataStatus: '' }; setFilters(d); syncFiltersToUrl(d); };
+
+  useEffect(() => {
+    const onPop = () => {
+      const p = new URLSearchParams(window.location.search);
+      setFilters((c) => {
+        const n = { ...c }; let changed = false;
+        Object.keys(c).forEach((k) => { const v = k === 'duplicatesOnly' ? p.get(k) === 'true' : p.get(k) || ''; if (c[k] !== v) { n[k] = v; changed = true; } });
+        return changed ? n : c;
+      });
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
 
   const toggleSort = (column) => {
     if (sortBy === column) { setSortDir((d) => (d === 'asc' ? 'desc' : 'asc')); }
@@ -280,17 +305,27 @@ function ContentLibraryPage() {
     if (event.defaultPrevented) return;
     const interactive = event.target.closest('a, button, input, select, textarea, label');
     if (interactive) return;
-    navigate(getPublicPath(item));
+    window.open(getPublicPath(item), '_blank');
   };
 
   const handlePublish = useCallback(async (id) => {
-    const item = await adminService.publishContent(id);
-    setAllContent((c) => mergeContentItem(c, item));
+    setPublishingIds((c) => [...c, id]);
+    try {
+      const item = await adminService.publishContent(id);
+      setAllContent((c) => mergeContentItem(c, item));
+    } finally {
+      setPublishingIds((c) => c.filter((e) => e !== id));
+    }
   }, []);
 
   const handleUnpublish = useCallback(async (id) => {
-    const item = await adminService.unpublishContent(id);
-    setAllContent((c) => mergeContentItem(c, item));
+    setPublishingIds((c) => [...c, id]);
+    try {
+      const item = await adminService.unpublishContent(id);
+      setAllContent((c) => mergeContentItem(c, item));
+    } finally {
+      setPublishingIds((c) => c.filter((e) => e !== id));
+    }
   }, []);
 
   const flushDelete = useCallback(async (id) => {
@@ -311,7 +346,7 @@ function ContentLibraryPage() {
     setPendingDelete({ id: target.id, title: target.title, timer: setTimeout(() => { flushDelete(target.id); setPendingDelete(null); }, 5000) });
     setDeleteTarget(null);
     setSuccessMsg(`"${target.title}" will be deleted in 5s.`);
-    setTimeout(() => setSuccessMsg(''), 4000);
+    setTimeout(() => setSuccessMsg(''), 5000);
   };
 
   const handleBulkDelete = async () => {
@@ -360,7 +395,7 @@ function ContentLibraryPage() {
     finally { setBulkUpdateLoading(false); }
   };
 
-  const handleBulkStatusUpdate = async (status) => {
+  const executeBulkStatusUpdate = useCallback(async (status) => {
     if (!selectedContentIds.length) return;
     try {
       setBulkStatusLoading(true); setError('');
@@ -370,8 +405,10 @@ function ContentLibraryPage() {
       setSuccessMsg(`${status === 'published' ? 'Published' : 'Unpublished'} ${items.length} items.`);
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (e) { setError(e.message || 'Bulk status update failed.'); }
-    finally { setBulkStatusLoading(false); }
-  };
+    finally { setBulkStatusLoading(false); setConfirmBulkAction(null); }
+  }, [selectedContentIds]);
+
+  const handleBulkStatusUpdate = (status) => setConfirmBulkAction({ type: status });
 
   const saveCurrentPreset = () => {
     const name = presetName.trim() || `Preset ${savedPresets.length + 1}`;
@@ -379,7 +416,7 @@ function ContentLibraryPage() {
     setPresetName('');
   };
 
-  const applyPreset = (preset) => { setFilters({ ...preset.filters }); setSearchInput(preset.filters.search || ''); setPagination((c) => ({ ...c, page: 1 })); };
+  const applyPreset = (preset) => { const f = { ...preset.filters }; setFilters(f); syncFiltersToUrl(f); setSearchInput(f.search || ''); setPagination((c) => ({ ...c, page: 1 })); };
   const removePreset = (id) => setSavedPresets((c) => c.filter((p) => p.id !== id));
   const toggleColumn = (key) => setVisibleColumns((c) => ({ ...c, [key]: !c[key] }));
 
@@ -475,6 +512,21 @@ function ContentLibraryPage() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [allContent, handlePublish, handleUnpublish, navigate, selectedContentIds]);
 
+  const activeFilterCount = useMemo(() => {
+    let c = 0;
+    if (filters.search) c++;
+    if (filters.status) c++;
+    if (filters.source) c++;
+    if (filters.language) c++;
+    if (filters.category) c++;
+    if (filters.collection) c++;
+    if (filters.tag) c++;
+    if (filters.sourceRootId) c++;
+    if (filters.duplicatesOnly) c++;
+    if (filters.metadataStatus) c++;
+    return c;
+  }, [filters]);
+
   const colSpan = 3 + Number(visibleColumns.status) + Number(visibleColumns.metadata) + Number(visibleColumns.source) + Number(visibleColumns.actions);
 
   return (
@@ -529,8 +581,8 @@ function ContentLibraryPage() {
             />
           </div>
           <button type="button" onClick={() => setShowFilters(!showFilters)}
-            style={{ ...styles.chip, ...(showFilters ? styles.chipActive : {}) }}>
-            Filters {showFilters ? '▲' : '▼'}
+            style={{ ...styles.chip, ...(showFilters || activeFilterCount > 0 ? styles.chipActive : {}) }}>
+            {activeFilterCount > 0 ? `Filters (${activeFilterCount})` : 'Filters'} {showFilters ? '▲' : '▼'}
           </button>
           <button type="button" onClick={() => updateFilter('duplicatesOnly', !filters.duplicatesOnly)}
             style={{ ...styles.chip, ...(filters.duplicatesOnly ? styles.chipActive : {}) }}>Duplicates</button>
@@ -665,6 +717,7 @@ function ContentLibraryPage() {
       {selectedContentIds.length > 0 && (
         <div style={styles.selectionBar}>
           <span style={{ color: '#f1f5f9', fontWeight: 600 }}>{selectedContentIds.length} selected</span>
+          <button type="button" onClick={() => setSelectedContentIds([])} style={{ ...styles.chipSmall, color: '#94a3b8' }}>Clear</button>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             <input type="text" value={bulkEditor.collection} onChange={(e) => setBulkEditor((c) => ({ ...c, collection: e.target.value }))}
               placeholder="Collection" style={styles.smallInput} />
@@ -692,7 +745,8 @@ function ContentLibraryPage() {
           <thead>
             <tr>
               <th style={styles.thCheck}>
-                <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAllVisible} />
+                <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAllVisible}
+                  title={allVisibleSelected ? 'Deselect all on this page' : 'Select all on this page'} />
               </th>
               <th style={styles.thSort} onClick={() => toggleSort('title')}>
                 Title <SortIcon column="title" />
@@ -793,9 +847,9 @@ function ContentLibraryPage() {
                           {item.videoUrl && <span style={styles.miniBtn}>Has Video</span>}
                           <Link to={`/admin/content/${item.id}/edit`} style={styles.miniBtn}>Edit</Link>
                           {item.status === 'published' ? (
-                            <button type="button" onClick={() => handleUnpublish(item.id)} style={styles.miniBtn}>Unpub</button>
+                            <button type="button" onClick={() => handleUnpublish(item.id)} disabled={publishingIds.includes(item.id)} style={styles.miniBtn}>{publishingIds.includes(item.id) ? '…' : 'Unpub'}</button>
                           ) : (
-                            <button type="button" onClick={() => handlePublish(item.id)} style={styles.greenMiniBtn}>Publish</button>
+                            <button type="button" onClick={() => handlePublish(item.id)} disabled={publishingIds.includes(item.id)} style={styles.greenMiniBtn}>{publishingIds.includes(item.id) ? '…' : 'Publish'}</button>
                           )}
                           <button type="button" onClick={() => setDeleteTarget({ mode: 'single', id: item.id, title: item.title })}
                             style={styles.dangerMiniBtn}>Del</button>
@@ -808,6 +862,8 @@ function ContentLibraryPage() {
 
               const isExpanded = expandedGroups.has(entry.key);
               const totalEpisodes = entry.items.reduce((s, i) => s + (i.episodeCount || 0), 0);
+              const pubCount = entry.items.filter((i) => i.status === 'published').length;
+              const draftCount = entry.items.filter((i) => i.status === 'draft').length;
               const rows = [];
 
               rows.push(
@@ -833,6 +889,13 @@ function ContentLibraryPage() {
                         <div style={styles.metaLine}>
                           {entry.items[0]?.category || '-'} · {entry.items[0]?.year || 'N/A'} · {entry.items[0]?.language || 'Unknown'}
                         </div>
+                        {(pubCount > 0 || draftCount > 0) && (
+                          <div style={styles.metaLine}>
+                            <span style={{ color: '#4ade80' }}>{pubCount} published</span>
+                            <span style={{ color: '#64748b', margin: '0 4px' }}>·</span>
+                            <span style={{ color: '#facc15' }}>{draftCount} draft</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -893,9 +956,9 @@ function ContentLibraryPage() {
                               <Link to={getPublicPath(seasonItem)} style={styles.miniBtn}>View</Link>
                               <Link to={`/admin/content/${seasonItem.id}/edit`} style={styles.miniBtn}>Edit</Link>
                               {seasonItem.status === 'published' ? (
-                                <button type="button" onClick={() => handleUnpublish(seasonItem.id)} style={styles.miniBtn}>Unpub</button>
+                                <button type="button" onClick={() => handleUnpublish(seasonItem.id)} disabled={publishingIds.includes(seasonItem.id)} style={styles.miniBtn}>{publishingIds.includes(seasonItem.id) ? '…' : 'Unpub'}</button>
                               ) : (
-                                <button type="button" onClick={() => handlePublish(seasonItem.id)} style={styles.greenMiniBtn}>Publish</button>
+                                <button type="button" onClick={() => handlePublish(seasonItem.id)} disabled={publishingIds.includes(seasonItem.id)} style={styles.greenMiniBtn}>{publishingIds.includes(seasonItem.id) ? '…' : 'Publish'}</button>
                               )}
                               <button type="button" onClick={() => setDeleteTarget({ mode: 'single', id: seasonItem.id, title: seasonItem.title })}
                                 style={styles.dangerMiniBtn}>Del</button>
@@ -970,9 +1033,9 @@ function ContentLibraryPage() {
                       {item.videoUrl && <span style={styles.miniBtn}>Has Video</span>}
                       <Link to={`/admin/content/${item.id}/edit`} style={styles.miniBtn}>Edit</Link>
                       {item.status === 'published' ? (
-                        <button type="button" onClick={() => handleUnpublish(item.id)} style={styles.miniBtn}>Unpub</button>
+                        <button type="button" onClick={() => handleUnpublish(item.id)} disabled={publishingIds.includes(item.id)} style={styles.miniBtn}>{publishingIds.includes(item.id) ? '…' : 'Unpub'}</button>
                       ) : (
-                        <button type="button" onClick={() => handlePublish(item.id)} style={styles.greenMiniBtn}>Publish</button>
+                        <button type="button" onClick={() => handlePublish(item.id)} disabled={publishingIds.includes(item.id)} style={styles.greenMiniBtn}>{publishingIds.includes(item.id) ? '…' : 'Publish'}</button>
                       )}
                       <button type="button" onClick={() => setDeleteTarget({ mode: 'single', id: item.id, title: item.title })}
                         style={styles.dangerMiniBtn}>Del</button>
@@ -1017,6 +1080,16 @@ function ContentLibraryPage() {
           ? `${deleteTarget?.count || 0} items will be permanently removed.`
           : `"${deleteTarget?.title || 'This item'}" will be permanently removed.`}
         confirmText={deleteTarget?.mode === 'bulk' ? 'Delete Selected' : 'Delete'}
+        cancelText="Cancel"
+      />
+
+      <ConfirmDialog
+        isOpen={Boolean(confirmBulkAction)}
+        onClose={() => setConfirmBulkAction(null)}
+        onConfirm={() => executeBulkStatusUpdate(confirmBulkAction?.type)}
+        title={confirmBulkAction?.type === 'published' ? 'Publish selected content?' : 'Unpublish selected content?'}
+        message={`${selectedContentIds.length} items will be ${confirmBulkAction?.type === 'published' ? 'published' : 'unpublished'}.`}
+        confirmText={confirmBulkAction?.type === 'published' ? 'Publish' : 'Unpublish'}
         cancelText="Cancel"
       />
 
