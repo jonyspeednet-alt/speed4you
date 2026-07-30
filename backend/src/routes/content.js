@@ -82,28 +82,28 @@ async function buildHomepagePayload(limit = HOMEPAGE_LIMIT) {
   const isWeekend = [0, 6].includes(new Date().getDay());
 
   const queries = [
-    getPublishedItems({}, 0, FEATURED_POOL, 'released'),
-    getPublishedItems({ type: 'movie' }, 0, limit, 'latest'),
-    getPublishedItems({}, 0, limit, 'popular'),
-    getPublishedItems({}, 0, TRENDING_POOL, 'trending'),
-    getPublishedItems({ type: 'series' }, 0, limit, 'latest'),
-    getPublishedItems({}, 0, 15, 'new-this-week'),
-    getPublishedItems({}, 0, 15, 'hidden-gems'),
-    getPublishedItems({ genre: 'action' }, 0, 10, 'trending').catch(() => []),
-    getPublishedItems({ genre: 'comedy' }, 0, 10, 'trending').catch(() => []),
-    getPublishedItems({}, 0, 15, 'rating'),
-    getPublishedItems({ language: 'Hindi' }, 0, 10, 'trending').catch(() => []),
-    getPublishedItems({ language: 'English' }, 0, 10, 'trending').catch(() => []),
-    getPublishedItems({ genre: 'horror' }, 0, 10, 'trending').catch(() => []),
-    getPublishedItems({ genre: 'drama' }, 0, 10, 'trending').catch(() => []),
-    getPublishedItems({ genre: 'thriller' }, 0, 10, 'trending').catch(() => []),
+    getPublishedItems({}, 0, FEATURED_POOL, 'year'),
+    getPublishedItems({ type: 'movie' }, 0, limit, 'year'),
+    getPublishedItems({}, 0, limit, 'year'),
+    getPublishedItems({}, 0, TRENDING_POOL, 'year'),
+    getPublishedItems({ type: 'series' }, 0, limit, 'year'),
+    getPublishedItems({}, 0, 15, 'year'),
+    getPublishedItems({}, 0, 15, 'year'),
+    getPublishedItems({ genre: 'action' }, 0, 10, 'year').catch(() => []),
+    getPublishedItems({ genre: 'comedy' }, 0, 10, 'year').catch(() => []),
+    getPublishedItems({}, 0, 15, 'year'),
+    getPublishedItems({ language: 'Hindi' }, 0, 10, 'year').catch(() => []),
+    getPublishedItems({ language: 'English' }, 0, 10, 'year').catch(() => []),
+    getPublishedItems({ genre: 'horror' }, 0, 10, 'year').catch(() => []),
+    getPublishedItems({ genre: 'drama' }, 0, 10, 'year').catch(() => []),
+    getPublishedItems({ genre: 'thriller' }, 0, 10, 'year').catch(() => []),
   ];
 
   if (hour >= 21 || hour < 5) {
-    queries.push(getPublishedItems({ genre: 'horror' }, 0, 10, 'trending').catch(() => []));
+    queries.push(getPublishedItems({ genre: 'horror' }, 0, 10, 'year').catch(() => []));
   }
   if (isWeekend) {
-    queries.push(getPublishedItems({ type: 'series' }, 0, 15, 'popular').catch(() => []));
+    queries.push(getPublishedItems({ type: 'series' }, 0, 15, 'year').catch(() => []));
   }
 
   const results = await Promise.all(queries);
