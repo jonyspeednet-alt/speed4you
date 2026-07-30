@@ -213,8 +213,10 @@ async function listItems(filters = {}, offset = 0, limit = null, sort = 'latest'
     orderClause = 'ORDER BY featured_order DESC NULLS LAST, CASE WHEN featured THEN 1 ELSE 0 END DESC, id DESC';
   } else if (sort === 'released') {
     orderClause = 'ORDER BY released_at DESC NULLS LAST, trending_score DESC, id DESC';
+  } else if (sort === 'year') {
+    orderClause = 'ORDER BY year DESC NULLS LAST, released_at DESC NULLS LAST, id DESC';
   } else {
-    orderClause = 'ORDER BY COALESCE(released_at, published_at, updated_at) DESC NULLS LAST, id DESC';
+    orderClause = 'ORDER BY year DESC NULLS LAST, COALESCE(released_at, published_at, updated_at) DESC NULLS LAST, id DESC';
   }
 
   const listParams = [...params];
@@ -339,8 +341,35 @@ async function syncDuplicateCountsForTitleKey(contentType, titleKey) {
   if (updatePromises.length) await Promise.all(updatePromises);
 }
 
+function resolveSourcePathFromVideoUrl(videoUrl) {
+  if (!videoUrl) return '';
+  let urlPath = String(videoUrl).split('?')[0];
+  try {
+    const parsed = new URL(urlPath);
+    urlPath = parsed.pathname;
+  } catch {}
+  const decoded = decodeURIComponent(urlPath);
+  if (!decoded || decoded === '/') return '';
+  const roots = loadScannerRoots().filter(r => r?.scanPath && r?.publicBaseUrl);
+  const sorted = roots.sort((a, b) => String(b.publicBaseUrl).length - String(a.publicBaseUrl).length);
+  for (const root of sorted) {
+    if (decoded === root.publicBaseUrl || decoded.startsWith(root.publicBaseUrl + '/')) {
+      const rel = decoded.slice(root.publicBaseUrl.length).replace(/^\/+/, '');
+      if (!rel) continue;
+      const absPath = require('path').join(root.scanPath, ...rel.split('/').filter(Boolean).map(s => decodeURIComponent(s)));
+      try {
+        if (fs.statSync(absPath).isFile()) return absPath;
+      } catch {}
+    }
+  }
+  return '';
+}
+
 async function createItem(payload) {
   const now = new Date().toISOString();
+  if (!payload.sourcePath && payload.videoUrl) {
+    payload.sourcePath = resolveSourcePathFromVideoUrl(payload.videoUrl);
+  }
   const item = normalizeItem({
     id: await allocateNextCatalogId(),
     createdAt: now,
@@ -370,6 +399,9 @@ async function updateItem(id, payload) {
   const current = await getItemById(id);
   if (!current) return null;
   const oldTitleKey = current.titleKey || normalizeTitleKey(current.title, current.year);
+  if (!payload.sourcePath && payload.videoUrl) {
+    payload.sourcePath = resolveSourcePathFromVideoUrl(payload.videoUrl) || current.sourcePath;
+  }
   const updated = normalizeItem({ ...current, ...payload, id: current.id, titleKey: normalizeTitleKey(payload.title || current.title, payload.year || current.year), updatedAt: new Date().toISOString() });
   const cols = extractTypedColumns(updated);
   await db.query(
