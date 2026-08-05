@@ -10,6 +10,7 @@ import VideoPlayerModal from '../components/player/VideoPlayerModal';
 import ConfirmDialog from '../components/overlays/ConfirmDialog';
 import ContentRail from '../features/home/components/ContentRail';
 import { toPlayableSrc } from '../utils/mediaUrl';
+import { triggerDownload } from '../utils/download';
 import { DETAIL_STYLES, DETAIL_SKELETON, posterFallbackUrl } from '../styles/detailPage';
 
 const posterFallback = posterFallbackUrl;
@@ -377,7 +378,7 @@ export default function MovieDetailsPage() {
       <ConfirmDialog
         isOpen={showDownloadConfirm}
         onClose={() => setShowDownloadConfirm(false)}
-        onConfirm={() => { window.location.href = `${(import.meta.env.VITE_API_URL || '/portal-api').replace(/\/$/, '')}/api/player/download/movie/${movie.id}`; setShowDownloadConfirm(false); }}
+        onConfirm={() => { triggerDownload(`${(import.meta.env.VITE_API_URL || '/portal-api').replace(/\/$/, '')}/api/player/download/movie/${movie.id}`); setShowDownloadConfirm(false); }}
         title="Download Movie"
         message={`Download "${movie?.title}"? This may use significant data.`}
         confirmText="Download"

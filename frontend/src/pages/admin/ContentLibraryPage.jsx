@@ -843,7 +843,11 @@ function ContentLibraryPage() {
                     {visibleColumns.actions && (
                       <td style={styles.tdActions}>
                         <div style={styles.actionGroup}>
-                          <Link to={getPublicPath(item)} style={styles.miniBtn}>View</Link>
+                          {item.status === 'published' ? (
+                            <Link to={getPublicPath(item)} style={styles.miniBtn}>View</Link>
+                          ) : (
+                            <Link to={getPublicPath(item)} style={styles.miniBtn}>Edit</Link>
+                          )}
                           {item.videoUrl && <span style={styles.miniBtn}>Has Video</span>}
                           <Link to={`/admin/content/${item.id}/edit`} style={styles.miniBtn}>Edit</Link>
                           {item.status === 'published' ? (
@@ -952,9 +956,13 @@ function ContentLibraryPage() {
                         )}
                         {visibleColumns.actions && (
                           <td style={styles.tdActions}>
-                            <div style={styles.actionGroup}>
-                              <Link to={getPublicPath(seasonItem)} style={styles.miniBtn}>View</Link>
-                              <Link to={`/admin/content/${seasonItem.id}/edit`} style={styles.miniBtn}>Edit</Link>
+                              <div style={styles.actionGroup}>
+                                {seasonItem.status === 'published' ? (
+                                  <Link to={getPublicPath(seasonItem)} style={styles.miniBtn}>View</Link>
+                                ) : (
+                                  <Link to={getPublicPath(seasonItem)} style={styles.miniBtn}>Edit</Link>
+                                )}
+                                <Link to={`/admin/content/${seasonItem.id}/edit`} style={styles.miniBtn}>Edit</Link>
                               {seasonItem.status === 'published' ? (
                                 <button type="button" onClick={() => handleUnpublish(seasonItem.id)} disabled={publishingIds.includes(seasonItem.id)} style={styles.miniBtn}>{publishingIds.includes(seasonItem.id) ? '…' : 'Unpub'}</button>
                               ) : (
@@ -1235,6 +1243,9 @@ function resolvePoster(item) {
 function getPublicPath(item) {
   if (!item) return '/';
   const slugOrId = item.slug || item.id;
+  if (item.status !== 'published') {
+    return `/admin/content/${item.id}/edit`;
+  }
   return item.type === 'series' ? `/series/${slugOrId}` : `/movies/${slugOrId}`;
 }
 

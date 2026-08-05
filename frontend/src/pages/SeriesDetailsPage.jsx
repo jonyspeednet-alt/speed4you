@@ -10,6 +10,7 @@ import VideoPlayerModal from '../components/player/VideoPlayerModal';
 import ConfirmDialog from '../components/overlays/ConfirmDialog';
 import ContentRail from '../features/home/components/ContentRail';
 import { toPlayableSrc } from '../utils/mediaUrl';
+import { triggerDownload } from '../utils/download';
 import { DETAIL_STYLES, DETAIL_SKELETON, posterFallbackUrl } from '../styles/detailPage';
 
 const posterFallback = posterFallbackUrl;
@@ -168,7 +169,7 @@ function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMo
       <ConfirmDialog
         isOpen={showDownloadConfirm}
         onClose={() => setShowDownloadConfirm(false)}
-        onConfirm={() => { window.location.href = downloadUrl; setShowDownloadConfirm(false); }}
+        onConfirm={() => { triggerDownload(downloadUrl); setShowDownloadConfirm(false); }}
         title="Download Episode"
         message={`Download Episode ${episodeParam}${episode.title ? ` — ${episode.title}` : ''}?`}
         confirmText="Download"
