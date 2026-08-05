@@ -7,6 +7,7 @@ import {
 } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { authService } from "../services";
+import LiveUserBadge from "../components/ui/LiveUserBadge";
 import { useBreakpoint } from "../hooks";
 
 const appBasePath = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
@@ -294,6 +295,9 @@ function AdminLayout() {
 
         {/* User */}
         <div style={s.userSection}>
+          <div style={s.onlineBadgeWrap}>
+            <LiveUserBadge />
+          </div>
           <div style={s.userCard}>
             <div style={s.userAvatar}>
               {(user?.username || "A")[0].toUpperCase()}
@@ -578,6 +582,15 @@ const s = {
     display: "flex",
     flexDirection: "column",
     gap: "6px",
+  },
+  onlineBadgeWrap: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "6px 10px",
+    borderRadius: "8px",
+    background: SURFACE2,
+    border: `1px solid ${BORDER}`,
   },
   userCard: {
     display: "flex",
