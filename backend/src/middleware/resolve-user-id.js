@@ -4,11 +4,7 @@ const { getJwtSecret } = require('../config/auth');
 const REQUIRE_USER_AUTH_FOR_STATE = String(process.env.REQUIRE_USER_AUTH_FOR_STATE || '0') === '1';
 
 function resolveUserId(req) {
-  const explicitUserId = String(req.headers['x-user-id'] || '').trim();
-  if (explicitUserId) {
-    return explicitUserId;
-  }
-
+  // A valid JWT is the source of truth for real users.
   const authHeader = String(req.headers.authorization || '');
   if (authHeader.startsWith('Bearer ')) {
     const token = authHeader.slice(7).trim();
@@ -22,6 +18,14 @@ function resolveUserId(req) {
         // Ignore invalid token and treat as guest user for public routes.
       }
     }
+  }
+
+  // The x-user-id header is only honored for anonymous guest identifiers
+  // (the frontend sends `guest:<uuid>` when not logged in). Any other value —
+  // e.g. a forged user id — is ignored so clients can't impersonate each other.
+  const explicitUserId = String(req.headers['x-user-id'] || '').trim();
+  if (explicitUserId.startsWith('guest:') && explicitUserId.length > 'guest:'.length) {
+    return explicitUserId;
   }
 
   return 'guest';

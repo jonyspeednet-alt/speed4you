@@ -72,14 +72,24 @@ function useRecentlyWatched() {
 function useFullscreen(ref) {
   const [isFull, setIsFull] = useState(false);
   useEffect(() => {
-    const handler = () => setIsFull(!!document.fullscreenElement);
+    const handler = () => setIsFull(!!(document.fullscreenElement || document.webkitFullscreenElement));
     document.addEventListener("fullscreenchange", handler);
-    return () => document.removeEventListener("fullscreenchange", handler);
+    document.addEventListener("webkitfullscreenchange", handler);
+    return () => {
+      document.removeEventListener("fullscreenchange", handler);
+      document.removeEventListener("webkitfullscreenchange", handler);
+    };
   }, []);
   const toggle = useCallback(() => {
     if (!ref.current) return;
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-    else ref.current.requestFullscreen?.().catch(() => {});
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    } else if (ref.current.requestFullscreen) {
+      ref.current.requestFullscreen().catch(() => {});
+    } else if (ref.current.webkitRequestFullscreen) {
+      ref.current.webkitRequestFullscreen();
+    }
   }, [ref]);
   return [isFull, toggle];
 }
@@ -794,6 +804,9 @@ const CSS = `
   border-radius: 16px; background: #000; overflow: hidden;
   border: 1px solid rgba(255,255,255,.07);
   box-shadow: 0 28px 64px rgba(0,0,0,.65);
+}
+@supports not (aspect-ratio: 16 / 9) {
+  .tv-player-wrap { min-height: 0; padding-top: 56.25%; }
 }
 .tv-player-wrap--stack { border-radius: 12px; }
 .tv-iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: none; }

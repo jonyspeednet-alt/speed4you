@@ -82,6 +82,7 @@ router.post('/scanner/cache/clear', asyncRoute(adminController.clearScannerMetad
 router.get('/scanner/jobs/current', adminController.getCurrentScannerJob);
 router.post('/scanner/run', adminController.runScanner);
 router.post('/scanner/stop', adminController.stopScanner);
+router.post('/scanner/rescan/:itemId', asyncRoute(adminController.rescanItem));
 
 // Database
 router.get('/db/health', asyncRoute(adminController.getDbHealth));

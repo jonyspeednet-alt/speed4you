@@ -20,9 +20,9 @@ async function addWatchlistEntry(externalUserId, contentType, contentId) {
   return { id: Number(result.rows[0].id), userId: user.external_id, contentType: String(contentType), contentId: Number(contentId), addedAt: result.rows[0].created_at };
 }
 
-async function removeWatchlistEntry(externalUserId, entryId) {
+async function removeWatchlistEntry(externalUserId, contentId) {
   const user = await ensureUser(externalUserId);
-  const result = await db.query('DELETE FROM watchlist_entries WHERE id = $1 AND user_id = $2', [Number(entryId), user.id]);
+  const result = await db.query('DELETE FROM watchlist_entries WHERE user_id = $1 AND content_id = $2', [user.id, Number(contentId)]);
   return result.rowCount > 0;
 }
 

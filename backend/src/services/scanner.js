@@ -86,6 +86,11 @@ const SCANNER_INSTANCE_ID = `${require('os').hostname()}:${process.pid}`;
 // Already-scanned roots (those with existing DB signatures) are always included;
 // this cap only applies to brand-new roots with zero DB signatures.
 const MAX_NEW_ROOTS_PER_SCAN = Math.max(10, Number(process.env.SCANNER_MAX_NEW_ROOTS_PER_SCAN || 30));
+// URL to POST scan completion summary to (e.g. a monitoring webhook service)
+const SCANNER_COMPLETION_WEBHOOK_URL = String(process.env.SCANNER_COMPLETION_WEBHOOK_URL || '').trim();
+// Per-root timeout: if a single root takes longer than this (ms), the scan moves on.
+// Default 0 = no timeout.
+const SCANNER_ROOT_TIMEOUT_MS = Math.max(0, Number(process.env.SCANNER_ROOT_TIMEOUT_MS || 0));
 const SKIP_DISCOVERY_NAMES = new Set(['portal', 'uploads', 'assets', 'css', 'js', 'api']);
 const SKIP_DISCOVERY_PATTERNS = [
   /\bcache\b/i,
@@ -1449,7 +1454,7 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
       const nestedDirectories = listDirectories(folderPath);
       const fingerprint = getFolderFingerprint(folderPath);
       const previousFingerprint = rootState.folders?.[relativeFolder]?.fingerprint;
-      const isSeriesFolder = relativeFolder !== '.' && detectSeriesFolder(root, folderPath, files, nestedDirectories);
+      const isSeriesFolder = relativeFolder !== '.' && !isYearFolderName(folderName) && detectSeriesFolder(root, folderPath, files, nestedDirectories);
       const movieCandidates = isSeriesFolder ? [] : buildMovieCandidates(root, folderPath, relativeFolder, files);
 
       // Detect explicit series files in this folder when it is not already classified as a series folder
@@ -1821,11 +1826,16 @@ async function processSeriesRoot(root, summary, progressCallback, scanContext, e
           : await getItemByScanSignature(seriesSignature);
 
         if (previousFingerprint && previousFingerprint === fingerprint && alreadyExists) {
-          seenSignatures.add(seriesSignature);
-          summary.unchanged += 1;
-          const current = summary.rootResults.find((entry) => entry.id === root.id);
-          updateRootProgress(summary, root.id, { unchanged: (current?.unchanged || 0) + 1 });
-          continue;
+          const existingItem = typeof alreadyExists === 'object' ? alreadyExists : await getItemByScanSignature(seriesSignature);
+          const firstSourcePath = existingItem?.seasons?.[0]?.episodes?.[0]?.sourcePath;
+          const pathsValid = firstSourcePath ? fs.existsSync(firstSourcePath) : false;
+          if (pathsValid) {
+            seenSignatures.add(seriesSignature);
+            summary.unchanged += 1;
+            const current = summary.rootResults.find((entry) => entry.id === root.id);
+            updateRootProgress(summary, root.id, { unchanged: (current?.unchanged || 0) + 1 });
+            continue;
+          }
         }
 
         const { seasons } = buildSeriesSeasons(root, folderName, seriesPath);
@@ -2132,7 +2142,10 @@ async function scanSelectedRoots(selectedRootIds = [], progressCallback, options
   const scanContext = {
     runId: options.runId || `${Date.now()}`,
     startedAt: summary.startedAt,
+    dryRun: !!options.dryRun,
   };
+
+  const hasRootTimeout = SCANNER_ROOT_TIMEOUT_MS > 0;
 
   for (const root of roots) {
     if (scanAbortRequested) {
@@ -2205,10 +2218,17 @@ async function scanSelectedRoots(selectedRootIds = [], progressCallback, options
     }
 
     try {
-      if (root.type === 'series') {
-        await processSeriesRoot(root, summary, progressCallback, scanContext, existingSignatureSet);
+      const rootPromise = root.type === 'series'
+        ? processSeriesRoot(root, summary, progressCallback, scanContext, existingSignatureSet)
+        : processMovieRoot(root, summary, progressCallback, scanContext, existingSignatureSet);
+
+      if (hasRootTimeout) {
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error(`Root scan timed out after ${SCANNER_ROOT_TIMEOUT_MS}ms`)), SCANNER_ROOT_TIMEOUT_MS);
+        });
+        await Promise.race([rootPromise, timeoutPromise]);
       } else {
-        await processMovieRoot(root, summary, progressCallback, scanContext, existingSignatureSet);
+        await rootPromise;
       }
       summary.rootsScanned += 1;
     } catch (error) {
@@ -2227,6 +2247,19 @@ async function scanSelectedRoots(selectedRootIds = [], progressCallback, options
 
   summary.completedAt = new Date().toISOString();
   const normalizedSummary = normalizeSummary(summary) || createSummary([]);
+
+  if (scanContext.dryRun) {
+    logScannerEvent('scan_dry_run_completed', {
+      runId: scanContext.runId,
+      wouldCreate: normalizedSummary.created,
+      wouldUpdate: normalizedSummary.updated,
+      wouldDelete: normalizedSummary.deleted,
+      wouldUnchanged: normalizedSummary.unchanged,
+      errors: normalizedSummary.errors.length,
+    });
+    return normalizedSummary;
+  }
+
   // Invalidate the duplicate group cache: scan added/updated many items
   // and stale cached groups will misreport duplicate counts on subsequent reads.
   try {
@@ -2268,6 +2301,40 @@ async function scanSelectedRoots(selectedRootIds = [], progressCallback, options
   setImmediate(() => {
     runPostScanTasks(normalizedSummary).catch(() => {});
   });
+
+  // Fire completion webhook if configured
+  if (SCANNER_COMPLETION_WEBHOOK_URL) {
+    setImmediate(async () => {
+      try {
+        const https = require('https');
+        const http = require('http');
+        const transport = SCANNER_COMPLETION_WEBHOOK_URL.startsWith('https') ? https : http;
+        const body = JSON.stringify({
+          event: 'scan_completed',
+          runId: scanContext.runId,
+          dryRun: scanContext.dryRun,
+          summary: {
+            rootsRequested: normalizedSummary.rootsRequested,
+            rootsScanned: normalizedSummary.rootsScanned,
+            created: normalizedSummary.created,
+            updated: normalizedSummary.updated,
+            unchanged: normalizedSummary.unchanged,
+            deleted: normalizedSummary.deleted,
+            errors: (normalizedSummary.errors || []).length,
+          },
+          completedAt: normalizedSummary.completedAt,
+        });
+        const req = transport.request(SCANNER_COMPLETION_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+          timeout: 10000,
+        });
+        req.on('error', () => {});
+        req.write(body);
+        req.end();
+      } catch { /* non-critical */ }
+    });
+  }
 
   return normalizedSummary;
 }
@@ -2403,6 +2470,9 @@ async function runPostScanTasks(summary) {
         // skip failed items
       }
     }
+    const newDiscoveries = (summary.rootResults || [])
+      .filter((r) => (r.discovered || 0) > 0)
+      .map((r) => ({ rootLabel: r.label, count: r.discovered }));
     const scanSummary = {
       completedAt: summary.completedAt || new Date().toISOString(),
       created: summary.created || 0,
@@ -2410,6 +2480,7 @@ async function runPostScanTasks(summary) {
       deleted: summary.deleted || 0,
       errors: (summary.errors || []).length,
       missingPostersFixed: fixed,
+      newDiscoveries,
     };
     try {
       const pool2 = await db.getPool();
@@ -2428,7 +2499,62 @@ async function runPostScanTasks(summary) {
   }
 }
 
-async function startScanJob(selectedRootIds = []) {
+async function rescanItem(item) {
+  const logger = require('../utils/logger');
+  if (!item || !item.id) return { ok: false, error: 'Invalid item' };
+  const sourcePath = String(item.sourcePath || item.source || '').trim();
+  if (!sourcePath) return { ok: false, error: 'Item has no sourcePath or source' };
+  const fs = require('fs');
+  if (!fs.existsSync(sourcePath)) return { ok: false, error: `Path not found on disk: ${sourcePath}` };
+
+  const stat = fs.statSync(sourcePath);
+  const isDir = stat.isDirectory();
+  const logPrefix = `[rescan ${item.id}]`;
+
+  try {
+    let processedItem = { ...item, sourcePath, source: sourcePath };
+
+    if (item.type === 'series' && isDir) {
+      const { buildSeriesSeasons } = require('./scanner-series-parser');
+      const root = loadScannerRoots().find((r) => item.sourceRootId === r.id || sourcePath.startsWith(r.scanPath));
+      const listFiles = (dir) => { try { return fs.readdirSync(dir); } catch { return []; } };
+      const listDirectories = (dir) => { try { const entries = fs.readdirSync(dir, { withFileTypes: true }); return entries.filter((e) => e.isDirectory()).map((e) => e.name); } catch { return []; } };
+      const listVideoFiles = (files, dir) => { try { return files.filter((f) => { const ext = path.extname(f).toLowerCase(); return VIDEO_EXTENSIONS.has(ext) && !JUNK_REGEX.test(f); }); } catch { return []; } };
+      const toPublicUrl = (rootRef, filePath) => { try { if (rootRef?.publicBaseUrl) { const rel = path.relative(rootRef.scanPath, filePath).replace(/\\/g, '/'); return rootRef.publicBaseUrl + '/' + encodeURI(rel); } } catch {} return ''; };
+      const preferredLabel = item.seasons?.[0]?.title || 'Season 1';
+      const result = buildSeriesSeasons(
+        root || { id: 'rescan', scanPath: isDir ? sourcePath : path.dirname(sourcePath), publicBaseUrl: '' },
+        path.basename(sourcePath),
+        isDir ? sourcePath : path.dirname(sourcePath),
+        { listFiles, listDirectories, listVideoFiles, toPublicUrl, findSubtitleFile: () => '', preferredSeasonLabel: preferredLabel }
+      );
+      processedItem = {
+        ...item,
+        sourcePath,
+        source: sourcePath,
+        seasons: result.seasons,
+        seasonCount: result.seasons.length,
+        episodeCount: result.seasons.reduce((sum, s) => sum + (s.episodes?.length || 0), 0),
+      };
+    } else if (item.type === 'movie' && !isDir) {
+      processedItem.sourcePath = sourcePath;
+      processedItem.source = sourcePath;
+    }
+
+    const enriched = await enrichItemWithMetadata(processedItem);
+    if (enriched) processedItem = { ...processedItem, ...enriched };
+
+    const { upsertScannedItem } = require('../data/store/scanner');
+    const result = await upsertScannedItem(processedItem);
+    logger.info(`${logPrefix} completed: created=${result.created}, updated=${result.updated}`);
+    return { ok: true, item: result.item, created: result.created, updated: result.updated };
+  } catch (err) {
+    logger.error(`${logPrefix} failed: ${err.message}`);
+    return { ok: false, error: err.message };
+  }
+}
+
+async function startScanJob(selectedRootIds = [], options = {}) {
   if (currentScanJob?.status === 'running') {
     logScannerEvent('scan_start_skipped_already_running', { runId: currentScanJob.id });
     return currentScanJob;
@@ -2445,6 +2571,7 @@ async function startScanJob(selectedRootIds = []) {
   }
 
   const rootIds = Array.isArray(selectedRootIds) ? [...selectedRootIds] : [];
+  const dryRun = !!options.dryRun;
   currentScanJob = {
     id: `${Date.now()}`,
     status: 'running',
@@ -2457,7 +2584,7 @@ async function startScanJob(selectedRootIds = []) {
     summary: createSummary(getEffectiveRoots().filter((root) => !rootIds.length || rootIds.includes(root.id))),
     error: '',
   };
-  logScannerEvent('scan_started', { runId: currentScanJob.id, rootIds: currentScanJob.rootIds });
+  logScannerEvent('scan_started', { runId: currentScanJob.id, rootIds: currentScanJob.rootIds, dryRun });
   void updateRuntimeJob(currentScanJob);
 
   const workerPath = path.resolve(__dirname, 'scanner-worker.js');
@@ -2470,6 +2597,7 @@ async function startScanJob(selectedRootIds = []) {
         ...process.env,
         SCANNER_ROOT_IDS: JSON.stringify(rootIds),
         SCANNER_RUN_ID: currentScanJob.id,
+        SCANNER_DRY_RUN: dryRun ? 'true' : 'false',
       },
     });
   } catch (err) {
@@ -3069,6 +3197,7 @@ module.exports = {
   getCurrentScanJob,
   getScannerHealth,
   listScannerRoots,
+  rescanItem,
   scanSelectedRoots,
   startScanJob,
   stopScanJob,
