@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import ProfileMenu from "./ProfileMenu";
-import LiveUserBadge from "../ui/LiveUserBadge";
 import { useBreakpoint, useTVMode } from "../../hooks";
 
 const navItems = [
@@ -393,8 +392,6 @@ function TopNav() {
                 <span className="top-nav-search-hint">CTRL+K</span>
               )}
             </button>
-
-            {isDesktop && <LiveUserBadge />}
 
             {showLiveChip && (
               <a href="http://10.45.45.254/" target="_blank" rel="noopener noreferrer" className="top-nav-live-chip">
