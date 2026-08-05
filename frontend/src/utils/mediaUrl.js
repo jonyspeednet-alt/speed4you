@@ -7,5 +7,5 @@
 export function toPlayableSrc(videoUrl) {
   if (!videoUrl) return '';
   if (/^https?:\/\//i.test(videoUrl)) return videoUrl;
-  return `/media${videoUrl}`;
+  return videoUrl.startsWith('/') ? `/media${videoUrl}` : `/media/${videoUrl}`;
 }

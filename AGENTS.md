@@ -41,13 +41,16 @@ speed4you/
 | Deploy workflow | `.github/workflows/deploy.yml` |
 
 ## Server Access
-- **Host**: GitHub Secret `DEPLOY_HOST`
-- **User**: GitHub Secret `DEPLOY_USER`
-- **Port**: GitHub Secret `DEPLOY_PORT`
-- **SSH Key**: GitHub Secret `DEPLOY_SSH_KEY`
+- **SSH Alias**: `speed4you-server` (configured in `~/.ssh/config`)
+- **Host**: 203.0.113.2
+- **Port**: 2973
+- **User**: speed4you
+- **SSH Key**: `~/.ssh/id_ed25519_speed4you`
 - **Backend dir**: `/home/speed4you/portal-app/backend`
 - **Frontend dir**: `/var/www/speed4you.net/`
 - **Service**: `isp-portal.service` (systemd)
+
+**Quick connect**: `ssh speed4you-server "command"`
 
 ## Database
 - **Host**: GitHub Secret `DB_HOST`
@@ -78,7 +81,7 @@ speed4you/
 - **Webhook endpoint**: `POST /portal-api/api/webhook/scan` with header `x-webhook-secret` to trigger a scan remotely
 
 ## Webhook
-- **Secret**: `72e92581146914e2e57744787297f460d2f61c75eaa85619c2715cf1735b9576`
+- **Secret**: `d0c80a137b5ee31e7eff7083704c0ac073e26601429062491b3206d23ad80876`
 - **Endpoint**: `POST /portal-api/api/webhook/scan` (header `x-webhook-secret`)
 - 🔄 Webhook secret is auto-rotated by deploy workflow — re-check `.env` if it fails
 
@@ -102,6 +105,14 @@ speed4you/
 - Missing poster auto-fix: metadata enricher noise patterns updated — **DONE**
 - Draft/undefined content blocking: status check added to `/series`, `/movies`, `/player` routes — **DONE**
 - Orphan items (no slug/root_id) set to `draft` on 2026-07-27 — **DONE**
+- Scanner STALE_PATH: episode `sourcePath`/`videoUrl` changes inside seasons not detected — **FIXED** (added `seasonEpisodePathsChanged` comparison in `upsertScannedItem`)
+- Series 33380 (Pritam and Pedro): stale paths manually corrected — **DONE**
+- Selective root scan: `POST /api/webhook/scan?rootId=<id>&dryRun=true` — **DONE**
+- Per-item rescan: `POST /api/admin/scanner/rescan/:itemId` (JWT auth) and `POST /api/webhook/rescan/:itemId` (webhook secret auth) — **DONE**
+- Dry-run mode: `POST /api/webhook/scan?dryRun=true` or `POST /api/admin/scanner/run` with `{ dryRun: true }` — **DONE**
+- Completion webhook: scanner POSTs results to `SCANNER_COMPLETION_WEBHOOK_URL` after scan finishes — **DONE**
+- Root timeout: each root scan capped at `SCANNER_ROOT_TIMEOUT_MS` (default 10 min) — **DONE**
+- New content report: `last_scan_summary` includes `newContent` array with newly discovered item IDs — **DONE**
 
 ## Special Notes
 - Scanner auto-discovers directories under `/var/www/html/` with IDs prefixed `auto-`. These can override manually created roots with the same ID. Use unique non-`auto-` prefix IDs for manual roots.

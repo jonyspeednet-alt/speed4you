@@ -53,6 +53,47 @@
 }
 
 /* ──────────────────────────────────────────────────────────────
+   LEGACY BROWSER FALLBACKS (no clamp()/min())
+   Chrome <79, Edge <79, Safari <13.1 lack clamp(); Chrome <79 and
+   Edge <79 also lack min(). An invalid custom-property value makes
+   every var() consumer break, so give plain fallbacks here.
+   ────────────────────────────────────────────────────────────── */
+
+@supports not (font-size: clamp(1rem, 2vw, 2rem)) {
+    :root {
+        --font-scale-xs: 0.75rem;
+        --font-scale-sm: 0.875rem;
+        --font-scale-base: 1rem;
+        --font-scale-lg: 1.125rem;
+        --font-scale-xl: 1.5rem;
+        --font-scale-2xl: 2rem;
+        --font-scale-3xl: 2.5rem;
+
+        --pad-xs: 0.5rem;
+        --pad-sm: 1rem;
+        --pad-md: 1.5rem;
+        --pad-lg: 2rem;
+        --pad-xl: 2.5rem;
+
+        --gap-xs: 0.5rem;
+        --gap-sm: 0.75rem;
+        --gap-md: 1rem;
+        --gap-lg: 1.5rem;
+        --gap-xl: 2rem;
+    }
+}
+
+@supports not (width: min(100%, 1rem)) {
+    :root {
+        --container-sm: 100%;
+        --container-md: 100%;
+        --container-lg: 100%;
+        --container-xl: 100%;
+        --container-2xl: 100%;
+    }
+}
+
+/* ──────────────────────────────────────────────────────────────
    EXTRA SMALL PHONES (< 480px)
    ────────────────────────────────────────────────────────────── */
 
@@ -837,20 +878,25 @@
 
 .responsive-video {
     width: 100%;
+    min-height: 340px;
     aspect-ratio: 16 / 9;
     object-fit: cover;
 }
 
 .aspect-square {
+    min-height: 320px;
     aspect-ratio: 1 / 1;
 }
 .aspect-video {
+    min-height: 320px;
     aspect-ratio: 16 / 9;
 }
 .aspect-cinema {
+    min-height: 260px;
     aspect-ratio: 21 / 9;
 }
 .aspect-portrait {
+    min-height: 420px;
     aspect-ratio: 3 / 4;
 }
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import searchService from '../../services/searchService';
-import { useBreakpoint } from '../../hooks';
+import { useBreakpoint, useModalBackNav } from '../../hooks';
 
 function GlobalSearchModal() {
   const [isOpen, setIsOpen] = useState(false);
@@ -12,6 +12,7 @@ function GlobalSearchModal() {
   const inputRef = useRef(null);
   const navigate = useNavigate();
   const { isMobile } = useBreakpoint();
+  const closeSearch = useModalBackNav(() => setIsOpen(false), isOpen);
 
   useEffect(() => {
     function handleKeyDown(e) {
@@ -19,7 +20,7 @@ function GlobalSearchModal() {
         e.preventDefault();
         setIsOpen((prev) => !prev);
       } else if (e.key === 'Escape' && isOpen) {
-        setIsOpen(false);
+        closeSearch();
       }
     }
     function handleOpenEvent() {
@@ -31,7 +32,7 @@ function GlobalSearchModal() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('open-global-search', handleOpenEvent);
     };
-  }, [isOpen]);
+  }, [isOpen, closeSearch]);
 
   useEffect(() => {
     if (isOpen) {
@@ -124,7 +125,7 @@ function GlobalSearchModal() {
   if (!isOpen) return null;
 
   return (
-    <div style={styles.overlay} onClick={() => setIsOpen(false)}>
+    <div style={styles.overlay} onClick={closeSearch}>
       <div style={{ ...styles.modal, ...(isMobile ? styles.modalMobile : {}) }} onClick={(e) => e.stopPropagation()}>
         <div style={styles.header}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={styles.icon}>
@@ -140,7 +141,7 @@ function GlobalSearchModal() {
             style={styles.input}
             aria-label="Search movies, series"
           />
-          <button style={styles.escBtn} onClick={() => setIsOpen(false)} aria-label="Close search">ESC</button>
+          <button style={styles.escBtn} onClick={closeSearch} aria-label="Close search">ESC</button>
         </div>
         
         {loading && <div style={styles.message}>Searching...</div>}
@@ -165,7 +166,7 @@ function GlobalSearchModal() {
                   style={styles.resultBtn}
                   onClick={() => {
                     setIsOpen(false);
-                    navigate(item.type === 'series' ? `/series/${item.id}` : `/movies/${item.id}`);
+                    navigate(item.type === 'series' ? `/series/${item.id}` : `/movies/${item.id}`, { replace: true });
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
@@ -183,7 +184,7 @@ function GlobalSearchModal() {
                 style={styles.viewAllBtn}
                 onClick={() => {
                   setIsOpen(false);
-                  navigate(`/browse?q=${encodeURIComponent(query)}`);
+                  navigate(`/browse?q=${encodeURIComponent(query)}`, { replace: true });
                 }}
               >
                 View all results

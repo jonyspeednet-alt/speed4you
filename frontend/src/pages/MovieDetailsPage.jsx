@@ -5,7 +5,6 @@ import { contentService } from '../services/contentService';
 import { useBreakpoint } from '../hooks';
 import { useRecentlyViewed } from '../hooks';
 import ShareButton from '../components/ui/ShareButton';
-import StarRating from '../components/ui/StarRating';
 import WatchlistButton from '../components/ui/WatchlistButton';
 import VideoPlayerModal from '../components/player/VideoPlayerModal';
 import ConfirmDialog from '../components/overlays/ConfirmDialog';
@@ -68,7 +67,7 @@ function MovieDetailsSkeleton() {
 
 // ── Main component ───────────────────────────────────────────────────────────
 export default function MovieDetailsPage() {
-  const { isMobile, isTablet, isDesktop } = useBreakpoint();
+  const { isMobile, isTablet } = useBreakpoint();
   const { slug } = useParams();
   const { addItem: trackView } = useRecentlyViewed();
   const [movie, setMovie] = useState(() => readMovieCache(slug));
@@ -225,7 +224,6 @@ export default function MovieDetailsPage() {
             {(() => {
               const apiBase = (import.meta.env.VITE_API_URL || '/portal-api').replace(/\/$/, '');
               const videoUrl = movie.videoUrl;
-              const downloadUrl = `${apiBase}/api/player/download/movie/${movie.id}`;
               const btnBase = {
                 display: 'inline-flex',
                 alignItems: 'center',

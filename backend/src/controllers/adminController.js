@@ -411,6 +411,18 @@ exports.runReconciliation = async (req, res) => {
   }
 };
 
+exports.rescanItem = async (req, res) => {
+  try {
+    const { rescanItem } = require('../services/scanner');
+    const item = await getItemById(req.params.itemId);
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+    const result = await rescanItem(item);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message || 'Rescan failed.' });
+  }
+};
+
 exports.getDbHealth = async (req, res) => {
   const [sizeResult] = await Promise.all([
     db.query('SELECT pg_size_pretty(pg_database_size(current_database())) AS size_pretty'),

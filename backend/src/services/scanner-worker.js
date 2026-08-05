@@ -23,12 +23,14 @@ function loadRootIds() {
 async function run() {
   try {
     await ensureContentStore();
+    const dryRun = process.env.SCANNER_DRY_RUN === 'true';
     const summary = await scanSelectedRoots(loadRootIds(), (progressSummary) => {
       if (process.send) {
         process.send({ type: 'progress', summary: progressSummary });
       }
     }, {
       runId: process.env.SCANNER_RUN_ID || '',
+      dryRun,
     });
 
     if (process.send) {

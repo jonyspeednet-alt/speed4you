@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { useModalBackNav } from '../../hooks';
 
 const SURFACE = 'var(--surface, #111318)';
 const SURFACE2 = 'var(--surface-2, #181b22)';
@@ -10,6 +11,7 @@ const ACCENT = 'var(--accent-primary, #6366f1)';
 function ConfirmDialog({ isOpen, onClose, onConfirm, title, message, confirmText = 'Confirm', cancelText = 'Cancel' }) {
   const cancelRef = useRef(null);
   const dialogRef = useRef(null);
+  const closeDialog = useModalBackNav(onClose, isOpen);
 
   useEffect(() => {
     if (isOpen && cancelRef.current) {
@@ -20,7 +22,7 @@ function ConfirmDialog({ isOpen, onClose, onConfirm, title, message, confirmText
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Escape') {
       e.stopPropagation();
-      onClose();
+      closeDialog();
     }
     if (e.key === 'Tab' && dialogRef.current) {
       const focusable = dialogRef.current.querySelectorAll('button');
@@ -35,16 +37,16 @@ function ConfirmDialog({ isOpen, onClose, onConfirm, title, message, confirmText
         first.focus();
       }
     }
-  }, [onClose]);
+  }, [closeDialog]);
 
   if (!isOpen) return null;
   return (
-    <div style={styles.overlay} onClick={onClose} onKeyDown={handleKeyDown}>
+    <div style={styles.overlay} onClick={closeDialog} onKeyDown={handleKeyDown}>
       <div style={styles.modal} onClick={e => e.stopPropagation()} ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
         <h3 style={styles.title} id="confirm-dialog-title">{title}</h3>
         <p style={styles.message}>{message}</p>
         <div style={styles.actions}>
-          <button ref={cancelRef} onClick={onClose} style={styles.cancelBtn}>{cancelText}</button>
+          <button ref={cancelRef} onClick={closeDialog} style={styles.cancelBtn}>{cancelText}</button>
           <button onClick={onConfirm} style={styles.confirmBtn}>{confirmText}</button>
         </div>
       </div>

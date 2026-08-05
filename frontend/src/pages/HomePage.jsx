@@ -369,7 +369,7 @@ function HomePage() {
 
       {(isLoggedIn && (cwLoading || continueWatching.length > 0)) ? (
         <div style={{ padding: '0 max(48px, calc((100vw - 1720px) / 2))', marginTop: hasFeaturedHero ? '-20px' : '0' }}>
-          <ContinueWatchingRail items={[...continueWatching].sort((a, b) => (b.updatedAt || b.progress || 0) - (a.updatedAt || a.progress || 0))} isLoading={cwLoading} />
+          <ContinueWatchingRail items={[...continueWatching].sort((a, b) => (new Date(b.updatedAt).getTime() || 0) - (new Date(a.updatedAt).getTime() || 0))} isLoading={cwLoading} />
         </div>
       ) : null}
 

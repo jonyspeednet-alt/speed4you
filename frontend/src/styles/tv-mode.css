@@ -318,6 +318,7 @@ html.tv-mode,
 
 .tv-mode .media-card {
     min-width: 320px;
+    min-height: 180px;
     aspect-ratio: 16 / 9;
     border-radius: 20px;
     overflow: hidden;

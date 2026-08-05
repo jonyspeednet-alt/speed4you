@@ -129,8 +129,7 @@ const globalApiLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many requests. Please slow down.' },
   skip: (req) =>
-    !req.path.startsWith('/api/')
-    || req.path.startsWith('/api/tv/asset')
+    req.path === '/tv/asset'
     || (!isProduction && isLocalRequest(req)),
 });
 
@@ -160,7 +159,6 @@ app.use(cors({
   origin: buildCorsOriginChecker(),
   methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 }));
-app.use(globalApiLimiter);
 app.use(morgan(isProduction ? 'combined' : 'dev'));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
@@ -207,6 +205,9 @@ app.get('/health/scanner', async (req, res) => {
 
 // Group API routes to allow mounting at multiple points
 const apiRouter = express.Router();
+// Coarse global cap for ALL api requests under any mount prefix (/api and
+// /portal-api/api) — the /tv/asset endpoint stays exempt for high throughput.
+apiRouter.use(globalApiLimiter);
 apiRouter.use('/auth', require('./routes/auth'));
 apiRouter.use('/content', publicContentLimiter, publicPerIpLimiter, require('./routes/content'));
 apiRouter.use('/movies', publicContentLimiter, publicPerIpLimiter, require('./routes/movies'));

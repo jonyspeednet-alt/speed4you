@@ -1,0 +1,47 @@
+/*
+ * Legacy-browser layout fallbacks.
+ *
+ * Only applied to engines that cannot use `gap` in flex containers (Chrome <84,
+ * Safari <14.1, Firefox <63) — the `no-flexgap` class is added at runtime by
+ * src/polyfills.js. Spacing is re-created with margins on the key global
+ * navigation/layout components so the site stays usable on old smart-TV
+ * browsers instead of having elements sit flush together.
+ */
+
+.no-flexgap .top-nav-main > * + * {
+  margin-left: 14px;
+}
+.no-flexgap .top-nav-logo > * + * {
+  margin-left: 14px;
+}
+.no-flexgap .top-nav-links > * + * {
+  margin-left: 6px;
+}
+.no-flexgap .top-nav-actions > * + * {
+  margin-left: 8px;
+}
+.no-flexgap .top-nav-right > * + * {
+  margin-left: 10px;
+}
+.no-flexgap .top-nav-search > * + * {
+  margin-left: 10px;
+}
+.no-flexgap .top-nav-more-panel > * + * {
+  margin-top: 6px;
+}
+.no-flexgap .top-nav-live-chip > * + * {
+  margin-left: 8px;
+}
+
+.no-flexgap .player-controls-row > * + * {
+  margin-left: 8px;
+}
+.no-flexgap .player-center-btns > * + * {
+  margin-left: 12px;
+}
+
+@media (min-width: 768px) {
+  .no-flexgap .top-nav-main > * + * {
+    margin-left: 16px;
+  }
+}

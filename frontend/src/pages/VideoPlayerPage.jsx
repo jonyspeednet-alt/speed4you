@@ -146,9 +146,13 @@ export default function VideoPlayerPage() {
   useEffect(() => { startHideTimer(); return () => clearTimeout(controlsTimer.current); }, [startHideTimer]);
 
   useEffect(() => {
-    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    const handler = () => setIsFullscreen(!!(document.fullscreenElement || document.webkitFullscreenElement));
     document.addEventListener('fullscreenchange', handler);
-    return () => document.removeEventListener('fullscreenchange', handler);
+    document.addEventListener('webkitfullscreenchange', handler);
+    return () => {
+      document.removeEventListener('fullscreenchange', handler);
+      document.removeEventListener('webkitfullscreenchange', handler);
+    };
   }, []);
 
   useEffect(() => {
@@ -175,6 +179,11 @@ export default function VideoPlayerPage() {
     centerTimer.current = setTimeout(() => setShowCenterBtns(false), 1200);
   }, []);
 
+  const seek = useCallback((dir) => {
+    const v = videoRef.current; if (!v) return;
+    v.currentTime = Math.max(0, Math.min(v.duration || 0, v.currentTime + dir * 10));
+  }, []);
+
   const handleTap = useCallback((e) => {
     const now = Date.now();
     const x = e.changedTouches?.[0]?.clientX ?? e.clientX;
@@ -198,11 +207,6 @@ export default function VideoPlayerPage() {
     v.paused ? v.play().then(() => setPlaying(true)).catch(() => {}) : (v.pause(), setPlaying(false));
     startHideTimer();
   }, [startHideTimer]);
-
-  const seek = useCallback((dir) => {
-    const v = videoRef.current; if (!v) return;
-    v.currentTime = Math.max(0, Math.min(v.duration || 0, v.currentTime + dir * 10));
-  }, []);
 
   const changeRate = useCallback((r) => {
     if (videoRef.current) videoRef.current.playbackRate = r;
@@ -233,8 +237,15 @@ export default function VideoPlayerPage() {
     const el = document.querySelector('.player-wrap');
     if (!el) return;
     try {
-      if (document.fullscreenElement) await document.exitFullscreen();
-      else await el.requestFullscreen();
+      const isFs = document.fullscreenElement || document.webkitFullscreenElement;
+      if (isFs) {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      } else if (el.requestFullscreen) {
+        await el.requestFullscreen();
+      } else if (el.webkitRequestFullscreen) {
+        el.webkitRequestFullscreen();
+      }
     } catch {}
   }, []);
 
@@ -258,7 +269,7 @@ export default function VideoPlayerPage() {
         case 'ArrowRight': e.preventDefault(); seek(1); break;
         case 'ArrowUp': e.preventDefault(); changeVolume(Math.min(1, volume + 0.1)); break;
         case 'ArrowDown': e.preventDefault(); changeVolume(Math.max(0, volume - 0.1)); break;
-        case 'Escape': if (document.fullscreenElement) document.exitFullscreen(); break;
+        case 'Escape': if (document.fullscreenElement || document.webkitFullscreenElement) { if (document.exitFullscreen) document.exitFullscreen(); else if (document.webkitExitFullscreen) document.webkitExitFullscreen(); } break;
         case 'p': e.preventDefault(); togglePiP(); break;
       }
     };

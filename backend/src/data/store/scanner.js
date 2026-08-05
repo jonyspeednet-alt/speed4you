@@ -588,6 +588,22 @@ async function upsertScannedItem(payload) {
     publishedAt: preservedPublishedAt,
   });
 
+  // Compare episode-level paths across seasons to detect file moves/renames
+  function seasonEpisodePathsChanged(newSeasons, oldSeasons) {
+    if (!Array.isArray(newSeasons) || !Array.isArray(oldSeasons)) return true;
+    if (newSeasons.length !== oldSeasons.length) return true;
+    for (let s = 0; s < newSeasons.length; s++) {
+      const newEps = newSeasons[s]?.episodes || [];
+      const oldEps = oldSeasons[s]?.episodes || [];
+      if (newEps.length !== oldEps.length) return true;
+      for (let e = 0; e < newEps.length; e++) {
+        if ((newEps[e]?.sourcePath || '') !== (oldEps[e]?.sourcePath || '')) return true;
+        if ((newEps[e]?.videoUrl || '')   !== (oldEps[e]?.videoUrl || ''))   return true;
+      }
+    }
+    return false;
+  }
+
   // Skip DB write entirely if nothing meaningful changed
   const scanFieldsChanged = item.title        !== current.title
     || item.poster       !== (current.poster || '')
@@ -598,7 +614,8 @@ async function upsertScannedItem(payload) {
     || item.seasonCount  !== (current.seasonCount ?? 0)
     || item.episodeCount !== (current.episodeCount ?? 0)
     || item.status       !== current.status
-    || (shouldUpdateMetadata && item.metadataStatus !== current.metadataStatus);
+    || (shouldUpdateMetadata && item.metadataStatus !== current.metadataStatus)
+    || seasonEpisodePathsChanged(item.seasons, current.seasons);
 
   if (!scanFieldsChanged) {
     return { item: normalizeItem(current), created: false, updated: false };

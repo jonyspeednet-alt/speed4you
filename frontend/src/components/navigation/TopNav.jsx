@@ -512,7 +512,7 @@ function TopNav() {
               <span>Account</span>
               {user ? (
                 <Link
-                  to="/profile"
+                  to="/watchlist"
                   className="top-nav-mobile-menu-item"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
