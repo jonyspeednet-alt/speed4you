@@ -1,6 +1,32 @@
 import { useState } from 'react';
 import { useToast } from './useToast';
 
+async function copyToClipboard(text) {
+  try {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (error) {
+    // fall through to legacy copy fallback
+  }
+  try {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    textarea.style.top = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    const copied = document.execCommand('copy');
+    textarea.remove();
+    return copied;
+  } catch (error) {
+    return false;
+  }
+}
+
 function ShareButton({ title, text, url, compact = false }) {
   const [loading, setLoading] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -26,8 +52,12 @@ function ShareButton({ title, text, url, compact = false }) {
         // Successful share
       } else {
         // Fallback to clipboard
-        await navigator.clipboard.writeText(shareUrl);
-        show({ message: 'Link copied to clipboard!', type: 'success', icon: '✓' });
+        const copied = await copyToClipboard(shareUrl);
+        if (copied) {
+          show({ message: 'Link copied to clipboard!', type: 'success', icon: '✓' });
+        } else {
+          show({ message: `Copy this link: ${shareUrl}`, type: 'info', duration: 6000 });
+        }
       }
     } catch (error) {
       if (error.name !== 'AbortError') {

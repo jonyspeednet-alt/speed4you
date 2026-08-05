@@ -102,6 +102,7 @@
 
 .posterWrapper {
   position: relative;
+  min-height: 200px;
   aspect-ratio: 16/9;
   background: var(--bg-tertiary);
 }
@@ -129,7 +130,7 @@
 
 .overlay {
   position: absolute;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0; inset: 0;
   background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 50%);
   display: flex;
   align-items: center;

@@ -127,6 +127,18 @@ function BrowsePage({ type }) {
     setSelectedYear("All");
   }, [type]);
 
+  // Sync filter state when the URL params change (e.g. back/forward or a
+  // same-route navigation like `/browse?q=...` from the search modal).
+  useEffect(() => {
+    setSelectedGenre(normalizeQuery(searchParams.get("genre")));
+    setSelectedLanguage(normalizeQuery(searchParams.get("language")));
+    setSortBy(normalizeQuery(searchParams.get("sort"), "latest"));
+    setSelectedCollection(normalizeQuery(searchParams.get("collection")));
+    setSelectedType(normalizeQuery(searchParams.get("type"), type || "All"));
+    setSelectedYear(normalizeQuery(searchParams.get("year")));
+    setSearchText(searchParams.get("q") || "");
+  }, [searchParams, type]);
+
   useEffect(() => {
     const nextParams = {};
     if (selectedGenre !== "All") nextParams.genre = selectedGenre;
@@ -263,6 +275,10 @@ function BrowsePage({ type }) {
   useEffect(() => {
     const el = loadMoreRef.current;
     if (!el || !hasNextPage || isFetchingNextPage) return undefined;
+    if (typeof IntersectionObserver !== "function") {
+      fetchNextPage();
+      return undefined;
+    }
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) fetchNextPage();

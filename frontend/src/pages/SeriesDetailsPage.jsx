@@ -5,7 +5,6 @@ import { contentService } from '../services/contentService';
 import { useBreakpoint } from '../hooks';
 import { useRecentlyViewed } from '../hooks';
 import ShareButton from '../components/ui/ShareButton';
-import StarRating from '../components/ui/StarRating';
 import WatchlistButton from '../components/ui/WatchlistButton';
 import VideoPlayerModal from '../components/player/VideoPlayerModal';
 import ConfirmDialog from '../components/overlays/ConfirmDialog';
@@ -181,7 +180,7 @@ function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMo
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function SeriesDetailsPage() {
-  const { isMobile, isTablet, isDesktop } = useBreakpoint();
+  const { isMobile, isTablet } = useBreakpoint();
   const { slug } = useParams();
   const { addItem: trackView } = useRecentlyViewed();
   const [series, setSeries] = useState(() => readCache(slug));

@@ -65,6 +65,7 @@ function AddContentPage() {
   }, []);
 
   useEffect(() => {
+    if (typeof IntersectionObserver !== 'function') return undefined;
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) setActiveSection(entry.target.id);

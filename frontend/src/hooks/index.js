@@ -165,6 +165,7 @@ export function useRecentlyViewed() {
 }
 
 export { useTVMode } from "./useTVMode";
+export { useModalBackNav } from "./useModalBackNav";
 
 export {
   useResponsive,

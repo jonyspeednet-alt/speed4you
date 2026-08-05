@@ -2,6 +2,8 @@ const TMDB_API_BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p';
 const NOISE_PATTERNS = [
   /\b(480p|720p|1080p|2160p|4k)\b/gi,
+  /\bhdwebmovies?\b/gi,
+  /\bh\s*\.?\s*264\b/gi,
   /\b(web[- ]?dl|webrip|bluray|brrip|hdrip|dvdrip|x264|x265|h\.?264|h\.?265|hevc)\b/gi,
   /\b(dual audio|multi audio|english|hindi|bangla|bengali|japanese|korean|french|spanish|dubbed|subbed|esub|msub|engsub|subs?|eng|hin)\b/gi,
   /\b(complete|full|uncut|uncensored|extended|directors?\.?\s*cut)\b/gi,
@@ -136,7 +138,7 @@ function inferOriginalLanguage(item) {
 
 function scoreCandidate(candidate, item) {
   const searchTitle = cleanSearchTitle(item.title).toLowerCase();
-  const candidateTitle = String(candidate.title || candidate.name || '').toLowerCase();
+  const candidateTitle = cleanSearchTitle(String(candidate.title || candidate.name || '')).toLowerCase();
   const candidateOriginalTitle = String(candidate.original_title || candidate.original_name || '').toLowerCase();
   const targetYear = Number(item.year) || null;
   const candidateYear = Number((candidate.release_date || candidate.first_air_date || '').slice(0, 4)) || null;
@@ -522,7 +524,10 @@ async function enrichItemWithMetadata(item) {
       if (pathParts.length >= 2) {
         const parentFolder = pathParts[pathParts.length - 2];
         const cleanParent = cleanSearchTitle(parentFolder);
-        if (cleanParent && cleanParent !== parsedTitle) {
+        // Skip if parent folder is a year-only name or a category/label name
+        const isYearFolder = /^\d{4}$/.test(parentFolder.trim());
+        const isCategoryFolder = /\b(movies|series|dubbed|hindi|bangla|english|tamil|telugu|malayalam|korean|japanese|animation|3d)\b/i.test(parentFolder);
+        if (cleanParent && cleanParent !== parsedTitle && !isYearFolder && !isCategoryFolder) {
           try {
             const parentResp = await tmdbFetchJson(`/search/${mediaType}`, { query: cleanParent });
             results = Array.isArray(parentResp.results) ? parentResp.results : [];
@@ -567,25 +572,26 @@ async function enrichItemWithMetadata(item) {
     };
     const resolvedLanguage = languageMap[langCode] || enrichedItem.language || 'English';
 
+    const applyTmdb = confidence >= 40;
     return {
       ...enrichedItem,
-      description: enrichedItem.description || details.overview,
-      poster: isGoodUrl(enrichedItem.poster) ? enrichedItem.poster : details.poster,
-      backdrop: isGoodUrl(enrichedItem.backdrop) ? enrichedItem.backdrop : (details.backdrop || details.poster),
-      genre: enrichedItem.genre || details.genre,
-      genres: Array.isArray(enrichedItem.genres) && enrichedItem.genres.length ? enrichedItem.genres : details.genres,
+      description: enrichedItem.description || (applyTmdb ? details.overview : ''),
+      poster: isGoodUrl(enrichedItem.poster) ? enrichedItem.poster : (applyTmdb ? details.poster : ''),
+      backdrop: isGoodUrl(enrichedItem.backdrop) ? enrichedItem.backdrop : (applyTmdb ? (details.backdrop || details.poster) : ''),
+      genre: applyTmdb ? (enrichedItem.genre || details.genre) : enrichedItem.genre,
+      genres: applyTmdb ? (Array.isArray(enrichedItem.genres) && enrichedItem.genres.length ? enrichedItem.genres : details.genres) : enrichedItem.genres,
       rating: enrichedItem.rating || details.rating,
       runtime: enrichedItem.runtime || details.runtime,
       seasons: enrichedItem.type === 'series' && seasons.length ? mergeEpisodeMetadata(enrichedItem.seasons || [], seasons) : enrichedItem.seasons,
-      tmdbId: details.tmdbId,
-      imdbId: details.imdbId,
+      tmdbId: applyTmdb ? details.tmdbId : null,
+      imdbId: applyTmdb ? details.imdbId : null,
       title: confidence >= 60 ? details.title : enrichedItem.title,
-      originalTitle: details.originalTitle,
-      originalLanguage: details.originalLanguage,
+      originalTitle: applyTmdb ? details.originalTitle : '',
+      originalLanguage: applyTmdb ? details.originalLanguage : '',
       language: resolvedLanguage,
       // If TMDb match confidence is 70% or greater, auto-publish directly to website
       status: confidence >= 70 ? 'published' : 'draft',
-      metadataStatus: confidence >= 50 ? 'matched' : 'needs_review',
+      metadataStatus: confidence >= 50 ? 'matched' : (applyTmdb ? 'needs_review' : 'not_found'),
       metadataProvider: 'tmdb',
       metadataConfidence: confidence,
       metadataUpdatedAt: new Date().toISOString(),

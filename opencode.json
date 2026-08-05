@@ -35,47 +35,47 @@
     },
     "ssh": {
       "description": "SSH into the production server",
-      "template": "Connect via SSH: ssh -p $DEPLOY_PORT $DEPLOY_USER@$DEPLOY_HOST (credentials in GitHub Secrets / your local SSH config)"
+      "template": "Connect via SSH: ssh speed4you-server (alias configured in ~/.ssh/config)"
     },
     "db-query": {
       "description": "Run a SQL query on the production database",
-      "template": "SSH into server and run: PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -c \"$ARGUMENTS\""
+      "template": "SSH into server and run: ssh speed4you-server \"PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -c '$ARGUMENTS'\""
     },
     "db-psql": {
       "description": "Open interactive psql shell on the production database",
-      "template": "SSH into server and run: PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME"
+      "template": "SSH into server and run: ssh speed4you-server \"PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME\""
     },
     "logs": {
       "description": "View backend server logs",
-      "template": "SSH into server and run: journalctl -u isp-portal.service --no-pager -n 100"
+      "template": "SSH into server and run: ssh speed4you-server \"journalctl -u isp-portal.service --no-pager -n 100\""
     },
     "restart": {
       "description": "Restart the backend service on the server",
-      "template": "SSH into server and run: sudo systemctl restart isp-portal.service && sleep 3 && curl -fs http://127.0.0.1:4100/health"
+      "template": "SSH into server and run: ssh speed4you-server \"sudo systemctl restart isp-portal.service && sleep 3 && curl -fs http://127.0.0.1:4100/health\""
     },
     "health": {
       "description": "Check backend health on the server",
-      "template": "SSH into server and run: curl -fs http://127.0.0.1:4100/health"
+      "template": "SSH into server and run: ssh speed4you-server \"curl -fs http://127.0.0.1:4100/health\""
     },
     "server-ls": {
       "description": "List files/directories on the remote server at a given path",
-      "template": "SSH into server and run: ls -la $ARGUMENTS"
+      "template": "ssh speed4you-server \"ls -la $ARGUMENTS\""
     },
     "server-cat": {
       "description": "View the contents of a file on the remote server",
-      "template": "SSH into server and run: cat $ARGUMENTS"
+      "template": "ssh speed4you-server \"cat $ARGUMENTS\""
     },
     "server-disk": {
       "description": "Check disk usage on the remote server",
-      "template": "SSH into server and run: df -h && echo '---' && du -sh /home/speed4you/* /var/www/* 2>/dev/null"
+      "template": "ssh speed4you-server \"df -h && echo '---' && du -sh /home/speed4you/* /var/www/* 2>/dev/null\""
     },
     "server-find": {
       "description": "Find files on the remote server matching a pattern",
-      "template": "SSH into server and run: find $ARGUMENTS"
+      "template": "ssh speed4you-server \"find $ARGUMENTS\""
     },
     "server-download": {
       "description": "Download a file from the remote server to local temp directory",
-      "template": "SSH into server and run: cat $ARGUMENTS (then pipe output to local file)"
+      "template": "scp speed4you-server:$ARGUMENTS C:\\Users\\SN - IT\\AppData\\Local\\Temp\\opencode\\"
     },
     "search-content": {
       "description": "Search for content on the site by title keyword",

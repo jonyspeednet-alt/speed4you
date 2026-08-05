@@ -20,8 +20,9 @@ function ContentRail({
   const [canScrollRight, setCanScrollRight] = useState(true);
   const [isFocused, setIsFocused] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const dragStartRef = useRef({ x: 0, scrollLeft: 0 });
+  const dragStartRef = useRef({ x: 0, scrollLeft: 0, moved: false });
   const isDraggingRef = useRef(false);
+  const suppressClickRef = useRef(false);
 
   const accent = subtitle === "Local language highlights"
     ? "var(--accent-violet)"
@@ -138,7 +139,7 @@ function ContentRail({
     if (!element) return;
     isDraggingRef.current = true;
     setIsDragging(true);
-    dragStartRef.current = { x: event.clientX, scrollLeft: element.scrollLeft };
+    dragStartRef.current = { x: event.clientX, scrollLeft: element.scrollLeft, moved: false };
     element.style.cursor = 'grabbing';
     element.style.userSelect = 'none';
   }, []);
@@ -149,6 +150,9 @@ function ContentRail({
     const element = scrollRef.current;
     if (!element) return;
     const { x, scrollLeft } = dragStartRef.current;
+    if (Math.abs(event.clientX - x) > 5) {
+      dragStartRef.current.moved = true;
+    }
     const walk = (event.clientX - x) * 1.2;
     element.scrollLeft = scrollLeft - walk;
   }, []);
@@ -162,8 +166,18 @@ function ContentRail({
       element.style.cursor = '';
       element.style.userSelect = '';
     }
+    if (dragStartRef.current.moved) {
+      suppressClickRef.current = true;
+    }
     updateScrollIndicators();
   }, [updateScrollIndicators]);
+
+  const handleRailClickCapture = useCallback((event) => {
+    if (!suppressClickRef.current) return;
+    suppressClickRef.current = false;
+    event.preventDefault();
+    event.stopPropagation();
+  }, []);
 
   useEffect(() => {
     const element = scrollRef.current;
@@ -329,6 +343,7 @@ function ContentRail({
         onFocus={() => { setIsFocused(true); scheduleScrollIndicatorUpdate(); }}
         onBlur={() => setIsFocused(false)}
         onMouseEnter={scheduleScrollIndicatorUpdate}
+        onClickCapture={handleRailClickCapture}
       >
         {items.map((item, index) => (
           <ContentCard

@@ -5,6 +5,7 @@ const {
   getItemById,
   getItemsByIds,
   getWatchlistEntries,
+  getWatchProgressEntries,
   removeWatchlistEntry,
   boostTrendingScore,
 } = require('../data/store');
@@ -25,11 +26,22 @@ router.get('/', requireStateUser, async (req, res, next) => {
     }
 
     const contentIds = entries.map((e) => e.contentId).filter(Boolean);
-    const itemsMap = await getItemsByIds(contentIds);
+    const [itemsMap, progressEntries] = await Promise.all([
+      getItemsByIds(contentIds),
+      getWatchProgressEntries(userId, { incompleteOnly: true }).catch(() => []),
+    ]);
+
+    const progressByContent = new Map(
+      progressEntries.map((p) => {
+        const pct = p.duration > 0 ? Math.min(100, Math.round((p.position / p.duration) * 100)) : 0;
+        return [String(p.contentId), pct];
+      }),
+    );
 
     const userList = entries.map((entry) => {
       const item = itemsMap.get(Number(entry.contentId));
-      return item ? { ...entry, ...item } : entry;
+      const contentId = Number(entry.contentId);
+      return item ? { ...item, id: contentId, entryId: entry.id, addedAt: entry.addedAt, contentType: entry.contentType, progress: progressByContent.get(String(contentId)) || 0 } : { ...entry, entryId: entry.id, progress: 0 };
     });
 
     res.json({ items: userList, total: userList.length });
@@ -95,10 +107,10 @@ router.post('/', requireStateUser, async (req, res, next) => {
   }
 });
 
-router.delete('/:id', requireStateUser, async (req, res, next) => {
+router.delete('/:contentId', requireStateUser, async (req, res, next) => {
   try {
     const userId = getUserId(req);
-    const removed = await removeWatchlistEntry(userId, req.params.id);
+    const removed = await removeWatchlistEntry(userId, req.params.contentId);
     if (!removed) {
       throw new AppError('Item not found', 404, 'NOT_FOUND');
     }

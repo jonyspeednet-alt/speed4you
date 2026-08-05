@@ -2,6 +2,7 @@ import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import autoprefixer from 'autoprefixer'
 
 export default defineConfig(({ mode }) => {
   const envDir = dirname(fileURLToPath(import.meta.url))
@@ -17,8 +18,9 @@ export default defineConfig(({ mode }) => {
       }),
     ],
     build: {
-      // Target modern browsers for smaller bundles
-      target: ['es2020', 'chrome80', 'firefox78', 'safari14'],
+      // Target a wider browser floor so old smart-TV/webview engines can parse the bundle.
+      // esbuild down-levels optional chaining / nullish coalescing / class fields for these.
+      target: ['es2017', 'chrome60', 'firefox55', 'safari11.1'],
       // Reduce chunk size warning limit for better performance
       chunkSizeWarningLimit: 400,
       // Enable CSS code splitting
@@ -81,6 +83,13 @@ export default defineConfig(({ mode }) => {
         'react-router-dom',
         '@tanstack/react-query',
       ],
+    },
+    css: {
+      postcss: {
+        plugins: [
+          autoprefixer(),
+        ],
+      },
     },
     server: {
       host: '127.0.0.1',

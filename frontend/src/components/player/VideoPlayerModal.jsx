@@ -29,6 +29,29 @@ export default function VideoPlayerModal({ src, title, onClose, onNext }) {
 
   useEffect(() => { startHideTimer(); return () => clearTimeout(controlsTimer.current); }, [startHideTimer]);
 
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+
+  const closeModal = useCallback(() => {
+    if (window.history.state && window.history.state.__portalPlayerModal) {
+      window.history.back();
+    } else {
+      onCloseRef.current?.();
+    }
+  }, []);
+
+  useEffect(() => {
+    const handlePop = () => onCloseRef.current?.();
+    window.addEventListener('popstate', handlePop);
+    window.history.pushState({ __portalPlayerModal: true }, '');
+    return () => {
+      window.removeEventListener('popstate', handlePop);
+      if (window.history.state && window.history.state.__portalPlayerModal) {
+        window.history.back();
+      }
+    };
+  }, []);
+
   useEffect(() => {
     document.documentElement.style.overflow = 'hidden';
     return () => { document.documentElement.style.overflow = ''; };
@@ -67,8 +90,15 @@ export default function VideoPlayerModal({ src, title, onClose, onNext }) {
     const el = document.querySelector('.modal-player-wrap');
     if (!el) return;
     try {
-      if (document.fullscreenElement) await document.exitFullscreen();
-      else await el.requestFullscreen();
+      const isFs = document.fullscreenElement || document.webkitFullscreenElement;
+      if (isFs) {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      } else if (el.requestFullscreen) {
+        await el.requestFullscreen();
+      } else if (el.webkitRequestFullscreen) {
+        el.webkitRequestFullscreen();
+      }
     } catch {}
   }, []);
 
@@ -112,13 +142,13 @@ export default function VideoPlayerModal({ src, title, onClose, onNext }) {
         case 'm': e.preventDefault(); toggleMute(); break;
         case 'ArrowLeft': e.preventDefault(); seek(-1); break;
         case 'ArrowRight': e.preventDefault(); seek(1); break;
-        case 'Escape': e.preventDefault(); onClose?.(); break;
+        case 'Escape': e.preventDefault(); closeModal(); break;
         case 'p': e.preventDefault(); togglePiP(); break;
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [togglePlay, toggleFS, toggleMute, togglePiP, seek, onClose]);
+  }, [togglePlay, toggleFS, toggleMute, togglePiP, seek, closeModal]);
 
   useEffect(() => {
     const v = videoRef.current; if (!v) return;
@@ -160,7 +190,7 @@ export default function VideoPlayerModal({ src, title, onClose, onNext }) {
   return (
     <div className="player-wrap modal-player-wrap" style={{ cursor: showControls ? 'default' : 'none' }}>
       <div className={`player-top-bar ${showControls ? 'visible' : 'hidden'}`}>
-        <button className="player-back-btn" onClick={onClose}>
+        <button className="player-back-btn" onClick={closeModal}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <polyline points="15 18 9 12 15 6"/>
           </svg>
@@ -168,7 +198,7 @@ export default function VideoPlayerModal({ src, title, onClose, onNext }) {
         </button>
         <span className="player-title">{title}</span>
         <div className="player-spacer" />
-        <button className="player-ctrl-btn" onClick={onClose} title="Close">
+        <button className="player-ctrl-btn" onClick={closeModal} title="Close">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>

@@ -90,27 +90,33 @@ function ContinueWatchingRail({ items, isLoading }) {
         </div>
       </div>
       <div className={styles.rail} ref={scrollRef}>
-        {items.map((item) => (
-          <Link key={item.id} to={`/watch/${item.id}`} className={styles.card} data-cw-card>
-            <div className={styles.posterWrapper}>
-              <img src={item.poster?.includes('image.tmdb.org/t/p/') ? item.poster.replace(/\/t\/p\/[^/]+\//, '/t/p/w342/') : item.poster} alt={item.title} className={styles.poster} loading="lazy" />
-              <div className={styles.progressContainer}>
-                <div style={{ width: `${item.progress}%` }} className={styles.progressBar} />
-              </div>
-              <div className={styles.overlay}>
-                <div className={styles.playIcon}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
+        {items.map((item) => {
+          const isSeries = item.contentType === 'series' || item.type === 'series';
+          const pct = item.duration > 0
+            ? Math.min(100, Math.max(0, (item.position / item.duration) * 100))
+            : (Number(item.progress) || 0);
+          return (
+            <Link key={item.id} to={`/play/${isSeries ? 'series' : 'movie'}/${item.id}`} className={styles.card} data-cw-card>
+              <div className={styles.posterWrapper}>
+                <img src={item.poster?.includes('image.tmdb.org/t/p/') ? item.poster.replace(/\/t\/p\/[^/]+\//, '/t/p/w342/') : item.poster} alt={item.title} className={styles.poster} loading="lazy" />
+                <div className={styles.progressContainer}>
+                  <div style={{ width: `${pct}%` }} className={styles.progressBar} />
+                </div>
+                <div className={styles.overlay}>
+                  <div className={styles.playIcon}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className={styles.info}>
-              <h3 className={styles.cardTitle}>{item.title}</h3>
-              <span className={styles.progressText}>{Math.round(item.progress)}% watched</span>
-            </div>
-          </Link>
-        ))}
+              <div className={styles.info}>
+                <h3 className={styles.cardTitle}>{item.title}</h3>
+                <span className={styles.progressText}>{Math.round(pct)}% watched</span>
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );
