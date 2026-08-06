@@ -45,8 +45,8 @@ function LoginPage() {
         }}
       >
         <div style={styles.logo}>
-          <span style={styles.logoIcon}>ISP</span>
-          <span style={styles.logoText}>ISP Portal</span>
+          <span style={styles.logoIcon}>S4Y</span>
+          <span style={styles.logoText}>Speed4You</span>
         </div>
 
         <h1 style={styles.title}>Admin Login</h1>
