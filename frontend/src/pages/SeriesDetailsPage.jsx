@@ -88,9 +88,9 @@ function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMo
     border: '1px solid rgba(255, 255, 255, 0.1)',
     display: 'grid',
     placeItems: 'center',
-    color: downloadHovered ? 'var(--accent-cyan)' : 'rgba(255, 255, 255, 0.7)',
+    color: downloadHovered ? 'var(--accent-secondary)' : 'rgba(255, 255, 255, 0.7)',
     background: downloadHovered ? 'rgba(0, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.04)',
-    borderColor: downloadHovered ? 'var(--accent-cyan)' : 'rgba(255, 255, 255, 0.1)',
+    borderColor: downloadHovered ? 'var(--accent-secondary)' : 'rgba(255, 255, 255, 0.1)',
     boxShadow: downloadHovered ? '0 0 12px rgba(0, 255, 255, 0.25)' : 'none',
     transition: 'all 180ms ease',
     cursor: 'pointer',
@@ -134,7 +134,7 @@ function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMo
               style={{
                 ...downloadBtnStyle,
                 background: playHovered ? 'rgba(0, 255, 255, 0.12)' : 'rgba(0, 200, 255, 0.08)',
-                borderColor: playHovered ? 'var(--accent-cyan)' : 'rgba(0, 200, 255, 0.25)',
+                borderColor: playHovered ? 'var(--accent-secondary)' : 'rgba(0, 200, 255, 0.25)',
               }}
               onMouseEnter={() => setPlayHovered(true)}
               onMouseLeave={() => setPlayHovered(false)}
@@ -179,7 +179,7 @@ function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMo
   );
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
+// ── Main component ──────��─────────────────────────────────────────────────────
 export default function SeriesDetailsPage({ adminPreview, contentData }) {
   const { isMobile, isTablet } = useBreakpoint();
   const { slug } = useParams();
@@ -276,7 +276,7 @@ export default function SeriesDetailsPage({ adminPreview, contentData }) {
 
   return (
     <div style={s.page}>
-      <div style={{ ...s.auroraOrb, top: '-5%', left: '-10%', background: 'radial-gradient(circle, var(--accent-cyan), transparent 70%)' }} />
+      <div style={{ ...s.auroraOrb, top: '-5%', left: '-10%', background: 'radial-gradient(circle, var(--accent-secondary), transparent 70%)' }} />
       <div style={{ ...s.auroraOrb, bottom: '30%', right: '-10%', background: 'radial-gradient(circle, var(--accent-pink), transparent 70%)' }} />
 
       {/* ── Hero ── */}
@@ -322,7 +322,7 @@ export default function SeriesDetailsPage({ adminPreview, contentData }) {
             {/* Meta */}
             <div style={s.metaRow}>
               <div style={s.ratingBox}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--accent-cyan)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--accent-secondary)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
                 <span style={s.ratingVal}>{series.rating || 'N/A'}</span>
               </div>
               {(series.releasedAt || series.year) && <span style={s.metaChip}>{formatReleaseDate(series.releasedAt) || series.year}</span>}
@@ -392,7 +392,7 @@ export default function SeriesDetailsPage({ adminPreview, contentData }) {
                     color: '#fff', fontWeight: '700', fontSize: '0.85rem',
                     textDecoration: 'none', transition: 'all 180ms ease',
                   }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(0, 255, 255, 0.12)'; e.currentTarget.style.borderColor = 'var(--accent-cyan)'; e.currentTarget.style.color = 'var(--accent-cyan)'; }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(0, 255, 255, 0.12)'; e.currentTarget.style.borderColor = 'var(--accent-secondary)'; e.currentTarget.style.color = 'var(--accent-secondary)'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)'; e.currentTarget.style.color = '#fff'; }}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
@@ -535,7 +535,7 @@ s.seasonsBadge = {
   padding: '6px 12px', borderRadius: '8px',
   background: 'rgba(0, 255, 255, 0.1)',
   border: '1px solid rgba(0, 255, 255, 0.3)',
-  color: 'var(--accent-cyan)', fontSize: '0.78rem',
+  color: 'var(--accent-secondary)', fontSize: '0.78rem',
   fontWeight: '900', letterSpacing: '0.05em',
 };
 s.draftBadge = {
@@ -576,13 +576,13 @@ s.seasonTab = {
   textAlign: 'left',
 };
 s.seasonTabActive = {
-  background: 'rgba(0, 255, 255, 0.16)', borderColor: 'var(--accent-cyan)',
+  background: 'rgba(0, 255, 255, 0.16)', borderColor: 'var(--accent-secondary)',
   color: '#ffffff', transform: 'translateY(-1px)',
   boxShadow: '0 18px 40px rgba(0, 255, 255, 0.12)',
 };
 s.seasonTabLabel = { fontSize: '0.95rem', fontWeight: '800', letterSpacing: '0.02em' };
 s.seasonTabCount = { marginTop: '6px', fontSize: '0.8rem', color: 'rgba(255,255,255,0.65)' };
-s.seasonTabCountActive = { color: 'var(--accent-cyan)' };
+s.seasonTabCountActive = { color: 'var(--accent-secondary)' };
 s.episodeSection = { display: 'flex', flexDirection: 'column', gap: '18px' };
 s.episodeSectionHeader = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '18px', flexWrap: 'wrap' };
 s.episodeSectionTitle = { margin: 0, fontSize: 'clamp(1.8rem, 3vw, 2.5rem)', fontWeight: '900', letterSpacing: '-0.04em' };
@@ -620,7 +620,7 @@ s.epPlay = {
   transition: 'all 180ms ease',
 };
 s.epPlayHover = {
-  background: 'var(--accent-cyan)', borderColor: 'var(--accent-cyan)',
+  background: 'var(--accent-secondary)', borderColor: 'var(--accent-secondary)',
   color: '#050c16', boxShadow: '0 0 15px rgba(0, 255, 255, 0.4)',
 };
 s.detailTopGrid = {

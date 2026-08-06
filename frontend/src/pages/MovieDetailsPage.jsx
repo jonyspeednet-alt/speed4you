@@ -147,7 +147,7 @@ export default function MovieDetailsPage({ adminPreview, contentData }) {
   return (
     <>
     <div style={s.page}>
-      <div style={{ ...s.auroraOrb, top: '-10%', left: '-10%', background: 'radial-gradient(circle, var(--accent-cyan), transparent 70%)' }} />
+      <div style={{ ...s.auroraOrb, top: '-10%', left: '-10%', background: 'radial-gradient(circle, var(--accent-secondary), transparent 70%)' }} />
       <div style={{ ...s.auroraOrb, bottom: '20%', right: '-10%', background: 'radial-gradient(circle, var(--accent-pink), transparent 70%)' }} />
 
       {/* ── Hero ── */}
@@ -199,7 +199,7 @@ export default function MovieDetailsPage({ adminPreview, contentData }) {
             {/* Meta row */}
             <div style={s.metaRow}>
               <div style={s.ratingBox}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--accent-cyan)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--accent-secondary)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
                 <span style={s.ratingVal}>{movie.rating || 'N/A'}</span>
               </div>
               {(movie.releasedAt || movie.year) && <span style={s.metaChip}>{formatReleaseDate(movie.releasedAt) || movie.year}</span>}
@@ -253,15 +253,15 @@ export default function MovieDetailsPage({ adminPreview, contentData }) {
               const getPlayBtnStyle = (h) => ({
                 ...btnBase,
                 background: h ? 'rgba(0, 255, 255, 0.12)' : 'rgba(0, 200, 255, 0.08)',
-                border: h ? '1px solid var(--accent-cyan)' : '1px solid rgba(0, 200, 255, 0.25)',
-                color: h ? 'var(--accent-cyan)' : '#ffffff',
+                border: h ? '1px solid var(--accent-secondary)' : '1px solid rgba(0, 200, 255, 0.25)',
+                color: h ? 'var(--accent-secondary)' : '#ffffff',
                 boxShadow: h ? '0 0 20px rgba(0, 255, 255, 0.15)' : 'none',
               });
               const getDlBtnStyle = (h) => ({
                 ...btnBase,
                 background: h ? 'rgba(0, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.05)',
-                border: h ? '1px solid var(--accent-cyan)' : '1px solid rgba(255, 255, 255, 0.12)',
-                color: h ? 'var(--accent-cyan)' : '#ffffff',
+                border: h ? '1px solid var(--accent-secondary)' : '1px solid rgba(255, 255, 255, 0.12)',
+                color: h ? 'var(--accent-secondary)' : '#ffffff',
                 boxShadow: h ? '0 0 20px rgba(0, 255, 255, 0.15)' : 'none',
               });
 
@@ -331,7 +331,7 @@ export default function MovieDetailsPage({ adminPreview, contentData }) {
                         color: '#fff', fontWeight: '700', fontSize: '0.85rem',
                         textDecoration: 'none', transition: 'all 180ms ease',
                       }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(0, 255, 255, 0.12)'; e.currentTarget.style.borderColor = 'var(--accent-cyan)'; e.currentTarget.style.color = 'var(--accent-cyan)'; }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(0, 255, 255, 0.12)'; e.currentTarget.style.borderColor = 'var(--accent-secondary)'; e.currentTarget.style.color = 'var(--accent-secondary)'; }}
                         onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)'; e.currentTarget.style.color = '#fff'; }}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>

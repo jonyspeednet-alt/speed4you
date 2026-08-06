@@ -112,7 +112,7 @@ function ContentPreviewPage() {
             fontWeight: '600',
             boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
           }}>
-            <span>⚠️ Admin Preview - Draft Content</span>
+            <span>Admin Preview · Draft Content</span>
             <span style={{ opacity: 0.8 }}>|</span>
             <span style={{ fontWeight: '400', opacity: 0.9 }}>Status: {content.status}</span>
             <button
@@ -158,7 +158,7 @@ function ContentPreviewPage() {
           fontWeight: '600',
           boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
         }}>
-          <span>⚠️ Admin Preview - Draft Content</span>
+          <span>Admin Preview · Draft Content</span>
           <span style={{ opacity: 0.8 }}>|</span>
           <span style={{ fontWeight: '400', opacity: 0.9 }}>Status: {content.status}</span>
           <button

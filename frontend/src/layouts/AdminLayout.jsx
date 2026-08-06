@@ -253,7 +253,7 @@ function AdminLayout() {
             </svg>
           </div>
           <div>
-            <div style={s.brandName}>ISP Portal</div>
+            <div style={s.brandName}>Speed4You</div>
             <div style={s.brandSub}>Admin</div>
           </div>
         </div>
@@ -408,12 +408,12 @@ function AdminLayout() {
 }
 
 const SIDEBAR_W = "200px";
-const ACCENT = "#6366f1";
-const ACCENT_LIGHT = "rgba(99,102,241,0.12)";
-const ACCENT_BORDER = "rgba(99,102,241,0.3)";
-const BG = "#0a0c10";
-const SURFACE = "#111318";
-const SURFACE2 = "#181b22";
+const ACCENT = "#52d8e8";
+const ACCENT_LIGHT = "rgba(82,216,232,0.12)";
+const ACCENT_BORDER = "rgba(82,216,232,0.3)";
+const BG = "#07111f";
+const SURFACE = "#0b1728";
+const SURFACE2 = "#12233a";
 const BORDER = "rgba(255,255,255,0.07)";
 const TEXT = "#f1f5f9";
 const TEXT2 = "#94a3b8";

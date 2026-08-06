@@ -234,7 +234,7 @@ function MaintenancePanel() {
 
   return (
     <div style={{ background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: '14px', padding: '18px' }}>
-      <h3 style={{ fontSize: '0.9rem', fontWeight: '700', color: TEXT, margin: '0 0 12px 0' }}>🔧 Maintenance</h3>
+      <h3 style={{ fontSize: '0.9rem', fontWeight: '700', color: TEXT, margin: '0 0 12px 0' }}>Maintenance</h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
         {/* Fix Missing Posters */}
@@ -250,16 +250,16 @@ function MaintenancePanel() {
               transition: 'all 150ms',
             }}
           >
-            {posterState.running ? '⏳ Fixing posters…' : '🖼️ Fix Missing Posters'}
+            {posterState.running ? 'Fixing posters…' : 'Fix Missing Posters'}
           </button>
           {posterState.result && (
             <div style={{ marginTop: '6px', fontSize: '0.73rem', color: '#4ade80', padding: '6px 10px', background: 'rgba(34,197,94,0.08)', borderRadius: '7px', border: '1px solid rgba(34,197,94,0.15)' }}>
-              ✅ Fixed {posterState.result.fixed} items, skipped {posterState.result.skipped}, failed {posterState.result.failed} (total: {posterState.result.total})
+              Fixed {posterState.result.fixed} items, skipped {posterState.result.skipped}, failed {posterState.result.failed} (total: {posterState.result.total})
             </div>
           )}
           {posterState.error && (
             <div style={{ marginTop: '6px', fontSize: '0.73rem', color: '#f87171', padding: '6px 10px', background: 'rgba(248,113,113,0.08)', borderRadius: '7px', border: '1px solid rgba(248,113,113,0.15)' }}>
-              ❌ {posterState.error}
+              {posterState.error}
             </div>
           )}
         </div>
@@ -277,16 +277,16 @@ function MaintenancePanel() {
               transition: 'all 150ms',
             }}
           >
-            {rematchState.running ? '⏳ Rematching…' : '🔄 Re-match Metadata'}
+            {rematchState.running ? 'Rematching…' : 'Re-match Metadata'}
           </button>
           {rematchState.result && (
             <div style={{ marginTop: '6px', fontSize: '0.73rem', color: '#4ade80', padding: '6px 10px', background: 'rgba(34,197,94,0.08)', borderRadius: '7px', border: '1px solid rgba(34,197,94,0.15)' }}>
-              ✅ Matched {rematchState.result.matched}/{rematchState.result.total}, failed {rematchState.result.failed}
+              Matched {rematchState.result.matched}/{rematchState.result.total}, failed {rematchState.result.failed}
             </div>
           )}
           {rematchState.error && (
             <div style={{ marginTop: '6px', fontSize: '0.73rem', color: '#f87171', padding: '6px 10px', background: 'rgba(248,113,113,0.08)', borderRadius: '7px', border: '1px solid rgba(248,113,113,0.15)' }}>
-              ❌ {rematchState.error}
+              {rematchState.error}
             </div>
           )}
         </div>
@@ -296,10 +296,10 @@ function MaintenancePanel() {
   );
 }
 
-const ACCENT = 'var(--accent-primary, #6366f1)';
-const ACCENT_BORDER = 'var(--accent-border, rgba(99,102,241,0.3))';
-const SURFACE = 'var(--surface, #111318)';
-const SURFACE2 = 'var(--surface-2, #181b22)';
+const ACCENT = 'var(--accent-secondary)';
+const ACCENT_BORDER = 'var(--border-accent)';
+const SURFACE = 'var(--bg-secondary)';
+const SURFACE2 = 'var(--bg-tertiary)';
 const BORDER = 'var(--border-color, rgba(255,255,255,0.07))';
 const TEXT = 'var(--text, #f1f5f9)';
 const TEXT2 = 'var(--text-2, #94a3b8)';
