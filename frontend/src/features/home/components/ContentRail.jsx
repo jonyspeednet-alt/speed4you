@@ -364,7 +364,7 @@ function ContentRail({
 
 const styles = {
   section: {
-    padding: "var(--spacing-md) 0 var(--spacing-lg)",
+    padding: "var(--spacing-lg) 0 var(--spacing-xl)",
     overflow: "hidden",
     width: "100%",
     maxWidth: "100vw",
