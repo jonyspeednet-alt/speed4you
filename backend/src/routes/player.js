@@ -7,6 +7,23 @@ const logger = require('../utils/logger');
 const optionalAdminAuth = require('../middleware/optional-admin-auth');
 
 const router = express.Router();
+const path = require('path');
+
+router.get('/:contentType/:id/preview', require('../middleware/admin-auth'), async (req, res, next) => {
+  try {
+    const item = await getItemById(req.params.id);
+    if (!item) {
+      throw new AppError('Content not found', 404, 'NOT_FOUND');
+    }
+    if (item.status !== 'published') {
+      return res.sendFile(path.join(process.cwd(), 'frontend/public/admin-preview.html'));
+    }
+    res.redirect(`/player/${req.params.contentType}/${item.id}`);
+  } catch (error) {
+    next(error);
+  }
+});
+
 
 function safeStat(targetPath) {
   try {
