@@ -28,7 +28,6 @@ function AddContentPage() {
   const [episodesExpanded, setEpisodesExpanded] = useState(false);
   const [uploadingPoster, setUploadingPoster] = useState(false);
   const [uploadingBackdrop, setUploadingBackdrop] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
   const [showFileBrowser, setShowFileBrowser] = useState(false);
   const [browseRootId, setBrowseRootId] = useState('');
@@ -355,25 +354,14 @@ function AddContentPage() {
               />
 
               {form.isEditMode && (
-                <button type="button" onClick={() => setShowPreview(!showPreview)} style={S.miniBtn}>
-                  {showPreview ? 'Hide' : 'Preview'}
-                </button>
-              )}
-
-              {showPreview && (
-                <div style={{ ...S.section, padding: '4px 6px' }}>
-                  <div style={S.previewRow}>
-                    {form.formData.poster
-                      ? <img src={form.formData.poster} alt="" style={S.previewImg} />
-                      : <div style={S.previewImgPlaceholder}>No Poster</div>}
-                    <div style={S.previewInfo}>
-                      <strong style={S.previewTitle}>{form.formData.title || 'Untitled'}</strong>
-                      <span style={S.previewMeta}>
-                        {[form.formData.year, form.formData.genre, form.formData.language].filter(Boolean).join(' · ')}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                <Link
+                  to={form.formData.type === 'series' ? `/series/${form.itemMeta?.slug || id}` : `/movies/${form.itemMeta?.slug || id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={S.miniBtn}
+                >
+                  Preview Page
+                </Link>
               )}
             </div>
           </div>

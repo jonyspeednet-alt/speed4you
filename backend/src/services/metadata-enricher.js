@@ -74,7 +74,8 @@ function cleanSearchTitle(value) {
   let cleaned = normalized
     .replace(/\((19|20)\d{2}\)/g, ' ')
     .replace(/\b(19|20)\d{2}\b/g, ' ')
-    .replace(/\s*[-:–—]+\s*/g, ' ')
+    // Don't remove colons at all - they might be part of the title (e.g., "13:14")
+    .replace(/\s*[-–—]+\s*/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -145,10 +146,17 @@ function scoreCandidate(candidate, item) {
   const targetLanguage = inferOriginalLanguage(item);
   let score = 0;
 
+  console.log('[scoreCandidate] searchTitle:', searchTitle);
+  console.log('[scoreCandidate] candidateTitle:', candidateTitle);
+  console.log('[scoreCandidate] candidateOriginalTitle:', candidateOriginalTitle);
+  console.log('[scoreCandidate] targetYear:', targetYear, 'candidateYear:', candidateYear);
+
   if (candidateTitle === searchTitle || candidateOriginalTitle === searchTitle) {
     score += 55;
+    console.log('[scoreCandidate] Exact match +55');
   } else if (candidateTitle.includes(searchTitle) || searchTitle.includes(candidateTitle)) {
     score += 35;
+    console.log('[scoreCandidate] Partial match +35');
   }
 
   if (targetYear && candidateYear) {
@@ -156,10 +164,13 @@ function scoreCandidate(candidate, item) {
     if (delta === 0) score += 25;
     else if (delta === 1) score += 15;
     else if (delta === 2) score += 6;
+    console.log('[scoreCandidate] Year delta:', delta, 'points added:', delta === 0 ? 25 : delta === 1 ? 15 : delta === 2 ? 6 : 0);
   }
 
   if (candidate.original_language === targetLanguage) score += 12;
   score += Math.min(Number(candidate.popularity || 0) / 10, 8);
+  
+  console.log('[scoreCandidate] Final score:', score);
   return Math.round(score);
 }
 
@@ -536,6 +547,28 @@ async function enrichItemWithMetadata(item) {
       }
     }
 
+    // Strategy 8: Try colon/number pattern variations (e.g., "13 14" → "13:14", "13-14")
+    if (!results.length && /\b\d+\s+\d+\b/.test(parsedTitle)) {
+      try {
+        const colonVariation = parsedTitle.replace(/\b(\d+)\s+(\d+)\b/g, '$1:$2');
+        if (colonVariation !== parsedTitle) {
+          const colonResp = await tmdbFetchJson(`/search/${mediaType}`, { query: colonVariation });
+          results = Array.isArray(colonResp.results) ? colonResp.results : [];
+        }
+      } catch {}
+    }
+
+    // Strategy 9: Try dash/number pattern variations (e.g., "13 14" → "13-14")
+    if (!results.length && /\b\d+\s+\d+\b/.test(parsedTitle)) {
+      try {
+        const dashVariation = parsedTitle.replace(/\b(\d+)\s+(\d+)\b/g, '$1-$2');
+        if (dashVariation !== parsedTitle) {
+          const dashResp = await tmdbFetchJson(`/search/${mediaType}`, { query: dashVariation });
+          results = Array.isArray(dashResp.results) ? dashResp.results : [];
+        }
+      } catch {}
+    }
+
     if (!results.length) {
       return {
         ...enrichedItem,
@@ -591,7 +624,7 @@ async function enrichItemWithMetadata(item) {
       language: resolvedLanguage,
       // If TMDb match confidence is 70% or greater, auto-publish directly to website
       status: confidence >= 70 ? 'published' : 'draft',
-      metadataStatus: confidence >= 50 ? 'matched' : (applyTmdb ? 'needs_review' : 'not_found'),
+      metadataStatus: confidence >= 25 ? 'matched' : (applyTmdb ? 'needs_review' : 'not_found'),
       metadataProvider: 'tmdb',
       metadataConfidence: confidence,
       metadataUpdatedAt: new Date().toISOString(),

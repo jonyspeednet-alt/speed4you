@@ -360,6 +360,14 @@ export default function VideoPlayerPage() {
           Back
         </button>
         <span className="player-title">{title}</span>
+        {item?.status === 'draft' && (
+          <span style={{
+            marginLeft: '10px', padding: '3px 10px', borderRadius: '6px',
+            background: 'rgba(234,179,8,0.15)', border: '1px solid rgba(234,179,8,0.35)',
+            color: '#facc15', fontSize: '0.7rem', fontWeight: '700', letterSpacing: '0.08em',
+            textTransform: 'uppercase', whiteSpace: 'nowrap',
+          }}>Draft</span>
+        )}
       </div>
 
       <div className="player-video-area"
