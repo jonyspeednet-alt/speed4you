@@ -142,7 +142,7 @@ const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <Navigate to="/admin/content" replace />,
+        element: withRouteFallback(<AdminDashboard />, 'default'),
       },
       {
         path: 'content',

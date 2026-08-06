@@ -74,7 +74,7 @@ export const DETAIL_SKELETON = {
     flexWrap: "wrap",
   },
   eyebrow: {
-    color: "var(--accent-pink)",
+    color: "var(--accent-primary)",
     textTransform: "uppercase",
     letterSpacing: "0.2em",
     fontSize: "0.75rem",
@@ -204,7 +204,7 @@ export const DETAIL_STYLES = {
     flexWrap: "wrap",
   },
   eyebrow: {
-    color: "var(--accent-pink)",
+    color: "var(--accent-primary)",
     textTransform: "uppercase",
     letterSpacing: "0.2em",
     fontSize: "0.75rem",
