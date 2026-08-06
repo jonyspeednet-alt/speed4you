@@ -6,9 +6,7 @@ const { AppError } = require('../utils/error');
 const logger = require('../utils/logger');
 
 const router = express.Router();
-const path = require('path');
-
-router.get('/:contentType/:id/preview', require('../middleware/admin-auth'), async (req, res, next) => {
+router.get('/:contentType/:id/preview', require('../middleware/require-admin-auth'), async (req, res, next) => {
   try {
     const item = await getItemById(req.params.id);
     if (!item) {

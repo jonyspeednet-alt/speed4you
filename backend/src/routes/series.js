@@ -38,7 +38,7 @@ router.get('/', validateQuery(seriesQuerySchema), async (req, res, next) => {
   }
 });
 
-router.get('/:id/preview', require('../middleware/admin-auth'), async (req, res, next) => {
+router.get('/:id/preview', require('../middleware/require-admin-auth'), async (req, res, next) => {
   try {
     const show = await getItemById(req.params.id);
     if (!show || show.type !== 'series') {

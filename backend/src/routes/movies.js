@@ -38,7 +38,7 @@ router.get('/', validateQuery(moviesQuerySchema), async (req, res, next) => {
   }
 });
 
-router.get('/:id/preview', require('../middleware/admin-auth'), async (req, res, next) => {
+router.get('/:id/preview', require('../middleware/require-admin-auth'), async (req, res, next) => {
   try {
     const movie = await getItemById(req.params.id);
     if (!movie || movie.type !== 'movie') {
