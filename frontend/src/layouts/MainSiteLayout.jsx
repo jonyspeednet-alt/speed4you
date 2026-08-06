@@ -1,7 +1,6 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, lazy, Suspense } from "react";
 import TopNav from "../components/navigation/TopNav";
-import ScrollToTop from "../components/ui/ScrollToTop";
 import BottomNav from "../components/ui/BottomNav";
 import { ToastProvider } from "../components/ui/Toast";
 import { useBreakpoint, useTVMode } from "../hooks";
@@ -73,7 +72,6 @@ function MainSiteLayout() {
         >
           <Outlet />
         </main>
-        <ScrollToTop />
         {isMobile && !isPlayerRoute && <BottomNav />}
         {!isMobile && !isPlayerRoute && (
           <Suspense fallback={null}>
