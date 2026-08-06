@@ -180,12 +180,12 @@ function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMo
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function SeriesDetailsPage() {
+export default function SeriesDetailsPage({ adminPreview, contentData }) {
   const { isMobile, isTablet } = useBreakpoint();
   const { slug } = useParams();
   const { addItem: trackView } = useRecentlyViewed();
-  const [series, setSeries] = useState(() => readCache(slug));
-  const [loading, setLoading] = useState(() => !readCache(slug));
+  const [series, setSeries] = useState(() => adminPreview ? contentData : readCache(slug));
+  const [loading, setLoading] = useState(() => !adminPreview && !readCache(slug));
   const [error, setError] = useState('');
   const [activeSeason, setActiveSeason] = useState(0);
   const [descExpanded, setDescExpanded] = useState(false);
@@ -199,6 +199,14 @@ export default function SeriesDetailsPage() {
   }, []);
 
   useEffect(() => {
+    // If admin preview with content data, skip API call
+    if (adminPreview && contentData) {
+      setSeries(contentData);
+      setActiveSeason(0);
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
     async function load() {
       try {
@@ -220,7 +228,7 @@ export default function SeriesDetailsPage() {
     }
     load();
     return () => { cancelled = true; };
-  }, [slug, trackView]);
+  }, [slug, trackView, adminPreview, contentData]);
 
   useEffect(() => {
     if (!series?.id) return;
