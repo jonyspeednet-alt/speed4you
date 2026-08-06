@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Preview</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0b0f14;
+      color: #f1f5f9;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      max-width: 600px;
+      width: 100%;
+      background: #181b22;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 12px;
+      padding: 32px;
+      text-align: center;
+    }
+    .icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 8px;
+      color: #f1f5f9;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      background: rgba(245,158,11,0.1);
+      color: #fbbf24;
+      border: 1px solid rgba(245,158,11,0.2);
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    p {
+      color: #94a3b8;
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+    .info-box {
+      background: rgba(99,102,241,0.08);
+      border: 1px solid rgba(99,102,241,0.2);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 24px;
+      text-align: left;
+    }
+    .info-box h3 {
+      font-size: 0.85rem;
+      color: #818cf8;
+      margin-bottom: 8px;
+    }
+    .info-box ul {
+      list-style: none;
+      padding: 0;
+    }
+    .info-box li {
+      padding: 4px 0;
+      color: #c7d2fe;
+      font-size: 0.85rem;
+    }
+    .info-box li:before {
+      content: "✓ ";
+      color: #4ade80;
+      font-weight: bold;
+    }
+    .btn-group {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .btn {
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 150ms;
+    }
+    .btn-primary {
+      background: rgba(99,102,241,0.85);
+      color: #fff;
+      border: none;
+    }
+    .btn-primary:hover {
+      background: rgba(99,102,241,1);
+    }
+    .btn-secondary {
+      background: rgba(255,255,255,0.06);
+      color: #94a3b8;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .btn-secondary:hover {
+      background: rgba(255,255,255,0.1);
+      color: #f1f5f9;
+    }
+    .note {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255,255,255,0.07);
+      color: #475569;
+      font-size: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">🔒</div>
+    <h1>Admin Preview Mode</h1>
+    <div class="badge">Draft Content</div>
+    <p>
+      You are viewing this content in <strong>admin preview mode</strong>.
+      This item is not published and is only visible to authorized administrators.
+    </p>
+
+    <div class="info-box">
+      <h3>What you can do:</h3>
+      <ul>
+        <li>View content details and metadata</li>
+        <li>Play/download the media file</li>
+        <li>Test playback and quality</li>
+        <li>Verify content before publishing</li>
+      </ul>
+    </div>
+
+    <div class="btn-group">
+      <a href="/admin/content" class="btn btn-secondary">← Back to Admin</a>
+      <button onclick="window.close()" class="btn btn-primary">Close Preview</button>
+    </div>
+
+    <div class="note">
+      This preview is only accessible to authenticated administrators.<br>
+      Regular users will see "Content not found" for unpublished items.
+    </div>
+  </div>
+
+  <script>
+    // Try to extract content ID from URL for logging/debugging
+    const path = window.location.pathname;
+    const match = path.match(/\/admin\/content\/(\d+)\/preview/);
+    if (match) {
+      console.log('Admin preview for content ID:', match[1]);
+    }
+  </script>
+</body>
+</html>
