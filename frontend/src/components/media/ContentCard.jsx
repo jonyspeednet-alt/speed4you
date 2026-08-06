@@ -275,10 +275,10 @@ const styles = {
   },
   posterWrap: {
     position: "relative",
-    borderRadius: "14px",
+    borderRadius: "16px",
     overflow: "hidden",
-    background: "#0d1a2d",
-    border: "1px solid rgba(255, 255, 255, 0.08)",
+    background: "var(--bg-tertiary)",
+    border: "1px solid rgba(173, 211, 236, 0.14)",
     transition: "transform 450ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 450ms cubic-bezier(0.34, 1.56, 0.64, 1), border-color 450ms cubic-bezier(0.34, 1.56, 0.64, 1)",
   },
   poster: {
