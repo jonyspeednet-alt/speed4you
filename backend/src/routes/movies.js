@@ -39,6 +39,22 @@ router.get('/', validateQuery(moviesQuerySchema), async (req, res, next) => {
   }
 });
 
+router.get('/:id/preview', require('../middleware/admin-auth'), async (req, res, next) => {
+  try {
+    const movie = await getItemById(req.params.id);
+    if (!movie || movie.type !== 'movie') {
+      throw new AppError('Movie not found', 404, 'NOT_FOUND');
+    }
+    if (movie.status !== 'published') {
+      // Render the public movie page with admin context
+      return res.sendFile(path.join(process.cwd(), 'frontend/public/admin-preview.html'));
+    }
+    res.json(movie);
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get('/:id', optionalAdminAuth, async (req, res, next) => {
   try {
     const movie = await getItemById(req.params.id);
