@@ -20,11 +20,11 @@
   --accent-amber: #ffd166;
   --border-color: rgba(173, 211, 236, 0.16);
 
-  --accent-cyan: #00ffff;
-  --accent-magenta: #ff00ff;
-  --accent-violet: #8a2be2;
-  --accent-pink: #ff0080;
-  --glow-red: 0 0 24px rgba(255, 76, 95, 0.38);
+  --accent-cyan: var(--accent-secondary);
+  --accent-magenta: var(--accent-primary);
+  --accent-violet: var(--accent-secondary);
+  --accent-pink: var(--accent-primary);
+  --glow-red: 0 0 24px rgba(255, 107, 95, 0.28);
   --glow-amber: 0 0 28px rgba(255, 200, 87, 0.28);
 
   --border-subtle: rgba(255, 255, 255, 0.06);

@@ -9,19 +9,21 @@ function AccessPage() {
   const { isMobile } = useBreakpoint();
   const isTVMode = useTVMode();
 
-  useEffect(() => {
-    async function checkAccess() {
-      try {
-        const result = await accessService.checkAccess();
-        if (result.allowed) {
-          navigate("/");
-        } else {
-          setStatus("restricted");
-        }
-      } catch {
-        setStatus("error");
+  async function checkAccess() {
+    setStatus("checking");
+    try {
+      const result = await accessService.checkAccess();
+      if (result.allowed) {
+        navigate("/");
+      } else {
+        setStatus("restricted");
       }
+    } catch {
+      setStatus("error");
     }
+  }
+
+  useEffect(() => {
     checkAccess();
   }, [navigate]);
 
@@ -67,12 +69,16 @@ function AccessPage() {
           </svg>
         </div>
 
-        <h1 style={styles.title}>Network Restricted</h1>
+        <h1 style={styles.title}>{status === "error" ? "Access Check Failed" : "Network Restricted"}</h1>
         <p style={styles.text}>
-          This platform is available only to ISP network users.
+          {status === "error"
+            ? "We could not verify your network connection right now."
+            : "This platform is available only to ISP network users."}
         </p>
         <p style={styles.subtext}>
-          Please connect to our network to access this content.
+          {status === "error"
+            ? "Try again or return to the portal home page."
+            : "Please connect to our network to access this content."}
         </p>
 
         <div style={styles.info}>
@@ -82,6 +88,15 @@ function AccessPage() {
             <li>Use your home internet connection</li>
             <li>Connect via our mobile data network</li>
           </ul>
+        </div>
+
+        <div style={styles.actions}>
+          <button type="button" style={styles.retryBtn} onClick={checkAccess}>
+            Try again
+          </button>
+          <button type="button" style={styles.homeBtn} onClick={() => navigate("/")}>
+            Return home
+          </button>
         </div>
 
         <div style={styles.help}>
@@ -145,6 +160,31 @@ const styles = {
     display: "grid",
     gap: "8px",
     color: "var(--text-secondary)",
+  },
+  actions: {
+    display: "flex",
+    justifyContent: "center",
+    gap: "10px",
+    flexWrap: "wrap",
+    marginBottom: "var(--spacing-lg)",
+  },
+  retryBtn: {
+    padding: "11px 18px",
+    border: "1px solid var(--accent-secondary)",
+    borderRadius: "999px",
+    background: "rgba(82, 216, 232, 0.12)",
+    color: "var(--accent-secondary)",
+    fontWeight: "700",
+    cursor: "pointer",
+  },
+  homeBtn: {
+    padding: "11px 18px",
+    border: "1px solid var(--border-color)",
+    borderRadius: "999px",
+    background: "var(--bg-secondary)",
+    color: "var(--text-secondary)",
+    fontWeight: "700",
+    cursor: "pointer",
   },
   help: {
     color: "var(--text-muted)",

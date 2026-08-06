@@ -15,8 +15,7 @@ function MainSiteLayout() {
   const navigate = useNavigate();
   const { isMobile } = useBreakpoint();
   const isTVMode = useTVMode();
-  const isPlayerRoute =
-    false;
+  const isPlayerRoute = location.pathname.startsWith("/play/");
 
   useEffect(() => {
     if (!isTVMode) return;
