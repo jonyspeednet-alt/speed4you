@@ -2,7 +2,7 @@ import { startTransition, useCallback, useContext, useEffect, useMemo, useRef, u
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { adminService } from '../../services';
 import ConfirmDialog from '../../components/overlays/ConfirmDialog';
-import { ToastContext } from '../../components/ui/ToastContext';
+import { ToastContext } from '../../components/ui/ToastContext.jsx';
 import { useBreakpoint } from '../../hooks';
 
 function formatWhen(value) {
