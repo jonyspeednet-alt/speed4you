@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { moviesService, seriesService } from '../../services';
 import MovieDetailsPage from '../MovieDetailsPage';
 import SeriesDetailsPage from '../SeriesDetailsPage';
-import { ToastProvider } from '../../components/ui/ToastContext';
+import { ToastProvider } from '../../components/ui/Toast.jsx';
 
 function ContentPreviewPage() {
   const { id } = useParams();
