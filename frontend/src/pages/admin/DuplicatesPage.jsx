@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { adminService } from '../../services';
-import { ToastContext } from '../../components/ui/ToastContext';
+import { ToastContext } from '../../components/ui/ToastContext.jsx';
 import { useContext } from 'react';
 
 const SURFACE = 'var(--surface, #111318)';
