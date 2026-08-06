@@ -305,7 +305,7 @@ function ContentLibraryPage() {
     if (event.defaultPrevented) return;
     const interactive = event.target.closest('a, button, input, select, textarea, label');
     if (interactive) return;
-    toggleContentSelection(item.id);
+    window.open(getPublicPath(item), '_blank');
   };
 
   const clearDetailPageCache = useCallback((contentId) => {
