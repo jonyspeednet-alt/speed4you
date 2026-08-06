@@ -359,7 +359,7 @@ export default function SeriesDetailsPage({ adminPreview, contentData }) {
             {/* Actions */}
             <div style={{ ...s.actions, ...(isMobile ? s.actionsMobile : {}) }}>
               <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
-                <WatchlistButton contentType="series" contentId={series.id} title={series.title} />
+                {!adminPreview && <WatchlistButton contentType="series" contentId={series.id} title={series.title} />}
                 <ShareButton title={series.title} url={`${window.location.origin}/series/${series.id}`} />
                 {isAdmin && series.status === 'draft' && (
                   <button
