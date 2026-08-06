@@ -1262,7 +1262,12 @@ function resolvePoster(item) {
 function getPublicPath(item) {
   if (!item) return '/';
   const slugOrId = item.slug || item.id;
-  return item.type === 'series' ? `/series/${slugOrId}` : `/movies/${slugOrId}`;
+  const publicPath = item.type === 'series' ? `/series/${slugOrId}` : `/movies/${slugOrId}`;
+  // Draft items should open via admin preview route so they are accessible
+  if (item.status === 'draft') {
+    return `/admin/content/${item.id}/preview`;
+  }
+  return publicPath;
 }
 
 const surface2 = 'var(--surface-2, #181b22)';

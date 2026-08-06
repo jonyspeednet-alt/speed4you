@@ -39,6 +39,21 @@ router.get('/', validateQuery(seriesQuerySchema), async (req, res, next) => {
   }
 });
 
+router.get('/:id/preview', require('../middleware/admin-auth'), async (req, res, next) => {
+  try {
+    const show = await getItemById(req.params.id);
+    if (!show || show.type !== 'series') {
+      throw new AppError('Series not found', 404, 'NOT_FOUND');
+    }
+    if (show.status !== 'published') {
+      return res.sendFile(path.join(process.cwd(), 'frontend/public/admin-preview.html'));
+    }
+    res.json(show);
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get('/:id', optionalAdminAuth, async (req, res, next) => {
   try {
     const show = await getItemById(req.params.id);
