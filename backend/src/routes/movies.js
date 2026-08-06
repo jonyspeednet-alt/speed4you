@@ -3,6 +3,7 @@ const router = express.Router();
 const { getItemById, listItems, toCardItem } = require('../data/store');
 const { Joi, validateQuery } = require('../middleware/validate');
 const { AppError } = require('../utils/error');
+const optionalAdminAuth = require('../middleware/optional-admin-auth');
 
 const moviesQuerySchema = Joi.object({
   genre: Joi.string().trim().min(1).max(80),
@@ -38,10 +39,14 @@ router.get('/', validateQuery(moviesQuerySchema), async (req, res, next) => {
   }
 });
 
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', optionalAdminAuth, async (req, res, next) => {
   try {
     const movie = await getItemById(req.params.id);
-    if (!movie || movie.type !== 'movie' || movie.status !== 'published') {
+    if (!movie || movie.type !== 'movie') {
+      throw new AppError('Movie not found', 404, 'NOT_FOUND');
+    }
+    // Allow admins to view draft content; regular users only see published
+    if (movie.status !== 'published' && !req.isAdmin) {
       throw new AppError('Movie not found', 404, 'NOT_FOUND');
     }
     res.json(movie);

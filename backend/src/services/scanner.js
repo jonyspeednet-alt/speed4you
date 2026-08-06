@@ -1023,7 +1023,7 @@ function getLegacyMovieSignatures(root, relativeFolder, folderPath, movieCandida
   return [...legacySignatures];
 }
 
-function hasAllCandidatesInCatalog(candidates = [], existingSignatureSet = null) {
+async function hasAllCandidatesInCatalog(candidates = [], existingSignatureSet = null) {
   if (existingSignatureSet instanceof Set) {
     return Promise.resolve(candidates.every((candidate) => existingSignatureSet.has(candidate.scanSignature)));
   }
@@ -1032,11 +1032,21 @@ function hasAllCandidatesInCatalog(candidates = [], existingSignatureSet = null)
     return Promise.resolve(false);
   }
 
-  return Promise.all(
-    candidates.map((candidate) =>
-      getItemByScanSignature(candidate.scanSignature).catch(() => null),
-    ),
-  ).then((items) => items.every(Boolean));
+  const BATCH_SIZE = 20;
+  const results = [];
+  for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
+    const batch = candidates.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.all(
+      batch.map((candidate) =>
+        getItemByScanSignature(candidate.scanSignature).catch(() => null),
+      ),
+    );
+    results.push(...batchResults);
+    if (i + BATCH_SIZE < candidates.length) {
+      await waitForImmediate();
+    }
+  }
+  return results.every(Boolean);
 }
 
 
@@ -1152,7 +1162,7 @@ function normalizeSummary(summary) {
     duplicateDrafts: toNonNegativeInteger(summary.duplicateDrafts),
     skipped: Array.isArray(summary.skipped) ? summary.skipped : [],
     errors: Array.isArray(summary.errors) ? summary.errors.map((error) => String(error || '')) : [],
-    drafts: Array.isArray(summary.drafts) ? summary.drafts : [],
+    drafts: Array.isArray(summary.drafts) ? summary.drafts.slice(0, 100) : [],
     rootResults: Array.isArray(summary.rootResults)
       ? summary.rootResults.map((root) => normalizeRootProgressEntry(root))
       : [],
@@ -1222,21 +1232,25 @@ function logScannerEvent(event, payload = {}) {
     if (scannerLogWriteCount >= 100) {
       scannerLogWriteCount = 0;
       try {
-        const content = fs.readFileSync(logFile, 'utf8');
-        const cutoff = Date.now() - 60 * 60 * 1000; // 1 hour ago
-        const trimmed = content
-          .split('\n')
-          .filter((row) => {
-            if (!row.trim()) return false;
-            try {
-              const parsed = JSON.parse(row);
-              return parsed.timestamp && new Date(parsed.timestamp).getTime() >= cutoff;
-            } catch {
-              return true; // keep non-JSON lines
-            }
-          })
-          .join('\n');
-        fs.writeFileSync(logFile, trimmed + (trimmed.endsWith('\n') ? '' : '\n'));
+        const stats = fs.statSync(logFile);
+        // Also rotate if file exceeds 10MB regardless of write count
+        if (stats.size > 10 * 1024 * 1024) {
+          const content = fs.readFileSync(logFile, 'utf8');
+          const cutoff = Date.now() - 60 * 60 * 1000; // 1 hour ago
+          const trimmed = content
+            .split('\n')
+            .filter((row) => {
+              if (!row.trim()) return false;
+              try {
+                const parsed = JSON.parse(row);
+                return parsed.timestamp && new Date(parsed.timestamp).getTime() >= cutoff;
+              } catch {
+                return true; // keep non-JSON lines
+              }
+            })
+            .join('\n');
+          fs.writeFileSync(logFile, trimmed + (trimmed.endsWith('\n') ? '' : '\n'));
+        }
       } catch {
         // rotation failed — not critical
       }
@@ -1445,6 +1459,10 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
   });
 
   for (let start = 0; start < candidateFolders.length; start += root.batchSize || DEFAULT_BATCH_SIZE) {
+    if (scanAbortRequested) {
+      logScannerEvent('scan_aborted_mid_root', { rootId: root.id, progress: start, total: candidateFolders.length });
+      break;
+    }
     const batch = candidateFolders.slice(start, start + (root.batchSize || DEFAULT_BATCH_SIZE));
 
     for (const [offset, folderPath] of batch.entries()) {
@@ -1577,8 +1595,21 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
               }
             }
 
-            // Cache miss - check if sourcePath exists
-            const sourceExists = await fs.promises.access(existingItem.payload.sourcePath).then(() => true).catch(() => false);
+            // Cache miss - check if sourcePath exists (with symlink support)
+            let sourceExists = false;
+            try {
+              await fs.promises.access(existingItem.payload.sourcePath);
+              sourceExists = true;
+            } catch {
+              // Try resolving symlinks before marking as missing
+              try {
+                const realPath = await fs.promises.realpath(existingItem.payload.sourcePath);
+                await fs.promises.access(realPath);
+                sourceExists = true;
+              } catch {
+                sourceExists = false;
+              }
+            }
             if (!sourceExists) {
               // Find the relocated file in current folder
               const videoFiles = listVideoFiles(listFiles(folderPath), folderPath, 'movie');
@@ -1800,6 +1831,10 @@ async function processSeriesRoot(root, summary, progressCallback, scanContext, e
   }
 
   for (let start = 0; start < processEntries.length; start += root.batchSize || DEFAULT_BATCH_SIZE) {
+    if (scanAbortRequested) {
+      logScannerEvent('scan_aborted_mid_root', { rootId: root.id, progress: start, total: processEntries.length });
+      break;
+    }
     const batch = processEntries.slice(start, start + (root.batchSize || DEFAULT_BATCH_SIZE));
 
     for (const [offset, entry] of batch.entries()) {
@@ -2516,7 +2551,15 @@ async function rescanItem(item) {
 
     if (item.type === 'series' && isDir) {
       const { buildSeriesSeasons } = require('./scanner-series-parser');
-      const root = loadScannerRoots().find((r) => item.sourceRootId === r.id || sourcePath.startsWith(r.scanPath));
+      // Prefer exact sourceRootId match; fallback to longest scanPath prefix match
+      const roots = loadScannerRoots();
+      let root = roots.find((r) => item.sourceRootId === r.id);
+      if (!root) {
+        const matches = roots
+          .filter((r) => sourcePath.startsWith(r.scanPath))
+          .sort((a, b) => b.scanPath.length - a.scanPath.length);
+        root = matches[0] || null;
+      }
       const listFiles = (dir) => { try { return fs.readdirSync(dir); } catch { return []; } };
       const listDirectories = (dir) => { try { const entries = fs.readdirSync(dir, { withFileTypes: true }); return entries.filter((e) => e.isDirectory()).map((e) => e.name); } catch { return []; } };
       const listVideoFiles = (files, dir) => { try { return files.filter((f) => { const ext = path.extname(f).toLowerCase(); return VIDEO_EXTENSIONS.has(ext) && !JUNK_REGEX.test(f); }); } catch { return []; } };

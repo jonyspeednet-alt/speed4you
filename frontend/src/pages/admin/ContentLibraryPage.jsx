@@ -305,28 +305,39 @@ function ContentLibraryPage() {
     if (event.defaultPrevented) return;
     const interactive = event.target.closest('a, button, input, select, textarea, label');
     if (interactive) return;
-    window.open(getPublicPath(item), '_blank');
+    toggleContentSelection(item.id);
   };
+
+  const clearDetailPageCache = useCallback((contentId) => {
+    try {
+      if (typeof sessionStorage === 'undefined') return;
+      const slug = String(contentId || '');
+      sessionStorage.removeItem(`portal-movie-details-v1:${slug}`);
+      sessionStorage.removeItem(`portal-series-details-v1:${slug}`);
+    } catch {}
+  }, []);
 
   const handlePublish = useCallback(async (id) => {
     setPublishingIds((c) => [...c, id]);
     try {
       const item = await adminService.publishContent(id);
       setAllContent((c) => mergeContentItem(c, item));
+      clearDetailPageCache(id);
     } finally {
       setPublishingIds((c) => c.filter((e) => e !== id));
     }
-  }, []);
+  }, [clearDetailPageCache]);
 
   const handleUnpublish = useCallback(async (id) => {
     setPublishingIds((c) => [...c, id]);
     try {
       const item = await adminService.unpublishContent(id);
       setAllContent((c) => mergeContentItem(c, item));
+      clearDetailPageCache(id);
     } finally {
       setPublishingIds((c) => c.filter((e) => e !== id));
     }
-  }, []);
+  }, [clearDetailPageCache]);
 
   const flushDelete = useCallback(async (id) => {
     try {
@@ -354,12 +365,19 @@ function ContentLibraryPage() {
     try {
       setBulkDeleteLoading(true); setError('');
       const ids = [...selectedContentIds];
-      await Promise.all(ids.map((id) => adminService.deleteContent(id)));
+      const results = await Promise.allSettled(ids.map((id) => adminService.deleteContent(id)));
+      const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+      const failed = results.filter((r) => r.status === 'rejected');
       setSelectedContentIds([]);
-      setSuccessMsg(`Deleted ${ids.length} item${ids.length > 1 ? 's' : ''}.`);
-      setAllContent((c) => c.filter((i) => !ids.includes(i.id)));
-      setPagination((c) => ({ ...c, total: Math.max(0, c.total - ids.length) }));
-      setTimeout(() => setSuccessMsg(''), 3000);
+      const succeededIds = ids.filter((_, i) => results[i].status === 'fulfilled');
+      setAllContent((c) => c.filter((i) => !succeededIds.includes(i.id)));
+      setPagination((c) => ({ ...c, total: Math.max(0, c.total - succeeded) }));
+      if (failed.length > 0) {
+        setError(`Deleted ${succeeded} items, but ${failed.length} failed.`);
+      } else {
+        setSuccessMsg(`Deleted ${succeeded} item${succeeded > 1 ? 's' : ''}.`);
+        setTimeout(() => setSuccessMsg(''), 3000);
+      }
     } catch (e) { setError(e.message || 'Bulk delete failed.'); }
     finally { setBulkDeleteLoading(false); setDeleteTarget(null); }
   };
@@ -476,7 +494,7 @@ function ContentLibraryPage() {
     const h = ['id', 'title', 'type', 'status', 'sourceType', 'language', 'category', 'collection', 'year', 'metadataStatus', 'metadataConfidence', 'duplicateCount'];
     const esc = (v) => { const t = String(v ?? ''); return (t.includes(',') || t.includes('"') || t.includes('\n')) ? `"${t.replace(/"/g, '""')}"` : t; };
     const rows = allContent.map((i) => [i.id, i.title, i.type, i.status, i.sourceType, i.language, i.category, i.collection, i.year, i.metadataStatus, i.metadataConfidence, i.duplicateCount].map(esc).join(','));
-    const csv = `${h.join(',')}\n${rows.join('\n')}`;
+    const csv = `\uFEFF${h.join(',')}\n${rows.join('\n')}`; // UTF-8 BOM for Excel
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = `content-${sectionType}-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
@@ -846,7 +864,7 @@ function ContentLibraryPage() {
                           {item.status === 'published' ? (
                             <Link to={getPublicPath(item)} style={styles.miniBtn}>View</Link>
                           ) : (
-                            <Link to={getPublicPath(item)} style={styles.miniBtn}>Edit</Link>
+                            <Link to={getPublicPath(item)} style={styles.miniBtn}>Preview</Link>
                           )}
                           {item.videoUrl && <span style={styles.miniBtn}>Has Video</span>}
                           <Link to={`/admin/content/${item.id}/edit`} style={styles.miniBtn}>Edit</Link>
@@ -960,7 +978,7 @@ function ContentLibraryPage() {
                                 {seasonItem.status === 'published' ? (
                                   <Link to={getPublicPath(seasonItem)} style={styles.miniBtn}>View</Link>
                                 ) : (
-                                  <Link to={getPublicPath(seasonItem)} style={styles.miniBtn}>Edit</Link>
+                                  <Link to={getPublicPath(seasonItem)} style={styles.miniBtn}>Preview</Link>
                                 )}
                                 <Link to={`/admin/content/${seasonItem.id}/edit`} style={styles.miniBtn}>Edit</Link>
                               {seasonItem.status === 'published' ? (
@@ -1039,6 +1057,7 @@ function ContentLibraryPage() {
                   <td style={styles.tdActions}>
                     <div style={styles.actionGroup}>
                       {item.videoUrl && <span style={styles.miniBtn}>Has Video</span>}
+                      <Link to={getPublicPath(item)} style={styles.miniBtn}>{item.status === 'published' ? 'View' : 'Preview'}</Link>
                       <Link to={`/admin/content/${item.id}/edit`} style={styles.miniBtn}>Edit</Link>
                       {item.status === 'published' ? (
                         <button type="button" onClick={() => handleUnpublish(item.id)} disabled={publishingIds.includes(item.id)} style={styles.miniBtn}>{publishingIds.includes(item.id) ? '…' : 'Unpub'}</button>
@@ -1243,9 +1262,6 @@ function resolvePoster(item) {
 function getPublicPath(item) {
   if (!item) return '/';
   const slugOrId = item.slug || item.id;
-  if (item.status !== 'published') {
-    return `/admin/content/${item.id}/edit`;
-  }
   return item.type === 'series' ? `/series/${slugOrId}` : `/movies/${slugOrId}`;
 }
 
