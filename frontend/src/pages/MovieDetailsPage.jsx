@@ -67,12 +67,12 @@ function MovieDetailsSkeleton() {
 }
 
 // ── Main component ───────────────────────────────────────────────────────────
-export default function MovieDetailsPage() {
+export default function MovieDetailsPage({ adminPreview, contentData }) {
   const { isMobile, isTablet } = useBreakpoint();
   const { slug } = useParams();
   const { addItem: trackView } = useRecentlyViewed();
-  const [movie, setMovie] = useState(() => readMovieCache(slug));
-  const [loading, setLoading] = useState(() => !readMovieCache(slug));
+  const [movie, setMovie] = useState(() => adminPreview ? contentData : readMovieCache(slug));
+  const [loading, setLoading] = useState(() => !adminPreview && !readMovieCache(slug));
   const [error, setError] = useState('');
   const [descExpanded, setDescExpanded] = useState(false);
   const [posterError, setPosterError] = useState(false);
@@ -87,6 +87,13 @@ export default function MovieDetailsPage() {
   }, []);
 
   useEffect(() => {
+    // If admin preview with content data, skip API call
+    if (adminPreview && contentData) {
+      setMovie(contentData);
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
     async function load() {
       try {
@@ -107,7 +114,7 @@ export default function MovieDetailsPage() {
     }
     load();
     return () => { cancelled = true; };
-  }, [slug, trackView]);
+  }, [slug, trackView, adminPreview, contentData]);
 
   useEffect(() => {
     if (!movie?.id) return;

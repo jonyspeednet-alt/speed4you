@@ -44,10 +44,7 @@ router.get('/:id/preview', require('../middleware/require-admin-auth'), async (r
     if (!movie || movie.type !== 'movie') {
       throw new AppError('Movie not found', 404, 'NOT_FOUND');
     }
-    if (movie.status !== 'published') {
-      // Render the public movie page with admin context
-      return res.sendFile(path.join(process.cwd(), 'frontend/public/admin-preview.html'));
-    }
+    // Return movie data regardless of status for admin preview
     res.json(movie);
   } catch (error) {
     next(error);
