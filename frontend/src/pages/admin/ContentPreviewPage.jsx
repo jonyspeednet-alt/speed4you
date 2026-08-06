@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { moviesService, seriesService } from '../../services';
 import MovieDetailsPage from '../MovieDetailsPage';
 import SeriesDetailsPage from '../SeriesDetailsPage';
+import { ToastProvider } from '../../components/ui/ToastContext';
 
 function ContentPreviewPage() {
   const { id } = useParams();
@@ -92,6 +93,53 @@ function ContentPreviewPage() {
   // Render the appropriate details page with admin preview context
   if (content.type === 'series') {
     return (
+      <ToastProvider>
+        <>
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            background: 'rgba(239, 68, 68, 0.95)',
+            color: '#fff',
+            padding: '12px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '16px',
+            zIndex: 9999,
+            fontSize: '0.9rem',
+            fontWeight: '600',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+          }}>
+            <span>⚠️ Admin Preview - Draft Content</span>
+            <span style={{ opacity: 0.8 }}>|</span>
+            <span style={{ fontWeight: '400', opacity: 0.9 }}>Status: {content.status}</span>
+            <button
+              onClick={() => navigate('/admin/content')}
+              style={{
+                background: 'rgba(255,255,255,0.2)',
+                color: '#fff',
+                border: 'none',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.85rem'
+              }}
+            >
+              Back to Library
+            </button>
+          </div>
+          <div style={{ marginTop: '56px' }}>
+            <SeriesDetailsPage adminPreview contentData={content} />
+          </div>
+        </>
+      </ToastProvider>
+    );
+  }
+  
+  return (
+    <ToastProvider>
       <>
         <div style={{
           position: 'fixed',
@@ -129,53 +177,10 @@ function ContentPreviewPage() {
           </button>
         </div>
         <div style={{ marginTop: '56px' }}>
-          <SeriesDetailsPage adminPreview contentData={content} />
+          <MovieDetailsPage adminPreview contentData={content} />
         </div>
       </>
-    );
-  }
-  
-  return (
-    <>
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        background: 'rgba(239, 68, 68, 0.95)',
-        color: '#fff',
-        padding: '12px 20px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '16px',
-        zIndex: 9999,
-        fontSize: '0.9rem',
-        fontWeight: '600',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-      }}>
-        <span>⚠️ Admin Preview - Draft Content</span>
-        <span style={{ opacity: 0.8 }}>|</span>
-        <span style={{ fontWeight: '400', opacity: 0.9 }}>Status: {content.status}</span>
-        <button
-          onClick={() => navigate('/admin/content')}
-          style={{
-            background: 'rgba(255,255,255,0.2)',
-            color: '#fff',
-            border: 'none',
-            padding: '6px 12px',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '0.85rem'
-          }}
-        >
-          Back to Library
-        </button>
-      </div>
-      <div style={{ marginTop: '56px' }}>
-        <MovieDetailsPage adminPreview contentData={content} />
-      </div>
-    </>
+    </ToastProvider>
   );
 }
 
