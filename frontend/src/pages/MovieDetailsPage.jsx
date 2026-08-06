@@ -299,7 +299,7 @@ export default function MovieDetailsPage({ adminPreview, contentData }) {
                   </div>
                   <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center', ...(isMobile ? { width: '100%', justifyContent: 'flex-start' } : {}) }}>
                     {!adminPreview && <WatchlistButton contentType="movie" contentId={movie.id} title={movie.title} />}
-                    <ShareButton title={movie.title} url={`${window.location.origin}/movies/${movie.id}`} />
+                    {!adminPreview && <ShareButton title={movie.title} url={`${window.location.origin}/movies/${movie.id}`} />}
                     {isAdmin && movie.status === 'draft' && (
                       <button
                         onClick={async () => {
