@@ -58,19 +58,29 @@ function extractCoreTitle(raw) {
 }
 
 function cleanSearchTitle(value) {
-  let normalized = String(value || '').replace(/\.[a-z0-9]{2,4}$/i, '');
+  let normalized = String(value || '');
+  
+  // Preserve Unicode characters - only remove file extension first
+  normalized = normalized.replace(/\.[a-z0-9]{2,4}$/i, '');
+  
+  // Replace dots and underscores with spaces (Unicode-safe)
   normalized = normalized.replace(/[._]/g, ' ');
+  
+  // Remove normalization artifacts and hex strings
   normalized = normalized
     .replace(/\bnormalizing\s+\d+\s+[a-f0-9]{6,}\b/gi, ' ')
     .replace(/\bpre[- ]normalize\s+\d+\b/gi, ' ')
     .replace(/\b[a-f0-9]{7,}\b/gi, ' ');
 
+  // Apply noise patterns (these should be Unicode-safe)
   for (const pattern of NOISE_PATTERNS) {
     normalized = normalized.replace(pattern, ' ');
   }
 
+  // Add space between camelCase words (Unicode-safe)
   normalized = normalized.replace(/([a-z])([A-Z])/g, '$1 $2');
 
+  // Remove year patterns and special separators (Unicode-safe)
   let cleaned = normalized
     .replace(/\((19|20)\d{2}\)/g, ' ')
     .replace(/\b(19|20)\d{2}\b/g, ' ')
@@ -88,7 +98,7 @@ function cleanSearchTitle(value) {
     } else {
       cleaned = String(value || '').trim();
     }
-    // Remove dots/underscores/file extension
+    // Remove dots/underscores/file extension (Unicode-safe)
     cleaned = cleaned.replace(/\.[a-z0-9]{2,4}$/i, '').replace(/[._]/g, ' ').trim();
   }
 
