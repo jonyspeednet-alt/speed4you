@@ -108,6 +108,49 @@ function detectLanguageFromText(text) {
   return null;
 }
 
+// Check if the current parsedTitle is actually derived from the current title
+// This prevents cases where old wrong metadata (like "Cholo Digonte" for "13 Mussoorie") gets stuck
+function isParsedTitleValid(currentTitle, currentParsedTitle) {
+  if (!currentTitle || !currentParsedTitle) return false;
+  
+  const expectedParsedTitle = cleanSearchTitle(currentTitle).toLowerCase();
+  const actualParsedTitle = String(currentParsedTitle).toLowerCase();
+  
+  // If they match exactly, it's valid
+  if (expectedParsedTitle === actualParsedTitle) return true;
+  
+  // If the parsedTitle contains the core title words, it's likely valid
+  const expectedWords = expectedParsedTitle.split(/\s+/).filter(w => w.length > 2);
+  const actualWords = actualParsedTitle.split(/\s+/).filter(w => w.length > 2);
+  
+  // At least 50% of significant words should match
+  if (expectedWords.length > 0 && actualWords.length > 0) {
+    const matchingWords = expectedWords.filter(word => 
+      actualWords.some(actualWord => 
+        actualWord.includes(word) || word.includes(actualWord)
+      )
+    );
+    const matchRatio = matchingWords.length / Math.max(expectedWords.length, actualWords.length);
+    return matchRatio >= 0.5;
+  }
+  
+  return false;
+}
+
+// Check if metadata is stale (older than 30 days)
+function isMetadataStale(metadataUpdatedAt) {
+  if (!metadataUpdatedAt) return true;
+  
+  try {
+    const updated = new Date(metadataUpdatedAt);
+    const now = new Date();
+    const daysSinceUpdate = (now - updated) / (1000 * 60 * 60 * 24);
+    return daysSinceUpdate > 30;
+  } catch {
+    return true; // If date parsing fails, consider it stale
+  }
+}
+
 function inferOriginalLanguage(item) {
   // 1. Try to detect from item title or source path
   let detected = detectLanguageFromText(item.title) || detectLanguageFromText(item.sourcePath);
@@ -375,13 +418,20 @@ async function fetchMetadataByImdbId(imdbId, mediaType = 'movie') {
 async function enrichItemWithMetadata(item) {
   const parsedTitle = cleanSearchTitle(item.title);
 
-  // Skip re-enrichment for items already matched with complete metadata
-  if (
+  // Skip re-enrichment for items already matched with complete metadata, BUT only if:
+  // 1. Metadata confidence is high (>= 70%)
+  // 2. Current parsedTitle is actually derived from the current title (sanity check)
+  // 3. Metadata is not too old (re-enrich if older than 30 days)
+  const shouldSkipReenrichment = 
     item.metadataStatus === 'matched' &&
     isGoodUrl(item.poster) &&
     item.description &&
-    item.description.trim().length > 0
-  ) {
+    item.description.trim().length > 0 &&
+    (item.metadataConfidence || 0) >= 70 &&
+    isParsedTitleValid(item.title, item.parsedTitle) &&
+    !isMetadataStale(item.metadataUpdatedAt);
+
+  if (shouldSkipReenrichment) {
     return { ...item, parsedTitle };
   }
 
