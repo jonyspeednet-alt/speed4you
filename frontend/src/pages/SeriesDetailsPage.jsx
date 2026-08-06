@@ -304,6 +304,9 @@ export default function SeriesDetailsPage() {
             <div style={s.eyebrowRow}>
               <span style={s.eyebrow}>Original Series</span>
               <span style={s.seasonsBadge}>{seasons.length} Season{seasons.length !== 1 ? 's' : ''}</span>
+              {isAdmin && series.status === 'draft' && (
+                <span style={s.draftBadge}>Draft</span>
+              )}
             </div>
 
             <h1 style={{ ...s.title, ...(isMobile ? s.titleMobile : {}) }}>{series.title}</h1>
@@ -350,6 +353,29 @@ export default function SeriesDetailsPage() {
               <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <WatchlistButton contentType="series" contentId={series.id} title={series.title} />
                 <ShareButton title={series.title} url={`${window.location.origin}/series/${series.id}`} />
+                {isAdmin && series.status === 'draft' && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        const { adminService } = await import('../services/adminService');
+                        await adminService.publishContent(series.id);
+                        window.location.reload();
+                      } catch (err) {
+                        alert(`Publish failed: ${err.message}`);
+                      }
+                    }}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '8px',
+                      padding: '10px 20px', borderRadius: '10px',
+                      background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.35)',
+                      color: '#4ade80', fontWeight: '700', fontSize: '0.85rem',
+                      textDecoration: 'none', transition: 'all 180ms ease', cursor: 'pointer',
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg>
+                    Publish
+                  </button>
+                )}
                 {isAdmin && (
                   <Link to={`/admin/content/${series.id}/edit`} style={{
                     display: 'inline-flex', alignItems: 'center', gap: '8px',
@@ -503,6 +529,13 @@ s.seasonsBadge = {
   border: '1px solid rgba(0, 255, 255, 0.3)',
   color: 'var(--accent-cyan)', fontSize: '0.78rem',
   fontWeight: '900', letterSpacing: '0.05em',
+};
+s.draftBadge = {
+  padding: '6px 12px', borderRadius: '8px',
+  background: 'rgba(234,179,8,0.15)',
+  border: '1px solid rgba(234,179,8,0.35)', color: '#facc15',
+  fontSize: '0.78rem', fontWeight: '700', letterSpacing: '0.08em',
+  textTransform: 'uppercase',
 };
 s.primaryActions = { display: 'flex', flexWrap: 'wrap', gap: '14px', alignItems: 'center' };
 s.secondaryBtn = {

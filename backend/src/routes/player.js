@@ -4,6 +4,7 @@ const path = require('path');
 const { getItemById, loadScannerRoots } = require('../data/store');
 const { AppError } = require('../utils/error');
 const logger = require('../utils/logger');
+const optionalAdminAuth = require('../middleware/optional-admin-auth');
 
 const router = express.Router();
 
@@ -36,7 +37,8 @@ async function findSelectedMedia(req) {
   const item = await getItemById(id);
   if (!item) return { error: { status: 404, message: 'Content not found' } };
   if (requestedType && item.type !== requestedType) return { error: { status: 404, message: 'Content not found' } };
-  if (item.status !== 'published') return { error: { status: 404, message: 'Content not found' } };
+  // Allow admins to play/download draft content; regular users only see published
+  if (item.status !== 'published' && !req.isAdmin) return { error: { status: 404, message: 'Content not found' } };
 
   const selectedSeason = item.type === 'series'
     ? (item.seasons || []).find((season, index) => toPositiveInt(season?.number ?? season?.id, index + 1) === seasonNumber)
@@ -120,7 +122,7 @@ function resolvePlayableFilePath(sourcePath, videoUrl) {
   return findFirstVideoFile(sourcePath);
 }
 
-router.get('/download/:contentType/:id', async (req, res, next) => {
+router.get('/download/:contentType/:id', optionalAdminAuth, async (req, res, next) => {
   try {
     const selection = await findSelectedMedia(req);
     if (selection.error) {

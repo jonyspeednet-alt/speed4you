@@ -178,6 +178,9 @@ export default function MovieDetailsPage() {
             <div style={s.eyebrowRow}>
               <span style={s.eyebrow}>Spotlight</span>
               {movie.quality && <span style={s.qualityBadge}>{movie.quality}</span>}
+              {isAdmin && movie.status === 'draft' && (
+                <span style={s.draftBadge}>Draft</span>
+              )}
             </div>
 
             <h1 style={{ ...s.title, ...(isMobile ? s.titleMobile : {}) }}>{movie.title}</h1>
@@ -290,6 +293,29 @@ export default function MovieDetailsPage() {
                   <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center', ...(isMobile ? { width: '100%', justifyContent: 'flex-start' } : {}) }}>
                     <WatchlistButton contentType="movie" contentId={movie.id} title={movie.title} />
                     <ShareButton title={movie.title} url={`${window.location.origin}/movies/${movie.id}`} />
+                    {isAdmin && movie.status === 'draft' && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            const { adminService } = await import('../services/adminService');
+                            await adminService.publishContent(movie.id);
+                            window.location.reload();
+                          } catch (err) {
+                            alert(`Publish failed: ${err.message}`);
+                          }
+                        }}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '8px',
+                          padding: '10px 20px', borderRadius: '10px',
+                          background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.35)',
+                          color: '#4ade80', fontWeight: '700', fontSize: '0.85rem',
+                          textDecoration: 'none', transition: 'all 180ms ease', cursor: 'pointer',
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg>
+                        Publish
+                      </button>
+                    )}
                     {isAdmin && (
                       <Link to={`/admin/content/${movie.id}/edit`} style={{
                         display: 'inline-flex', alignItems: 'center', gap: '8px',
@@ -402,6 +428,13 @@ s.qualityBadge = {
   padding: '6px 12px', borderRadius: '8px',
   background: 'rgba(255,255,255,0.08)',
   border: '1px solid rgba(255,255,255,0.12)', color: '#ffffff',
+  fontSize: '0.78rem', fontWeight: '700', letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+};
+s.draftBadge = {
+  padding: '6px 12px', borderRadius: '8px',
+  background: 'rgba(234,179,8,0.15)',
+  border: '1px solid rgba(234,179,8,0.35)', color: '#facc15',
   fontSize: '0.78rem', fontWeight: '700', letterSpacing: '0.08em',
   textTransform: 'uppercase',
 };
