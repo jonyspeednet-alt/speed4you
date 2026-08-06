@@ -3,6 +3,7 @@ const router = express.Router();
 const { getItemById, listItems, toCardItem } = require('../data/store');
 const { Joi, validateQuery } = require('../middleware/validate');
 const { AppError } = require('../utils/error');
+const optionalAdminAuth = require('../middleware/optional-admin-auth');
 
 const seriesQuerySchema = Joi.object({
   genre: Joi.string().trim().min(1).max(80),
@@ -38,10 +39,14 @@ router.get('/', validateQuery(seriesQuerySchema), async (req, res, next) => {
   }
 });
 
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', optionalAdminAuth, async (req, res, next) => {
   try {
     const show = await getItemById(req.params.id);
-    if (!show || show.type !== 'series' || show.status !== 'published') {
+    if (!show || show.type !== 'series') {
+      throw new AppError('Series not found', 404, 'NOT_FOUND');
+    }
+    // Allow admins to view draft content; regular users only see published
+    if (show.status !== 'published' && !req.isAdmin) {
       throw new AppError('Series not found', 404, 'NOT_FOUND');
     }
     res.json(show);
@@ -50,10 +55,14 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
-router.get('/:id/seasons', async (req, res, next) => {
+router.get('/:id/seasons', optionalAdminAuth, async (req, res, next) => {
   try {
     const show = await getItemById(req.params.id);
-    if (!show || show.type !== 'series' || show.status !== 'published') {
+    if (!show || show.type !== 'series') {
+      throw new AppError('Series not found', 404, 'NOT_FOUND');
+    }
+    // Allow admins to view draft content; regular users only see published
+    if (show.status !== 'published' && !req.isAdmin) {
       throw new AppError('Series not found', 404, 'NOT_FOUND');
     }
     res.json({
@@ -69,10 +78,14 @@ router.get('/:id/seasons', async (req, res, next) => {
   }
 });
 
-router.get('/:id/seasons/:seasonId/episodes', async (req, res, next) => {
+router.get('/:id/seasons/:seasonId/episodes', optionalAdminAuth, async (req, res, next) => {
   try {
     const show = await getItemById(req.params.id);
-    if (!show || show.type !== 'series' || show.status !== 'published') {
+    if (!show || show.type !== 'series') {
+      throw new AppError('Series not found', 404, 'NOT_FOUND');
+    }
+    // Allow admins to view draft content; regular users only see published
+    if (show.status !== 'published' && !req.isAdmin) {
       throw new AppError('Series not found', 404, 'NOT_FOUND');
     }
     const season = (show.seasons || []).find((item) => String(item.id) === req.params.seasonId || String(item.number) === req.params.seasonId);

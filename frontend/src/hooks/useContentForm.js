@@ -324,6 +324,16 @@ function useContentForm(id) {
     } catch {}
   }, []);
 
+  // Clear cached public detail pages so admins don't see stale draft data
+  const clearDetailPageCache = useCallback((contentId) => {
+    try {
+      if (typeof sessionStorage === 'undefined') return;
+      const slug = String(contentId || '');
+      sessionStorage.removeItem(`portal-movie-details-v1:${slug}`);
+      sessionStorage.removeItem(`portal-series-details-v1:${slug}`);
+    } catch {}
+  }, []);
+
   const handleSubmit = useCallback(async (event) => {
     event.preventDefault();
     try {
@@ -338,6 +348,7 @@ function useContentForm(id) {
       setIsDirty(false);
       setLastSavedAt(Date.now());
       localStorage.removeItem(AUTOSAVE_KEY);
+      clearDetailPageCache(id);
       return { success: true };
     } catch (err) {
       setError(err.message || 'Failed to save content.');
@@ -345,7 +356,7 @@ function useContentForm(id) {
     } finally {
       setLoading(false);
     }
-  }, [formData, itemMeta, isEditMode, id]);
+  }, [formData, itemMeta, isEditMode, id, clearDetailPageCache]);
 
   const handleSaveAndPublish = useCallback(async () => {
     try {
@@ -365,6 +376,7 @@ function useContentForm(id) {
       setPublishedUrl(`/movies/${submissionData.slug || targetId}`);
       setLastSavedAt(Date.now());
       localStorage.removeItem(AUTOSAVE_KEY);
+      clearDetailPageCache(targetId);
       return { success: true };
     } catch (err) {
       setError(err.message || 'Failed to publish content.');
@@ -372,7 +384,7 @@ function useContentForm(id) {
     } finally {
       setLoading(false);
     }
-  }, [formData, itemMeta, isEditMode, id, refreshItemMeta]);
+  }, [formData, itemMeta, isEditMode, id, refreshItemMeta, clearDetailPageCache]);
 
   const handleAssetUpload = useCallback(async (event, kind) => {
     const file = event.target.files?.[0];
