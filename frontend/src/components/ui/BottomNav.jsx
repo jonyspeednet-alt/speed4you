@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   {
     path: '/movies',
     label: 'Movies',
+    resetSearch: true,
     icon: (active) => (
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
         <rect x="3" y="4" width="18" height="16" rx="3" fill={active ? 'currentColor' : 'none'} opacity={active ? '0.18' : '1'} />
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   {
     path: '/series',
     label: 'Series',
+    resetSearch: true,
     icon: (active) => (
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
         <rect x="3" y="5" width="18" height="12" rx="2" fill={active ? 'currentColor' : 'none'} opacity={active ? '0.18' : '1'} />
@@ -45,6 +47,7 @@ const NAV_ITEMS = [
   {
     path: '/browse',
     label: 'Browse',
+    resetSearch: true,
     icon: (active) => (
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
         <circle cx="11" cy="11" r="7" fill={active ? 'currentColor' : 'none'} opacity={active ? '0.18' : '1'} />
@@ -53,6 +56,13 @@ const NAV_ITEMS = [
     ),
   },
 ];
+
+function navLinkTarget(item) {
+  if (item.resetSearch) {
+    return { pathname: item.path, search: '' };
+  }
+  return item.path;
+}
 
 function BottomNav() {
   const location = useLocation();
@@ -93,7 +103,7 @@ function BottomNav() {
         ) : (
           <Link
             key={item.path}
-            to={item.path}
+            to={navLinkTarget(item)}
             className={`bottom-nav-item${isActive ? ' active' : ''}`}
             style={{
               ...styles.item,

@@ -94,15 +94,15 @@ const router = createBrowserRouter([
       },
       {
         path: 'browse',
-        element: withRouteFallback(<BrowsePage />, 'browse'),
+        element: withRouteFallback(<BrowsePage key="browse" />, 'browse'),
       },
       {
         path: 'movies',
-        element: withRouteFallback(<BrowsePage type="movie" />, 'browse'),
+        element: withRouteFallback(<BrowsePage key="movies" type="movie" />, 'browse'),
       },
       {
         path: 'series',
-        element: withRouteFallback(<BrowsePage type="series" />, 'browse'),
+        element: withRouteFallback(<BrowsePage key="series" type="series" />, 'browse'),
       },
       {
         path: 'watchlist',
