@@ -16,6 +16,7 @@ export const seriesService = {
   getById: (id) => apiClient(`/series/${id}`),
   list: (params) => apiClient(`/series?${toQueryString(params)}`),
   search: (query, params) => apiClient(`/search/series?q=${encodeURIComponent(query)}&${toQueryString(params)}`),
+  getPreview: (id) => apiClient(`/series/${id}/preview`),
 };
 
 export default seriesService;
