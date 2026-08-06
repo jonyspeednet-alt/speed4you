@@ -70,6 +70,20 @@ function normalizeQuery(value, fallback = "All") {
   return value;
 }
 
+function resolveBrowseType(routeType, searchParams) {
+  if (routeType) return routeType;
+  return normalizeQuery(searchParams.get("type"), "All");
+}
+
+function filterParamsMatch(searchParams, nextParams) {
+  const current = Object.fromEntries(searchParams.entries());
+  const keys = new Set([...Object.keys(current), ...Object.keys(nextParams)]);
+  for (const key of keys) {
+    if ((current[key] ?? "") !== (nextParams[key] ?? "")) return false;
+  }
+  return true;
+}
+
 function BrowseCard({ item, index, isMobile, isTablet, isTVMode }) {
   return (
     <ContentCard
@@ -101,7 +115,7 @@ function BrowsePage({ type }) {
     normalizeQuery(searchParams.get("collection")),
   );
   const [selectedType, setSelectedType] = useState(() =>
-    normalizeQuery(searchParams.get("type"), type || "All"),
+    resolveBrowseType(type, searchParams),
   );
   const [selectedYear, setSelectedYear] = useState(() =>
     normalizeQuery(searchParams.get("year")),
@@ -134,10 +148,20 @@ function BrowsePage({ type }) {
     setSelectedLanguage(normalizeQuery(searchParams.get("language")));
     setSortBy(normalizeQuery(searchParams.get("sort"), "latest"));
     setSelectedCollection(normalizeQuery(searchParams.get("collection")));
-    setSelectedType(normalizeQuery(searchParams.get("type"), type || "All"));
+    setSelectedType(resolveBrowseType(type, searchParams));
     setSelectedYear(normalizeQuery(searchParams.get("year")));
     setSearchText(searchParams.get("q") || "");
   }, [searchParams, type]);
+
+  // Clear type parameter from URL when on dedicated routes
+  useEffect(() => {
+    if (type && searchParams.has("type")) {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete("type");
+      setSearchParams(newParams, { replace: true });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type]);
 
   useEffect(() => {
     const nextParams = {};
@@ -146,12 +170,17 @@ function BrowsePage({ type }) {
     if (sortBy !== "latest") nextParams.sort = sortBy;
     if (selectedCollection !== "All")
       nextParams.collection = selectedCollection;
-    if (selectedType !== "All") nextParams.type = selectedType;
+    // Dedicated /movies and /series routes already encode the content type.
+    // Only add type parameter for /browse route
+    if (!type && selectedType !== "All") nextParams.type = selectedType;
     if (selectedYear !== "All") nextParams.year = selectedYear;
     if (deferredSearchText.trim()) nextParams.q = deferredSearchText.trim();
-    setSearchParams(nextParams, { replace: true });
+    if (!filterParamsMatch(searchParams, nextParams)) {
+      setSearchParams(nextParams, { replace: true });
+    }
   }, [
     deferredSearchText,
+    searchParams,
     selectedCollection,
     selectedGenre,
     selectedLanguage,
@@ -159,11 +188,14 @@ function BrowsePage({ type }) {
     sortBy,
     selectedType,
     selectedYear,
+    type,
   ]);
+
+  const effectiveType = type || (selectedType !== "All" ? selectedType : undefined);
 
   const params = useMemo(
     () => ({
-      type: selectedType !== "All" ? selectedType : undefined,
+      type: effectiveType,
       genre: selectedGenre !== "All" ? selectedGenre : undefined,
       language: selectedLanguage !== "All" ? selectedLanguage : undefined,
       collection: selectedCollection !== "All" ? selectedCollection : undefined,
@@ -173,7 +205,7 @@ function BrowsePage({ type }) {
       limit: PAGE_SIZE,
     }),
     [
-      selectedType,
+      effectiveType,
       selectedGenre,
       selectedLanguage,
       selectedCollection,
@@ -289,17 +321,17 @@ function BrowsePage({ type }) {
     return () => observer.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
-  const currentType = type || selectedType;
+  const currentType = effectiveType || "All";
   const pageTitle =
-    currentType === "movie"
+    type === "movie"
       ? "Movies"
-      : currentType === "series"
+      : type === "series"
         ? "Series"
         : "Browse";
   const pageDescription =
-    currentType === "movie"
+    type === "movie"
       ? "A sharper movie shelf with stronger filtering, calmer spacing, and better scan rhythm."
-      : currentType === "series"
+      : type === "series"
         ? "Track longer stories with tighter discovery, clearer metadata, and cleaner results."
         : "Explore the full catalog with a redesigned discovery workspace built for speed.";
 

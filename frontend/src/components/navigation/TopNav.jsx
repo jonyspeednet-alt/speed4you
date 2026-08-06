@@ -5,16 +5,23 @@ import { useBreakpoint, useTVMode } from "../../hooks";
 
 const navItems = [
   { path: "/", label: "Home" },
-  { path: "/movies", label: "Movies" },
-  { path: "/series", label: "Series" },
+  { path: "/movies", label: "Movies", resetSearch: true },
+  { path: "/series", label: "Series", resetSearch: true },
   { path: "/tv", label: "Live TV" },
-  { path: "/browse", label: "Browse" },
+  { path: "/browse", label: "Browse", resetSearch: true },
 ];
 
 const partnerSites = [
   { url: "https://bokasoka.net", label: "Bokasoka", icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15l-5-5 1.41-1.41L11 14.17l7.59-7.59L20 8l-9 9z" },
   { url: "https://cinemabazar.net", label: "Cinemabazar", icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15l-5-5 1.41-1.41L11 14.17l7.59-7.59L20 8l-9 9z" },
 ];
+
+function navLinkTarget(item) {
+  if (item.resetSearch) {
+    return { pathname: item.path, search: "" };
+  }
+  return item.path;
+}
 
 function TopNav() {
   const location = useLocation();
@@ -218,7 +225,7 @@ function TopNav() {
                     </a>
                   ) : (
                     <Link
-                      to={item.path}
+                      to={navLinkTarget(item)}
                       className={linkClasses}
                       onMouseEnter={() => setHoveredLink(item.path)}
                       onMouseLeave={() => setHoveredLink(null)}
@@ -262,7 +269,7 @@ function TopNav() {
                         ) : (
                           <Link
                             key={item.path}
-                            to={item.path}
+                            to={navLinkTarget(item)}
                             onClick={() => setIsMoreOpen(false)}
                             className={`top-nav-more-item ${isActive ? "active" : ""}`}
                           >
@@ -494,7 +501,7 @@ function TopNav() {
                       </a>
                     ) : (
                       <Link
-                        to={item.path}
+                        to={navLinkTarget(item)}
                         className={`top-nav-mobile-menu-item ${isActive ? "active" : ""}`}
                         onClick={() => setIsMobileMenuOpen(false)}
                       >
