@@ -22,6 +22,7 @@ const ScannerPage = lazy(() => import('../pages/admin/ScannerPage'));
 const DuplicatesPage = lazy(() => import('../pages/admin/DuplicatesPage'));
 const UsersPage = lazy(() => import('../pages/admin/UsersPage'));
 const SearchAnalyticsPage = lazy(() => import('../pages/admin/SearchAnalyticsPage'));
+const ContentPreviewPage = lazy(() => import('../pages/admin/ContentPreviewPage'));
 
 function withRouteFallback(element, routeType = 'default') {
   const getFallback = () => {
@@ -154,6 +155,10 @@ const router = createBrowserRouter([
       {
         path: 'content/:id/edit',
         element: withRouteFallback(<AddContentPage />, 'default'),
+      },
+      {
+        path: 'content/:id/preview',
+        element: withRouteFallback(<ContentPreviewPage key="admin-preview" />, 'detail'),
       },
       {
         path: 'movies',

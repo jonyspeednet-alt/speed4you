@@ -44,9 +44,7 @@ router.get('/:id/preview', require('../middleware/require-admin-auth'), async (r
     if (!show || show.type !== 'series') {
       throw new AppError('Series not found', 404, 'NOT_FOUND');
     }
-    if (show.status !== 'published') {
-      return res.sendFile(path.join(process.cwd(), 'frontend/public/admin-preview.html'));
-    }
+    // Return series data regardless of status for admin preview
     res.json(show);
   } catch (error) {
     next(error);

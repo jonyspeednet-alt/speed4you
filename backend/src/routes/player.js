@@ -12,10 +12,37 @@ router.get('/:contentType/:id/preview', require('../middleware/require-admin-aut
     if (!item) {
       throw new AppError('Content not found', 404, 'NOT_FOUND');
     }
-    if (item.status !== 'published') {
-      return res.sendFile(path.join(process.cwd(), 'frontend/public/admin-preview.html'));
+    // For admin preview, allow access regardless of status
+    const selection = await findSelectedMediaForPreview(req, item);
+    if (selection.error) {
+      throw new AppError(selection.error.message, selection.error.status, 'MEDIA_SELECTION_ERROR');
     }
-    res.redirect(`/player/${req.params.contentType}/${item.id}`);
+    const { sourcePath, videoUrl, item: contentItem, seasonNumber, episodeNumber } = selection;
+    const resolvedPath = resolvePlayableFilePath(sourcePath, videoUrl);
+    if (!resolvedPath) {
+      if (process.env.REMOTE_MEDIA_BASE_URL && videoUrl) {
+        return res.redirect(`${process.env.REMOTE_MEDIA_BASE_URL}${videoUrl}`);
+      }
+      throw new AppError('Source file is not available for preview', 404, 'NOT_FOUND');
+    }
+    const stat = safeStat(resolvedPath);
+    if (!stat?.isFile()) {
+      throw new AppError('Source file is not available on the server for preview', 404, 'NOT_FOUND');
+    }
+    const ext = path.extname(resolvedPath).toLowerCase() || '.mp4';
+    let filename = contentItem.title;
+    if (contentItem.type === 'series') {
+      const sPad = String(seasonNumber).padStart(2, '0');
+      const ePad = String(episodeNumber).padStart(2, '0');
+      filename = `${contentItem.title} - S${sPad}E${ePad}`;
+    }
+    filename = filename.replace(/[\\/:*?"<>|]/g, '_');
+    const cleanFilename = `${filename}${ext}`;
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(cleanFilename)}"; filename*=UTF-8''${encodeURIComponent(cleanFilename)}`);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Length', stat.size);
+    res.setHeader('Cache-Control', 'no-cache');
+    fs.createReadStream(resolvedPath).pipe(res);
   } catch (error) {
     next(error);
   }
@@ -52,6 +79,27 @@ async function findSelectedMedia(req) {
   if (!item) return { error: { status: 404, message: 'Content not found' } };
   if (requestedType && item.type !== requestedType) return { error: { status: 404, message: 'Content not found' } };
   if (item.status !== 'published') return { error: { status: 404, message: 'Content not found' } };
+
+  const selectedSeason = item.type === 'series'
+    ? (item.seasons || []).find((season, index) => toPositiveInt(season?.number ?? season?.id, index + 1) === seasonNumber)
+    || item.seasons?.[0] : null;
+  const selectedEpisode = item.type === 'series'
+    ? (selectedSeason?.episodes || []).find((episode, index) => toPositiveInt(episode?.number ?? episode?.id, index + 1) === episodeNumber)
+    || selectedSeason?.episodes?.[episodeNumber - 1] || selectedSeason?.episodes?.[0] : null;
+
+  const videoUrl = item.type === 'movie' ? item.videoUrl : selectedEpisode?.videoUrl;
+  const sourcePath = item.type === 'movie' ? item.sourcePath : selectedEpisode?.sourcePath || selectedSeason?.sourcePath || item.sourcePath;
+  if (!videoUrl && !sourcePath) return { error: { status: 404, message: 'No playable source found' } };
+
+  return { item, selectedSeason, selectedEpisode, videoUrl, sourcePath, seasonNumber, episodeNumber };
+}
+
+async function findSelectedMediaForPreview(req, item) {
+  const requestedType = String(req.params.contentType || '').toLowerCase();
+  const seasonNumber = toPositiveInt(req.query.season, 1);
+  const episodeNumber = toPositiveInt(req.query.episode, 1);
+  
+  if (requestedType && item.type !== requestedType) return { error: { status: 404, message: 'Content not found' } };
 
   const selectedSeason = item.type === 'series'
     ? (item.seasons || []).find((season, index) => toPositiveInt(season?.number ?? season?.id, index + 1) === seasonNumber)
