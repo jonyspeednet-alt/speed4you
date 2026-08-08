@@ -673,6 +673,29 @@ async function enrichItemWithMetadata(item) {
       } catch {}
     }
 
+    // Strategy 12: Try searching DuckDuckGo for the IMDb/TMDB title or ID when direct TMDB search returns empty
+    if (!results.length && parsedTitle && parsedTitle.length >= 3) {
+      try {
+        const queryStr = `${parsedTitle} ${item.year || ''} site:imdb.com/title OR site:themoviedb.org/movie`;
+        const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(queryStr)}`;
+        const fetch = require('node-fetch');
+        const res = await fetch(searchUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+          timeout: 4000
+        });
+        const html = await res.text();
+        const ttMatch = html.match(/tt\d{7,8}/i);
+        if (ttMatch) {
+          const imdbId = ttMatch[0];
+          const findResp = await tmdbFetchJson(`/find/${imdbId}`, { external_source: 'imdb_id' });
+          const matches = mediaType === 'tv' ? findResp.tv_results : findResp.movie_results;
+          if (Array.isArray(matches) && matches.length > 0) {
+            results = matches;
+          }
+        }
+      } catch {}
+    }
+
     if (!results.length) {
       return {
         ...enrichedItem,
