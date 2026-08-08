@@ -22,6 +22,7 @@ const {
   saveScannerState,
   upsertScannedItem,
 } = require('../data/store');
+const { setAppState } = require('../data/store/base');
 
 const { enrichItemWithMetadata, getEnhancedCacheStats } = require('./scanner-enhanced-metadata');
 const { retryAsync } = require('./scanner-error-handler');
@@ -162,6 +163,10 @@ function cacheFileRelocation(oldPath, newPath) {
     newPath,
     detectedAt: Date.now(),
   });
+
+  // ── PERSIST: save cache snapshot to DB so server restarts don't lose relocation data ──
+  // Fire-and-forget; don't block the scan for a cache write.
+  setFileRelocationCachePersisted().catch(() => {});
 }
 
 function getCachedRelocation(oldPath) {
@@ -180,6 +185,40 @@ function getFileRelocationCacheStats() {
     maxSize: FILE_RELOCATION_CACHE_MAX,
     ttlMs: FILE_RELOCATION_CACHE_TTL_MS,
   };
+}
+
+// ── PERSISTENCE HELPERS ────────────────────────────────────────────────────────
+// Save the in-memory relocation cache to DB so it survives restarts.
+async function setFileRelocationCachePersisted() {
+  const snapshot = {};
+  const now = Date.now();
+  for (const [oldPath, entry] of fileRelocationCache.entries()) {
+    if (now - entry.detectedAt <= FILE_RELOCATION_CACHE_TTL_MS) {
+      snapshot[oldPath] = entry;
+    }
+  }
+  try {
+    await setAppState('file_relocation_cache', snapshot);
+  } catch { /* non-critical */ }
+}
+
+// Load the persisted relocation cache back into memory (called on startup).
+async function loadFileRelocationCachePersisted() {
+  try {
+    const snapshot = await getAppState('file_relocation_cache', {});
+    const now = Date.now();
+    let loaded = 0;
+    for (const [oldPath, entry] of Object.entries(snapshot || {})) {
+      if (entry && entry.newPath && now - (entry.detectedAt || 0) <= FILE_RELOCATION_CACHE_TTL_MS) {
+        fileRelocationCache.set(oldPath, entry);
+        loaded++;
+      }
+    }
+    if (loaded > 0) {
+      // eslint-disable-next-line no-console
+      console.log(`[scanner] Restored ${loaded} file relocation cache entries from DB.`);
+    }
+  } catch { /* non-critical */ }
 }
 
 function requestScanAbort() {
@@ -2570,6 +2609,21 @@ async function runPostScanTasks(summary) {
          ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
         [JSON.stringify(scanSummary)],
       );
+
+      // ── SCAN HISTORY: Maintain last 10 scan summaries in 'last_scan_history' ──
+      try {
+        const historyRes = await pool2.query(`SELECT value FROM app_state WHERE key = 'last_scan_history' LIMIT 1`);
+        const currentHistory = Array.isArray(historyRes.rows[0]?.value) ? historyRes.rows[0].value : [];
+        const updatedHistory = [scanSummary, ...currentHistory].slice(0, 10);
+        await pool2.query(
+          `INSERT INTO app_state (key, value, updated_at)
+           VALUES ('last_scan_history', $1::jsonb, NOW())
+           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+          [JSON.stringify(updatedHistory)],
+        );
+      } catch {
+        // history save failure non-critical
+      }
     } catch {
       // non-critical
     }
