@@ -20,6 +20,7 @@ const NOISE_PATTERNS = [
   /\b(ddp?[+-]?\d([.\s]*\d)?|ddp?|dolby|atmos|ac3|dts|aac|mp3|truehd|he-aac)\b/gi,
   /\b(katmoviehd|psa|yts|yify|rarbg|fgt|pahe|galaxyrg|tgx|qxr|sartre|tomboc|joy|etrg|juggs|axxo|shaanig)\b/gi,
   /\b(old|repack|proper|v\d+|temp|sample|copy)\b/gi,
+  /\bHQ\b/gi,
   /\[[^\]]+\]/g,
   /\{[^}]+\}/g,
 ];
@@ -60,6 +61,9 @@ function extractCoreTitle(raw) {
 function cleanSearchTitle(value) {
   let normalized = String(value || '');
   
+  // Decode URL-encoded spaces (e.g., %20)
+  normalized = normalized.replace(/%20/g, ' ');
+
   // Preserve Unicode characters - only remove file extension first
   normalized = normalized.replace(/\.[a-z0-9]{2,4}$/i, '');
   
@@ -76,6 +80,19 @@ function cleanSearchTitle(value) {
   for (const pattern of NOISE_PATTERNS) {
     normalized = normalized.replace(pattern, ' ');
   }
+
+  // Strip trailing "p" that leaked from resolution tags (e.g. "Turbulencep" -> "Turbulence")
+  const REAL_P_WORDS = new Set([
+    'stop','loop','drop','wrap','help','sleep','keep','step','deep','cheap',
+    'pump','jump','dump','bump','hump','lump','ramp','camp','lamp','stamp',
+    'hemp','temp','shop','crop','prop','drip','grip','trip','chip','ship',
+    'clip','flip','snoop','swoop','troop','stoop','scalp','yelp','gulp','pulp'
+  ]);
+  normalized = normalized.replace(/\b([a-zA-Z]{3,})p\b/g, (match, base) => {
+    if (REAL_P_WORDS.has(match.toLowerCase())) return match;
+    if (/^\d+$/.test(base)) return match;
+    return base;
+  });
 
   // Add space between camelCase words (Unicode-safe)
   normalized = normalized.replace(/([a-z])([A-Z])/g, '$1 $2');
@@ -429,15 +446,17 @@ async function enrichItemWithMetadata(item) {
   const parsedTitle = cleanSearchTitle(item.title);
 
   // Skip re-enrichment for items already matched with complete metadata, BUT only if:
-  // 1. Metadata confidence is high (>= 70%)
-  // 2. Current parsedTitle is actually derived from the current title (sanity check)
-  // 3. Metadata is not too old (re-enrich if older than 30 days)
+  // 1. Metadata confidence is reasonable (>= 40%)
+  // 2. Both poster AND backdrop are valid URLs
+  // 3. Current parsedTitle is actually derived from the current title (sanity check)
+  // 4. Metadata is not too old (re-enrich if older than 30 days)
   const shouldSkipReenrichment = 
     item.metadataStatus === 'matched' &&
     isGoodUrl(item.poster) &&
+    isGoodUrl(item.backdrop) &&
     item.description &&
     item.description.trim().length > 0 &&
-    (item.metadataConfidence || 0) >= 70 &&
+    (item.metadataConfidence || 0) >= 40 &&
     isParsedTitleValid(item.title, item.parsedTitle) &&
     !isMetadataStale(item.metadataUpdatedAt);
 
@@ -629,6 +648,23 @@ async function enrichItemWithMetadata(item) {
       } catch {}
     }
 
+    // Strategy 10: For non-Latin script titles (Devanagari, Tamil, Telugu, Malayalam, Bengali)
+    // try searching TMDB with native language query
+    if (!results.length && /[\u0900-\u097F\u0980-\u09FF\u0B80-\u0BFF\u0C00-\u0C7F\u0D00-\u0D7F]/.test(item.title)) {
+      const lang = inferOriginalLanguage(item);
+      const langMap = { hi: 'hi-IN', bn: 'bn-BD', ta: 'ta-IN', te: 'te-IN', ml: 'ml-IN', kn: 'kn-IN' };
+      const langCode = langMap[lang];
+      if (langCode) {
+        try {
+          const nativeResp = await tmdbFetchJson(`/search/${mediaType}`, {
+            query: item.title,
+            language: langCode,
+          });
+          results = Array.isArray(nativeResp.results) ? nativeResp.results : [];
+        } catch {}
+      }
+    }
+
     if (!results.length) {
       return {
         ...enrichedItem,
@@ -684,7 +720,7 @@ async function enrichItemWithMetadata(item) {
       language: resolvedLanguage,
       // If TMDb match confidence is 70% or greater, auto-publish directly to website
       status: confidence >= 70 ? 'published' : 'draft',
-      metadataStatus: confidence >= 25 ? 'matched' : (applyTmdb ? 'needs_review' : 'not_found'),
+      metadataStatus: applyTmdb ? 'matched' : (confidence >= 25 ? 'needs_review' : 'not_found'),
       metadataProvider: 'tmdb',
       metadataConfidence: confidence,
       metadataUpdatedAt: new Date().toISOString(),
