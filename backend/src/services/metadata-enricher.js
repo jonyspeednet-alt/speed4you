@@ -211,37 +211,35 @@ function scoreCandidate(candidate, item) {
   const searchTitle = cleanSearchTitle(item.title).toLowerCase();
   const candidateTitle = cleanSearchTitle(String(candidate.title || candidate.name || '')).toLowerCase();
   const candidateOriginalTitle = String(candidate.original_title || candidate.original_name || '').toLowerCase();
-  const targetYear = Number(item.year) || null;
+  const targetYear = Number(item.year) || extractYearFromRawTitle(item.title) || extractYearFromRawTitle(item.sourcePath);
   const candidateYear = Number((candidate.release_date || candidate.first_air_date || '').slice(0, 4)) || null;
   const targetLanguage = inferOriginalLanguage(item);
   let score = 0;
 
-  console.log('[scoreCandidate] searchTitle:', searchTitle);
-  console.log('[scoreCandidate] candidateTitle:', candidateTitle);
-  console.log('[scoreCandidate] candidateOriginalTitle:', candidateOriginalTitle);
-  console.log('[scoreCandidate] targetYear:', targetYear, 'candidateYear:', candidateYear);
-
   if (candidateTitle === searchTitle || candidateOriginalTitle === searchTitle) {
-    score += 55;
-    console.log('[scoreCandidate] Exact match +55');
+    score += 75;
   } else if (candidateTitle.includes(searchTitle) || searchTitle.includes(candidateTitle)) {
-    score += 35;
-    console.log('[scoreCandidate] Partial match +35');
+    score += 60;
+  } else if (candidate.poster_path || candidate.backdrop_path) {
+    score += 45;
   }
 
   if (targetYear && candidateYear) {
     const delta = Math.abs(targetYear - candidateYear);
-    if (delta === 0) score += 25;
-    else if (delta === 1) score += 15;
-    else if (delta === 2) score += 6;
-    console.log('[scoreCandidate] Year delta:', delta, 'points added:', delta === 0 ? 25 : delta === 1 ? 15 : delta === 2 ? 6 : 0);
+    if (delta === 0) score += 20;
+    else if (delta === 1) score += 10;
+    else if (delta === 2) score += 5;
+  } else if (candidateYear) {
+    score += 10;
   }
 
-  if (candidate.original_language === targetLanguage) score += 12;
-  score += Math.min(Number(candidate.popularity || 0) / 10, 8);
+  if (candidate.original_language === targetLanguage) score += 10;
+  if (candidate.poster_path) score += 10;
+  if (candidate.overview && candidate.overview.length > 20) score += 5;
   
-  console.log('[scoreCandidate] Final score:', score);
-  return Math.round(score);
+  score += Math.min(Number(candidate.popularity || 0) / 10, 5);
+  
+  return Math.min(100, Math.round(score));
 }
 
 async function tmdbFetchJson(pathname, params = {}) {
