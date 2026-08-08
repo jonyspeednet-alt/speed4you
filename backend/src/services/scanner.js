@@ -25,6 +25,7 @@ const {
 
 const { enrichItemWithMetadata, getEnhancedCacheStats } = require('./scanner-enhanced-metadata');
 const { retryAsync } = require('./scanner-error-handler');
+const { listDirectoryEntriesSafe, isPathReadable } = require('./scanner-permission-handler');
 const {
   buildSeriesSeasons: buildSeriesSeasonsFromParser,
   cleanTitle,
@@ -395,9 +396,8 @@ async function renameMediaForItem(item) {
 
 function listDirectoryEntries(dirPath) {
   try {
-    return fs.readdirSync(dirPath, { withFileTypes: true })
-      .filter((entry) => entry.name !== DUPLICATE_HOLD_DIR_NAME)
-      .filter((entry) => !entry.name.startsWith('.'));
+    return listDirectoryEntriesSafe(dirPath)
+      .filter((entry) => entry.name !== DUPLICATE_HOLD_DIR_NAME);
   } catch (err) {
     // Log so a broken/unreachable mount (EACCES/ENOENT/EIO on network storage) is
     // distinguishable from a genuinely empty folder — silently returning [] here previously
@@ -781,7 +781,7 @@ function listFiles(dirPath) {
 
 function getFolderFingerprint(folderPath) {
   try {
-    const entries = fs.readdirSync(folderPath, { withFileTypes: true });
+    const entries = listDirectoryEntriesSafe(folderPath);
     let newestTime = 0;
     let videoCount = 0;
     let imageCount = 0;
@@ -803,7 +803,11 @@ function getFolderFingerprint(folderPath) {
     }
 
     return `${entries.length}:${videoCount}:${imageCount}:${Math.round(newestTime)}`;
-  } catch {
+  } catch (err) {
+    // Log permission errors specifically
+    if (err.code === 'EACCES' || err.code === 'EPERM') {
+      logScannerEvent('fingerprint_permission_error', { path: folderPath, error: err.message });
+    }
     return 'missing';
   }
 }
@@ -815,6 +819,12 @@ function collectDirectoriesIncrementally(rootPath, maxDepth = DEFAULT_MOVIE_DEPT
   while (queue.length) {
     const current = queue.shift();
     if (current.depth >= maxDepth) {
+      continue;
+    }
+
+    // Skip directories that aren't readable
+    if (!isPathReadable(current.folderPath)) {
+      logScannerEvent('directory_not_readable', { path: current.folderPath });
       continue;
     }
 
@@ -1069,8 +1079,10 @@ function createBaseScannerItem(root, values) {
   if (values.sourcePath) {
     try {
       const stat = fs.statSync(values.sourcePath);
-      item.fileSize = stat.size;
-      item.fileLastModified = stat.mtime.toISOString();
+      if (stat.isFile()) {
+        item.fileSize = stat.size;
+        item.fileLastModified = stat.mtime.toISOString();
+      }
     } catch {
       // File doesn't exist yet or can't be stat'd - skip checksum
     }
@@ -1082,6 +1094,7 @@ function createBaseScannerItem(root, values) {
 function hasFileChanged(filePath, storedSize, storedLastModified) {
   try {
     const stat = fs.statSync(filePath);
+    if (!stat.isFile()) return false;
     if (storedSize && stat.size !== storedSize) return true;
     if (storedLastModified && stat.mtime.toISOString() !== storedLastModified) return true;
     return false;
@@ -1450,6 +1463,21 @@ async function processMovieRoot(root, summary, progressCallback, scanContext, ex
     folders: { ...(rootState.folders || {}) },
     lastCompletedAt: '',
   };
+  
+  // Check if root path is readable before processing
+  if (!isPathReadable(root.scanPath)) {
+    logScannerEvent('root_permission_error', { 
+      rootId: root.id, 
+      path: root.scanPath,
+      error: 'Root path not readable by scanner user' 
+    });
+    updateRootProgress(summary, root.id, {
+      status: 'error',
+      errors: ['Root path not readable by scanner user - permission denied'],
+    });
+    return;
+  }
+  
   const candidateFolders = collectDirectoriesIncrementally(root.scanPath, root.maxDepth || DEFAULT_MOVIE_DEPTH);
   const seenSignatures = new Set();
 
@@ -1796,6 +1824,21 @@ async function processSeriesRoot(root, summary, progressCallback, scanContext, e
     folders: { ...(rootState.folders || {}) },
     lastCompletedAt: '',
   };
+  
+  // Check if root path is readable before processing
+  if (!isPathReadable(root.scanPath)) {
+    logScannerEvent('root_permission_error', { 
+      rootId: root.id, 
+      path: root.scanPath,
+      error: 'Root path not readable by scanner user' 
+    });
+    updateRootProgress(summary, root.id, {
+      status: 'error',
+      errors: ['Root path not readable by scanner user - permission denied'],
+    });
+    return;
+  }
+  
   const rawFolders = listDirectories(root.scanPath);
 
   // Group sibling folders that share a base show name (differing only by season suffix)
@@ -2127,7 +2170,7 @@ async function getScannerHealth() {
   return {
     checkedAt: new Date().toISOString(),
     ...rootsHealth,
-    recentRuns: getScannerRuns(10),
+    recentRuns: await getScannerRuns(10),
     metadataCache: getEnhancedCacheStats(),
     fileRelocationCache: getFileRelocationCacheStats(),
     currentJob: serializeJob(currentScanJob),
@@ -2320,6 +2363,7 @@ async function scanSelectedRoots(selectedRootIds = [], progressCallback, options
     skipped: normalizedSummary.skipped,
     errors: normalizedSummary.errors,
     rootResults: normalizedSummary.rootResults,
+    triggerSource: currentScanJob?.triggerSource || 'manual',
   });
 
   logScannerEvent('scan_completed', {
@@ -2615,6 +2659,7 @@ async function startScanJob(selectedRootIds = [], options = {}) {
 
   const rootIds = Array.isArray(selectedRootIds) ? [...selectedRootIds] : [];
   const dryRun = !!options.dryRun;
+  const triggerSource = String(options.triggerSource || 'manual');
   currentScanJob = {
     id: `${Date.now()}`,
     status: 'running',
@@ -2624,6 +2669,7 @@ async function startScanJob(selectedRootIds = [], options = {}) {
     owner: SCANNER_INSTANCE_ID,
     lockedAt: new Date().toISOString(),
     rootIds,
+    triggerSource,
     summary: createSummary(getEffectiveRoots().filter((root) => !rootIds.length || rootIds.includes(root.id))),
     error: '',
   };
@@ -2879,7 +2925,7 @@ function bootstrapAutoScanScheduler() {
         return;
       }
       logScannerEvent('auto_scan_interval_triggered', { intervalMinutes: AUTO_SCAN_INTERVAL_MINUTES });
-      Promise.resolve(startScanJob([])).catch((err) => logScannerEvent('auto_scan_failed', { error: err.message }));
+      Promise.resolve(startScanJob([], { triggerSource: 'auto' })).catch((err) => logScannerEvent('auto_scan_failed', { error: err.message }));
       // Schedule the next run after the interval (scan may still be running;
       // the running-check above guards against true overlap)
       scheduleNext();
