@@ -59,7 +59,7 @@ function extractCoreTitle(raw) {
 }
 
 function cleanSearchTitle(value) {
-  let normalized = String(value || '');
+  let normalized = String(value || '').normalize('NFC');
   
   // Decode URL-encoded spaces (e.g., %20)
   normalized = normalized.replace(/%20/g, ' ');
