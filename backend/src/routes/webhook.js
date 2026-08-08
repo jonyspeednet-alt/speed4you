@@ -25,7 +25,8 @@ router.post('/scan', requireSecret, async (req, res) => {
     const job = await startScanJob(rootIds, { dryRun, triggerSource: 'webhook' });
     res.status(202).json({ ok: true, jobId: job?.id || null, rootIds, dryRun });
   } catch (err) {
-    res.status(500).json({ error: err.message || 'Failed to start scan' });
+    const isConflict = err.message && err.message.toLowerCase().includes('already running');
+    res.status(isConflict ? 409 : 500).json({ error: err.message || 'Failed to start scan' });
   }
 });
 
