@@ -1062,6 +1062,7 @@ async function hasAllCandidatesInCatalog(candidates = [], existingSignatureSet =
 
 function createBaseScannerItem(root, values) {
   const item = {
+    status: 'published',
     language: root.language,
     category: root.category,
     sourceRootId: root.id,
