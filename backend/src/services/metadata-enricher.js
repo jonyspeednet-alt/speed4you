@@ -709,7 +709,7 @@ async function enrichItemWithMetadata(item) {
     };
     const resolvedLanguage = languageMap[langCode] || enrichedItem.language || 'English';
 
-    const applyTmdb = confidence >= 40;
+    const applyTmdb = confidence >= 15;
     return {
       ...enrichedItem,
       description: enrichedItem.description || (applyTmdb ? details.overview : ''),
