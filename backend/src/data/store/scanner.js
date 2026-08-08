@@ -1,7 +1,21 @@
 const fs = require('fs');
+const path = require('path');
+const { exec } = require('child_process');
 const { db, appStateCache, ensureContentStore, setAppState } = require('./base');
 const { MAX_SCANNER_RUNS } = require('./constants');
 const { toSafeInteger, rowToScannerRoot, rowToScannerRun, normalizeItem, normalizeTitleKey, titlesFuzzyMatch, extractTypedColumns, attachDuplicateMetadata } = require('./helpers');
+
+// Async wrapper for exec — avoids blocking the Node.js event loop
+// when running shell commands (e.g. `find`) during stale-item deletion checks.
+function execAsync(cmd, opts = {}) {
+  return new Promise((resolve, reject) => {
+    exec(cmd, { ...opts }, (err, stdout) => {
+      if (err && err.killed) resolve(''); // timed out → treat as not found
+      else if (err && err.code !== 1) reject(err);
+      else resolve(stdout || '');
+    });
+  });
+}
 
 function loadScannerLog() {
   try {
@@ -797,17 +811,20 @@ async function deleteScannerItemsNotInSignatures(sourceRootId, scanSignatures = 
       // As a final guard, check if the file's basename exists somewhere else
       // under the media root on disk. If it does, hold off on deletion —
       // Root B's scan will claim this record when it runs.
+      // Uses async exec (not execSync) to avoid blocking the Node.js event loop.
       if (!claimedByOtherRoot) {
-        const basename = require('path').basename(p.sourcePath);
+        const basename = path.basename(p.sourcePath);
         const mediaRoot = process.env.SCANNER_MEDIA_ROOT || '/var/www/html';
+        // Sanitize filename to prevent shell injection
+        const safeBasename = basename.replace(/["'\\`$;|&<>()]/g, '_');
+        const safeSrcPath = p.sourcePath.replace(/["'\\`$;|&<>()]/g, '_');
         try {
-          const { execSync } = require('child_process');
-          // Use find with maxdepth 5 to avoid hanging on massive trees
-          const found = execSync(
-            `find "${mediaRoot}" -maxdepth 5 -name "${basename.replace(/"/g, '')}" -not -path "${p.sourcePath}" 2>/dev/null | head -1`,
-            { timeout: 5000, encoding: 'utf8' }
-          ).trim();
-          if (found) claimedByOtherRoot = true;
+          // maxdepth 4 for speed; head -1 stops find early once a match is found
+          const found = await execAsync(
+            `find "${mediaRoot}" -maxdepth 4 -name "${safeBasename}" -not -path "${safeSrcPath}" 2>/dev/null | head -1`,
+            { timeout: 8000 }
+          );
+          if (found.trim()) claimedByOtherRoot = true;
         } catch { /* find failed or timed out — proceed with deletion */ }
       }
 
