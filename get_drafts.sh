@@ -1,0 +1,2 @@
+#!/bin/bash
+PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -c "SELECT id, title, status, source_type, source_path, metadata_status, metadata_confidence, metadata_updated_at, duplicate_count FROM content_catalog WHERE status = 'draft' ORDER BY id LIMIT 50;"

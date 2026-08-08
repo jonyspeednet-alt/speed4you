@@ -320,29 +320,40 @@ exports.getScannerRoots = (req, res) => {
 };
 
 exports.getScannerDrafts = async (req, res) => {
-  const latestOnly = req.query.latestOnly !== 'false';
-  const page = Math.max(1, Number(req.query.page) || 1);
-  const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
-  const offset = (page - 1) * limit;
-  const latestRunId = latestOnly ? getScannerRuns(1)[0]?.id : '';
-  const result = await listItems({
-    source: 'scanner',
-    status: req.query.status || 'draft',
-    ...(latestRunId ? { scanRunId: latestRunId } : {}),
-  }, offset, limit, 'latest', true, true);
-  res.json({
-    ...result,
-    page,
-    limit,
-    hasMore: page * limit < Number(result.total || 0),
-  });
+  try {
+    const latestOnly = req.query.latestOnly !== 'false';
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
+    const offset = (page - 1) * limit;
+    const runs = await getScannerRuns(1);
+    const latestRunId = latestOnly ? runs[0]?.id : '';
+    const result = await listItems({
+      source: 'scanner',
+      status: req.query.status || 'draft',
+      ...(latestRunId ? { scanRunId: latestRunId } : {}),
+    }, offset, limit, 'latest', true, true);
+    res.json({
+      ...result,
+      page,
+      limit,
+      hasMore: page * limit < Number(result.total || 0),
+    });
+  } catch (err) {
+    console.error('[admin] Error getting scanner drafts:', err);
+    res.status(500).json({ error: 'Failed to retrieve scanner drafts' });
+  }
 };
 
 
-exports.getScannerLogs = (req, res) => {
-  const limit = Number(req.query.limit || 10);
-  const runs = getScannerRuns(limit);
-  res.json({ items: runs, total: runs.length });
+exports.getScannerLogs = async (req, res) => {
+  try {
+    const limit = Number(req.query.limit || 10);
+    const runs = await getScannerRuns(limit);
+    res.json({ items: runs, total: runs.length });
+  } catch (err) {
+    console.error('[admin] Error getting scanner logs:', err);
+    res.status(500).json({ error: 'Failed to retrieve scanner logs' });
+  }
 };
 
 exports.getScannerEventLog = (req, res) => {

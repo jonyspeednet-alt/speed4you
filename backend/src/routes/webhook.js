@@ -22,7 +22,7 @@ router.post('/scan', requireSecret, async (req, res) => {
     const dryRun = req.query.dryRun === 'true' || req.body?.dryRun === true;
     const rootIds = rootId ? [rootId] : [];
     const { startScanJob } = require('../services/scanner');
-    const job = await startScanJob(rootIds, { dryRun });
+    const job = await startScanJob(rootIds, { dryRun, triggerSource: 'webhook' });
     res.status(202).json({ ok: true, jobId: job?.id || null, rootIds, dryRun });
   } catch (err) {
     res.status(500).json({ error: err.message || 'Failed to start scan' });
