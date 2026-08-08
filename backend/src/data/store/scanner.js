@@ -545,11 +545,17 @@ async function upsertScannedItem(payload) {
     category:       current.category       || payload.category   || '',
   };
 
-  // For metadata: only update if scan found a better match or current is pending
+  // For metadata: only update if scan found a better match or current is pending.
+  // ALSO force a full metadata refresh when the scanSignature changed — this means
+  // the file was renamed on disk, so we must re-fetch TMDB data (title, poster, etc.)
+  // from the new filename rather than keeping stale data from the old name.
+  const fileWasRenamed = payload.scanSignature && current.scanSignature
+    && payload.scanSignature !== current.scanSignature;
   const shouldUpdateMetadata = !isUserManaged
     || current.metadataStatus === 'pending'
     || current.metadataStatus === 'not_found'
-    || current.metadataStatus === 'skipped';
+    || current.metadataStatus === 'skipped'
+    || fileWasRenamed;
   const metaFields = shouldUpdateMetadata
     ? {
         tmdbId:              payload.tmdbId              || current.tmdbId,
