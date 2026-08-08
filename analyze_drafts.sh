@@ -1,0 +1,2 @@
+#!/bin/bash
+PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -d isp_entertainment -c "SELECT id, title, payload->>'originalTitle' as original_title, payload->>'parsedTitle' as parsed_title, payload->>'year' as year, language FROM content_catalog WHERE status = 'draft' AND metadata_status = 'not_found' LIMIT 10;"

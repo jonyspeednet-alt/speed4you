@@ -1,0 +1,2 @@
+#!/bin/bash
+PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -d isp_entertainment -c "UPDATE content_catalog SET status = 'published' WHERE status = 'draft' AND metadata_status = 'matched' AND (payload->>'metadataConfidence')::numeric >= 50;"

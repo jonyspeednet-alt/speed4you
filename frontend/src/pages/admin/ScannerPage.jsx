@@ -163,6 +163,8 @@ export default function ScannerPage() {
   const [confirmStop, setConfirmStop] = useState(false);
   const [confirmClearCache, setConfirmClearCache] = useState(false);
   const [filter, setFilter] = useState('all');
+  const [selectedRun, setSelectedRun] = useState(null);
+  const [runFilter, setRunFilter] = useState('all');
 
   // The current-job query drives whether a scan is active. It self-schedules: poll fast while
   // running, stop when idle (avoids hammering 3 endpoints every 2-5s forever). Starting a scan
@@ -214,6 +216,12 @@ export default function ScannerPage() {
   const roots = health?.roots || [];
   const recentRuns = logsData?.items || health?.recentRuns || [];
   const rootResults = job?.summary?.rootResults || [];
+  
+  // Filter recent runs by status
+  const filteredRuns = useMemo(() => {
+    if (runFilter === 'all') return recentRuns;
+    return recentRuns.filter(run => run.status === runFilter);
+  }, [recentRuns, runFilter]);
   // Only the job's own status decides "running". Previously a root left in 'pending' after the
   // job ended pinned the UI to "running" forever (Run stayed disabled, Stop stayed enabled).
   const isRunning = job?.status === 'running';
@@ -618,21 +626,50 @@ export default function ScannerPage() {
       </div>
 
       {/* Recent Runs Timeline */}
-      {recentRuns.length > 0 && (
-        <div style={{ background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: '16px', padding: '20px 24px' }}>
-          <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem', fontWeight: '700', color: TEXT, margin: '0 0 16px 0' }}>
+      <div style={{ background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: '16px', padding: '20px 24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem', fontWeight: '700', color: TEXT, margin: '0' }}>
             <Icon name="history" size={16} color={TEXT2} />
             Recent Runs
-            <span style={{ fontSize: '0.78rem', color: TEXT3, fontWeight: '600' }}>· {recentRuns.length}</span>
+            {recentRuns.length > 0 && <span style={{ fontSize: '0.78rem', color: TEXT3, fontWeight: '600' }}>· {recentRuns.length}</span>}
           </h3>
+          <select 
+            value={runFilter} 
+            onChange={(e) => setRunFilter(e.target.value)}
+            style={{
+              fontSize: '0.75rem',
+              padding: '4px 8px',
+              borderRadius: '6px',
+              background: SURFACE2,
+              border: `1px solid ${BORDER}`,
+              color: TEXT2,
+              cursor: 'pointer'
+            }}
+          >
+            <option value="all">All Status</option>
+            <option value="running">Running</option>
+            <option value="completed">Completed</option>
+            <option value="completed_with_errors">With Errors</option>
+            <option value="failed">Failed</option>
+          </select>
+        </div>
+        {filteredRuns.length > 0 ? (
           <div ref={runsContainerRef} style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '0', maxHeight: '400px', overflowY: 'auto' }}>
-            {recentRuns.map((run, i) => {
+            {filteredRuns.map((run, i) => {
               const dur = run.startedAt && run.completedAt
                 ? Math.round((new Date(run.completedAt) - new Date(run.startedAt)) / 1000)
                 : null;
-              const isLast = i === recentRuns.length - 1;
+              const isLast = i === filteredRuns.length - 1;
+              const isRunning = run.status === 'running';
+              const runningElapsed = useElapsed(isRunning ? run.startedAt : null);
+              const displayDur = isRunning ? runningElapsed : dur;
               return (
-                <div key={run.id || i} className="scn-anim-in" style={{ display: 'flex', gap: '14px', position: 'relative' }}>
+                <div 
+                  key={run.id || i} 
+                  className="scn-anim-in" 
+                  style={{ display: 'flex', gap: '14px', position: 'relative', cursor: 'pointer' }}
+                  onClick={() => setSelectedRun(run)}
+                >
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: '24px' }}>
                     <div style={{
                       width: '12px', height: '12px', borderRadius: '50%',
@@ -649,18 +686,29 @@ export default function ScannerPage() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
                         <StatusPill status={run.status} size="sm" />
+                        {run.triggerSource && run.triggerSource !== 'manual' && (
+                          <span style={{ 
+                            fontSize: '0.68rem', 
+                            color: run.triggerSource === 'auto' ? '#60a5fa' : '#a78bfa',
+                            fontWeight: '600',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em'
+                          }}>
+                            {run.triggerSource}
+                          </span>
+                        )}
                         {run.rootIds?.length > 0 && (
                           <span
-                            style={{ fontSize: '0.72rem', color: TEXT2 }}
-                            title={run.rootIds.map(id => roots.find(r => String(r.id) === String(id))?.label || id).join(', ')}
+                            style={{ fontSize: '0.72rem', color: TEXT2, fontWeight: '500' }}
                           >
-                            {run.rootIds.length} root{run.rootIds.length > 1 ? 's' : ''}
+                            {run.rootIds.slice(0, 2).map(id => roots.find(r => String(r.id) === String(id))?.label || id).join(', ')}
+                            {run.rootIds.length > 2 && <span style={{ color: TEXT3 }}> +{run.rootIds.length - 2} more</span>}
                           </span>
                         )}
                       </div>
                       <div style={{ fontSize: '0.72rem', color: TEXT3 }}>
                         {run.startedAt ? new Date(run.startedAt).toLocaleString() : ''}
-                        {dur !== null && <span style={{ color: TEXT2, marginLeft: '8px' }}>· {dur < 60 ? `${dur}s` : `${Math.floor(dur / 60)}m ${dur % 60}s`}</span>}
+                        {displayDur !== null && <span style={{ color: TEXT2, marginLeft: '8px' }}>· {displayDur}</span>}
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '6px', fontSize: '0.72rem', flexWrap: 'wrap' }}>
@@ -674,8 +722,287 @@ export default function ScannerPage() {
             })}
             <div ref={logEndRef} />
           </div>
-          {/* Fade gradient hinting scrollable content */}
+        ) : (
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: TEXT3 }}>
+            <Icon name="history" size={32} color={TEXT3} style={{ opacity: 0.5, marginBottom: '12px' }} />
+            <p style={{ fontSize: '0.85rem', margin: '0 0 8px 0', fontWeight: '500' }}>
+              {runFilter === 'all' ? 'No scan runs yet' : `No ${runFilter} runs found`}
+            </p>
+            <p style={{ fontSize: '0.75rem', margin: '0', opacity: 0.7 }}>
+              {runFilter === 'all' ? 'Start a scan to see activity history here' : 'Try a different filter'}
+            </p>
+          </div>
+        )}
+        {filteredRuns.length > 0 && (
           <div style={{ pointerEvents: 'none', position: 'relative', marginTop: '-32px', height: '32px', background: `linear-gradient(to bottom, transparent, ${SURFACE})`, borderRadius: '0 0 8px 8px' }} />
+        )}
+        
+        {/* Run Details Modal */}
+        {selectedRun && (
+          <div 
+            style={{
+              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(0,0,0,0.7)', zIndex: 1000,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '20px'
+            }}
+            onClick={() => setSelectedRun(null)}
+          >
+            <div 
+              style={{
+                background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: '16px',
+                maxWidth: '600px', width: '100%', maxHeight: '80vh', overflow: 'auto',
+                padding: '24px'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700', color: TEXT }}>
+                  Scan Run Details
+                </h3>
+                <button 
+                  onClick={() => setSelectedRun(null)}
+                  style={{
+                    background: 'transparent', border: 'none', color: TEXT2,
+                    cursor: 'pointer', fontSize: '1.5rem', lineHeight: 1
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '16px' }}>
+                <div>
+                  <div style={{ fontSize: '0.7rem', color: TEXT3, marginBottom: '4px' }}>Status</div>
+                  <StatusPill status={selectedRun.status} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.7rem', color: TEXT3, marginBottom: '4px' }}>Trigger</div>
+                  <span style={{ fontSize: '0.85rem', color: TEXT2, fontWeight: '500' }}>
+                    {selectedRun.triggerSource || 'manual'}
+                  </span>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.7rem', color: TEXT3, marginBottom: '4px' }}>Started</div>
+                  <div style={{ fontSize: '0.85rem', color: TEXT2 }}>
+                    {selectedRun.startedAt ? new Date(selectedRun.startedAt).toLocaleString() : 'N/A'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.7rem', color: TEXT3, marginBottom: '4px' }}>Completed</div>
+                  <div style={{ fontSize: '0.85rem', color: TEXT2 }}>
+                    {selectedRun.completedAt ? new Date(selectedRun.completedAt).toLocaleString() : 'N/A'}
+                  </div>
+                </div>
+              </div>
+              
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                <Tag color="#4ade80" bg="rgba(34,197,94,0.1)">+{selectedRun.created || 0} created</Tag>
+                <Tag>{selectedRun.updated || 0} updated</Tag>
+                <Tag>{selectedRun.unchanged || 0} unchanged</Tag>
+                {selectedRun.deleted > 0 && <Tag color="#f87171" bg="rgba(239,68,68,0.1)">{selectedRun.deleted} deleted</Tag>}
+              </div>
+              
+              {selectedRun.rootIds?.length > 0 && (
+                <div style={{ marginBottom: '16px' }}>
+                  <div style={{ fontSize: '0.7rem', color: TEXT3, marginBottom: '8px' }}>Roots Scanned</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {selectedRun.rootIds.map(id => {
+                      const root = roots.find(r => String(r.id) === String(id));
+                      return (
+                        <span key={id} style={{
+                          fontSize: '0.75rem', padding: '4px 8px', borderRadius: '4px',
+                          background: SURFACE2, color: TEXT2, border: `1px solid ${BORDER}`
+                        }}>
+                          {root?.label || id}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              
+              {(selectedRun.errors?.length > 0 || selectedRun.rootResults?.some(r => r.errors?.length > 0)) && (
+                <div>
+                  <div style={{ fontSize: '0.7rem', color: TEXT3, marginBottom: '8px' }}>Errors</div>
+                  <div style={{ 
+                    maxHeight: '200px', overflow: 'auto', 
+                    background: SURFACE2, borderRadius: '8px', padding: '12px',
+                    fontSize: '0.75rem', color: TEXT2
+                  }}>
+                    {selectedRun.errors?.map((err, i) => (
+                      <div key={i} style={{ marginBottom: '4px', paddingBottom: '4px', borderBottom: `1px solid ${BORDER}` }}>
+                        {typeof err === 'string' ? err : JSON.stringify(err)}
+                      </div>
+                    ))}
+                    {selectedRun.rootResults?.filter(r => r.errors?.length > 0).map((root, i) => (
+                      <div key={`root-${i}`} style={{ marginTop: '8px' }}>
+                        <div style={{ fontWeight: '600', marginBottom: '4px' }}>
+                          {roots.find(r => String(r.id) === String(root.id))?.label || root.id}
+                        </div>
+                        {root.errors.map((err, j) => (
+                          <div key={j} style={{ marginBottom: '4px', marginLeft: '8px' }}>
+                            {typeof err === 'string' ? err : JSON.stringify(err)}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {selectedRun.skipped?.length > 0 && (
+                <div style={{ marginTop: '16px' }}>
+                  <div style={{ fontSize: '0.7rem', color: TEXT3, marginBottom: '8px' }}>Skipped Items ({selectedRun.skipped.length})</div>
+                  <div style={{ 
+                    maxHeight: '150px', overflow: 'auto', 
+                    background: SURFACE2, borderRadius: '8px', padding: '12px',
+                    fontSize: '0.75rem', color: TEXT2
+                  }}>
+                    {selectedRun.skipped.map((item, i) => (
+                      <div key={i} style={{ marginBottom: '4px' }}>
+                        {typeof item === 'string' ? item : JSON.stringify(item)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {/* Run Details Modal */}
+      {selectedRun && (
+        <div 
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.7)', zIndex: 1000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '20px'
+          }}
+          onClick={() => setSelectedRun(null)}
+        >
+          <div 
+            style={{
+              background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: '16px',
+              maxWidth: '600px', width: '100%', maxHeight: '80vh', overflow: 'auto',
+              padding: '24px'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700', color: TEXT }}>
+                Scan Run Details
+              </h3>
+              <button 
+                onClick={() => setSelectedRun(null)}
+                style={{
+                  background: 'transparent', border: 'none', color: TEXT2,
+                  cursor: 'pointer', fontSize: '1.5rem', lineHeight: 1
+                }}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '16px' }}>
+              <div>
+                <div style={{ fontSize: '0.7rem', color: TEXT3, marginBottom: '4px' }}>Status</div>
+                <StatusPill status={selectedRun.status} />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.7rem', color: TEXT3, marginBottom: '4px' }}>Trigger</div>
+                <span style={{ fontSize: '0.85rem', color: TEXT2, fontWeight: '500' }}>
+                  {selectedRun.triggerSource || 'manual'}
+                </span>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.7rem', color: TEXT3, marginBottom: '4px' }}>Started</div>
+                <div style={{ fontSize: '0.85rem', color: TEXT2 }}>
+                  {selectedRun.startedAt ? new Date(selectedRun.startedAt).toLocaleString() : 'N/A'}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.7rem', color: TEXT3, marginBottom: '4px' }}>Completed</div>
+                <div style={{ fontSize: '0.85rem', color: TEXT2 }}>
+                  {selectedRun.completedAt ? new Date(selectedRun.completedAt).toLocaleString() : 'N/A'}
+                </div>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+              <Tag color="#4ade80" bg="rgba(34,197,94,0.1)">+{selectedRun.created || 0} created</Tag>
+              <Tag>{selectedRun.updated || 0} updated</Tag>
+              <Tag>{selectedRun.unchanged || 0} unchanged</Tag>
+              {selectedRun.deleted > 0 && <Tag color="#f87171" bg="rgba(239,68,68,0.1)">{selectedRun.deleted} deleted</Tag>}
+            </div>
+            
+            {selectedRun.rootIds?.length > 0 && (
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ fontSize: '0.7rem', color: TEXT3, marginBottom: '8px' }}>Roots Scanned</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {selectedRun.rootIds.map(id => {
+                    const root = roots.find(r => String(r.id) === String(id));
+                    return (
+                      <span key={id} style={{
+                        fontSize: '0.75rem', padding: '4px 8px', borderRadius: '4px',
+                        background: SURFACE2, color: TEXT2, border: `1px solid ${BORDER}`
+                      }}>
+                        {root?.label || id}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            
+            {(selectedRun.errors?.length > 0 || selectedRun.rootResults?.some(r => r.errors?.length > 0)) && (
+              <div>
+                <div style={{ fontSize: '0.7rem', color: TEXT3, marginBottom: '8px' }}>Errors</div>
+                <div style={{ 
+                  maxHeight: '200px', overflow: 'auto', 
+                  background: SURFACE2, borderRadius: '8px', padding: '12px',
+                  fontSize: '0.75rem', color: TEXT2
+                }}>
+                  {selectedRun.errors?.map((err, i) => (
+                    <div key={i} style={{ marginBottom: '4px', paddingBottom: '4px', borderBottom: `1px solid ${BORDER}` }}>
+                      {typeof err === 'string' ? err : JSON.stringify(err)}
+                    </div>
+                  ))}
+                  {selectedRun.rootResults?.filter(r => r.errors?.length > 0).map((root, i) => (
+                    <div key={`root-${i}`} style={{ marginTop: '8px' }}>
+                      <div style={{ fontWeight: '600', marginBottom: '4px' }}>
+                        {roots.find(r => String(r.id) === String(root.id))?.label || root.id}
+                      </div>
+                      {root.errors.map((err, j) => (
+                        <div key={j} style={{ marginBottom: '4px', marginLeft: '8px' }}>
+                          {typeof err === 'string' ? err : JSON.stringify(err)}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {selectedRun.skipped?.length > 0 && (
+              <div style={{ marginTop: '16px' }}>
+                <div style={{ fontSize: '0.7rem', color: TEXT3, marginBottom: '8px' }}>Skipped Items ({selectedRun.skipped.length})</div>
+                <div style={{ 
+                  maxHeight: '150px', overflow: 'auto', 
+                  background: SURFACE2, borderRadius: '8px', padding: '12px',
+                  fontSize: '0.75rem', color: TEXT2
+                }}>
+                  {selectedRun.skipped.map((item, i) => (
+                    <div key={i} style={{ marginBottom: '4px' }}>
+                      {typeof item === 'string' ? item : JSON.stringify(item)}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
       </div>

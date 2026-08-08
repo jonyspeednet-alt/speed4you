@@ -147,6 +147,7 @@ function rowToScannerRun(row) {
     errors:          row.errors       || [],
     rootResults:     row.root_results || [],
     error:           row.error        || null,
+    triggerSource:   row.trigger_source || 'manual',
   };
 }
 

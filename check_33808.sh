@@ -1,0 +1,2 @@
+#!/bin/bash
+PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -c "SELECT id, title, type, status, slug, root_id, year, poster, backdrop, description FROM content_items WHERE id = 33808;"
