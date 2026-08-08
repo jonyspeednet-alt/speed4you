@@ -679,12 +679,11 @@ export default function ScannerPage() {
           <div ref={runsContainerRef} style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '0', maxHeight: '400px', overflowY: 'auto' }}>
             {filteredRuns.map((run, i) => {
               const dur = run.startedAt && run.completedAt
-                ? Math.round((new Date(run.completedAt) - new Date(run.startedAt)) / 1000)
+                ? formatDuration(Math.round((new Date(run.completedAt) - new Date(run.startedAt)) / 1000))
                 : null;
               const isLast = i === filteredRuns.length - 1;
               const isRunning = run.status === 'running';
-              const runningElapsed = useElapsed(isRunning ? run.startedAt : null);
-              const displayDur = isRunning ? runningElapsed : dur;
+              const displayDur = isRunning ? elapsed : dur;
               return (
                 <div 
                   key={run.id || i} 
