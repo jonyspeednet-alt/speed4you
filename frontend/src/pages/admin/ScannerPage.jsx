@@ -271,9 +271,26 @@ export default function ScannerPage() {
         ? `Scan finished with ${totalCount} error(s). ${summary?.created || 0} created, ${summary?.updated || 0} updated, ${summary?.unchanged || 0} unchanged.`
         : `Scan completed successfully. ${summary?.created || 0} created, ${summary?.updated || 0} updated, ${summary?.unchanged || 0} unchanged, ${summary?.duplicateDrafts || 0} duplicates.`;
       toast?.({ type: totalCount > 0 ? 'error' : 'success', message: msg, duration: 6000 });
+      // Invalidate all admin queries so ContentLibrary and Dashboard reflect new items instantly
+      queryClient.invalidateQueries({ queryKey: ['admin'] });
     }
     prevJobStatusRef.current = job.status;
-  }, [job?.status, job, toast]);
+  }, [job?.status, job, toast, queryClient]);
+
+  // ETA Calculation
+  const estimatedRemainingLabel = useMemo(() => {
+    if (!isRunning || !overallProgress || overallProgress <= 0 || overallProgress >= 100) return null;
+    const startTime = job?.startedAt ? new Date(job.startedAt).getTime() : 0;
+    if (!startTime) return null;
+    const elapsedMs = Date.now() - startTime;
+    if (elapsedMs < 3000) return null; // wait 3s for stabilization
+    const totalEstMs = (elapsedMs / overallProgress) * 100;
+    const remainingMs = Math.max(0, totalEstMs - elapsedMs);
+    const remSec = Math.round(remainingMs / 1000);
+    if (remSec < 60) return `~${remSec}s remaining`;
+    const remMin = Math.round(remSec / 60);
+    return `~${remMin}m remaining`;
+  }, [isRunning, overallProgress, job?.startedAt]);
 
   useEffect(() => {
     setConfirmStop(false);
@@ -354,7 +371,13 @@ export default function ScannerPage() {
 
             {isRunning && (
               <div style={{ marginTop: '16px' }}>
-                <ProgressBar percent={overallProgress} color="linear-gradient(90deg, #4ade80 0%, #22c55e 100%)" height={8} animated label={`${elapsed} elapsed`} />
+                <ProgressBar
+                  percent={overallProgress}
+                  color="linear-gradient(90deg, #4ade80 0%, #22c55e 100%)"
+                  height={8}
+                  animated
+                  label={`${elapsed} elapsed${estimatedRemainingLabel ? ` (${estimatedRemainingLabel})` : ''}`}
+                />
               </div>
             )}
             {!isRunning && job?.summary && (
