@@ -606,19 +606,23 @@ async function enrichItemWithMetadata(item) {
       } catch {}
     }
 
-    // Strategy 7: Try searching with parent folder name from sourcePath if file title is non-English or failed
+    // Strategy 7: Try searching with parent folder name or grandparent folder name from sourcePath if file title search failed
     if (!results.length && item.sourcePath) {
       const pathParts = String(item.sourcePath).split(/[/\\]/).filter(Boolean);
-      if (pathParts.length >= 2) {
-        const parentFolder = pathParts[pathParts.length - 2];
-        const cleanParent = cleanSearchTitle(parentFolder);
-        // Skip if parent folder is a year-only name or a category/label name
-        const isYearFolder = /^\d{4}$/.test(parentFolder.trim());
-        const isCategoryFolder = /\b(movies|series|dubbed|hindi|bangla|english|tamil|telugu|malayalam|korean|japanese|animation|3d)\b/i.test(parentFolder);
-        if (cleanParent && cleanParent !== parsedTitle && !isYearFolder && !isCategoryFolder) {
+      // Try current folder or parent folders
+      for (let i = pathParts.length - 1; i >= Math.max(0, pathParts.length - 3); i--) {
+        const folderCandidate = pathParts[i];
+        if (/\.(mkv|mp4|avi|webm|mov)$/i.test(folderCandidate)) continue;
+        const cleanFolder = cleanSearchTitle(folderCandidate);
+        const isYearFolder = /^\d{4}$/.test(folderCandidate.trim());
+        const isCategoryFolder = /\b(movies|series|dubbed|hindi|bangla|english|tamil|telugu|malayalam|korean|japanese|animation|3d)\b/i.test(folderCandidate);
+        if (cleanFolder && cleanFolder.length >= 2 && !isYearFolder && !isCategoryFolder) {
           try {
-            const parentResp = await tmdbFetchJson(`/search/${mediaType}`, { query: cleanParent });
-            results = Array.isArray(parentResp.results) ? parentResp.results : [];
+            const folderResp = await tmdbFetchJson(`/search/${mediaType}`, { query: cleanFolder });
+            if (Array.isArray(folderResp.results) && folderResp.results.length > 0) {
+              results = folderResp.results;
+              break;
+            }
           } catch {}
         }
       }
