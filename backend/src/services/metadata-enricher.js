@@ -653,16 +653,24 @@ async function enrichItemWithMetadata(item) {
     if (!results.length && /[\u0900-\u097F\u0980-\u09FF\u0B80-\u0BFF\u0C00-\u0C7F\u0D00-\u0D7F]/.test(item.title)) {
       const lang = inferOriginalLanguage(item);
       const langMap = { hi: 'hi-IN', bn: 'bn-BD', ta: 'ta-IN', te: 'te-IN', ml: 'ml-IN', kn: 'kn-IN' };
-      const langCode = langMap[lang];
-      if (langCode) {
-        try {
-          const nativeResp = await tmdbFetchJson(`/search/${mediaType}`, {
-            query: item.title,
-            language: langCode,
-          });
-          results = Array.isArray(nativeResp.results) ? nativeResp.results : [];
-        } catch {}
-      }
+      const langCode = langMap[lang] || 'hi-IN';
+      try {
+        const nativeResp = await tmdbFetchJson(`/search/${mediaType}`, {
+          query: item.title.replace(/\.[a-z0-9]{2,4}$/i, '').replace(/\((19|20)\d{2}\)/g, '').trim(),
+          language: langCode,
+        });
+        results = Array.isArray(nativeResp.results) ? nativeResp.results : [];
+      } catch {}
+    }
+
+    // Strategy 11: If native query yielded no result, try searching TMDB without language code filter
+    if (!results.length && /[\u0900-\u097F\u0980-\u09FF\u0B80-\u0BFF\u0C00-\u0C7F\u0D00-\u0D7F]/.test(item.title)) {
+      try {
+        const globalNativeResp = await tmdbFetchJson(`/search/${mediaType}`, {
+          query: item.title.replace(/\.[a-z0-9]{2,4}$/i, '').replace(/\((19|20)\d{2}\)/g, '').trim(),
+        });
+        results = Array.isArray(globalNativeResp.results) ? globalNativeResp.results : [];
+      } catch {}
     }
 
     if (!results.length) {
