@@ -462,14 +462,9 @@ async function upsertScannedItem(payload) {
 
   // ── NEW ITEM (truly new) ────────────────────────────────────────────────
   if (!current) {
-    const metadataConfidence = payload.metadataConfidence ?? 0;
-    // Auto-publish any item that was successfully matched by the metadata enricher,
-    // regardless of confidence score. Regional/international titles often score below 70
-    // even when correctly matched. 'not_found' items remain as draft for manual review.
-    const shouldAutoPublish = payload.metadataStatus === 'matched'
-      || payload.metadataStatus === 'skipped';
-    const nextStatus = payload.status
-      || (shouldAutoPublish ? (process.env.SCANNER_DEFAULT_STATUS || 'published') : 'draft');
+    // By default, scanner publishes 100% of discovered media items directly to the portal.
+    // Metadata enricher will try to attach TMDB/OMDB info, but missing metadata does not prevent publishing.
+    const nextStatus = payload.status || process.env.SCANNER_DEFAULT_STATUS || 'published';
     const nextPublishedAt = nextStatus === 'published' ? (payload.publishedAt || now) : '';
 
     const baseItem = normalizeItem({
