@@ -83,11 +83,9 @@ const SCANNER_STOP_GRACE_MS = Math.max(2000, Number(process.env.SCANNER_STOP_GRA
 // Generous default so a slow root (infrequent progress heartbeats) isn't falsely stolen.
 const SCANNER_LOCK_TTL_MS = Math.max(60000, Number(process.env.SCANNER_LOCK_TTL_MS || 5 * 60 * 1000));
 const SCANNER_INSTANCE_ID = `${require('os').hostname()}:${process.pid}`;
-// Cap the number of newly-discovered auto-roots processed per scan so that the
-// first scan after a discovery fix doesn't try to process 500+ roots at once.
-// Already-scanned roots (those with existing DB signatures) are always included;
-// this cap only applies to brand-new roots with zero DB signatures.
-const MAX_NEW_ROOTS_PER_SCAN = Math.max(10, Number(process.env.SCANNER_MAX_NEW_ROOTS_PER_SCAN || 30));
+// Cap the number of newly-discovered auto-roots processed per scan.
+// Raised default to 100 (was 30) so new bulk uploads don't get deferred unnecessarily.
+const MAX_NEW_ROOTS_PER_SCAN = Math.max(10, Number(process.env.SCANNER_MAX_NEW_ROOTS_PER_SCAN || 100));
 // URL to POST scan completion summary to (e.g. a monitoring webhook service)
 const SCANNER_COMPLETION_WEBHOOK_URL = String(process.env.SCANNER_COMPLETION_WEBHOOK_URL || '').trim();
 // Per-root timeout: if a single root takes longer than this (ms), the scan moves on.
