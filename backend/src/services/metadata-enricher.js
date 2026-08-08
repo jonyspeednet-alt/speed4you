@@ -718,8 +718,7 @@ async function enrichItemWithMetadata(item) {
       originalTitle: applyTmdb ? details.originalTitle : '',
       originalLanguage: applyTmdb ? details.originalLanguage : '',
       language: resolvedLanguage,
-      // If TMDb match confidence is 70% or greater, auto-publish directly to website
-      status: confidence >= 70 ? 'published' : 'draft',
+      status: enrichedItem.status || process.env.SCANNER_DEFAULT_STATUS || 'published',
       metadataStatus: applyTmdb ? 'matched' : (confidence >= 25 ? 'needs_review' : 'not_found'),
       metadataProvider: 'tmdb',
       metadataConfidence: confidence,
