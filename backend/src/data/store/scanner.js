@@ -4,7 +4,16 @@ const { MAX_SCANNER_RUNS } = require('./constants');
 const { toSafeInteger, rowToScannerRoot, rowToScannerRun, normalizeItem, normalizeTitleKey, titlesFuzzyMatch, extractTypedColumns, attachDuplicateMetadata } = require('./helpers');
 
 function loadScannerLog() {
-  return appStateCache.get('scanner_log') || { runs: [] };
+  try {
+    const cached = appStateCache.get('scanner_log');
+    if (cached && Array.isArray(cached.runs)) {
+      return cached;
+    }
+    return { runs: [] };
+  } catch (err) {
+    console.error('[scanner] Error loading scanner log from cache:', err.message);
+    return { runs: [] };
+  }
 }
 
 async function saveScannerLog(payload) {
@@ -71,24 +80,41 @@ async function refreshScannerCaches() {
 async function recordScannerRun(entry) {
   await ensureContentStore();
   await db.query(
-    `INSERT INTO scanner_runs (id, status, started_at, completed_at, root_ids, roots_requested, roots_scanned, total_created, total_updated, total_deleted, total_unchanged, total_duplicate_drafts, skipped, errors, root_results, error, created_at) VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14::jsonb, $15::jsonb, $16, $17) ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, completed_at = EXCLUDED.completed_at, roots_scanned = EXCLUDED.roots_scanned, total_created = EXCLUDED.total_created, total_updated = EXCLUDED.total_updated, total_deleted = EXCLUDED.total_deleted, total_unchanged = EXCLUDED.total_unchanged, total_duplicate_drafts = EXCLUDED.total_duplicate_drafts, skipped = EXCLUDED.skipped, errors = EXCLUDED.errors, root_results = EXCLUDED.root_results, error = EXCLUDED.error`,
-    [String(entry.id || ''), String(entry.status || 'completed'), entry.startedAt || null, entry.completedAt || null, JSON.stringify(entry.rootIds || []), toSafeInteger(entry.rootsRequested), toSafeInteger(entry.rootsScanned), toSafeInteger(entry.created), toSafeInteger(entry.updated), toSafeInteger(entry.deleted), toSafeInteger(entry.unchanged), toSafeInteger(entry.duplicateDrafts), JSON.stringify(entry.skipped || []), JSON.stringify(entry.errors || []), JSON.stringify(entry.rootResults || []), entry.error || null, entry.startedAt || new Date().toISOString()]
+    `INSERT INTO scanner_runs (id, status, started_at, completed_at, root_ids, roots_requested, roots_scanned, total_created, total_updated, total_deleted, total_unchanged, total_duplicate_drafts, skipped, errors, root_results, error, trigger_source, created_at) VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14::jsonb, $15::jsonb, $16, $17, $18) ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, completed_at = EXCLUDED.completed_at, roots_scanned = EXCLUDED.roots_scanned, total_created = EXCLUDED.total_created, total_updated = EXCLUDED.total_updated, total_deleted = EXCLUDED.total_deleted, total_unchanged = EXCLUDED.total_unchanged, total_duplicate_drafts = EXCLUDED.total_duplicate_drafts, skipped = EXCLUDED.skipped, errors = EXCLUDED.errors, root_results = EXCLUDED.root_results, error = EXCLUDED.error, trigger_source = EXCLUDED.trigger_source`,
+    [String(entry.id || ''), String(entry.status || 'completed'), entry.startedAt || null, entry.completedAt || null, JSON.stringify(entry.rootIds || []), toSafeInteger(entry.rootsRequested), toSafeInteger(entry.rootsScanned), toSafeInteger(entry.created), toSafeInteger(entry.updated), toSafeInteger(entry.deleted), toSafeInteger(entry.unchanged), toSafeInteger(entry.duplicateDrafts), JSON.stringify(entry.skipped || []), JSON.stringify(entry.errors || []), JSON.stringify(entry.rootResults || []), entry.error || null, String(entry.triggerSource || 'manual'), entry.startedAt || new Date().toISOString()]
   );
-  const current = appStateCache.get('scanner_log') || { runs: [] };
-  const cacheEntry = {
-    ...entry,
-    totalErrors: Array.isArray(entry.errors) ? entry.errors.length : 0,
-    rootResults: Array.isArray(entry.rootResults)
-      ? entry.rootResults.map((r) => ({ ...r, totalErrors: Array.isArray(r.errors) ? r.errors.length : 0 }))
-      : entry.rootResults || [],
-  };
-  const runs = [cacheEntry, ...(current.runs || []).filter((r) => r.id !== entry.id)].slice(0, MAX_SCANNER_RUNS);
-  appStateCache.set('scanner_log', { runs });
+  
+  try {
+    const current = appStateCache.get('scanner_log') || { runs: [] };
+    const cacheEntry = {
+      ...entry,
+      totalErrors: Array.isArray(entry.errors) ? entry.errors.length : 0,
+      rootResults: Array.isArray(entry.rootResults)
+        ? entry.rootResults.map((r) => ({ ...r, totalErrors: Array.isArray(r.errors) ? r.errors.length : 0 }))
+        : entry.rootResults || [],
+    };
+    const runs = [cacheEntry, ...(current.runs || []).filter((r) => r.id !== entry.id)].slice(0, MAX_SCANNER_RUNS);
+    appStateCache.set('scanner_log', { runs });
+  } catch (err) {
+    console.error('[scanner] Error updating scanner log cache:', err.message);
+    // Fallback: reload from database to ensure cache is in sync
+    await refreshScannerCaches();
+  }
   return entry;
 }
 
-function getScannerRuns(limit = 10) {
-  return (loadScannerLog().runs || []).slice(0, limit);
+async function getScannerRuns(limit = 10) {
+  try {
+    const log = loadScannerLog();
+    const runs = Array.isArray(log.runs) ? log.runs : [];
+    return runs.slice(0, limit);
+  } catch (err) {
+    console.error('[scanner] Error getting scanner runs:', err.message);
+    // Fallback: load from database
+    await ensureContentStore();
+    const result = await db.query('SELECT * FROM scanner_runs ORDER BY created_at DESC LIMIT $1', [limit]);
+    return result.rows.map(rowToScannerRun);
+  }
 }
 
 async function getScannerRunById(id) {
@@ -194,7 +220,7 @@ function isLiveDistinctSourcePath(existingPayload, incomingPayload) {
     // Treat them as the same item to prevent duplicate creation.
     const existingSize = existingPayload?.fileSize || 0;
     const incomingSize = incomingPayload?.fileSize || 0;
-    if (existingSize > 0 && incomingSize > 0 && existingSize === incomingSize) {
+    if (existingSize > 4096 && incomingSize > 4096 && existingSize === incomingSize) {
       return false;
     }
     // Cross-root duplicates: if files are in different scanner roots but share
@@ -387,7 +413,9 @@ async function upsertScannedItem(payload) {
   // gave a wrong title). Fall back to matching by fileSize + source_root_id:
   // same file size in the same root = same file, just renamed.
   // Also check across roots when title matches (cross-root duplicates).
-  if (!current && payload.fileSize && payload.fileSize > 0 && payload.sourceRootId) {
+  // Note: Only apply to movies with actual file sizes (> 4096 bytes) to prevent
+  // directory fileSize collisions in series roots.
+  if (!current && payload.type === 'movie' && payload.fileSize && payload.fileSize > 4096 && payload.sourceRootId) {
     const sizeMatch = await db.query(
       `SELECT id, payload FROM content_catalog
        WHERE content_type = $1 AND source_type = 'scanner'
@@ -410,7 +438,7 @@ async function upsertScannedItem(payload) {
 
   // Cross-root fileSize dedup: if no same-root match found, check other roots
   // but only if the title also matches (to avoid false positives from coincidental size matches).
-  if (!current && payload.fileSize && payload.fileSize > 0 && payload.sourceRootId && payload.title) {
+  if (!current && payload.type === 'movie' && payload.fileSize && payload.fileSize > 4096 && payload.sourceRootId && payload.title) {
     const crossRootMatch = await db.query(
       `SELECT id, payload FROM content_catalog
        WHERE content_type = $1 AND source_type = 'scanner'
@@ -435,7 +463,10 @@ async function upsertScannedItem(payload) {
   // ── NEW ITEM (truly new) ────────────────────────────────────────────────
   if (!current) {
     const metadataConfidence = payload.metadataConfidence ?? 0;
-    const shouldAutoPublish = (payload.metadataStatus === 'matched' && metadataConfidence >= 70)
+    // Auto-publish any item that was successfully matched by the metadata enricher,
+    // regardless of confidence score. Regional/international titles often score below 70
+    // even when correctly matched. 'not_found' items remain as draft for manual review.
+    const shouldAutoPublish = payload.metadataStatus === 'matched'
       || payload.metadataStatus === 'skipped';
     const nextStatus = payload.status
       || (shouldAutoPublish ? (process.env.SCANNER_DEFAULT_STATUS || 'published') : 'draft');
