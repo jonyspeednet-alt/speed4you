@@ -117,3 +117,22 @@ speed4you/
 ## Special Notes
 - Scanner auto-discovers directories under `/var/www/html/` with IDs prefixed `auto-`. These can override manually created roots with the same ID. Use unique non-`auto-` prefix IDs for manual roots.
 - Webhook secret checked from `.env`; may rotate on deploy — always re-read before use.
+
+## Scanner Permission Requirements (CRITICAL)
+- **Media files MUST be owned by `www-data:www-data`** with `755` directory permissions and `644` file permissions
+- Scanner runs as `speed4you` user (via systemd service) which must have read access to media files
+- Permission mismatches cause content to be skipped during scans
+- **Upload guidelines**: Always upload content with proper permissions (`chown www-data:www-data` and `chmod 755`)
+- **Scanner-level Permission Handling**: 
+  - Enhanced `listDirectoryEntriesSafe()` function in `scanner-permission-handler.js` handles permission errors gracefully
+  - Scanner now checks root path readability before processing (`isPathReadable()`)
+  - Permission errors are logged with specific event types for debugging
+  - Auto-skips directories with permission issues instead of failing silently
+- **Monitoring**: Permission monitoring script runs daily at 2 AM via cron (`/home/speed4you/monitor-permissions.sh`)
+- **Fix script**: Manual permission fix available at `backend/fix-content-permissions.sh` for correcting ownership issues
+
+## Scanner Configuration Updates (2026-08-08)
+- **Minimum file size reduced**: `SCANNER_MIN_MOVIE_SIZE=52428800` (50MB) and `SCANNER_MIN_EPISODE_SIZE=52428800` (50MB)
+- **Auto-scan interval**: `SCANNER_AUTO_SCAN_INTERVAL_MINUTES=360` (6 hours)
+- **File naming**: Avoid double dots in filenames (e.g., `file.720p..mkv` → `file.720p.mkv`)
+- **Draft handling**: Items with incomplete metadata (ending with 'p') remain in draft status until metadata is complete

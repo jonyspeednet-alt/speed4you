@@ -1,0 +1,2 @@
+#!/bin/bash
+PGPASSWORD=REDACTED_DB_PASSWORD psql -h localhost -p 5432 -U postgres -d isp_entertainment -c "SELECT id, title, type, status, slug, root_id, year, poster, backdrop, description FROM content_items WHERE id = 33808;"
