@@ -740,7 +740,83 @@ async function deleteScannerItemsNotInSignatures(sourceRootId, scanSignatures = 
       const pathExists = await fs.promises.access(p.sourcePath).then(() => true).catch(() => false);
       if (pathExists) continue;
 
-      // If sourcePath no longer exists on disk, delete the stale record to prevent ghost/duplicate DB rows
+      // ── CROSS-ROOT MOVE GUARD ──────────────────────────────────────────────
+      // Before deleting, check if another root has already claimed this item.
+      // This handles the race condition where Root A scans first (sees file gone),
+      // would delete the record, but Root B hasn't scanned yet and will find the
+      // file in its new location. If we delete here, Root B creates a new ID,
+      // breaking any direct links to the old catalog ID.
+      //
+      // We check two signals:
+      //   1. Same titleKey with a different sourceRootId and a live sourcePath
+      //   2. Same fileSize in a different root with a live sourcePath
+      const titleKey = p.titleKey || normalizeTitleKey(p.title, p.year);
+      let claimedByOtherRoot = false;
+
+      if (titleKey) {
+        const titleClaim = await db.query(
+          `SELECT id, payload FROM content_catalog
+           WHERE title_key = $1
+             AND source_type = 'scanner'
+             AND source_root_id <> $2
+             AND id <> $3
+           LIMIT 1`,
+          [titleKey, rootId, row.id],
+        );
+        if (titleClaim.rows[0]) {
+          const claimedPath = titleClaim.rows[0].payload?.sourcePath;
+          if (claimedPath) {
+            const claimedExists = await fs.promises.access(claimedPath).then(() => true).catch(() => false);
+            if (claimedExists) claimedByOtherRoot = true;
+          }
+        }
+      }
+
+      // Also check by fileSize as a secondary signal
+      if (!claimedByOtherRoot && p.fileSize && Number(p.fileSize) > 4096) {
+        const sizeClaim = await db.query(
+          `SELECT id, payload FROM content_catalog
+           WHERE source_type = 'scanner'
+             AND source_root_id <> $1
+             AND id <> $2
+             AND payload->>'fileSize' = $3
+           LIMIT 1`,
+          [rootId, row.id, String(p.fileSize)],
+        );
+        if (sizeClaim.rows[0]) {
+          const claimedPath = sizeClaim.rows[0].payload?.sourcePath;
+          if (claimedPath) {
+            const claimedExists = await fs.promises.access(claimedPath).then(() => true).catch(() => false);
+            if (claimedExists) claimedByOtherRoot = true;
+          }
+        }
+      }
+
+      // ── DISK-LEVEL FALLBACK ────────────────────────────────────────────────
+      // Root B may not have scanned yet, so no DB claim exists.
+      // As a final guard, check if the file's basename exists somewhere else
+      // under the media root on disk. If it does, hold off on deletion —
+      // Root B's scan will claim this record when it runs.
+      if (!claimedByOtherRoot) {
+        const basename = require('path').basename(p.sourcePath);
+        const mediaRoot = process.env.SCANNER_MEDIA_ROOT || '/var/www/html';
+        try {
+          const { execSync } = require('child_process');
+          // Use find with maxdepth 5 to avoid hanging on massive trees
+          const found = execSync(
+            `find "${mediaRoot}" -maxdepth 5 -name "${basename.replace(/"/g, '')}" -not -path "${p.sourcePath}" 2>/dev/null | head -1`,
+            { timeout: 5000, encoding: 'utf8' }
+          ).trim();
+          if (found) claimedByOtherRoot = true;
+        } catch { /* find failed or timed out — proceed with deletion */ }
+      }
+
+      // If another root already has this file, skip deletion — the upsert
+      // path will naturally re-assign this record when that root is scanned.
+      if (claimedByOtherRoot) continue;
+
+      // If sourcePath no longer exists on disk AND no other root has claimed it,
+      // delete the stale record to prevent ghost/duplicate DB rows.
       await db.query('DELETE FROM content_catalog WHERE id = $1', [row.id]);
       stalePublishedDeleted += 1;
     }
