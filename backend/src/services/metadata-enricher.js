@@ -414,17 +414,32 @@ async function fetchMetadataByTmdbId(tmdbId, mediaType = 'movie') {
 async function fetchMetadataByImdbId(imdbId, mediaType = 'movie') {
   const normalizedType = mediaType === 'series' || mediaType === 'tv' ? 'tv' : 'movie';
 
-  // First try TMDb's find endpoint to get the TMDb ID
+  // First try TMDb's find endpoint to get the TMDb ID.
+  // TMDb can return both movie_results and tv_results for an IMDb UUID lookup.
+  // The caller's mediaType is advisory, so we need to inspect both arrays and
+  // pick whichever returned a real result. If the preferred branch comes back empty,
+  // we should consider the alternate branch instead of falling through to a 404.
   if (hasTmdbKey()) {
     try {
       const found = await tmdbFetchJson(`/find/${imdbId}`, { external_source: 'imdb_id' });
-      const results = found?.movie_results || found?.tv_results || [];
-      const tmdbResults = normalizedType === 'tv' ? (found?.tv_results || []) : results;
-      if (tmdbResults.length > 0) {
-        const tmdbId = tmdbResults[0].id;
-        return fetchMetadataByTmdbId(tmdbId, normalizedType);
+      const movieResults = Array.isArray(found?.movie_results) ? found.movie_results : [];
+      const tvResults = Array.isArray(found?.tv_results) ? found.tv_results : [];
+
+      const preferredResults = normalizedType === 'tv' ? tvResults : movieResults;
+      const preferredMatchType = normalizedType === 'tv' ? 'tv' : 'movie';
+      const alternateResults = normalizedType === 'tv' ? movieResults : tvResults;
+      const alternateMatchType = alternateResults === movieResults ? 'movie' : 'tv';
+
+      const usedResults = preferredResults.length > 0 ? preferredResults : alternateResults;
+      const resolvedType = preferredResults.length > 0 ? preferredMatchType : alternateMatchType;
+
+      if (usedResults.length > 0) {
+        const tmdbId = usedResults[0].id;
+        return fetchMetadataByTmdbId(tmdbId, resolvedType);
       }
-    } catch {}
+    } catch (error) {
+      // TMDb find can reject for malformed or missing lookup; allow OMDB fallback.
+    }
   }
 
   // Fallback to OMDB
@@ -432,6 +447,13 @@ async function fetchMetadataByImdbId(imdbId, mediaType = 'movie') {
     try {
       return await fetchMetadataFromOmdb(imdbId);
     } catch {}
+  }
+
+  if (!hasTmdbKey() && !hasOmdbKey()) {
+    throw Object.assign(
+      new Error(`IMDb lookup for ${imdbId} is unavailable because TMDB_API_KEY and OMDB_API_KEY are not configured on this server.`),
+      { statusCode: 503 }
+    );
   }
 
   const hint = !hasOmdbKey()
