@@ -618,7 +618,15 @@ async function enrichItemWithMetadata(item) {
         const isCategoryFolder = /\b(movies|series|dubbed|hindi|bangla|english|tamil|telugu|malayalam|korean|japanese|animation|3d)\b/i.test(folderCandidate);
         if (cleanFolder && cleanFolder.length >= 2 && !isYearFolder && !isCategoryFolder) {
           try {
-            const folderResp = await tmdbFetchJson(`/search/${mediaType}`, { query: cleanFolder });
+            // First try cleanFolder
+            let folderResp = await tmdbFetchJson(`/search/${mediaType}`, { query: cleanFolder });
+            if (!folderResp.results?.length) {
+              // Second try raw folderCandidate stripped of (YYYY) and extensions
+              const rawClean = folderCandidate.replace(/\.[a-z0-9]{2,4}$/i, '').replace(/\((19|20)\d{2}\)/g, '').trim();
+              if (rawClean !== cleanFolder) {
+                folderResp = await tmdbFetchJson(`/search/${mediaType}`, { query: rawClean });
+              }
+            }
             if (Array.isArray(folderResp.results) && folderResp.results.length > 0) {
               results = folderResp.results;
               break;
