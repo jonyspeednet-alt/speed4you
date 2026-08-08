@@ -734,24 +734,9 @@ async function deleteScannerItemsNotInSignatures(sourceRootId, scanSignatures = 
       const pathExists = await fs.promises.access(p.sourcePath).then(() => true).catch(() => false);
       if (pathExists) continue;
 
-      // Check if a newer entry with the same titleKey exists
-      const titleKey = p.title_key || normalizeTitleKey(p.title, p.year);
-      if (!titleKey) continue;
-
-      const newerEntry = await db.query(
-        `SELECT id FROM content_catalog
-         WHERE content_type = $1
-           AND title_key = $2
-           AND source_type = 'scanner'
-           AND id <> $3
-           AND COALESCE(payload->>'scanSignature', '') = ANY($4::text[])`,
-        [p.type || 'movie', titleKey, row.id, signatures],
-      );
-
-      if (newerEntry.rows.length > 0) {
-        await db.query('DELETE FROM content_catalog WHERE id = $1', [row.id]);
-        stalePublishedDeleted += 1;
-      }
+      // If sourcePath no longer exists on disk, delete the stale record to prevent ghost/duplicate DB rows
+      await db.query('DELETE FROM content_catalog WHERE id = $1', [row.id]);
+      stalePublishedDeleted += 1;
     }
   }
 
