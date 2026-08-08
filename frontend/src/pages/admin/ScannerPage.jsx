@@ -157,6 +157,7 @@ export default function ScannerPage() {
   const queryClient = useQueryClient();
   const logEndRef = useRef(null);
   const runsContainerRef = useRef(null);
+  const shouldAutoScrollRef = useRef(true);
   const toast = useContext(ToastContext);
   const prevJobStatusRef = useRef(null);
   const [selectedRoots, setSelectedRoots] = useState([]);
@@ -245,8 +246,6 @@ export default function ScannerPage() {
     if (!el) return true;
     return el.scrollHeight - el.scrollTop - el.clientHeight < 80;
   }, []);
-
-  const shouldAutoScrollRef = useRef(true);
 
   useEffect(() => {
     if (shouldAutoScrollRef.current && logEndRef.current) {
