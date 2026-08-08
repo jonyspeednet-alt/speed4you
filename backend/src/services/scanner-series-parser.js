@@ -7,11 +7,11 @@ function cleanTitle(name, type = 'series') {
     .replace(/\.(?=\s|[0-9]|[A-Z])/g, ' ') // Replace dots
     .replace(/([a-z])([A-Z])/g, '$1 $2'); // Separate camelCase words
 
-  // Strip quality tags, codecs, release groups and metadata noise
+  // Strip quality tags, codecs, release groups, resolutions, and metadata noise
   cleaned = cleaned
-    .replace(/\b(\d{3,4}p|bluray|bdrip|brrip|web-?dl|webrip|dvdrip|hdrip|hdtv|camrip|telesync)\b/i, '')
-    .replace(/\b(x264|x265|hevc|h264|h265|aac|dts|dd5\.1|ac3|mp3|esub|sub|dual|dual-audio|multi|multi-audio|hindi-dubbed)\b/i, '')
-    .replace(/\b(yify|yts|psa|qxr|rarbg|tigole|galaxyrg|megusta|mkvca?c?)\b/i, '');
+    .replace(/\b(\d{3,4}p|4k|uhd|hdr\d*|10bit|remux|bluray|bdrip|brrip|web-?dl|webrip|dvdrip|hdrip|hdtv|camrip|telesync)\b/gi, '')
+    .replace(/\b(x264|x265|hevc|h264|h265|av1|vp9|aac|dts|dd5\.1|ac3|eac3|mp3|flac|esub|sub|dual|dual-audio|multi|multi-audio|hindi-dubbed|bengali-dubbed|tamil-dubbed|telugu-dubbed)\b/gi, '')
+    .replace(/\b(yify|yts|psa|qxr|rarbg|tigole|galaxyrg|megusta|mkvca?c?)\b/gi, '');
 
   if (type === 'movie') {
     cleaned = cleaned
@@ -86,10 +86,19 @@ function parseEpisodeIdentity(filename) {
     || basename.match(/\s*-\s*(\d{1,3})\s*-\s*/)
     || basename.match(/(?:^|[^\d])(?:ep?|episode|part)\s*(\d{1,3})(?:[^\d]|$)/i)
     || basename.match(/(?:^|[^\d])(\d{1,3})(?:[^\d]|$)(?!.*\d)/);
+
   if (episodeOnlyMatch) {
+    const epNum = Number(episodeOnlyMatch[1]);
+    // Ignore years (1900-2099) and standard video resolutions as false episode numbers
+    if (epNum >= 1900 && epNum <= 2099) {
+      return { season: null, episode: null };
+    }
+    if ([2160, 1080, 720, 480, 360, 240].includes(epNum)) {
+      return { season: null, episode: null };
+    }
     return {
       season: null,
-      episode: Number(episodeOnlyMatch[1]),
+      episode: epNum,
     };
   }
 
