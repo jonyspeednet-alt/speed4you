@@ -8,7 +8,7 @@
     "build": "vite build",
     "build:android": "set VITE_API_URL=https://speed4you.net/portal-api&& vite build",
     "build:apk": "powershell -ExecutionPolicy Bypass -File scripts/build-apk.ps1",
-    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
   "dependencies": {

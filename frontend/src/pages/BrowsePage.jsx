@@ -1,7 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { contentService, searchService } from "../services";
+import { contentService } from "../services";
 import { useBreakpoint, useTVMode } from "../hooks";
 import { CardSkeleton } from "../components/feedback/Skeleton";
 import ContentCard from "../components/media/ContentCard";
@@ -125,8 +125,11 @@ function BrowsePage({ type }) {
   );
   const [filtersOpen, setFiltersOpen] = useState(false);
   const loadMoreRef = useRef(null);
-  const [suggestions, setSuggestions] = useState([]);
   const deferredSearchText = useDeferredValue(searchText);
+  // URL changes can originate outside this component (for example, the main
+  // navigation's Browse link clears its query string). Prevent that incoming
+  // update from being immediately overwritten by the previous local filters.
+  const isSyncingFromUrlRef = useRef(false);
 
   const prevTypeRef = useRef(type);
   useEffect(() => {
@@ -144,6 +147,7 @@ function BrowsePage({ type }) {
   // Sync filter state when the URL params change (e.g. back/forward or a
   // same-route navigation like `/browse?q=...` from the search modal).
   useEffect(() => {
+    isSyncingFromUrlRef.current = true;
     setSelectedGenre(normalizeQuery(searchParams.get("genre")));
     setSelectedLanguage(normalizeQuery(searchParams.get("language")));
     setSortBy(normalizeQuery(searchParams.get("sort"), "latest"));
@@ -164,6 +168,11 @@ function BrowsePage({ type }) {
   }, [type]);
 
   useEffect(() => {
+    if (isSyncingFromUrlRef.current) {
+      isSyncingFromUrlRef.current = false;
+      return;
+    }
+
     const nextParams = {};
     if (selectedGenre !== "All") nextParams.genre = selectedGenre;
     if (selectedLanguage !== "All") nextParams.language = selectedLanguage;
@@ -241,33 +250,6 @@ function BrowsePage({ type }) {
   );
   const total = data?.pages[0]?.total || 0;
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function fetchSuggestions() {
-      const query = deferredSearchText.trim();
-      if (query.length < 2) {
-        setSuggestions([]);
-        return;
-      }
-
-      try {
-        const result = await searchService.getSuggestions(query);
-        if (!cancelled)
-          setSuggestions(
-            Array.isArray(result.items) ? result.items.slice(0, 6) : [],
-          );
-      } catch {
-        if (!cancelled) setSuggestions([]);
-      }
-    }
-
-    fetchSuggestions();
-    return () => {
-      cancelled = true;
-    };
-  }, [deferredSearchText]);
-
   const collectionOptions = useMemo(
     () => [
       "All",
@@ -321,7 +303,6 @@ function BrowsePage({ type }) {
     return () => observer.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
-  const currentType = effectiveType || "All";
   const pageTitle =
     type === "movie"
       ? "Movies"
