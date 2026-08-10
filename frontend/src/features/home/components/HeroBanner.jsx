@@ -17,7 +17,6 @@ function HeroBanner({ content: contentItems }) {
   }, [contentItems]);
 
   const content = Array.isArray(contentItems) ? contentItems[activeIndex] : contentItems;
-  if (!content) return null;
 
   // Parallax scroll effect (desktop only)
   useEffect(() => {
@@ -30,6 +29,9 @@ function HeroBanner({ content: contentItems }) {
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, [isMobile, isTablet]);
+
+  if (!content) return null;
+
   const heroImage = content.backdrop || content.poster || '';
   const hasPoster = Boolean(content.poster);
   const isSeries = content.type === 'series';
