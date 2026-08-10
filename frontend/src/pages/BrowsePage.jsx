@@ -705,9 +705,13 @@ function FilterDrawer({ isOpen, onClose, children }) {
           ...styles.drawerBackdrop,
           ...(isOpen ? styles.drawerBackdropOpen : {}),
         }}
-        onClick={onClose}
+        onClick={isOpen ? onClose : undefined}
+        aria-hidden="true"
       />
-      <aside style={{ ...styles.drawer, ...(isOpen ? styles.drawerOpen : {}) }}>
+      <aside
+        style={{ ...styles.drawer, ...(isOpen ? styles.drawerOpen : {}) }}
+        aria-hidden={!isOpen}
+      >
         {children}
       </aside>
     </>
@@ -751,7 +755,8 @@ const styles = {
     padding: "84px 12px var(--spacing-2xl)",
   },
   hero: {
-    width: "min(1720px, calc(100vw - 96px))",
+    width: "100%",
+    maxWidth: "1720px",
     margin: "0 auto 16px",
     padding: "24px",
     borderRadius: "34px",
@@ -956,9 +961,11 @@ const styles = {
     alignContent: "flex-start",
     overflowY: "auto",
     maxWidth: "100vw",
+    pointerEvents: "none",
   },
   drawerOpen: {
     transform: "translateX(0)",
+    pointerEvents: "auto",
   },
   drawerTitle: {
     fontSize: "1.5rem",
@@ -1011,7 +1018,8 @@ const styles = {
     boxShadow: "0 0 20px rgba(0, 255, 255, 0.25)",
   },
   summaryPanel: {
-    width: "min(1720px, calc(100vw - 96px))",
+    width: "100%",
+    maxWidth: "1720px",
     margin: "0 auto 16px",
     padding: "16px 18px",
     borderRadius: "24px",
@@ -1062,7 +1070,8 @@ const styles = {
     overflowWrap: "anywhere",
   },
   grid: {
-    width: "min(1720px, calc(100vw - 96px))",
+    width: "100%",
+    maxWidth: "1720px",
     margin: "0 auto",
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
@@ -1089,7 +1098,8 @@ const styles = {
     gap: "10px",
   },
   loadMoreWrap: {
-    width: "min(1720px, calc(100vw - 96px))",
+    width: "100%",
+    maxWidth: "1720px",
     minHeight: "56px",
     margin: "22px auto 0",
     display: "grid",
