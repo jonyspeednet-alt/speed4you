@@ -1,14 +1,11 @@
 import js from '@eslint/js'
 import globals from 'globals'
-import { FlatCompat } from '@eslint/eslintrc'
-import { defineConfig, globalIgnores } from 'eslint/config'
+import reactHooks from 'eslint-plugin-react-hooks'
+import reactRefresh from 'eslint-plugin-react-refresh'
 
-const compat = new FlatCompat({ baseDirectory: import.meta.url })
-
-export default defineConfig([
-  globalIgnores(['dist']),
+export default [
+  { ignores: ['dist'] },
   js.configs.recommended,
-  ...compat.extends('plugin:react-hooks/recommended', 'plugin:react-refresh/vite'),
   {
     files: ['**/*.{js,jsx}'],
     languageOptions: {
@@ -20,8 +17,14 @@ export default defineConfig([
         sourceType: 'module',
       },
     },
+    plugins: {
+      'react-hooks': reactHooks,
+      'react-refresh': reactRefresh,
+    },
     rules: {
+      ...reactHooks.configs.recommended.rules,
+      ...reactRefresh.configs.vite.rules,
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
     },
   },
-])
+]
