@@ -135,6 +135,18 @@ function Icon({ name, size = 16, color = 'currentColor', strokeWidth = 2 }) {
   );
 }
 
+function formatDuration(seconds) {
+  if (seconds === null || seconds === undefined || Number.isNaN(Number(seconds))) return '—';
+  const total = Math.max(0, Math.floor(Number(seconds)));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
 function useElapsed(startedAt) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
