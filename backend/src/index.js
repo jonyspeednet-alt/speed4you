@@ -246,7 +246,11 @@ if (fs.existsSync(frontendDistPath)) {
     }
   });
 
-  // Handle SPA routing: serve index.html for all non-API routes
+  // Handle SPA routing: serve index.html for all non-API routes.
+  // IMPORTANT: if the path looks like an asset request that wasn't matched by
+  // express.static() (e.g. a stale hashed chunk name during a deploy/cache race),
+  // do not emit the HTML shell. That makes the browser download a real 404/asset error
+  // instead of a SPA HTML response that breaks dynamic import resolution.
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api/') || req.path.startsWith('/portal-api/')) {
       return next();
@@ -255,6 +259,12 @@ if (fs.existsSync(frontendDistPath)) {
     // Explicitly handle /health to avoid sending index.html
     if (req.path === '/health' || req.path === '/health/scanner') {
       return next();
+    }
+
+    const assetLikePath = req.path.startsWith('/assets/') || req.path.startsWith('/portal/assets/');
+    const hasFileExtension = path.extname(req.path) !== '';
+    if (assetLikePath || hasFileExtension) {
+      return res.status(404).type('text/plain').send('Asset not found');
     }
 
     res.setHeader('Cache-Control', 'no-cache');
