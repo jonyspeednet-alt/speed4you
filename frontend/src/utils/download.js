@@ -2,7 +2,7 @@ export function triggerDownload(url) {
   document.querySelectorAll('video').forEach((v) => {
     try {
       v.pause();
-    } catch {}
+    } catch { /* intentionally ignored: video may already be stopped */ }
   });
   const a = document.createElement('a');
   a.href = url;

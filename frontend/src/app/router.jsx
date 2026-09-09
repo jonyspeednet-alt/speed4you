@@ -1,6 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
-import { RailSkeleton, HeroBannerSkeleton } from '../components/feedback/Skeleton';
 
 const RouteErrorBoundary = lazy(() => import('../components/feedback/ErrorBoundary').then(m => ({ default: m.RouteErrorBoundary })));
 const GlobalErrorBoundary = lazy(() => import('../components/feedback/GlobalErrorBoundary'));
@@ -24,44 +23,8 @@ const UsersPage = lazy(() => import('../pages/admin/UsersPage'));
 const SearchAnalyticsPage = lazy(() => import('../pages/admin/SearchAnalyticsPage'));
 const ContentPreviewPage = lazy(() => import('../pages/admin/ContentPreviewPage'));
 
-function withRouteFallback(element, routeType = 'default') {
-  const getFallback = () => {
-    switch (routeType) {
-      case 'home':
-        return <HeroBannerSkeleton />;
-      case 'browse':
-        return (
-          <div style={{ padding: 'var(--spacing-lg) var(--spacing-lg) var(--spacing-xl)' }}>
-            <RailSkeleton count={6} />
-          </div>
-        );
-      case 'detail':
-        return (
-          <div style={{ padding: 'var(--spacing-xl) var(--spacing-lg)' }}>
-            <RailSkeleton count={1} />
-          </div>
-        );
-      default:
-        return (
-          <div style={{
-            minHeight: '40vh',
-            display: 'grid',
-            placeItems: 'center',
-            color: 'rgba(255,255,255,0.72)',
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase'
-          }}>
-            Loading...
-          </div>
-        );
-    }
-  };
-
-  return (
-    <Suspense fallback={getFallback()}>
-      {element}
-    </Suspense>
-  );
+function withRouteFallback(element) {
+  return <Suspense fallback={<div className="catalog-message" role="status">Loading…</div>}>{element}</Suspense>;
 }
 
 function TVRedirect() {
@@ -74,7 +37,7 @@ function TVRedirect() {
 function LayoutSuspense({ children }) {
   return (
     <Suspense fallback={
-      <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }} />
+      <div className="catalog-message" role="status">Loading…</div>
     }>
       {children}
     </Suspense>
@@ -205,7 +168,7 @@ const router = createBrowserRouter([
 function AppRouter() {
   return (
     <Suspense fallback={
-      <div style={{ minHeight: '100vh', background: 'var(--bg-primary)' }} />
+      <div className="catalog-message" role="status">Loading…</div>
     }>
       <GlobalErrorBoundary>
         <RouterProvider router={router} />

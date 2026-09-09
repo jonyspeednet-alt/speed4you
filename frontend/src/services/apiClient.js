@@ -1,3 +1,5 @@
+import { readStorage, writeStorage, removeStorage } from '../utils/storage';
+
 const API_BASE = (import.meta.env.VITE_API_URL || '/portal-api').replace(/\/$/, '');
 
 class ApiError extends Error {
@@ -49,12 +51,8 @@ function parseApiErrorPayload(rawText, status) {
 }
 
 function clearStoredSession() {
-  if (typeof localStorage === 'undefined') {
-    return;
-  }
-
-  localStorage.removeItem('token');
-  localStorage.removeItem('user');
+  removeStorage('token');
+  removeStorage('user');
 }
 
 
@@ -77,19 +75,19 @@ function redirectToLogin() {
   window.location.replace(loginUrl.toString());
 }
 
-async function apiClient(endpoint, options = {}) {
+async function requestApi(endpoint, options = {}) {
   const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
-  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : '';
+  const token = readStorage('token') || '';
 
   let guestUserId = '';
-  if (!token && typeof localStorage !== 'undefined') {
-    guestUserId = localStorage.getItem('guest_user_id');
+  if (!token) {
+    guestUserId = readStorage('guest_user_id');
     if (!guestUserId) {
       const randomUuid = typeof crypto !== 'undefined' && crypto.randomUUID
         ? crypto.randomUUID()
         : Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
       guestUserId = 'guest:' + randomUuid;
-      localStorage.setItem('guest_user_id', guestUserId);
+      writeStorage('guest_user_id', guestUserId);
     }
   }
 
@@ -150,11 +148,31 @@ async function apiClient(endpoint, options = {}) {
   return text ? JSON.parse(text) : null;
 }
 
+function apiClient(endpoint, options = {}) {
+  // Bound public catalog reads, including body download. Never time out
+  // scanner jobs, uploads or other mutations using this short deadline.
+  const isCatalogRead = (!options.method || options.method.toUpperCase() === 'GET') &&
+    /^\/(content|movies|series)(\/|\?|$)/.test(endpoint);
+  if (!isCatalogRead) return requestApi(endpoint, options);
+  const controller = typeof AbortController === 'function' && !options.signal ? new AbortController() : null;
+  let timer;
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new ApiError('The server is taking too long. Please try again.', { status: 408, code: 'TIMEOUT' }));
+      if (controller) controller.abort();
+    }, 20000);
+  });
+  return Promise.race([
+    requestApi(endpoint, controller ? { ...options, signal: controller.signal } : options),
+    deadline,
+  ]).finally(() => clearTimeout(timer));
+}
+
 export default apiClient;
 export { ApiError };
 
 function getAuthHeader() {
-  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : '';
+  const token = readStorage('token') || '';
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 

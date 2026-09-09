@@ -9,7 +9,7 @@ function cleanTitle(name, type = 'series') {
 
   // Strip quality tags, codecs, release groups, resolutions, and metadata noise
   cleaned = cleaned
-    .replace(/\b(\d{3,4}p|4k|uhd|hdr\d*|10bit|remux|bluray|bdrip|brrip|web-?dl|webrip|dvdrip|hdrip|hdtv|camrip|telesync)\b/gi, '')
+    .replace(/\b(\d{1,4}p|4k|uhd|hdr\d*|10bit|remux|bluray|bdrip|brrip|web-?dl|webrip|dvdrip|hdrip|hdtv|camrip|telesync)\b/gi, '')
     .replace(/\b(x264|x265|hevc|h264|h265|av1|vp9|aac|dts|dd5\.1|ac3|eac3|mp3|flac|esub|sub|dual|dual-audio|multi|multi-audio|hindi-dubbed|bengali-dubbed|tamil-dubbed|telugu-dubbed)\b/gi, '')
     .replace(/\b(yify|yts|psa|qxr|rarbg|tigole|galaxyrg|megusta|mkvca?c?)\b/gi, '');
 

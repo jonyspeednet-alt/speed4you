@@ -201,7 +201,7 @@ function ContentLibraryPage() {
     try {
       const orgRes = await adminService.getContentOrganization(orgParams);
       setOrganization(orgRes || {});
-    } catch {}
+    } catch { /* intentionally ignored: best-effort refresh */ }
   }, [orgParams]);
 
   useEffect(() => {
@@ -314,7 +314,7 @@ function ContentLibraryPage() {
       const slug = String(contentId || '');
       sessionStorage.removeItem(`portal-movie-details-v1:${slug}`);
       sessionStorage.removeItem(`portal-series-details-v1:${slug}`);
-    } catch {}
+    } catch { /* intentionally ignored: best-effort refresh */ }
   }, []);
 
   const handlePublish = useCallback(async (id) => {

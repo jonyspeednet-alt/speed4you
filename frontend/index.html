@@ -1,189 +1,31 @@
 <!doctype html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-visual" />
-
-  <!-- Prevent Caching for HTML only (assets use hash-based cache busting) -->
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <meta http-equiv="Pragma" content="no-cache" />
-  <meta http-equiv="Expires" content="0" />
-
-  <!-- PWA & Mobile App Meta -->
-  <meta name="theme-color" content="#07111f" media="(prefers-color-scheme: dark)" />
-  <meta name="theme-color" content="#07111f" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="ISP Portal" />
-  <meta name="application-name" content="ISP Entertainment Portal" />
-  <meta name="msapplication-TileColor" content="#07111f" />
-  <meta name="msapplication-tap-highlight" content="no" />
-
-  <!-- SEO -->
-  <meta name="description"
-    content="Speed4You Entertainment Portal — Stream movies, series, and live TV on your local network. Premium Bengali, Hindi, and English content." />
-  <meta name="robots" content="index, follow" />
-  <meta name="keywords" content="streaming, movies, series, live TV, ISP portal, Bengali movies, local network, entertainment" />
-  <link rel="canonical" href="https://data.speed4you.net/portal/" />
-
-  <!-- Open Graph -->
-  <meta property="og:type" content="website" />
-  <meta property="og:title" content="Speed4You Entertainment Portal" />
-  <meta property="og:description" content="Stream movies, series, and live TV. Premium Bengali, Hindi, and English content on your local network." />
-  <meta property="og:image" content="/portal/logo.png" />
-  <meta property="og:url" content="https://data.speed4you.net/portal/" />
-  <meta property="og:site_name" content="Speed4You" />
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Speed4You Entertainment Portal" />
-  <meta name="twitter:description" content="Stream movies, series, and live TV on your local network." />
-
-  <!-- Favicon & Icons -->
-  <link rel="icon" type="image/png" href="favicon.png" />
-  <link rel="apple-touch-icon" href="favicon.png" />
-  <link rel="manifest" href="manifest.json" />
-
-  <!-- Preconnect for performance -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#11151b" />
+  <meta name="description" content="Browse and watch movies, series and live TV on Speed4You." />
+  <link rel="canonical" href="https://speed4you.net/" />
+  <link rel="icon" type="image/png" href="%BASE_URL%favicon.png" />
+  <link rel="apple-touch-icon" href="%BASE_URL%favicon.png" />
+  <link rel="manifest" href="%BASE_URL%manifest.json" />
   <link rel="preconnect" href="https://image.tmdb.org" />
-  <link rel="dns-prefetch" href="https://image.tmdb.org" />
-
-  <!-- Preload UI fonts -->
-  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap"
-    as="style" onload="this.onload=null;this.rel='stylesheet'" />
-  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
-    as="style" onload="this.onload=null;this.rel='stylesheet'" />
-  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
-    as="style" onload="this.onload=null;this.rel='stylesheet'" />
-  <noscript>
-    <link rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap" />
-    <link rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" />
-    <link rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" />
-  </noscript>
-
-  <title>Speed4You Entertainment Portal — Movies, Series & Live TV</title>
+  <title>Speed4You — Movies, Series &amp; Live TV</title>
   <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      background-color: #07111f;
-      font-family: 'Hind Siliguri', system-ui, -apple-system, sans-serif;
-    }
-    .critical-loader {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 100vw;
-      height: 100vh;
-      height: 100dvh;
-      background: radial-gradient(circle at center, #0f223d 0%, #07111f 100%);
-      color: #ffffff;
-      position: fixed;
-      top: 0;
-      left: 0;
-      z-index: 9999;
-    }
-    .loader-content {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 24px;
-    }
-    .glowing-orb {
-      width: 80px;
-      height: 80px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-      position: relative;
-      box-shadow: 0 0 40px rgba(0, 242, 254, 0.6);
-      animation: pulse 2s infinite ease-in-out;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .glowing-orb::before {
-      content: '';
-      position: absolute;
-      width: 90px;
-      height: 90px;
-      border-radius: 50%;
-      border: 2px solid rgba(0, 242, 254, 0.3);
-      animation: spin-outer 3s infinite linear;
-    }
-    .inner-core {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background-color: #07111f;
-      box-shadow: inset 0 0 15px rgba(0, 242, 254, 0.4);
-    }
-    .loader-text {
-      font-size: 1.1rem;
-      font-weight: 600;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      background: linear-gradient(120deg, #ffffff, #a5b4fc, #ffffff);
-      background-size: 200% auto;
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      animation: shine 3s linear infinite;
-    }
-    .loader-bar-container {
-      width: 140px;
-      height: 4px;
-      background-color: rgba(255, 255, 255, 0.08);
-      border-radius: 2px;
-      overflow: hidden;
-      position: relative;
-    }
-    .loader-bar {
-      width: 60px;
-      height: 100%;
-      background: linear-gradient(90deg, #00f2fe, #4facfe);
-      border-radius: 2px;
-      position: absolute;
-      animation: shift 1.5s infinite ease-in-out;
-    }
-    @keyframes pulse {
-      0%, 100% { transform: scale(0.92); box-shadow: 0 0 30px rgba(0, 242, 254, 0.4); }
-      50% { transform: scale(1.08); box-shadow: 0 0 60px rgba(0, 242, 254, 0.8); }
-    }
-    @keyframes spin-outer {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    @keyframes shift {
-      0% { left: -60px; }
-      50% { left: 140px; }
-      100% { left: -60px; }
-    }
-    @keyframes shine {
-      to { background-position: 200% center; }
-    }
+    html, body { margin: 0; min-height: 100%; background: #11151b; color: #f1f3f5; font-family: Arial, sans-serif; }
+    .startup { max-width: 600px; margin: 48px auto; padding: 24px; line-height: 1.6; }
+    .startup a { color: #92d2ff; }
   </style>
 </head>
-
 <body>
   <div id="root">
-    <div class="critical-loader">
-      <div class="loader-content">
-        <div class="glowing-orb">
-          <div class="inner-core"></div>
-        </div>
-        <div class="loader-text">Speed4You পোর্টাল লোড হচ্ছে</div>
-        <div class="loader-bar-container">
-          <div class="loader-bar"></div>
-        </div>
-      </div>
+    <div class="startup">
+      <h1>Speed4You</h1>
+      <p>Loading movies and series…</p>
+      <p>If this page does not open, <a href="">reload the page</a> or try an updated browser.</p>
+      <noscript><p>Enable JavaScript in your browser to browse and watch titles.</p></noscript>
     </div>
   </div>
   <script type="module" src="/src/main.jsx"></script>
 </body>
-
 </html>

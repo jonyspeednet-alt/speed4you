@@ -99,7 +99,7 @@ export default function VideoPlayerModal({ src, title, onClose, onNext }) {
       } else if (el.webkitRequestFullscreen) {
         el.webkitRequestFullscreen();
       }
-    } catch {}
+    } catch { /* intentionally ignored: fullscreen/PiP unsupported */ }
   }, []);
 
   const togglePiP = useCallback(async () => {
@@ -107,7 +107,7 @@ export default function VideoPlayerModal({ src, title, onClose, onNext }) {
     try {
       if (document.pictureInPictureElement) await document.exitPictureInPicture();
       else await v.requestPictureInPicture();
-    } catch {}
+    } catch { /* intentionally ignored: fullscreen/PiP unsupported */ }
   }, []);
 
   const changeRate = useCallback((r) => {

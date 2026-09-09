@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 
-function EpisodeEditor({ formData, episodesExpanded, setEpisodesExpanded, handleSeasonChange, handleEpisodeChange, onBatchSetUrls, onMoveEpisode, autoResize, styles: S }) {
+function EpisodeEditor({ formData, episodesExpanded, setEpisodesExpanded, handleSeasonChange, handleEpisodeChange, onBatchSetUrls, onMoveEpisode, styles: S }) {
   const [batchPattern, setBatchPattern] = useState('');
 
   const handleBatchApply = useCallback(() => {

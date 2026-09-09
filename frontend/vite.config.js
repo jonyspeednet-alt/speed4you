@@ -2,6 +2,7 @@ import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import legacy from '@vitejs/plugin-legacy'
 import autoprefixer from 'autoprefixer'
 
 export default defineConfig(({ mode }) => {
@@ -16,11 +17,15 @@ export default defineConfig(({ mode }) => {
         // Faster JSX transform
         jsxRuntime: 'automatic',
       }),
+      // Old module engines also need dynamic-import and runtime fallbacks;
+      // lowering esbuild's syntax target alone does not provide these.
+      legacy({
+        targets: ['Chrome >= 60', 'Firefox >= 55', 'Safari >= 11.1', 'Edge >= 79'],
+        additionalLegacyPolyfills: ['abortcontroller-polyfill/dist/abortcontroller-polyfill-only'],
+      }),
     ],
     build: {
-      // Target a wider browser floor so old smart-TV/webview engines can parse the bundle.
-      // esbuild down-levels optional chaining / nullish coalescing / class fields for these.
-      target: ['es2017', 'chrome60', 'firefox55', 'safari11.1'],
+      // The legacy plugin supplies the separate old-browser build.
       // Reduce chunk size warning limit for better performance
       chunkSizeWarningLimit: 400,
       // Enable CSS code splitting

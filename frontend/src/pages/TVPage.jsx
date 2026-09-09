@@ -1,10 +1,10 @@
 import {
   useEffect, useMemo, useRef, useState, useCallback, memo, forwardRef,
 } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { FixedSizeList } from "react-window";
 import tvService from "../services/tvService";
-import { useBreakpoint, useTVMode } from "../hooks";
+import { useBreakpoint } from "../hooks";
 
 const API = (import.meta.env.VITE_API_URL || "/portal-api").replace(/\/$/, "");
 const api  = (p) => (p?.startsWith("http") ? p : `${API}${p}`);
@@ -361,7 +361,6 @@ function PlayerSpinner() {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function TVPage() {
   const { isMobile } = useBreakpoint();
-  const isTVMode = useTVMode();
 
   const [sid,    setSid]    = useState("");
   const [pLoad,  setPLoad]  = useState(false);

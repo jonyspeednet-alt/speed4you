@@ -161,7 +161,7 @@ export function useResponsive() {
 
     getFontSize: (base = 1) => `${base * fontMultiplier}rem`,
 
-    getGridTemplate: (minSize = 280) => {
+    getGridTemplate: () => {
       if (isExtraSmall) return '1fr';
       if (isSmall) return 'repeat(2, 1fr)';
       if (isMobile) return 'repeat(2, 1fr)';

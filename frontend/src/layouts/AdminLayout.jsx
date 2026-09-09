@@ -3,7 +3,6 @@ import {
   Navigate,
   Outlet,
   useLocation,
-  useNavigate,
 } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { authService } from "../services";
@@ -148,7 +147,6 @@ const NAV = [
 
 function AdminLayout() {
   const location = useLocation();
-  const navigate = useNavigate();
   const { isMobile } = useBreakpoint();
   const [authState, setAuthState] = useState(() =>
     localStorage.getItem("token") ? "checking" : "unauthenticated",
@@ -261,7 +259,6 @@ function AdminLayout() {
         {/* Nav */}
         <nav style={s.nav} aria-label="Admin navigation">
           {NAV.map((item) => {
-            const isExactDashboard = item.exact && location.pathname === "/admin";
             const hasMoreSpecificMatch = NAV.some(
               (other) =>
                 other.path !== item.path &&
