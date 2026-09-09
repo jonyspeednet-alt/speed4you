@@ -8,7 +8,7 @@ function formatTimeAgo(timestamp) {
   return `${Math.floor(minutes / 60)}h`;
 }
 
-function ActionBar({ isEditMode, loading, onSave, onSaveAndPublish, onDelete, onRetry, isDirty, hasError, publishedUrl, lastSavedAt, onReset, styles: S }) {
+function ActionBar({ isEditMode, loading, onSaveAndPublish, onDelete, onRetry, isDirty, hasError, publishedUrl, lastSavedAt, onReset, styles: S }) {
   return (
     <div style={S.actions}>
       <button type="submit" disabled={loading} style={S.secondaryBtn}>

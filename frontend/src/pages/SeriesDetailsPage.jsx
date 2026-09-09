@@ -1,17 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { seriesService } from '../services/seriesService';
-import { contentService } from '../services/contentService';
 import { useBreakpoint } from '../hooks';
 import { useRecentlyViewed } from '../hooks';
 import ShareButton from '../components/ui/ShareButton';
 import WatchlistButton from '../components/ui/WatchlistButton';
 import VideoPlayerModal from '../components/player/VideoPlayerModal';
 import ConfirmDialog from '../components/overlays/ConfirmDialog';
-import ContentRail from '../features/home/components/ContentRail';
 import { toPlayableSrc } from '../utils/mediaUrl';
 import { triggerDownload } from '../utils/download';
-import { DETAIL_STYLES, DETAIL_SKELETON, posterFallbackUrl, getBackdropSrcSet } from '../styles/detailPage';
+import { DETAIL_STYLES, posterFallbackUrl } from '../styles/detailPage';
 
 const posterFallback = posterFallbackUrl;
 const SERIES_CACHE_PREFIX = 'portal-series-details-v1:';
@@ -44,30 +42,7 @@ function writeCache(slug, data) {
 
 // ── Skeleton ─────────────────────────────────────────────────────────────────
 function SeriesDetailsSkeleton() {
-  const sk = DETAIL_SKELETON;
-  return (
-    <div style={sk.page}>
-      <div style={sk.hero}>
-        <div style={{ ...sk.skeletonBlock, position: 'absolute', inset: 0 }} />
-        <div style={sk.heroGradient} />
-        <div style={sk.heroInner}>
-          <div style={{ ...sk.skeletonBlock, width: 220, height: 330, borderRadius: 20, flexShrink: 0 }} />
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ ...sk.skeletonLine, width: 100, height: 12 }} />
-            <div style={{ ...sk.skeletonLine, width: '55%', height: 52 }} />
-            <div style={{ ...sk.skeletonLine, width: '80%', height: 16 }} />
-            <div style={{ ...sk.skeletonLine, width: '70%', height: 16 }} />
-            <div style={{ ...sk.skeletonLine, width: '60%', height: 16 }} />
-            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-              {[150, 52].map((w, i) => (
-                <div key={i} style={{ ...sk.skeletonLine, width: w, height: 50, borderRadius: 999 }} />
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  return <div className="catalog-message" role="status">Loading details…</div>;
 }
 
 // ── Episode card ──────────────────────────────────────────────────────────────
@@ -190,8 +165,6 @@ export default function SeriesDetailsPage({ adminPreview, contentData }) {
   const [activeSeason, setActiveSeason] = useState(0);
   const [descExpanded, setDescExpanded] = useState(false);
   const [posterError, setPosterError] = useState(false);
-  const [backdropError, setBackdropError] = useState(false);
-  const [related, setRelated] = useState([]);
   const activeTabRef = useRef(null);
   const seasonTabsRef = useRef(null);
   const isAdmin = useMemo(() => {
@@ -230,12 +203,6 @@ export default function SeriesDetailsPage({ adminPreview, contentData }) {
     return () => { cancelled = true; };
   }, [slug, trackView, adminPreview, contentData]);
 
-  useEffect(() => {
-    if (!series?.id) return;
-    contentService.getRecommendations(series.id, 10)
-      .then(res => setRelated((res?.items || []).filter(i => i.id !== series.id)))
-      .catch(() => {});
-  }, [series?.id]);
 
   // Scroll active season tab into view
   useEffect(() => {
@@ -266,28 +233,12 @@ export default function SeriesDetailsPage({ adminPreview, contentData }) {
   const descLong = (series.description || '').length > 180;
 
   return (
-    <div style={s.page}>
-      <div style={{ ...s.auroraOrb, top: '-5%', left: '-10%', background: 'radial-gradient(circle, var(--accent-secondary), transparent 70%)' }} />
-      <div style={{ ...s.auroraOrb, bottom: '30%', right: '-10%', background: 'radial-gradient(circle, var(--accent-pink), transparent 70%)' }} />
+    <div style={s.page} className="simple-details">
 
       {/* ── Hero ── */}
       <section style={s.hero} className="detail-hero">
-        <div style={s.backdropWrap}>
-          <img
-            src={backdropError ? posterFallback : (series.backdrop || series.poster || posterFallback)}
-            srcSet={backdropError ? undefined : getBackdropSrcSet(series.backdrop || series.poster)}
-            sizes="100vw"
-            alt=""
-            style={s.backdropImg}
-            loading="lazy"
-            decoding="async"
-            onError={() => setBackdropError(true)}
-          />
-          <div style={s.backdropOverlay} />
-          <div style={s.heroGradient} />
-        </div>
 
-        <div style={{ ...s.heroInner, ...(isMobile ? s.heroInnerMobile : isTablet ? s.heroInnerTablet : {}) }}>
+        <div className="simple-detail-inner" style={{ ...s.heroInner, ...(isMobile ? s.heroInnerMobile : isTablet ? s.heroInnerTablet : {}) }}>
 
           {/* Poster */}
           <div style={{ ...s.posterWrap, ...(isMobile ? s.posterWrapMobile : {}) }}>
@@ -298,7 +249,7 @@ export default function SeriesDetailsPage({ adminPreview, contentData }) {
               loading="lazy"
               onError={() => setPosterError(true)}
             />
-            <div style={s.posterGlow} />
+
           </div>
 
           {/* Info */}
@@ -402,35 +353,6 @@ export default function SeriesDetailsPage({ adminPreview, contentData }) {
       {/* ── Season & Episodes ── */}
       <div style={s.body}>
 
-        {/* Overview */}
-        <div style={{ ...s.detailTopGrid, ...(isMobile ? s.detailTopGridMobile : {}) }}>
-          <section style={s.card}>
-            <h2 style={s.cardTitle}>Series details</h2>
-            <div style={{ ...s.statGrid, ...(isMobile ? s.statGridMobile : {}) }}>
-              {[
-                { label: 'Released', value: formatReleaseDate(series.releasedAt) || series.year || '—' },
-                { label: 'Seasons', value: seasons.length || '—' },
-                { label: 'Episodes', value: totalEpisodes || '—' },
-                { label: 'Language', value: series.language || series.originalLanguage || '—' },
-                { label: 'Rating', value: series.rating ? `${series.rating} / 10` : '—' },
-                { label: 'Genre', value: genres.slice(0, 2).join(', ') || '—' },
-              ].map(({ label, value }) => (
-                <div key={label} style={s.statItem}>
-                  <span style={s.statLabel}>{label}</span>
-                  <strong style={s.statValue}>{value}</strong>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {series.description && (
-            <section style={s.card}>
-              <h2 style={s.cardTitle}>Synopsis</h2>
-              <p style={s.synopsisText}>{series.description}</p>
-            </section>
-          )}
-        </div>
-
         {/* Season tabs */}
         {seasons.length > 1 && (
           <div style={{ ...s.seasonTabsWrap, ...(isMobile ? s.seasonTabsWrapMobile : {}) }} ref={seasonTabsRef}>
@@ -510,21 +432,13 @@ export default function SeriesDetailsPage({ adminPreview, contentData }) {
         </div>
       </div>
 
-      {related.length >= 3 && (
-        <ContentRail
-          title="You May Also Like"
-          subtitle="Similar series"
-          items={related}
-          type="series"
-          viewAllLink={`/browse?genre=${genres[0] || ''}&type=series`}
-        />
-      )}
+
     </div>
   );
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
-const s = DETAIL_STYLES;
+const s = { ...DETAIL_STYLES };
 s.seasonsBadge = {
   padding: '6px 12px', borderRadius: '8px',
   background: 'rgba(0, 255, 255, 0.1)',
@@ -550,8 +464,8 @@ s.secondaryBtn = {
   transition: 'background 180ms ease, transform 180ms ease',
 };
 s.seasonTabsWrap = {
-  position: 'sticky', top: 96, zIndex: 3,
-  background: 'rgba(5,12,22,0.92)', backdropFilter: 'blur(18px)',
+  position: 'static', zIndex: 3,
+  background: '#1b222c',
   border: '1px solid rgba(255,255,255,0.08)', borderRadius: '22px',
   padding: '10px 12px', marginBottom: '24px', overflowX: 'auto',
 };
@@ -591,7 +505,7 @@ s.episodeCard = {
   textDecoration: 'none',
   transition: 'transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease',
 };
-s.episodeCardMobile = { flexDirection: 'row' };
+s.episodeCardMobile = { flexDirection: 'row', flexWrap: 'wrap' };
 s.epActions = { display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 };
 s.epActionsMobile = { gap: '8px' };
 s.epNumBadge = {
@@ -602,7 +516,7 @@ s.epNumBadge = {
 };
 s.epNumBadgeMobile = { width: '44px', height: '44px', borderRadius: '14px' };
 s.epNum = { fontSize: '0.95rem', fontWeight: '900' };
-s.epInfo = { flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' };
+s.epInfo = { minWidth: 0, overflowWrap: 'break-word', flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' };
 s.epTitleRow = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' };
 s.epTitle = { margin: 0, fontSize: '1rem', fontWeight: '900' };
 s.epDuration = { color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: '700' };

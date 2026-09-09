@@ -5,9 +5,9 @@ const NOISE_PATTERNS = [
   /\bhdwebmovies?\b/gi,
   /\bh\s*\.?\s*264\b/gi,
   /\b(web[- ]?dl|webrip|bluray|brrip|hdrip|dvdrip|x264|x265|h\.?264|h\.?265|hevc)\b/gi,
-  /\b(dual audio|multi audio|english|hindi|bangla|bengali|japanese|korean|french|spanish|dubbed|subbed|esub|msub|engsub|subs?|eng|hin)\b/gi,
-  /\b(complete|full|uncut|uncensored|extended|directors?\.?\s*cut)\b/gi,
   /\b(complete|full)\s+(series|season)\b/gi,
+  /\b(complete|full|uncut|uncensored|extended|directors?\.?\s*cut)\b/gi,
+  /\bseries\b/gi,
   /\bseason\s*\d{1,2}\b/gi,
   /\bs\d{1,2}\s*[-_. ]*e\d{1,3}\b/gi,
   /\bs\d{1,2}\b/gi,
@@ -637,7 +637,7 @@ async function enrichItemWithMetadata(item) {
         if (/\.(mkv|mp4|avi|webm|mov)$/i.test(folderCandidate)) continue;
         const cleanFolder = cleanSearchTitle(folderCandidate);
         const isYearFolder = /^\d{4}$/.test(folderCandidate.trim());
-        const isCategoryFolder = /\b(movies|series|dubbed|hindi|bangla|english|tamil|telugu|malayalam|korean|japanese|animation|3d)\b/i.test(folderCandidate);
+        const isCategoryFolder = /\b(movies|series|dubbed|hindi|bangla|english|tamil|telugu|malayalam|korean|japanese|animation|3d|requested|foreign|collection|cartoon|storage|extra|adult|new|other|web|tv)\b/i.test(folderCandidate);
         if (cleanFolder && cleanFolder.length >= 2 && !isYearFolder && !isCategoryFolder) {
           try {
             // First try cleanFolder

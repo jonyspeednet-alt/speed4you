@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 const appBasePath = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
 const loginPath = `${appBasePath}/login`.replace(/\/{2,}/g, '/');
 
-function ProfileMenu({ user, compact = false }) {
+function ProfileMenu({ user }) {
   const [isOpen, setIsOpen] = useState(false);
   const [hoveredItem, setHoveredItem] = useState(null);
   const containerRef = useRef(null);

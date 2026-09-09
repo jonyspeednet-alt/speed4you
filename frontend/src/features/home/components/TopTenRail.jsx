@@ -46,7 +46,7 @@ function TopTenRail({ items }) {
             ...(isTVMode ? styles.viewAllTV : {}),
           }}
         >
-          View All
+          View All ›
         </Link>
       </div>
 
@@ -122,7 +122,7 @@ const styles = {
   section: {
     // Extra bottom air: Top 10 closes the showcase zone
     // (Movies/Series/Top 10) before the catalog rails begin.
-    padding: '4px 0 20px',
+    padding: '2px 0 12px',
     overflow: 'hidden',
     width: '100%',
     maxWidth: '100vw',
@@ -167,16 +167,13 @@ const styles = {
     fontWeight: '800',
   },
   viewAll: {
-    minHeight: '34px',
+    minHeight: '44px',
     display: 'inline-flex',
     alignItems: 'center',
-    padding: '0 12px',
-    borderRadius: '10px',
-    background: 'rgba(255, 255, 255, 0.055)',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
+    padding: '0 6px',
     color: 'var(--text-secondary)',
-    fontSize: '0.72rem',
-    fontWeight: '800',
+    fontSize: '0.8rem',
+    fontWeight: '700',
     whiteSpace: 'nowrap',
     textDecoration: 'none',
     flexShrink: 0,

@@ -24,10 +24,10 @@ export default function ResponsiveImage({
   aspectRatio,
   ...props
 }) {
-  const [imageSrc, setImageSrc] = useState(src);
+  const [imageSrc] = useState(src);
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState(false);
-  const { isMobile, isTablet, isDesktop, isTV, is4K } = useResponsive();
+  const { isMobile, isTablet, isTV, is4K } = useResponsive();
 
   // Generate responsive sizes based on breakpoints
   const getResponsiveSizes = () => {
@@ -125,14 +125,13 @@ export default function ResponsiveImage({
  */
 export function ResponsiveBackground({
   src,
-  srcWebP,
   alt = 'Background',
   className = '',
   style = {},
   children,
   ...props
 }) {
-  const { isMobile, isTablet, isDesktop } = useResponsive();
+  const { isMobile, isTablet } = useResponsive();
 
   // Determine background image URL based on breakpoint
   const getBgUrl = () => {

@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 
-function ArtworkSection({ formData, setFormField, onAssetUpload, uploadingPoster, uploadingBackdrop, styles: S, isMobile }) {
+function ArtworkSection({ formData, setFormField, onAssetUpload, uploadingPoster, uploadingBackdrop, styles: S }) {
   const posterInputRef = useRef(null);
   const backdropInputRef = useRef(null);
   const [posterError, setPosterError] = useState(false);
