@@ -7,6 +7,7 @@ import ShareButton from '../components/ui/ShareButton';
 import WatchlistButton from '../components/ui/WatchlistButton';
 import VideoPlayerModal from '../components/player/VideoPlayerModal';
 import ConfirmDialog from '../components/overlays/ConfirmDialog';
+import PlaybackHelpCard from '../components/ui/PlaybackHelpCard';
 import { toPlayableSrc } from '../utils/mediaUrl';
 import { triggerDownload } from '../utils/download';
 import { DETAIL_STYLES, posterFallbackUrl } from '../styles/detailPage';
@@ -345,6 +346,7 @@ export default function SeriesDetailsPage({ adminPreview, contentData }) {
                   </Link>
                 )}
               </div>
+              <PlaybackHelpCard style={{ marginTop: '20px' }} />
             </div>
           </div>
         </div>

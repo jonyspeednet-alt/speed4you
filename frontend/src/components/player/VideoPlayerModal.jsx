@@ -207,8 +207,23 @@ export default function VideoPlayerModal({ src, title, onClose, onNext }) {
 
       <div className="player-video-area" onMouseMove={startHideTimer} onClick={togglePlay}>
         {error ? (
-          <div className="player-error" style={{ minHeight: 'auto', padding: 40 }}>
-            <p>{error}</p>
+          <div className="player-error" style={{ minHeight: 'auto', padding: '40px 24px', maxWidth: '560px', margin: '0 auto' }}>
+            <div style={{
+              width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px',
+              border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444'
+            }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+            </div>
+            <h3 style={{ color: '#fff', fontSize: '1.1rem', marginBottom: '8px' }}>ভিডিওটি ব্রাউজারে প্লে করা যাচ্ছে না</h3>
+            <p style={{ color: '#94a3b8', fontSize: '0.88rem', lineHeight: '1.6', margin: '0 0 20px' }}>
+              অনেক ভিডিওর অডিও ফরম্যাট (AC3/5.1) অথবা হাই-কোয়ালিটি কোডেক সরাসরি ব্রাউজারে চলে না। অনুগ্রহ করে ফাইলটি <strong>Download</strong> করে <strong>VLC Media Player</strong> অথবা <strong>MX Player</strong> দিয়ে উপভোগ করুন।
+            </p>
+            <button className="player-back-btn" onClick={closeModal} style={{ margin: '0 auto' }}>
+              Close
+            </button>
           </div>
         ) : (
           <>
