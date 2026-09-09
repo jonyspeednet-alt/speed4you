@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
-import HeroCarousel from '../features/home/components/HeroCarousel';
+import { Link } from 'react-router-dom';
 import ContentRail from '../features/home/components/ContentRail';
-import TrendingBento from '../features/home/components/TrendingBento';
+import SpotlightBand from '../features/home/components/SpotlightBand';
+import TopTenRail from '../features/home/components/TopTenRail';
 import ContinueWatchingRail from '../features/continueWatching/components/ContinueWatchingRail';
-import { HeroBannerSkeleton, RailSkeleton } from '../components/feedback/Skeleton';
+import Skeleton, { RailSkeleton } from '../components/feedback/Skeleton';
 import EmptyState from '../components/feedback/EmptyState';
 import BackToTop from '../components/ui/BackToTop';
 import { contentService } from '../services';
@@ -232,6 +233,7 @@ function HomePage() {
   const [error, setError] = useState(null);
   const [continueWatching, setContinueWatching] = useState([]);
   const [cwLoading, setCwLoading] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const isLoggedIn = typeof localStorage !== 'undefined' && !!localStorage.getItem('token');
 
   // Invalidate cache on auth state change
@@ -293,9 +295,7 @@ function HomePage() {
       .finally(() => setCwLoading(false));
   }, [isLoggedIn]);
 
-  const hasFeaturedHero = Array.isArray(content.featured) && content.featured.length > 0;
-
-  const hasAnyContent = hasFeaturedHero ||
+  const hasAnyContent =
     content.movies?.length > 0 ||
     content.series?.length > 0 ||
     content.latest?.length > 0 ||
@@ -319,9 +319,11 @@ function HomePage() {
 
   if (loading) {
     return (
-      <div style={styles.page}>
-        <HeroBannerSkeleton />
+      <div style={{ ...styles.page, ...styles.pageWithoutHero }}>
         <div style={{ ...styles.content, ...(isTVMode ? styles.contentTV : {}), ...(isMobile ? styles.contentMobile : {}) }}>
+          <div style={{ ...styles.spotlightSkeleton, ...(isMobile ? styles.spotlightSkeletonMobile : {}) }}>
+            <Skeleton height="100%" borderRadius="20px" />
+          </div>
           <RailSkeleton count={isMobile ? 4 : 6} />
           <RailSkeleton count={isMobile ? 4 : 6} />
           <RailSkeleton count={isMobile ? 4 : 6} />
@@ -363,23 +365,48 @@ function HomePage() {
     );
   }
 
+  // Spotlight pick follows the 30-min rotation (varies per visit, no timers).
+  const spotlightItem =
+    content.trending?.[0] ||
+    content.popular?.[0] ||
+    content.latest?.[0] ||
+    content.movies?.[0] ||
+    null;
+  // Top 10 merges trending + popular (deduped) — replaces the old separate
+  // trending rail/bento so the same titles don't repeat back-to-back.
+  const topTenItems = uniqueById([
+    ...(content.trending || []),
+    ...(content.popular || []),
+  ]).slice(0, 10);
+
   return (
-    <div style={{ ...styles.page, ...(!hasFeaturedHero ? styles.pageWithoutHero : {}) }}>
-      {hasFeaturedHero ? <HeroCarousel items={content.featured} /> : null}
-
-      {(isLoggedIn && (cwLoading || continueWatching.length > 0)) ? (
-        <div style={{ padding: '0 max(48px, calc((100vw - 1720px) / 2))', marginTop: hasFeaturedHero ? '-20px' : '0' }}>
-          <ContinueWatchingRail items={[...continueWatching].sort((a, b) => (new Date(b.updatedAt).getTime() || 0) - (new Date(a.updatedAt).getTime() || 0))} isLoading={cwLoading} />
-        </div>
-      ) : null}
-
+    <div style={{ ...styles.page, ...styles.pageWithoutHero }}>
       <div style={{ ...styles.content, ...(isTVMode ? styles.contentTV : {}), ...(isMobile ? styles.contentMobile : {}) }}>
+        {spotlightItem ? (
+          <SpotlightBand
+            item={spotlightItem}
+            eyebrow={isLoggedIn ? 'Welcome back' : undefined}
+          />
+        ) : null}
+
+        {(isLoggedIn && (cwLoading || continueWatching.length > 0)) ? (
+          <div style={{ padding: '0 max(48px, calc((100vw - 1720px) / 2))' }}>
+            <ContinueWatchingRail items={[...continueWatching].sort((a, b) => (new Date(b.updatedAt).getTime() || 0) - (new Date(a.updatedAt).getTime() || 0))} isLoading={cwLoading} />
+          </div>
+        ) : null}
+
         {content.movies?.length >= 3 ? (
           <ContentRail title="Movies" subtitle="Lean-back movie night" items={content.movies} viewAllLink="/movies" />
         ) : null}
 
         {content.series?.length >= 1 ? (
           <ContentRail title="Series" subtitle="Binge-ready stories" items={content.series} type="series" viewAllLink="/series" />
+        ) : null}
+
+        {topTenItems.length >= 5 ? (
+          <TopTenRail items={topTenItems} />
+        ) : content.trending?.length >= 3 ? (
+          <ContentRail title="Trending Right Now" subtitle="Most watched this week" items={content.trending} viewAllLink="/browse?sort=trending" priorityCount={0} />
         ) : null}
 
         {content.latest?.length >= 1 ? (
@@ -391,104 +418,109 @@ function HomePage() {
         ) : null}
 
         {content.bengali?.length >= 2 ? (
-          <ContentRail title="Bengali Picks" subtitle="Local language highlights" items={content.bengali} viewAllLink="/browse?language=Bengali" />
-        ) : null}
-
-        {recentlyViewed?.length >= 2 ? (
-          <ContentRail
-            title="Recently Viewed"
-            subtitle="Pick up where you left off"
-            items={recentlyViewed
-              .filter(item => !continueWatching.some(cw => String(cw.id) === String(item.id)))
-              .map(item => ({
-                ...item,
-                poster: item.poster || `${import.meta.env.BASE_URL}assets/poster-placeholder.svg`,
-                genre: item.genre || 'Featured',
-                language: item.language || 'Mixed',
-              }))}
-          />
-        ) : null}
-
-        {content.recommendations?.length > 0 ? (
-          <ContentRail
-            title="Because you watched..."
-            subtitle="More of what you like"
-            items={content.recommendations}
-          />
-        ) : null}
-
-        {content.localTrending?.length > 3 ? (
-          <ContentRail
-            title="Trending Near You"
-            subtitle="Popular in your area"
-            items={content.localTrending}
-          />
-        ) : null}
-
-        {content.trending?.length >= 5 ? (
-          <TrendingBento items={content.trending} />
-        ) : content.trending?.length >= 3 ? (
-          <ContentRail title="Trending Right Now" subtitle="Most watched this week" items={content.trending} viewAllLink="/browse?sort=trending" priorityCount={4} />
-        ) : null}
-
-        {content.newThisWeek?.length >= 3 ? (
-          <ContentRail title="New This Week" subtitle="Freshly added" items={content.newThisWeek} viewAllLink="/browse?sort=latest" priorityCount={3} />
-        ) : null}
-
-        {content.hiddenGems?.length >= 3 ? (
-          <ContentRail title="Hidden Gems" subtitle="Highly rated, underrated" items={content.hiddenGems} viewAllLink="/browse?sort=hidden-gems" priorityCount={3} />
-        ) : null}
-
-        {content.action?.length >= 3 ? (
-          <ContentRail title="Action Hits" subtitle="Non-stop thrills" items={content.action} viewAllLink="/browse?genre=action" />
-        ) : null}
-
-        {content.comedy?.length >= 3 ? (
-          <ContentRail title="Comedy Spotlight" subtitle="Laugh out loud" items={content.comedy} viewAllLink="/browse?genre=comedy" />
+          <ContentRail minimal title="Bengali Picks" subtitle="Local language highlights" items={content.bengali} viewAllLink="/browse?language=Bengali" />
         ) : null}
 
         {content.topRated?.length >= 3 ? (
-          <ContentRail title="Top Rated" subtitle="Audience favorites" items={content.topRated} viewAllLink="/browse?sort=rating" priorityCount={3} />
+          <ContentRail minimal title="Top Rated" subtitle="Audience favorites" items={content.topRated} viewAllLink="/browse?sort=rating" priorityCount={0} />
         ) : null}
 
-        {content.hindi?.length >= 3 ? (
-          <ContentRail title="Hindi Picks" subtitle="Bollywood & Hindi dubbed" items={content.hindi} viewAllLink="/browse?language=Hindi" />
+        {content.newThisWeek?.length >= 3 ? (
+          <ContentRail minimal title="New This Week" subtitle="Freshly added" items={content.newThisWeek} viewAllLink="/browse?sort=latest" priorityCount={0} />
         ) : null}
 
-        {content.english?.length >= 3 ? (
-          <ContentRail title="English Picks" subtitle="Hollywood & international" items={content.english} viewAllLink="/browse?language=English" />
+        {content.action?.length >= 3 ? (
+          <ContentRail minimal title="Action Hits" subtitle="Non-stop thrills" items={content.action} viewAllLink="/browse?genre=action" />
         ) : null}
 
-        {content.horror?.length >= 3 ? (
-          <ContentRail title="Horror Hits" subtitle="If you dare" items={content.horror} viewAllLink="/browse?genre=horror" />
+        {content.comedy?.length >= 3 ? (
+          <ContentRail minimal title="Comedy Spotlight" subtitle="Laugh out loud" items={content.comedy} viewAllLink="/browse?genre=comedy" />
         ) : null}
 
-        {content.drama?.length >= 3 ? (
-          <ContentRail title="Drama Central" subtitle="Stories that move you" items={content.drama} viewAllLink="/browse?genre=drama" />
-        ) : null}
+        {!showAll ? (
+          <div style={styles.showMoreWrap}>
+            <button type="button" onClick={() => setShowAll(true)} style={styles.showMoreBtn}>
+              Show more categories
+            </button>
+            <Link to="/browse" style={styles.showMoreLink}>Or explore full library</Link>
+          </div>
+        ) : (
+          <>
+            {recentlyViewed?.length >= 2 ? (
+              <ContentRail
+                minimal
+                title="Recently Viewed"
+                subtitle="Pick up where you left off"
+                items={recentlyViewed
+                  .filter(item => !continueWatching.some(cw => String(cw.id) === String(item.id)))
+                  .map(item => ({
+                    ...item,
+                    poster: item.poster || `${import.meta.env.BASE_URL}assets/poster-placeholder.svg`,
+                    genre: item.genre || 'Featured',
+                    language: item.language || 'Mixed',
+                  }))}
+              />
+            ) : null}
 
-        {content.thriller?.length >= 3 ? (
-          <ContentRail title="Thriller Zone" subtitle="Edge of your seat" items={content.thriller} viewAllLink="/browse?genre=thriller" />
-        ) : null}
+            {content.recommendations?.length > 0 ? (
+              <ContentRail
+                minimal
+                title="Because you watched..."
+                subtitle="More of what you like"
+                items={content.recommendations}
+              />
+            ) : null}
 
-        {content.weekendBinge?.length >= 3 ? (
-          <ContentRail title="Weekend Binge" subtitle="Perfect for a marathon" items={content.weekendBinge} viewAllLink="/browse?type=series&sort=popular" type="series" />
-        ) : null}
+            {content.localTrending?.length > 3 ? (
+              <ContentRail
+                minimal
+                title="Trending Near You"
+                subtitle="Popular in your area"
+                items={content.localTrending}
+              />
+            ) : null}
 
-        {content.lateNight?.length >= 3 ? (
-          <ContentRail title="Late Night Picks" subtitle="For the night owls" items={content.lateNight} viewAllLink="/browse?genre=horror" />
-        ) : null}
+            {content.hiddenGems?.length >= 3 ? (
+              <ContentRail minimal title="Hidden Gems" subtitle="Highly rated, underrated" items={content.hiddenGems} viewAllLink="/browse?sort=hidden-gems" priorityCount={0} />
+            ) : null}
+
+            {content.hindi?.length >= 3 ? (
+              <ContentRail minimal title="Hindi Picks" subtitle="Bollywood & Hindi dubbed" items={content.hindi} viewAllLink="/browse?language=Hindi" />
+            ) : null}
+
+            {content.english?.length >= 3 ? (
+              <ContentRail minimal title="English Picks" subtitle="Hollywood & international" items={content.english} viewAllLink="/browse?language=English" />
+            ) : null}
+
+            {content.horror?.length >= 3 ? (
+              <ContentRail minimal title="Horror Hits" subtitle="If you dare" items={content.horror} viewAllLink="/browse?genre=horror" />
+            ) : null}
+
+            {content.drama?.length >= 3 ? (
+              <ContentRail minimal title="Drama Central" subtitle="Stories that move you" items={content.drama} viewAllLink="/browse?genre=drama" />
+            ) : null}
+
+            {content.thriller?.length >= 3 ? (
+              <ContentRail minimal title="Thriller Zone" subtitle="Edge of your seat" items={content.thriller} viewAllLink="/browse?genre=thriller" />
+            ) : null}
+
+            {content.weekendBinge?.length >= 3 ? (
+              <ContentRail minimal title="Weekend Binge" subtitle="Perfect for a marathon" items={content.weekendBinge} viewAllLink="/browse?type=series&sort=popular" type="series" />
+            ) : null}
+
+            {content.lateNight?.length >= 3 ? (
+              <ContentRail minimal title="Late Night Picks" subtitle="For the night owls" items={content.lateNight} viewAllLink="/browse?genre=horror" />
+            ) : null}
+
+            <div style={styles.showMoreWrap}>
+              <button type="button" onClick={() => setShowAll(false)} style={styles.showMoreBtn}>
+                Show less
+              </button>
+            </div>
+          </>
+        )}
 
       </div>
-
-      {!isLoggedIn ? (
-        <div style={styles.guestPrompt}>
-          <div style={styles.guestPromptContent}>
-            <h3 style={styles.guestPromptTitle}>Welcome to Speed4You</h3>
-            <p style={styles.guestPromptText}>Browse our collection of movies, series, and live TV. No account needed.</p>
-          </div>
-        </div>
-      ) : null}
 
       <BackToTop />
     </div>
@@ -542,16 +574,49 @@ const styles = {
     zIndex: 1,
     paddingBottom: 'var(--spacing-3xl)',
     display: 'grid',
-    gap: 'var(--spacing-2xl)',
-    marginTop: '-60px',
+    gap: '12px',
+    marginTop: '0',
   },
   contentTV: {
-    gap: '60px',
+    gap: '32px',
     paddingBottom: '120px',
   },
   contentMobile: {
-    gap: 'var(--spacing-xl)',
-    marginTop: '-30px',
+    gap: '10px',
+    marginTop: '0',
+  },
+  // Matches SpotlightBand geometry so content doesn't jump when it loads.
+  spotlightSkeleton: {
+    margin: '0 max(48px, calc((100vw - 1720px) / 2))',
+    minHeight: '300px',
+    borderRadius: '20px',
+    overflow: 'hidden',
+  },
+  spotlightSkeletonMobile: {
+    margin: '0 16px',
+    minHeight: '260px',
+  },
+  showMoreWrap: {
+    margin: '8px max(48px, calc((100vw - 1720px) / 2)) 0',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+    flexWrap: 'wrap',
+  },
+  showMoreBtn: {
+    padding: '12px 28px',
+    borderRadius: '999px',
+    background: 'rgba(255,255,255,0.06)',
+    color: 'var(--text-primary)',
+    fontSize: '0.9rem',
+    fontWeight: '800',
+    cursor: 'pointer',
+    border: '1px solid rgba(255,255,255,0.12)',
+  },
+  showMoreLink: {
+    color: 'var(--text-secondary)',
+    fontSize: '0.88rem',
+    fontWeight: '600',
   },
   emptyPage: {
     minHeight: '100vh',
@@ -559,30 +624,6 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     paddingTop: 'var(--nav-occupied-desktop)',
-  },
-  guestPrompt: {
-    padding: '60px max(48px, calc((100vw - 1720px) / 2))',
-    textAlign: 'center',
-  },
-  guestPromptContent: {
-    maxWidth: '480px',
-    margin: '0 auto',
-    padding: '40px 32px',
-    borderRadius: '24px',
-    background: 'rgba(255,255,255,0.03)',
-    border: '1px solid rgba(255,255,255,0.07)',
-  },
-  guestPromptTitle: {
-    color: 'var(--text-primary)',
-    fontSize: '1.4rem',
-    fontWeight: '800',
-    marginBottom: '12px',
-  },
-  guestPromptText: {
-    color: 'var(--text-secondary)',
-    fontSize: '0.95rem',
-    lineHeight: '1.6',
-    marginBottom: '24px',
   },
 };
 

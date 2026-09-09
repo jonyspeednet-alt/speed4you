@@ -96,6 +96,9 @@ export default defineConfig(({ mode }) => {
       port: 4173,
       // Faster HMR
       hmr: { overlay: true },
+      // Never watch build output: `npm run build` writes dist/ while dev
+      // runs, and locked files (e.g. speed4you.apk) crash chokidar on Windows.
+      watch: { ignored: ['**/dist/**', '**/android/**'] },
       proxy: {
         '/portal-api': {
           target: `http://127.0.0.1:${env.BACKEND_PORT || 3001}`,

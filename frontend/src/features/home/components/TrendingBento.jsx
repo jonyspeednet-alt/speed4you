@@ -22,7 +22,7 @@ export default function TrendingBento({ items }) {
   return (
     <section style={{
       ...styles.section,
-      width: isMobile ? '100vw' : isTablet ? 'calc(100vw - 48px)' : 'min(1720px, calc(100vw - 96px))',
+      width: isMobile ? '100%' : isTablet ? 'calc(100vw - 48px)' : 'min(1720px, calc(100vw - 96px))',
       ...(isTVMode ? styles.sectionTV : {})
     }}>
       <div style={styles.header}>
@@ -58,9 +58,11 @@ function BentoItem({ item, index, isLarge, tv, mobile }) {
   const [imgLoaded, setImgLoaded] = useState(false);
   const isSeries = item.type === 'series';
   const path = isSeries ? `/series/${item.id}` : `/movies/${item.id}`;
+  // TV: always small poster, never large backdrop (saves memory + bandwidth)
+  const effectiveLarge = isLarge && !tv;
   const imageSrc = getTmdbPosterSrc(
-    isLarge ? (item.backdrop || item.poster) : item.poster,
-    isLarge ? 'w780' : 'w342'
+    effectiveLarge ? (item.backdrop || item.poster) : item.poster,
+    tv ? 'w185' : effectiveLarge ? 'w780' : 'w342'
   );
   const genre = String(item.genre || '').split(',')[0].trim();
 
@@ -69,9 +71,9 @@ function BentoItem({ item, index, isLarge, tv, mobile }) {
       to={path}
       style={{
         ...styles.item,
-        ...(isLarge ? styles.itemLarge : {}),
+        ...(effectiveLarge ? styles.itemLarge : {}),
         ...(tv ? styles.itemTV : mobile ? styles.itemMobile : {}),
-        ...(hovered ? styles.itemHovered : {}),
+        ...(hovered && !tv ? styles.itemHovered : {}),
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -94,14 +96,14 @@ function BentoItem({ item, index, isLarge, tv, mobile }) {
           style={{
             ...styles.image,
             opacity: imgLoaded ? 1 : 0,
-            ...(hovered ? styles.imageHovered : {})
+            ...(hovered && !tv ? styles.imageHovered : {})
           }}
         />
       ) : null}
 
       <div style={{
         ...styles.overlay,
-        ...(hovered ? styles.overlayHovered : {})
+        ...(hovered && !tv ? styles.overlayHovered : {})
       }} />
 
       <div style={styles.content}>
@@ -123,7 +125,7 @@ function BentoItem({ item, index, isLarge, tv, mobile }) {
         <div style={styles.bottomRow}>
           <h3 style={{
             ...styles.itemTitle,
-            ...(isLarge ? styles.itemTitleLarge : {})
+            ...(effectiveLarge ? styles.itemTitleLarge : {})
           }}>{item.title}</h3>
 
           <div style={styles.metaRow}>
@@ -132,7 +134,7 @@ function BentoItem({ item, index, isLarge, tv, mobile }) {
             {item.year ? <span style={styles.yearText}>{item.year}</span> : null}
           </div>
 
-          {hovered && (
+          {hovered && !tv && (
             <div style={styles.actions}>
               <span style={styles.quickViewBtn}>View Details</span>
             </div>
@@ -140,7 +142,7 @@ function BentoItem({ item, index, isLarge, tv, mobile }) {
         </div>
       </div>
 
-      {isLarge && <div style={styles.glow} />}
+      {effectiveLarge && <div style={styles.glow} />}
     </Link>
   );
 }
@@ -241,9 +243,10 @@ const styles = {
     zIndex: 2,
   },
   itemTV: {
-    minWidth: '320px',
-    height: '480px',
+    minWidth: '240px',
+    height: '360px',
     flexShrink: 0,
+    transition: 'none',
   },
   itemMobile: {
     minWidth: '200px',
@@ -313,9 +316,7 @@ const styles = {
   typeBadge: {
     padding: '4px 8px',
     borderRadius: '6px',
-    background: 'rgba(5, 12, 22, 0.6)',
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)',
+    background: 'rgba(5, 12, 22, 0.85)',
     border: '1px solid rgba(255, 255, 255, 0.1)',
     fontSize: '0.62rem',
     fontWeight: '900',
@@ -326,9 +327,7 @@ const styles = {
   ratingBadge: {
     padding: '4px 8px',
     borderRadius: '6px',
-    background: 'rgba(5, 12, 22, 0.6)',
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)',
+    background: 'rgba(5, 12, 22, 0.85)',
     border: '1px solid rgba(255, 255, 255, 0.1)',
     color: 'var(--accent-cyan)',
     fontSize: '0.68rem',

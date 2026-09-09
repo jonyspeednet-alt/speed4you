@@ -431,6 +431,7 @@
 
 .player-error {
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   place-items: center;
   background: #000;
@@ -449,6 +450,9 @@
   .player-back-btn {
     padding: 6px 10px;
     font-size: 0.8rem;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
   }
 
   .player-title {
@@ -461,8 +465,8 @@
 
   .player-ctrl-btn,
   .player-seek-btn {
-    min-width: 36px;
-    min-height: 36px;
+    min-width: 44px;
+    min-height: 44px;
     padding: 6px;
   }
 

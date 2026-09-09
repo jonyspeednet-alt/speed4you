@@ -1090,7 +1090,9 @@
         white-space: nowrap;
         font-size: 0.68rem;
         padding: 6px 10px;
-        min-height: 32px;
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
     }
 
     .content-rail-list {
@@ -1202,6 +1204,44 @@
         min-width: 120px !important;
         max-width: 140px !important;
         width: 120px;
+    }
+}
+
+/* Phase 1: landscape phones (height-constrained, e.g. 740x360).
+   Reclaim vertical space without shrinking tap targets below 44px. */
+@media (max-height: 440px) and (orientation: landscape) {    .bottom-nav-label {
+        display: none !important;
+    }
+
+    .bottom-nav-item {
+        min-height: 44px;
+        padding-top: 2px;
+        padding-bottom: 2px;
+    }
+
+    .content-rail-section {
+        padding-top: 10px !important;
+        padding-bottom: 10px !important;
+    }
+
+    .content-rail-header {
+        margin-bottom: 8px !important;
+    }
+}
+
+/* Phase 2: touch laptops / tablets at desktop widths (iPad landscape,
+   touch laptops 1024-1366). Width breakpoints call these "desktop", but
+   fingers still need 44px targets and no hover-only affordances. */
+@media (hover: none) and (pointer: coarse) {
+    .content-rail-controls > button {
+        min-width: 44px !important;
+        min-height: 44px !important;
+    }
+
+    .content-rail-view-all {
+        min-height: 44px !important;
+        display: inline-flex;
+        align-items: center;
     }
 }
 
@@ -1496,9 +1536,16 @@
     }
 }
 
+/* Phase 3: ultrawide (21:9, 32:9) — cap the details hero so a 75vh hero
+   doesn't become a 1000px+ empty backdrop canyon. Content stays centered. */
+@media screen and (min-width: 2000px) {
+    .detail-hero {
+        min-height: 620px !important;
+    }
+}
+
 /* Ultra-wide 4K displays */
-@media screen and (min-width: 3000px) {
-    html {
+@media screen and (min-width: 3000px) {    html {
         font-size: 22px;
     }
 
@@ -1671,5 +1718,20 @@
     .top-nav-links { gap: 6px; }
     .top-nav-link { padding: 8px 10px; }
     .top-nav-search-text { display: none; }
+}
+
+/* Designer pass Chunk 1: calm rail chrome. On precise pointers the scroll
+   arrows add noise ×10 rails — reveal them only when the rail is in use.
+   Touch/TV (hover: none) always show arrows; View All never hides. */
+@media (hover: hover) and (pointer: fine) {
+    .content-rail-controls {
+        opacity: 0;
+        transition: opacity 220ms ease;
+    }
+
+    .content-rail-section:hover .content-rail-controls,
+    .content-rail-section:focus-within .content-rail-controls {
+        opacity: 1;
+    }
 }
 

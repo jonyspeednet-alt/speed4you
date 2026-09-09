@@ -22,7 +22,27 @@ function getTmdbSrcSet(url) {
   if (!parts) return undefined;
   const base = parts[1];
   const path = parts[2];
-  return `${base}w185${path} 185w, ${base}w342${path} 342w, ${base}w500${path} 500w`;
+  // TV/low-end: only 2 small sizes, no w500 (saves ~40% bytes per poster)
+  return `${base}w185${path} 185w, ${base}w342${path} 342w`;
+}
+
+/**
+ * TMDB backdrop sizes: w300, w780, w1280, original.
+ * Landscape (Netflix-style 16:9) cards use the backdrop still when available.
+ */
+function getTmdbBackdropSrc(url, targetSize = 'w780') {
+  if (!url) return url;
+  if (url.includes('image.tmdb.org/t/p/')) {
+    return url.replace(/\/t\/p\/[^/]+\//, `/t/p/${targetSize}/`);
+  }
+  return url;
+}
+
+function getTmdbBackdropSrcSet(url) {
+  if (!url || !url.includes('image.tmdb.org/t/p/')) return undefined;
+  const parts = url.match(/^(.*\/t\/p\/)[^/]+(\/.*)$/);
+  if (!parts) return undefined;
+  return `${parts[1]}w300${parts[2]} 300w, ${parts[1]}w780${parts[2]} 780w, ${parts[1]}w1280${parts[2]} 1280w`;
 }
 
 function formatReleaseDate(dateStr) {
@@ -35,23 +55,36 @@ function formatReleaseDate(dateStr) {
 function ContentCard({
   item,
   type,
-  index,
   eager,
   compact,
   tablet,
   tv,
   showReviewBadge,
   cardWidth,
+  orientation = "portrait",
 }) {
   const navigate = useNavigate();
   const isSeries = type === "series" || item.type === "series";
-  const isLandscape = type === "continue";
+  // Netflix-style: rails render 16:9 landscape stills, grids render portraits.
+  const isLandscape = orientation === "landscape" || type === "continue";
+  const targetPath = isSeries ? `/series/${item.id}` : `/movies/${item.id}`;
   const [hovered, setHovered] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
+  // Hover-expand runs on devices with a real hover pointer; touch + TV get
+  // the static card (TV shows the info panel on focus instead of scaling).
+  const canExpand = !compact && !tv;
+  const showPanel = isLandscape && hovered && !compact;
   const genre = String(item.genre || "Featured")
     .split(",")[0]
     .trim();
+  const genreLine = String(item.genre || "")
+    .split(",")
+    .map((g) => g.trim())
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(" • ");
+  const landscapeImg = item.backdrop || item.poster;
   const itemRating = item.rating || null;
   const displayDate = formatReleaseDate(item.releasedAt) || item.year || null;
   const isNew = item.releasedAt && (Date.now() - new Date(item.releasedAt).getTime() < 7 * 24 * 60 * 60 * 1000);
@@ -89,7 +122,6 @@ function ContentCard({
         className="content-card-trigger"
         style={{ ...styles.cardButton, touchAction: 'manipulation' }}
         onClick={() => {
-          const targetPath = isSeries ? `/series/${item.id}` : `/movies/${item.id}`;
           navigate(targetPath);
         }}
         onFocus={() => setHovered(true)}
@@ -98,19 +130,23 @@ function ContentCard({
         <div
           style={{
             ...styles.posterWrap,
+            ...(isLandscape ? styles.posterWrapLandscape : {}),
             aspectRatio: isLandscape ? "16 / 9" : "2 / 3",
             transform:
-              hovered && !compact
-                ? "translateY(-8px) scale(1.03)"
+              hovered && canExpand
+                ? isLandscape
+                  ? "scale(1.2)"
+                  : "translateY(-8px) scale(1.03)"
                 : "translateY(0) scale(1)",
             boxShadow:
-              hovered && !compact
+              hovered && canExpand
                 ? "0 32px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,255,255,0.2), 0 0 40px rgba(0,255,255,0.1)"
                 : "0 8px 32px rgba(0,0,0,0.4)",
             borderColor:
-              hovered && !compact
+              hovered && canExpand
                 ? "rgba(0,255,255,0.3)"
                 : "rgba(255,255,255,0.08)",
+            zIndex: showPanel && canExpand ? 10 : undefined,
           }}
         >
           {(!imgLoaded || imgError) ? (
@@ -119,30 +155,52 @@ function ContentCard({
             </div>
           ) : null}
           {!imgError ? (
-            <img
-              src={getTmdbPosterSrc(item.poster, compact ? 'w185' : 'w342')}
-              srcSet={getTmdbSrcSet(item.poster)}
-              sizes={compact ? '(max-width: 480px) 148px, 156px' : '(max-width: 1024px) 196px, 220px'}
-              alt={item.title}
-              loading={eager ? "eager" : "lazy"}
-              decoding="async"
-              fetchPriority={eager ? "high" : "low"}
-              style={{
-                ...styles.poster,
-                opacity: imgLoaded ? 1 : 0,
-                transform: hovered && !compact ? "scale(1.06)" : "scale(1)",
-              }}
-              onLoad={() => setImgLoaded(true)}
-              onError={() => setImgError(true)}
-            />
+            isLandscape ? (
+              <img
+                src={getTmdbBackdropSrc(landscapeImg, tv ? 'w300' : 'w780')}
+                srcSet={getTmdbBackdropSrcSet(landscapeImg)}
+                sizes={tv ? '320px' : compact ? '(max-width: 480px) 160px, 180px' : '(max-width: 1024px) 220px, 300px'}
+                alt={item.title}
+                loading={eager ? "eager" : "lazy"}
+                decoding="async"
+                fetchPriority={eager ? "high" : "low"}
+                style={{
+                  ...styles.poster,
+                  opacity: imgLoaded ? 1 : 0,
+                  // Faces sit in the top third of posters — cropping to 16:9
+                  // from the center beheads people; bias upward instead.
+                  objectPosition: 'center 20%',
+                }}
+                onLoad={() => setImgLoaded(true)}
+                onError={() => setImgError(true)}
+              />
+            ) : (
+              <img
+                src={getTmdbPosterSrc(item.poster, tv ? 'w185' : compact ? 'w185' : 'w342')}
+                srcSet={getTmdbSrcSet(item.poster)}
+                sizes={tv ? '200px' : compact ? '(max-width: 480px) 148px, 156px' : '(max-width: 1024px) 196px, 220px'}
+                alt={item.title}
+                loading={eager ? "eager" : "lazy"}
+                decoding="async"
+                fetchPriority={eager ? "high" : "low"}
+                style={{
+                  ...styles.poster,
+                  opacity: imgLoaded ? 1 : 0,
+                  transform: hovered && canExpand ? "scale(1.06)" : "scale(1)",
+                }}
+                onLoad={() => setImgLoaded(true)}
+                onError={() => setImgError(true)}
+              />
+            )
           ) : null}
           <div style={styles.posterOverlay} />
 
           <div style={styles.topBadges}>
-            <span style={styles.typeBadge}>
-              {isSeries ? "Series" : "Movie"}
-            </span>
-            {isNew ? <span style={styles.newBadge}>New</span> : null}
+            {!isLandscape ? (
+              <span style={styles.typeBadge}>
+                {isSeries ? "Series" : "Movie"}
+              </span>
+            ) : isNew ? <span style={styles.newBadge}>New</span> : <span />}
             <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
               {isAdmin ? (
                 <Link
@@ -173,10 +231,15 @@ function ContentCard({
             </div>
           </div>
 
-          <div style={styles.posterBottom}>
+          <div style={{
+            ...styles.posterBottom,
+            opacity: showPanel ? 0 : 1,
+            transition: "opacity 200ms ease",
+          }}>
             <h3
               style={{
                 ...styles.posterTitle,
+                ...(isLandscape ? styles.posterTitleLandscape : {}),
                 ...(compact ? styles.posterTitleCompact : {}),
                 ...(tv ? styles.posterTitleTV : {}),
               }}
@@ -193,13 +256,43 @@ function ContentCard({
               {!compact && displayDate ? (
                 <span style={styles.yearText}>{displayDate}</span>
               ) : null}
-              {!compact ? (
+              {!compact && !isLandscape ? (
                 <span style={styles.langText}>{item.language || "Mixed"}</span>
               ) : null}
             </div>
           </div>
 
-          {!compact && hovered ? (
+          {showPanel ? (
+            <div style={styles.xfPanel}>
+              <div style={styles.xfBtnRow}>
+                <span
+                  role="button"
+                  tabIndex={-1}
+                  aria-label={`Watch ${item.title}`}
+                  style={styles.xfPlay}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(targetPath);
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="#08111d" aria-hidden="true">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </span>
+                <span style={styles.xfType}>{isSeries ? "Series" : "Movie"}</span>
+              </div>
+              <div style={styles.xfTitle}>{item.title}</div>
+              <div style={styles.xfMeta}>
+                {itemRating ? <span style={styles.xfRating}>★ {itemRating}</span> : null}
+                {item.year ? <span style={styles.xfDim}>{item.year}</span> : null}
+                {item.quality ? <span style={styles.xfQuality}>{item.quality}</span> : null}
+                {item.runtime ? <span style={styles.xfDim}>{item.runtime}m</span> : null}
+              </div>
+              {genreLine ? <div style={styles.xfGenres}>{genreLine}</div> : null}
+            </div>
+          ) : null}
+
+          {!isLandscape && !compact && hovered && !tv ? (
             <div style={styles.hoverOverlay}>
               <div style={styles.playCircle}>
                 <svg
@@ -226,28 +319,30 @@ function ContentCard({
           ) : null}
         </div>
 
-        <div style={styles.cardInfo}>
-          <div className="content-rail-meta" style={styles.cardMeta}>
-            <span>{genre}</span>
-            <span style={styles.metaDot}>·</span>
-            {displayDate ? (
-              <>
-                <span>{displayDate}</span>
-                <span style={styles.metaDot}>·</span>
-              </>
-            ) : null}
-            <span>{item.language || "Mixed"}</span>
-            {item.runtime ? (
-              <>
-                <span style={styles.metaDot}>·</span>
-                <span>{item.runtime}m</span>
-              </>
-            ) : null}
-            {showReviewBadge && item.metadataStatus === "needs_review" ? (
-              <span style={styles.reviewBadge}>Review</span>
-            ) : null}
+        {!isLandscape ? (
+          <div style={styles.cardInfo}>
+            <div className="content-rail-meta" style={styles.cardMeta}>
+              <span>{genre}</span>
+              <span style={styles.metaDot}>·</span>
+              {displayDate ? (
+                <>
+                  <span>{displayDate}</span>
+                  <span style={styles.metaDot}>·</span>
+                </>
+              ) : null}
+              <span>{item.language || "Mixed"}</span>
+              {item.runtime ? (
+                <>
+                  <span style={styles.metaDot}>·</span>
+                  <span>{item.runtime}m</span>
+                </>
+              ) : null}
+              {showReviewBadge && item.metadataStatus === "needs_review" ? (
+                <span style={styles.reviewBadge}>Review</span>
+              ) : null}
+            </div>
           </div>
-        </div>
+        ) : null}
       </button>
 
     </article>
@@ -261,12 +356,12 @@ const styles = {
     flexShrink: 0,
     scrollSnapAlign: "start",
   },
-  cardWrapDefault: { width: "220px" },
+  cardWrapDefault: { width: "272px" },
   cardWrapLandscape: { width: "360px" },
-  cardWrapLandscapeTV: { width: "420px" },
+  cardWrapLandscapeTV: { width: "320px" },
   cardWrapTV: { width: "280px" },
-  cardWrapTablet: { width: "180px" },
-  cardWrapMobile: { width: "148px" },
+  cardWrapTablet: { width: "220px" },
+  cardWrapMobile: { width: "160px" },
   cardButton: {
     width: "100%",
     textAlign: "left",
@@ -275,11 +370,14 @@ const styles = {
   },
   posterWrap: {
     position: "relative",
-    borderRadius: "16px",
+    borderRadius: "10px",
     overflow: "hidden",
     background: "var(--bg-tertiary)",
     border: "1px solid rgba(173, 211, 236, 0.14)",
-    transition: "transform 450ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 450ms cubic-bezier(0.34, 1.56, 0.64, 1), border-color 450ms cubic-bezier(0.34, 1.56, 0.64, 1)",
+    transition: "transform 300ms ease, box-shadow 300ms ease, border-color 300ms ease",
+  },
+  posterWrapLandscape: {
+    borderRadius: "6px",
   },
   poster: {
     width: "100%",
@@ -403,6 +501,10 @@ const styles = {
     lineHeight: "1.22",
     marginBottom: "4px",
   },
+  posterTitleLandscape: {
+    fontSize: "0.82rem",
+    marginBottom: "4px",
+  },
   posterTitleTV: {
     fontSize: "1rem",
   },
@@ -475,6 +577,89 @@ const styles = {
     position: "absolute",
     top: "10px",
     right: "10px",
+  },
+  // Netflix-style expand panel (landscape rails): play + meta + genres.
+  // Brand colors, not Netflix red — white play, cyan rating, navy panel.
+  xfPanel: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 3,
+    padding: "28px 12px 12px",
+    background:
+      "linear-gradient(180deg, rgba(5,12,22,0) 0%, rgba(5,12,22,0.82) 45%, rgba(5,12,22,0.97) 100%)",
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+  },
+  xfBtnRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+  },
+  xfPlay: {
+    width: "38px",
+    height: "38px",
+    minWidth: "38px",
+    borderRadius: "50%",
+    background: "#ffffff",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingLeft: "2px",
+    cursor: "pointer",
+    boxShadow: "0 6px 20px rgba(0,0,0,0.45)",
+  },
+  xfType: {
+    color: "rgba(255,255,255,0.75)",
+    fontSize: "0.68rem",
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
+  },
+  xfTitle: {
+    color: "#fff",
+    fontSize: "0.9rem",
+    fontWeight: "800",
+    lineHeight: "1.2",
+    display: "-webkit-box",
+    WebkitLineClamp: 1,
+    WebkitBoxOrient: "vertical",
+    overflow: "hidden",
+    textShadow: "0 2px 10px rgba(0,0,0,0.6)",
+  },
+  xfMeta: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    flexWrap: "wrap",
+  },
+  xfRating: {
+    color: "var(--accent-cyan)",
+    fontSize: "0.76rem",
+    fontWeight: "800",
+  },
+  xfDim: {
+    color: "rgba(255,255,255,0.65)",
+    fontSize: "0.72rem",
+    fontWeight: "600",
+  },
+  xfQuality: {
+    padding: "1px 6px",
+    borderRadius: "4px",
+    border: "1px solid rgba(255,255,255,0.35)",
+    color: "rgba(255,255,255,0.8)",
+    fontSize: "0.62rem",
+    fontWeight: "700",
+  },
+  xfGenres: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: "0.68rem",
+    fontWeight: "600",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
   },
   cardInfo: {
     padding: "0 2px",
