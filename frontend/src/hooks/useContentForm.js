@@ -76,7 +76,7 @@ function useContentForm(id) {
             return restored;
           }
         }
-      } catch {}
+      } catch { /* intentionally ignored: storage/cache best-effort */ }
     }
     return emptyForm;
   });
@@ -321,7 +321,7 @@ function useContentForm(id) {
     try {
       const freshItem = await adminService.getContentById(contentId);
       setItemMeta(freshItem);
-    } catch {}
+    } catch { /* intentionally ignored: storage/cache best-effort */ }
   }, []);
 
   // Clear cached public detail pages so admins don't see stale draft data
@@ -331,7 +331,7 @@ function useContentForm(id) {
       const slug = String(contentId || '');
       sessionStorage.removeItem(`portal-movie-details-v1:${slug}`);
       sessionStorage.removeItem(`portal-series-details-v1:${slug}`);
-    } catch {}
+    } catch { /* intentionally ignored: storage/cache best-effort */ }
   }, []);
 
   const handleSubmit = useCallback(async (event) => {
@@ -438,7 +438,7 @@ function useContentForm(id) {
     autosaveTimerRef.current = setInterval(() => {
       try {
         localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(formData));
-      } catch {}
+      } catch { /* intentionally ignored: storage/cache best-effort */ }
     }, AUTOSAVE_INTERVAL);
     return () => {
       if (autosaveTimerRef.current) clearInterval(autosaveTimerRef.current);

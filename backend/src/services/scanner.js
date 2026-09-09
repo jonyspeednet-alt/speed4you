@@ -50,7 +50,7 @@ const VIDEO_EXTENSIONS = new Set(
 const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
 const MIN_MOVIE_SIZE = Number(process.env.SCANNER_MIN_MOVIE_SIZE || 104857600); // 100MB
 const MIN_EPISODE_SIZE = Number(process.env.SCANNER_MIN_EPISODE_SIZE || 104857600); // 100MB
-const JUNK_REGEX = /\b(sample|trailer|extras?|promo|short|clip|preview|teaser|behind\s*the\s*scenes|yts\.mx|advertisement|featurette)\b/i;
+const JUNK_REGEX = /\b(sample|trailer|extras?|promo|clip|short\s+film|preview|teaser|behind\s*the\s*scenes|yts\.mx|advertisement|featurette)\b/i;
 const DUPLICATE_HOLD_DIR_NAME = process.env.MEDIA_NORMALIZER_DUPLICATE_DIR || '_duplicate_hold';
 const PREFERRED_POSTER_PATTERNS = [
   /^(poster|cover|folder|front)$/i,

@@ -118,6 +118,17 @@ speed4you/
 - Scanner auto-discovers directories under `/var/www/html/` with IDs prefixed `auto-`. These can override manually created roots with the same ID. Use unique non-`auto-` prefix IDs for manual roots.
 - Webhook secret checked from `.env`; may rotate on deploy — always re-read before use.
 
+## Media File Naming Convention (CRITICAL)
+- **Always upload content with clean, descriptive filenames** — messy filenames cause scanner failures
+- **Trailing quality markers** (`2p`, `29p`, `7p`): These are resolution tags, NOT part of the title. Rename before upload:
+  - `Border 2p.mkv` → `Border 2.mkv`
+  - `Scream 7p.mkv` → `Scream 7.mkv`
+- **Dots as separators** (`.` instead of spaces): Scanner can't parse these correctly:
+  - `Dil.Deewana.Ho.Gaya.mkv` → `Dil Deewana Ho Gaya.mkv`
+  - `The.Night.Crew.2015.mkv` → `The Night Crew 2015.mkv`
+- **Double dots**: Always avoid (`file..mkv` → `file.mkv`)
+- **When uploading new content**: Check filename is clean before upload — bad names trigger metadata enrichment failures and wrong titles in DB
+
 ## Scanner Permission Requirements (CRITICAL)
 - **Media files MUST be owned by `www-data:www-data`** with `755` directory permissions and `644` file permissions
 - Scanner runs as `speed4you` user (via systemd service) which must have read access to media files

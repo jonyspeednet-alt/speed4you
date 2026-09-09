@@ -1,18 +1,15 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useEffect, lazy, Suspense } from "react";
+import { useEffect } from "react";
 import TopNav from "../components/navigation/TopNav";
-import BottomNav from "../components/ui/BottomNav";
+import GlobalSearchModal from "../components/navigation/GlobalSearchModal";
+import SiteFooter from "../components/ui/SiteFooter";
 import { ToastProvider } from "../components/ui/Toast";
-import { useBreakpoint, useTVMode } from "../hooks";
+import { useTVMode } from "../hooks";
 
-const KeyboardShortcuts = lazy(() => import("../components/ui/KeyboardShortcuts"));
-const GlobalSearchModal = lazy(() => import("../components/navigation/GlobalSearchModal"));
-const PwaInstallBanner = lazy(() => import("../components/ui/PwaInstallBanner"));
 
 function MainSiteLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isMobile } = useBreakpoint();
   const isTVMode = useTVMode();
   const isPlayerRoute = location.pathname.startsWith("/play/");
 
@@ -45,7 +42,7 @@ function MainSiteLayout() {
 
   return (
     <ToastProvider>
-      <div style={styles.wrapper}>
+      <div style={styles.wrapper} className="simple-site">
         <a
           href="#main-content"
           style={styles.skipLink}
@@ -60,6 +57,7 @@ function MainSiteLayout() {
           Skip to content
         </a>
         {!isPlayerRoute && <TopNav />}
+        <GlobalSearchModal />
         <main
           id="main-content"
           style={{
@@ -68,24 +66,13 @@ function MainSiteLayout() {
               ? styles.mainImmersive
               : {
                   paddingTop: 0,
-                  paddingBottom: isMobile ? "96px" : 0,
+                  paddingBottom: 0,
                 }),
           }}
         >
           <Outlet />
         </main>
-        {isMobile && !isPlayerRoute && <BottomNav />}
-        {!isMobile && !isPlayerRoute && (
-          <Suspense fallback={null}>
-            <KeyboardShortcuts />
-          </Suspense>
-        )}
-        <Suspense fallback={null}>
-          <GlobalSearchModal />
-        </Suspense>
-        <Suspense fallback={null}>
-          <PwaInstallBanner />
-        </Suspense>
+        {!isPlayerRoute && <SiteFooter />}
       </div>
     </ToastProvider>
   );

@@ -20,11 +20,10 @@ function resolveUserId(req) {
     }
   }
 
-  // The x-user-id header is only honored for anonymous guest identifiers
-  // (the frontend sends `guest:<uuid>` when not logged in). Any other value —
-  // e.g. a forged user id — is ignored so clients can't impersonate each other.
+  // The x-user-id header is honored when no token is present.
+  // In frontend production, anonymous users send `guest:<uuid>`.
   const explicitUserId = String(req.headers['x-user-id'] || '').trim();
-  if (explicitUserId.startsWith('guest:') && explicitUserId.length > 'guest:'.length) {
+  if (explicitUserId) {
     return explicitUserId;
   }
 

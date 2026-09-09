@@ -246,7 +246,7 @@ export default function VideoPlayerPage() {
       } else if (el.webkitRequestFullscreen) {
         el.webkitRequestFullscreen();
       }
-    } catch {}
+    } catch { /* intentionally ignored: fullscreen/PiP unsupported */ }
   }, []);
 
   const togglePiP = useCallback(async () => {
@@ -254,7 +254,7 @@ export default function VideoPlayerPage() {
     try {
       if (document.pictureInPictureElement) await document.exitPictureInPicture();
       else await v.requestPictureInPicture();
-    } catch {}
+    } catch { /* intentionally ignored: fullscreen/PiP unsupported */ }
   }, []);
 
   useEffect(() => {

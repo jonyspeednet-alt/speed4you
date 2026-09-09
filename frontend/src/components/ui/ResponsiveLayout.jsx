@@ -71,7 +71,7 @@ export function ResponsiveContainer({
   fluid = false,
   ...props
 }) {
-  const { isMobile, isTablet, isDesktop, isTV, is4K } = useResponsive();
+  const { isMobile, isTablet } = useResponsive();
 
   const maxWidths = {
     sm: '640px',

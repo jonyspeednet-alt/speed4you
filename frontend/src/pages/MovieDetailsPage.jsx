@@ -1,17 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { moviesService } from '../services/moviesService';
-import { contentService } from '../services/contentService';
 import { useBreakpoint } from '../hooks';
 import { useRecentlyViewed } from '../hooks';
 import ShareButton from '../components/ui/ShareButton';
 import WatchlistButton from '../components/ui/WatchlistButton';
 import VideoPlayerModal from '../components/player/VideoPlayerModal';
 import ConfirmDialog from '../components/overlays/ConfirmDialog';
-import ContentRail from '../features/home/components/ContentRail';
 import { toPlayableSrc } from '../utils/mediaUrl';
 import { triggerDownload } from '../utils/download';
-import { DETAIL_STYLES, DETAIL_SKELETON, posterFallbackUrl, getBackdropSrcSet } from '../styles/detailPage';
+import { DETAIL_STYLES, posterFallbackUrl } from '../styles/detailPage';
 
 const posterFallback = posterFallbackUrl;
 const MOVIE_CACHE_PREFIX = 'portal-movie-details-v1:';
@@ -40,30 +38,7 @@ function writeMovieCache(slug, movie) {
 
 // ── Skeleton ────────────────────────────────────────────────────────────────
 function MovieDetailsSkeleton() {
-  const s = DETAIL_SKELETON;
-  return (
-    <div style={s.page}>
-      <div style={s.hero}>
-        <div style={{ ...s.skeletonBlock, position: 'absolute', inset: 0 }} />
-        <div style={s.heroGradient} />
-        <div style={s.heroInner}>
-          <div style={{ ...s.skeletonBlock, width: 220, height: 330, borderRadius: 20, flexShrink: 0 }} />
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ ...s.skeletonLine, width: 100, height: 12 }} />
-            <div style={{ ...s.skeletonLine, width: '55%', height: 52 }} />
-            <div style={{ ...s.skeletonLine, width: '80%', height: 16 }} />
-            <div style={{ ...s.skeletonLine, width: '70%', height: 16 }} />
-            <div style={{ ...s.skeletonLine, width: '60%', height: 16 }} />
-            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-              {[150, 180, 52].map((w, i) => (
-                <div key={i} style={{ ...s.skeletonLine, width: w, height: 50, borderRadius: 999 }} />
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  return <div className="catalog-message" role="status">Loading details…</div>;
 }
 
 // ── Main component ───────────────────────────────────────────────────────────
@@ -76,12 +51,10 @@ export default function MovieDetailsPage({ adminPreview, contentData }) {
   const [error, setError] = useState('');
   const [descExpanded, setDescExpanded] = useState(false);
   const [posterError, setPosterError] = useState(false);
-  const [backdropError, setBackdropError] = useState(false);
   const [downloadHovered, setDownloadHovered] = useState(false);
   const [playHovered, setPlayHovered] = useState(false);
   const [playerSrc, setPlayerSrc] = useState(null);
   const [showDownloadConfirm, setShowDownloadConfirm] = useState(false);
-  const [related, setRelated] = useState([]);
   const isAdmin = useMemo(() => {
     try { const u = JSON.parse(localStorage.getItem('user') || 'null'); return ['admin', 'super_admin'].includes(u?.role); } catch { return false; }
   }, []);
@@ -116,12 +89,6 @@ export default function MovieDetailsPage({ adminPreview, contentData }) {
     return () => { cancelled = true; };
   }, [slug, trackView, adminPreview, contentData]);
 
-  useEffect(() => {
-    if (!movie?.id) return;
-    contentService.getRecommendations(movie.id, 10)
-      .then(res => setRelated((res?.items || []).filter(i => i.id !== movie.id)))
-      .catch(() => {});
-  }, [movie?.id]);
 
   if (loading && !movie) return <MovieDetailsSkeleton />;
   if (error || !movie) {
@@ -146,30 +113,14 @@ export default function MovieDetailsPage({ adminPreview, contentData }) {
 
   return (
     <>
-    <div style={s.page}>
-      <div style={{ ...s.auroraOrb, top: '-10%', left: '-10%', background: 'radial-gradient(circle, var(--accent-secondary), transparent 70%)' }} />
-      <div style={{ ...s.auroraOrb, bottom: '20%', right: '-10%', background: 'radial-gradient(circle, var(--accent-pink), transparent 70%)' }} />
+    <div style={s.page} className="simple-details">
 
       {/* ── Hero ── */}
       <section style={s.hero} className="detail-hero">
         {/* Backdrop */}
-        <div style={s.backdropWrap}>
-          <img
-            src={backdropError ? posterFallback : (movie.backdrop || movie.poster || posterFallback)}
-            srcSet={backdropError ? undefined : getBackdropSrcSet(movie.backdrop || movie.poster)}
-            sizes="100vw"
-            alt=""
-            style={s.backdropImg}
-            loading="lazy"
-            decoding="async"
-            onError={() => setBackdropError(true)}
-          />
-          <div style={s.backdropOverlay} />
-          <div style={s.heroGradient} />
-        </div>
 
         {/* Content */}
-        <div style={{ ...s.heroInner, ...(isMobile ? s.heroInnerMobile : isTablet ? s.heroInnerTablet : {}) }}>
+        <div className="simple-detail-inner" style={{ ...s.heroInner, ...(isMobile ? s.heroInnerMobile : isTablet ? s.heroInnerTablet : {}) }}>
 
           {/* Poster */}
           <div style={{ ...s.posterWrap, ...(isMobile ? s.posterWrapMobile : {}) }}>
@@ -180,7 +131,7 @@ export default function MovieDetailsPage({ adminPreview, contentData }) {
               loading="lazy"
               onError={() => setPosterError(true)}
             />
-            <div style={s.posterGlow} />
+
           </div>
 
           {/* Info */}
@@ -348,64 +299,6 @@ export default function MovieDetailsPage({ adminPreview, contentData }) {
         </div>
       </section>
 
-      {/* ── Details section ── */}
-      <div style={s.body}>
-        <div style={{ ...s.detailGrid, ...(isMobile ? s.detailGridMobile : {}) }}>
-
-          {/* Stats */}
-          <section style={s.card}>
-            <h2 style={s.cardTitle}>Details</h2>
-            <div style={{ ...s.statGrid, ...(isMobile ? s.statGridMobile : {}) }}>
-              {[
-                { label: 'Released', value: formatReleaseDate(movie.releasedAt) || movie.year || '—' },
-                { label: 'Runtime', value: runtime || '—' },
-                { label: 'Language', value: language || '—' },
-                { label: 'Quality', value: movie.quality || 'HD' },
-                { label: 'Rating', value: movie.rating ? `${movie.rating} / 10` : '—' },
-                { label: 'Genre', value: genres.slice(0, 2).join(', ') || '—' },
-              ].map(({ label, value }) => (
-                <div key={label} style={s.statItem}>
-                  <span style={s.statLabel}>{label}</span>
-                  <strong style={s.statValue}>{value}</strong>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Description card — desktop only (mobile shows in hero) */}
-          {!isMobile && movie.description && (
-            <section style={s.card}>
-              <h2 style={s.cardTitle}>Synopsis</h2>
-              <p style={s.synopsisText}>{movie.description}</p>
-            </section>
-          )}
-        </div>
-
-        {/* Similar content mini poster row */}
-        {related.length >= 3 && (
-          <div style={s.similarSection}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-              <h3 style={{ color: '#ffffff', fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>More Like This</h3>
-              <Link to={`/browse?genre=${genres[0] || ''}`} style={s.viewAllLink}>View All →</Link>
-            </div>
-            <div style={s.similarRow}>
-              {related.slice(0, 6).map((item) => (
-                <Link key={item.id} to={`/movies/${item.id}`} style={s.similarCard}>
-                  <div style={s.similarPosterWrap}>
-                    <img
-                      src={item.poster || posterFallback}
-                      alt={item.title}
-                      style={s.similarPoster}
-                      loading="lazy"
-                    />
-                  </div>
-                  <p style={s.similarTitle}>{item.title}</p>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
     </div>
       {playerSrc && (
         <VideoPlayerModal src={playerSrc} title={movie?.title || ''} onClose={() => setPlayerSrc(null)} />
@@ -419,20 +312,13 @@ export default function MovieDetailsPage({ adminPreview, contentData }) {
         confirmText="Download"
         cancelText="Cancel"
       />
-      {related.length >= 6 && (
-        <ContentRail
-          title="You May Also Like"
-          subtitle="Similar picks"
-          items={related.slice(6)}
-          viewAllLink={`/browse?genre=${genres[0] || ''}`}
-        />
-      )}
+
     </>
   );
 }
 
 // ── Styles ───────────────────────────────────────────────────────────────────
-const s = DETAIL_STYLES;
+const s = { ...DETAIL_STYLES };
 s.qualityBadge = {
   padding: '6px 12px', borderRadius: '8px',
   background: 'rgba(255,255,255,0.08)',
@@ -446,50 +332,4 @@ s.draftBadge = {
   border: '1px solid rgba(234,179,8,0.35)', color: '#facc15',
   fontSize: '0.78rem', fontWeight: '700', letterSpacing: '0.08em',
   textTransform: 'uppercase',
-};
-s.similarSection = {
-  marginTop: '32px',
-};
-s.viewAllLink = {
-  color: 'var(--accent-cyan, #7df9ff)',
-  fontSize: '0.85rem',
-  fontWeight: '700',
-  textDecoration: 'none',
-  transition: 'opacity 150ms ease',
-  letterSpacing: '0.02em',
-};
-s.similarRow = {
-  display: 'flex',
-  gap: '14px',
-  overflowX: 'auto',
-  paddingBottom: '8px',
-  scrollbarWidth: 'thin',
-};
-s.similarCard = {
-  flex: '0 0 auto',
-  width: '150px',
-  textDecoration: 'none',
-  transition: 'transform 180ms ease',
-};
-s.similarPosterWrap = {
-  width: '150px',
-  height: '215px',
-  borderRadius: '12px',
-  overflow: 'hidden',
-  background: 'rgba(255,255,255,0.04)',
-};
-s.similarPoster = {
-  width: '100%',
-  height: '100%',
-  objectFit: 'cover',
-  display: 'block',
-};
-s.similarTitle = {
-  color: '#c8d0da',
-  fontSize: '0.8rem',
-  fontWeight: 600,
-  marginTop: '8px',
-  whiteSpace: 'nowrap',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
 };

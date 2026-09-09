@@ -3,7 +3,8 @@ import { useNavigate, Link, useParams, useBlocker } from 'react-router-dom';
 import { adminService } from '../../services';
 import ConfirmDialog from '../../components/overlays/ConfirmDialog';
 import EpisodeEditor from '../../components/admin/EpisodeEditor';
-import FileBrowser, { titleFromFilename } from '../../components/admin/FileBrowser';
+import FileBrowser from '../../components/admin/FileBrowser';
+import { titleFromFilename } from '../../components/admin/fileUtils';
 import MetadataSection from '../../components/admin/MetadataSection';
 import DetailsSection from '../../components/admin/DetailsSection';
 import ArtworkSection from '../../components/admin/ArtworkSection';
@@ -15,7 +16,7 @@ import useTmdbImport from '../../hooks/useTmdbImport';
 import useDuplicateDetection from '../../hooks/useDuplicateDetection';
 
 function AddContentPage() {
-  const { isMobile, isTablet } = useBreakpoint();
+  const { isMobile } = useBreakpoint();
   const navigate = useNavigate();
   const { id } = useParams();
 

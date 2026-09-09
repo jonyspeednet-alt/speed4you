@@ -4,7 +4,6 @@ import { adminService } from '../services';
 function useDuplicateDetection(title, type, isEditMode, excludeId) {
   const [liveDuplicates, setLiveDuplicates] = useState(null);
   const dupTimerRef = useRef(null);
-  const lastTypeRef = useRef(type);
 
   useEffect(() => {
     if (dupTimerRef.current) clearTimeout(dupTimerRef.current);

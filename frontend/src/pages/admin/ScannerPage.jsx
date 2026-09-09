@@ -608,7 +608,6 @@ export default function ScannerPage() {
             {filteredRoots.map((root) => {
               const isSelected = selectedRoots.includes(root.id);
               const isCheckable = root.checkable !== false;
-              const isBroken = !isCheckable || !root.exists || root.error;
               const statusColor = !isCheckable ? '#60a5fa' : root.exists ? (root.error ? '#facc15' : '#4ade80') : '#f87171';
               return (
                 <div key={root.id} onClick={() => toggleRoot(root.id)}

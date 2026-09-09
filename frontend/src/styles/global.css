@@ -13,17 +13,17 @@
 
   --accent-primary: #ff6b5f;
   --accent-primary-strong: #f25455;
-  --accent-secondary: #52d8e8;
+  --accent-secondary: #00f0ff;
   --accent-tertiary: #ffd166;
   --accent-success: #6ee7b7;
   --accent-red: #ff6b5f;
   --accent-amber: #ffd166;
   --border-color: rgba(173, 211, 236, 0.16);
 
-  --accent-cyan: var(--accent-secondary);
-  --accent-magenta: var(--accent-primary);
-  --accent-violet: var(--accent-secondary);
-  --accent-pink: var(--accent-primary);
+  --accent-cyan: #00f0ff;
+  --accent-magenta: #ff007f;
+  --accent-violet: #8b5cf6;
+  --accent-pink: #ec4899;
   --glow-red: 0 0 24px rgba(255, 107, 95, 0.28);
   --glow-amber: 0 0 28px rgba(255, 200, 87, 0.28);
 
@@ -629,6 +629,16 @@ main,
   background: rgba(10, 12, 20, 0.65);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+}
+
+/* Netflix-style: transparent over the home billboard, solid once scrolled.
+   TV keeps its solid background (tv-mode rule wins with !important). */
+.top-nav-container.top-nav-transparent {
+  background: linear-gradient(180deg, rgba(5, 12, 22, 0.55) 0%, transparent 100%);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  border-bottom-color: transparent;
 }
 
 .top-nav-tablet {}
@@ -2344,9 +2354,39 @@ body {
 }
 
 .content-rail-view-all {
-  color: var(--accent-secondary) !important;
-  border-color: rgba(82, 216, 232, 0.2) !important;
-  background: rgba(82, 216, 232, 0.06) !important;
+  color: var(--text-secondary) !important;
+  border: none !important;
+  background: none !important;
+}
+
+/* Simple text-link rail action: chevron slides on hover. */
+.content-rail-view-all::after {
+  content: "›";
+  margin-left: 5px;
+  font-size: 1.1em;
+  line-height: 1;
+  transition: transform 200ms ease;
+}
+
+.content-rail-view-all:hover {
+  color: #fff !important;
+}
+
+.content-rail-view-all:hover::after {
+  transform: translateX(3px);
+}
+
+/* Hover-expand panel entrance (Netflix pop-in). Respects the global
+   prefers-reduced-motion kill-switch above. */
+@keyframes cardPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .content-rail-list {

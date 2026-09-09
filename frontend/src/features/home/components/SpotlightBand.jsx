@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import WatchlistButton from '../../../components/ui/WatchlistButton';
 import { useBreakpoint, useTVMode } from '../../../hooks';
@@ -8,20 +9,24 @@ function tmdbSized(url, width) {
 }
 
 /**
- * Compact static spotlight band (~300px) — fills the ex-hero void WITHOUT
- * a carousel: no timers, no autoplay, no transitions. One backdrop image,
- * title, one-line pitch, Watch Now. Variety comes from HomePage's rotated
- * pools (different pick every 30 min), not client-side animation.
+ * Full-bleed static billboard (Netflix-style, no carousel): edge-to-edge
+ * backdrop, oversized title, Top-10 badge, maturity box, Watch Now.
+ * Deliberately NO timers / autoplay / transitions — variety comes from
+ * HomePage's rotated pools, reliability from zero animation. TV-safe.
  */
-function SpotlightBand({ item, eyebrow }) {
+function SpotlightBand({ item, eyebrow, topRank }) {
   const { isMobile } = useBreakpoint();
   const isTVMode = useTVMode();
+  const [bgFailed, setBgFailed] = useState(false);
 
   if (!item?.id) return null;
 
   const isSeries = item.type === 'series';
   const href = isSeries ? `/series/${item.id}` : `/movies/${item.id}`;
-  const backdrop = item.backdrop || item.poster;
+  // Two-level fallback: backdrop → poster → solid color (never a void).
+  const backdrop = bgFailed
+    ? item.poster
+    : item.backdrop || item.poster;
   const genreFirst = String(item.genre || '').split(',')[0].trim();
 
   return (
@@ -44,12 +49,13 @@ function SpotlightBand({ item, eyebrow }) {
           alt=""
           aria-hidden="true"
           loading="eager"
-          fetchPriority="high"
           decoding="async"
+          onError={() => setBgFailed(true)}
           style={styles.bg}
         />
       ) : null}
       <div style={styles.scrim} />
+      <div style={styles.bottomFade} />
 
       <div style={{ ...styles.content, ...(isMobile ? styles.contentMobile : {}) }}>
         <div style={styles.eyebrowRow}>
@@ -59,6 +65,12 @@ function SpotlightBand({ item, eyebrow }) {
         <h2 style={{ ...styles.title, ...(isMobile ? styles.titleMobile : {}) }}>
           {item.title}
         </h2>
+        {topRank > 0 && topRank <= 10 ? (
+          <div style={styles.topRow}>
+            <span style={styles.topBox}>TOP 10</span>
+            <span style={styles.topText}>#{topRank} in Top 10 Today</span>
+          </div>
+        ) : null}
         {item.description ? (
           <p style={styles.desc}>{item.description}</p>
         ) : null}
@@ -74,7 +86,7 @@ function SpotlightBand({ item, eyebrow }) {
         </div>
         <div style={styles.actions}>
           <Link to={href} style={styles.watchBtn}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path d="M8 5v14l11-7z" />
             </svg>
             Watch Now
@@ -86,6 +98,12 @@ function SpotlightBand({ item, eyebrow }) {
           />
         </div>
       </div>
+
+      {item.quality ? (
+        <div style={styles.maturity} aria-label={`Quality ${item.quality}`}>
+          {item.quality}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -93,22 +111,18 @@ function SpotlightBand({ item, eyebrow }) {
 const styles = {
   band: {
     position: 'relative',
-    margin: '0 max(48px, calc((100vw - 1720px) / 2))',
-    minHeight: '300px',
-    borderRadius: '20px',
-    overflow: 'hidden',
-    background: '#0a1424',
-    border: '1px solid rgba(255,255,255,0.08)',
+    width: '100%',
+    minHeight: '66vh',
     display: 'flex',
     alignItems: 'flex-end',
+    overflow: 'hidden',
+    background: '#050c16',
   },
   bandTV: {
-    minHeight: '360px',
+    minHeight: '68vh',
   },
   bandMobile: {
-    margin: '0 16px',
-    minHeight: '260px',
-    borderRadius: '16px',
+    minHeight: '56vh',
   },
   bg: {
     position: 'absolute',
@@ -122,19 +136,32 @@ const styles = {
     position: 'absolute',
     inset: 0,
     background:
-      'linear-gradient(100deg, rgba(5,12,22,0.96) 0%, rgba(5,12,22,0.75) 45%, rgba(5,12,22,0.25) 75%, rgba(5,12,22,0.55) 100%), linear-gradient(0deg, rgba(5,12,22,0.9) 0%, transparent 45%)',
+      'linear-gradient(100deg, rgba(5,12,22,0.95) 0%, rgba(5,12,22,0.55) 45%, rgba(5,12,22,0.1) 75%, rgba(5,12,22,0.35) 100%)',
+  },
+  bottomFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '38%',
+    background: 'linear-gradient(180deg, transparent 0%, #050c16 100%)',
   },
   content: {
     position: 'relative',
     zIndex: 1,
-    padding: '28px 32px',
+    width: 'min(1720px, calc(100vw - 96px))',
     maxWidth: '640px',
+    marginLeft: 'max(48px, calc((100vw - 1720px) / 2))',
+    marginRight: 'auto',
+    padding: '0 0 10vh',
     display: 'flex',
     flexDirection: 'column',
-    gap: '10px',
+    gap: '12px',
   },
   contentMobile: {
-    padding: '20px 18px',
+    width: 'calc(100vw - 32px)',
+    marginLeft: '16px',
+    padding: '0 0 10vh',
   },
   eyebrowRow: {
     display: 'flex',
@@ -143,40 +170,62 @@ const styles = {
   },
   eyebrow: {
     color: 'var(--accent-cyan)',
-    fontSize: '0.7rem',
+    fontSize: '0.72rem',
     fontWeight: '900',
     letterSpacing: '0.18em',
     textTransform: 'uppercase',
   },
   type: {
     color: 'rgba(255,255,255,0.6)',
-    fontSize: '0.7rem',
+    fontSize: '0.72rem',
     fontWeight: '700',
     letterSpacing: '0.12em',
     textTransform: 'uppercase',
   },
   title: {
     color: '#fff',
-    fontSize: 'clamp(1.5rem, 3vw, 2.4rem)',
+    fontSize: 'clamp(2.2rem, 5.5vw, 4.6rem)',
     fontWeight: '900',
-    lineHeight: '1.1',
+    lineHeight: '1.02',
     margin: 0,
     display: '-webkit-box',
     WebkitLineClamp: 2,
     WebkitBoxOrient: 'vertical',
     overflow: 'hidden',
-    textShadow: '0 4px 24px rgba(0,0,0,0.6)',
+    textShadow: '0 8px 40px rgba(0,0,0,0.65)',
+    letterSpacing: '-0.02em',
   },
   titleMobile: {
-    fontSize: '1.35rem',
+    fontSize: 'clamp(1.7rem, 9vw, 2.4rem)',
+  },
+  topRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+  },
+  topBox: {
+    padding: '3px 7px',
+    borderRadius: '5px',
+    background: 'var(--accent-cyan)',
+    color: '#050c16',
+    fontSize: '0.68rem',
+    fontWeight: '900',
+    letterSpacing: '0.06em',
+  },
+  topText: {
+    color: '#fff',
+    fontSize: '1rem',
+    fontWeight: '800',
+    textShadow: '0 2px 12px rgba(0,0,0,0.6)',
   },
   desc: {
-    color: 'rgba(255,255,255,0.78)',
-    fontSize: '0.88rem',
-    lineHeight: '1.55',
+    color: 'rgba(255,255,255,0.82)',
+    fontSize: '0.95rem',
+    lineHeight: '1.6',
     margin: 0,
+    maxWidth: '52ch',
     display: '-webkit-box',
-    WebkitLineClamp: 2,
+    WebkitLineClamp: 3,
     WebkitBoxOrient: 'vertical',
     overflow: 'hidden',
   },
@@ -202,20 +251,33 @@ const styles = {
     alignItems: 'center',
     gap: '12px',
     flexWrap: 'wrap',
-    marginTop: '4px',
+    marginTop: '6px',
   },
   watchBtn: {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: '8px',
-    padding: '12px 28px',
-    borderRadius: '999px',
+    gap: '10px',
+    padding: '13px 34px',
+    borderRadius: '6px',
     background: '#ffffff',
     color: '#050c16',
-    fontSize: '0.92rem',
+    fontSize: '1rem',
     fontWeight: '900',
     textDecoration: 'none',
     whiteSpace: 'nowrap',
+  },
+  maturity: {
+    position: 'absolute',
+    right: 0,
+    bottom: '22%',
+    zIndex: 1,
+    padding: '8px 18px 8px 14px',
+    borderLeft: '3px solid rgba(255,255,255,0.85)',
+    background: 'rgba(5,12,22,0.45)',
+    color: '#fff',
+    fontSize: '0.85rem',
+    fontWeight: '700',
+    letterSpacing: '0.04em',
   },
 };
 
