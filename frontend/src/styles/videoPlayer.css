@@ -93,7 +93,7 @@
   width: 40px;
   height: 40px;
   border: 3px solid rgba(255,255,255,0.08);
-  border-top-color: var(--accent-cyan, #00ffff);
+  border-top-color: var(--accent-primary, #ff6600);
   border-radius: 50%;
   animation: player-spin 0.8s linear infinite;
 }
@@ -147,7 +147,7 @@
 
 .player-progress-fill {
   height: 100%;
-  background: var(--accent-cyan, #00ffff);
+  background: linear-gradient(90deg, #ff4500, #ff7700);
   border-radius: 2px;
   position: relative;
   transition: width 0.1s linear;
@@ -161,11 +161,11 @@
   transform: translateY(-50%);
   width: 12px;
   height: 12px;
-  background: var(--accent-cyan, #00ffff);
+  background: #ff7700;
   border-radius: 50%;
   opacity: 0;
   transition: opacity 0.15s, transform 0.15s;
-  box-shadow: 0 0 8px rgba(0,255,255,0.4);
+  box-shadow: 0 0 10px rgba(255, 119, 0, 0.7);
 }
 
 .player-progress-wrap:hover .player-progress-fill::after {
@@ -278,16 +278,16 @@
   appearance: none;
   width: 14px;
   height: 14px;
-  background: var(--accent-cyan, #00ffff);
+  background: var(--accent-primary, #ff6600);
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 0 6px rgba(0,255,255,0.3);
+  box-shadow: 0 0 8px rgba(255, 102, 0, 0.5);
 }
 
 .player-volume-slider input[type="range"]::-moz-range-thumb {
   width: 14px;
   height: 14px;
-  background: var(--accent-cyan, #00ffff);
+  background: var(--accent-primary, #ff6600);
   border-radius: 50%;
   border: none;
   cursor: pointer;
@@ -317,16 +317,16 @@
   position: absolute;
   bottom: calc(100% + 6px);
   right: 0;
-  background: rgba(20, 22, 30, 0.95);
+  background: rgba(18, 18, 24, 0.95);
   border-radius: 10px;
   padding: 6px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.65);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,102,0,0.2);
 }
 
 .player-speed-opt {
@@ -348,9 +348,9 @@
 }
 
 .player-speed-opt.active {
-  background: rgba(0,255,255,0.12);
-  color: var(--accent-cyan, #00ffff);
-  font-weight: 600;
+  background: rgba(255, 102, 0, 0.18);
+  color: #ffa31a;
+  font-weight: 700;
 }
 
 .player-next-hint {
