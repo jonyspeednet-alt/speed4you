@@ -39,29 +39,50 @@ export default function TopNav() {
           <img src={logoSrc} alt="Speed4You" className="simple-logo-img" />
         </Link>
 
-        {/* Mobile toggle button */}
-        <button
-          type="button"
-          className="simple-mobile-toggle"
-          onClick={() => setMobileMenuOpen((prev) => !prev)}
-          aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-          aria-expanded={mobileMenuOpen}
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            {mobileMenuOpen ? (
-              <>
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </>
-            ) : (
-              <>
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <line x1="3" y1="18" x2="21" y2="18" />
-              </>
-            )}
-          </svg>
-        </button>
+        {/* Mobile Header Right Actions */}
+        <div className="simple-mobile-actions">
+          {/* Mobile search bar trigger in top header */}
+          <button
+            type="button"
+            className="simple-mobile-search-btn"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent("open-global-search"));
+              setMobileMenuOpen(false);
+            }}
+            aria-label="Search"
+            title="Search"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <path d="M21 21l-4.35-4.35" />
+            </svg>
+            <span className="simple-mobile-search-text">Search...</span>
+          </button>
+
+          {/* Mobile toggle button */}
+          <button
+            type="button"
+            className="simple-mobile-toggle"
+            onClick={() => setMobileMenuOpen((prev) => !prev)}
+            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileMenuOpen}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              {mobileMenuOpen ? (
+                <>
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </>
+              ) : (
+                <>
+                  <line x1="3" y1="6" x2="21" y2="6" />
+                  <line x1="3" y1="12" x2="21" y2="12" />
+                  <line x1="3" y1="18" x2="21" y2="18" />
+                </>
+              )}
+            </svg>
+          </button>
+        </div>
 
         <nav aria-label="Primary" className={`simple-nav ${mobileMenuOpen ? "simple-nav-mobile-open" : ""}`}>
           <NavLink to="/" end onClick={() => setMobileMenuOpen(false)}>
