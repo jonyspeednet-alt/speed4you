@@ -59,9 +59,9 @@ export default function PlaybackNoticeBanner() {
 
 const bannerStyles = {
   wrap: {
-    background: 'linear-gradient(90deg, rgba(14, 28, 48, 0.95) 0%, rgba(20, 36, 60, 0.95) 50%, rgba(14, 28, 48, 0.95) 100%)',
-    borderBottom: '1px solid rgba(0, 240, 255, 0.25)',
-    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
+    background: 'linear-gradient(90deg, rgba(20, 16, 12, 0.96) 0%, rgba(28, 20, 14, 0.96) 50%, rgba(20, 16, 12, 0.96) 100%)',
+    borderBottom: '1px solid rgba(255, 102, 0, 0.35)',
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 119, 0, 0.2)',
     position: 'relative',
     zIndex: 990,
   },
@@ -80,7 +80,7 @@ const bannerStyles = {
     gap: '10px',
     flexWrap: 'wrap',
     fontSize: '0.86rem',
-    color: '#d4e4f7',
+    color: '#ffe5cc',
     lineHeight: '1.45',
   },
   badge: {
@@ -88,10 +88,11 @@ const bannerStyles = {
     alignItems: 'center',
     padding: '3px 9px',
     borderRadius: '6px',
-    background: 'rgba(0, 240, 255, 0.15)',
-    border: '1px solid rgba(0, 240, 255, 0.4)',
-    color: '#00f0ff',
-    fontWeight: '700',
+    background: 'rgba(255, 102, 0, 0.18)',
+    border: '1px solid rgba(255, 119, 0, 0.5)',
+    boxShadow: '0 2px 8px rgba(255, 102, 0, 0.25)',
+    color: '#ff9933',
+    fontWeight: '800',
     fontSize: '0.75rem',
     letterSpacing: '0.02em',
     whiteSpace: 'nowrap',
