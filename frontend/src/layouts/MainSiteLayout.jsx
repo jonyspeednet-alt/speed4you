@@ -1,6 +1,7 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import TopNav from "../components/navigation/TopNav";
+import PlaybackNoticeBanner from "../components/ui/PlaybackNoticeBanner";
 import GlobalSearchModal from "../components/navigation/GlobalSearchModal";
 import SiteFooter from "../components/ui/SiteFooter";
 import { ToastProvider } from "../components/ui/Toast";
@@ -57,6 +58,7 @@ function MainSiteLayout() {
           Skip to content
         </a>
         {!isPlayerRoute && <TopNav />}
+        {!isPlayerRoute && <PlaybackNoticeBanner />}
         <GlobalSearchModal />
         <main
           id="main-content"
