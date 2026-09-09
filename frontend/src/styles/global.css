@@ -95,11 +95,17 @@ html {
   color-scheme: dark;
   background: var(--bg-primary);
   overflow-y: auto;
+  /* Phase 0 foundation: clip stray horizontal overflow on ALL devices.
+     `clip` (not hidden) avoids creating a scroll container that would break
+     position: sticky children. scrollbar-gutter above already stops 100vw shift. */
+  overflow-x: clip;
 }
 
 body {
   height: auto;
   min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: clip;
   font-family: var(--font-family-ui);
   color: var(--text-primary);
   line-height: 1.6;
@@ -2354,5 +2360,19 @@ body {
 @media (max-width: 767px) {
   .top-nav-container {
     border-bottom-color: rgba(173, 211, 236, 0.09);
+  }
+}
+
+/* Phase 0 foundation: respect users who request reduced motion (older /
+   low-end devices, vestibular sensitivity). Kills shimmer/spin/pulse loops
+   and smooth-scroll without touching layout. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

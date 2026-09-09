@@ -10,6 +10,9 @@ function ContentRail({
   subtitle = "Curated now",
   viewAllLink,
   priorityCount = 0,
+  // Designer pass: lower rails use a quiet title-only header (no eyebrow
+  // shouting) so the page hierarchy fades instead of repeating at full volume.
+  minimal = false,
 }) {
   const scrollRef = useRef(null);
   const { isMobile, isTablet } = useBreakpoint();
@@ -220,19 +223,26 @@ function ContentRail({
         className={`content-rail-header${isMobile ? " content-rail-header--mobile" : ""}`}
         style={{
           ...styles.header,
+          ...(minimal ? styles.headerMinimal : {}),
           ...(isTVMode ? styles.headerTV : isMobile ? styles.headerMobile : {}),
         }}
       >
         <div>
-          <span
-            className="content-rail-eyebrow"
-            style={{ ...styles.eyebrow, color: accent }}
-          >
-            {subtitle}
-          </span>
+          {!minimal ? (
+            <span
+              className="content-rail-eyebrow"
+              style={{ ...styles.eyebrow, color: accent }}
+            >
+              {subtitle}
+            </span>
+          ) : null}
           <h2
             className="content-rail-title"
-            style={{ ...styles.title, ...(isMobile ? styles.titleMobile : {}) }}
+            style={{
+              ...styles.title,
+              ...(minimal ? styles.titleMinimal : {}),
+              ...(isMobile ? styles.titleMobile : {}),
+            }}
           >
             {title}
           </h2>
@@ -351,6 +361,7 @@ function ContentRail({
             item={item}
             index={index}
             type={type}
+            orientation="landscape"
             eager={index < priorityCount}
             compact={isMobile}
             tablet={isTablet}
@@ -364,7 +375,7 @@ function ContentRail({
 
 const styles = {
   section: {
-    padding: "var(--spacing-lg) 0 var(--spacing-xl)",
+    padding: "4px 0",
     overflow: "hidden",
     width: "100%",
     maxWidth: "100vw",
@@ -394,7 +405,9 @@ const styles = {
     padding: "0 max(48px, calc((100vw - 1720px) / 2))",
     margin: "0 0 24px",
   },
-  eyebrow: {
+  headerMinimal: {
+    margin: "0 0 8px",
+  },  eyebrow: {
     display: "inline-block",
     marginBottom: "4px",
     fontSize: "0.68rem",
@@ -405,6 +418,11 @@ const styles = {
   title: {
     color: "var(--text-primary)",
     fontSize: "clamp(1.1rem, 2.5vw, 1.8rem)",
+  },
+  titleMinimal: {
+    fontSize: "clamp(1rem, 2vw, 1.35rem)",
+    fontWeight: "750",
+    color: "var(--text-secondary)",
   },
   titleMobile: {
     fontSize: "1.1rem",
@@ -470,10 +488,10 @@ const styles = {
     touchAction: "manipulation",
   },
   arrowMobile: {
-    width: "36px",
-    height: "36px",
-    minWidth: "36px",
-    minHeight: "36px",
+    width: "44px",
+    height: "44px",
+    minWidth: "44px",
+    minHeight: "44px",
     borderRadius: "10px",
   },
   arrowTV: {
@@ -510,9 +528,9 @@ const styles = {
     display: "flex",
     justifyContent: "flex-start",
     alignItems: "flex-start",
-    gap: "16px",
+    gap: "10px",
     margin: "0",
-    padding: "6px max(48px, calc((100vw - 1720px) / 2)) 16px",
+    padding: "14px max(48px, calc((100vw - 1720px) / 2)) 22px",
     overflowX: "auto",
     scrollSnapType: "x proximity",
     scrollSnapStop: "normal",

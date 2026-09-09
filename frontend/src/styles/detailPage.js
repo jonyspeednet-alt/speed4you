@@ -2,6 +2,17 @@ const posterFallback = `${import.meta.env.BASE_URL}assets/poster-placeholder.svg
 
 export const posterFallbackUrl = posterFallback;
 
+/**
+ * Phase 3: responsive backdrop srcSet. Phones fetch w780 (~1/3 bytes),
+ * desktops/4K fetch w1280. Non-TMDB URLs pass through untouched.
+ */
+export function getBackdropSrcSet(url) {
+  if (!url || !url.includes('image.tmdb.org/t/p/')) return undefined;
+  const parts = url.match(/^(.*\/t\/p\/)[^/]+(\/.*)$/);
+  if (!parts) return undefined;
+  return `${parts[1]}w780${parts[2]} 800w, ${parts[1]}w1280${parts[2]} 1280w`;
+}
+
 export const DETAIL_SKELETON = {
   page: {
     minHeight: "100vh",
