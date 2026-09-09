@@ -11,7 +11,7 @@ import ConfirmDialog from '../components/overlays/ConfirmDialog';
 import ContentRail from '../features/home/components/ContentRail';
 import { toPlayableSrc } from '../utils/mediaUrl';
 import { triggerDownload } from '../utils/download';
-import { DETAIL_STYLES, DETAIL_SKELETON, posterFallbackUrl } from '../styles/detailPage';
+import { DETAIL_STYLES, DETAIL_SKELETON, posterFallbackUrl, getBackdropSrcSet } from '../styles/detailPage';
 
 const posterFallback = posterFallbackUrl;
 const SERIES_CACHE_PREFIX = 'portal-series-details-v1:';
@@ -259,15 +259,6 @@ export default function SeriesDetailsPage({ adminPreview, contentData }) {
 
   const seasons = Array.isArray(series.seasons) ? series.seasons : [];
   const currentSeason = seasons[activeSeason] || null;
-  const firstSeason = seasons[0] || null;
-  const firstEpisode = firstSeason?.episodes?.[0] || null;
-  const lastSeason = seasons[seasons.length - 1] || firstSeason;
-  const lastEpisode = lastSeason?.episodes?.[lastSeason?.episodes?.length - 1] || firstEpisode;
-  const firstSeasonNum = toPositiveInt(firstSeason?.number ?? firstSeason?.id, 1);
-  const firstEpNum = toPositiveInt(firstEpisode?.number ?? firstEpisode?.id, 1);
-  const lastSeasonNum = toPositiveInt(lastSeason?.number ?? lastSeason?.id, seasons.length || 1);
-  const lastEpNum = toPositiveInt(lastEpisode?.number ?? lastEpisode?.id, 1);
-  const showContinueLatest = lastEpisode && (lastSeasonNum !== firstSeasonNum || lastEpNum !== firstEpNum);
   const genres = Array.isArray(series.genres) && series.genres.length
     ? series.genres
     : String(series.genre || '').split(',').map((g) => g.trim()).filter(Boolean);
@@ -280,13 +271,16 @@ export default function SeriesDetailsPage({ adminPreview, contentData }) {
       <div style={{ ...s.auroraOrb, bottom: '30%', right: '-10%', background: 'radial-gradient(circle, var(--accent-pink), transparent 70%)' }} />
 
       {/* ── Hero ── */}
-      <section style={s.hero}>
+      <section style={s.hero} className="detail-hero">
         <div style={s.backdropWrap}>
           <img
             src={backdropError ? posterFallback : (series.backdrop || series.poster || posterFallback)}
+            srcSet={backdropError ? undefined : getBackdropSrcSet(series.backdrop || series.poster)}
+            sizes="100vw"
             alt=""
             style={s.backdropImg}
             loading="lazy"
+            decoding="async"
             onError={() => setBackdropError(true)}
           />
           <div style={s.backdropOverlay} />

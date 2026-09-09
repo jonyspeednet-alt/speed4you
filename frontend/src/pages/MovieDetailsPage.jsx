@@ -11,7 +11,7 @@ import ConfirmDialog from '../components/overlays/ConfirmDialog';
 import ContentRail from '../features/home/components/ContentRail';
 import { toPlayableSrc } from '../utils/mediaUrl';
 import { triggerDownload } from '../utils/download';
-import { DETAIL_STYLES, DETAIL_SKELETON, posterFallbackUrl } from '../styles/detailPage';
+import { DETAIL_STYLES, DETAIL_SKELETON, posterFallbackUrl, getBackdropSrcSet } from '../styles/detailPage';
 
 const posterFallback = posterFallbackUrl;
 const MOVIE_CACHE_PREFIX = 'portal-movie-details-v1:';
@@ -151,14 +151,17 @@ export default function MovieDetailsPage({ adminPreview, contentData }) {
       <div style={{ ...s.auroraOrb, bottom: '20%', right: '-10%', background: 'radial-gradient(circle, var(--accent-pink), transparent 70%)' }} />
 
       {/* ── Hero ── */}
-      <section style={s.hero}>
+      <section style={s.hero} className="detail-hero">
         {/* Backdrop */}
         <div style={s.backdropWrap}>
           <img
             src={backdropError ? posterFallback : (movie.backdrop || movie.poster || posterFallback)}
+            srcSet={backdropError ? undefined : getBackdropSrcSet(movie.backdrop || movie.poster)}
+            sizes="100vw"
             alt=""
             style={s.backdropImg}
             loading="lazy"
+            decoding="async"
             onError={() => setBackdropError(true)}
           />
           <div style={s.backdropOverlay} />
@@ -233,7 +236,6 @@ export default function MovieDetailsPage({ adminPreview, contentData }) {
 
             {/* Actions */}
             {(() => {
-              const apiBase = (import.meta.env.VITE_API_URL || '/portal-api').replace(/\/$/, '');
               const videoUrl = movie.videoUrl;
               const btnBase = {
                 display: 'inline-flex',

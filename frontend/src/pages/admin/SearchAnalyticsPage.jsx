@@ -29,7 +29,7 @@ export default function SearchAnalyticsPage() {
         <div style={{ color: TEXT3, padding: '40px', textAlign: 'center' }}>Loading...</div>
       ) : (
         <>
-          <div style={{ background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: '16px', padding: '20px' }}>
+          <div style={{ background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: '16px', padding: '20px', overflowX: 'auto' }}>
             <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem', fontWeight: '700', color: TEXT, margin: '0 0 16px 0' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
               Top Searches
@@ -37,7 +37,7 @@ export default function SearchAnalyticsPage() {
             {topSearches.length === 0 ? (
               <div style={{ color: TEXT3, textAlign: 'center', padding: '20px' }}>No search data yet.</div>
             ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+              <table style={{ width: '100%', minWidth: '480px', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${BORDER}`, background: SURFACE2 }}>
                     <th style={thStyle}>#</th>
@@ -60,7 +60,7 @@ export default function SearchAnalyticsPage() {
             )}
           </div>
 
-          <div style={{ background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: '16px', padding: '20px' }}>
+          <div style={{ background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: '16px', padding: '20px', overflowX: 'auto' }}>
             <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem', fontWeight: '700', color: TEXT, margin: '0 0 16px 0' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /><line x1="8" y1="11" x2="14" y2="11" /></svg>
               Zero-Result Queries
@@ -72,7 +72,7 @@ export default function SearchAnalyticsPage() {
                 <div style={{ fontSize: '0.8rem', color: TEXT3, marginBottom: '12px' }}>
                   These queries returned no results \u2014 consider adding matching content or fixing typos.
                 </div>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <table style={{ width: '100%', minWidth: '420px', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                   <thead>
                     <tr style={{ borderBottom: `1px solid ${BORDER}`, background: SURFACE2 }}>
                       <th style={thStyle}>#</th>

@@ -20,7 +20,10 @@ function MainSiteLayout() {
     if (!isTVMode) return;
 
     const handleGlobalBack = (e) => {
-      if (e.key === "Backspace" || e.key === "Escape") {
+      const keyCode = e.keyCode || e.which;
+      const isBack = e.key === "Backspace" || e.key === "Escape" || e.key === "GoBack" ||
+        e.key === "XF86Back" || e.key === "BrowserBack" || keyCode === 10009 || keyCode === 461;
+      if (!isBack) return;
         const activeTag = document.activeElement?.tagName;
         if (
           activeTag === "INPUT" ||
@@ -34,7 +37,6 @@ function MainSiteLayout() {
           e.preventDefault();
           navigate(-1);
         }
-      }
     };
 
     window.addEventListener("keydown", handleGlobalBack);

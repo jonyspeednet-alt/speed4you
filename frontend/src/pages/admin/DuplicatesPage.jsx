@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { adminService } from '../../services';
@@ -609,8 +609,8 @@ export default function DuplicatesPage() {
               <div style={{ fontSize: '0.85rem' }}>Drop files in any scanner root's <code>_duplicate_hold</code> folder to review them here.</div>
             </div>
           ) : (
-            <div style={{ background: SURFACE2, borderRadius: '14px', border: `1px solid ${BORDER}`, overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+            <div style={{ background: SURFACE2, borderRadius: '14px', border: `1px solid ${BORDER}`, overflowX: 'auto' }}>
+              <table style={{ width: '100%', minWidth: '560px', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                 <thead>
                   <tr style={{ background: SURFACE3, textAlign: 'left' }}>
                     <th style={{ padding: '10px 14px', color: TEXT3, fontWeight: '700', fontSize: '0.7rem', textTransform: 'uppercase' }}>Held File</th>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminService } from '../../services';
+import { useBreakpoint } from '../../hooks';
 
 const SURFACE = 'var(--surface, #111318)';
 const SURFACE2 = 'var(--surface-2, #181b22)';
@@ -12,6 +13,7 @@ const ACCENT = 'var(--accent-primary, #6366f1)';
 
 export default function UsersPage() {
   const queryClient = useQueryClient();
+  const { isMobile } = useBreakpoint();
   const [showForm, setShowForm] = useState(false);
   const [editUser, setEditUser] = useState(null);
   const [form, setForm] = useState({ username: '', password: '', role: 'admin' });
@@ -85,7 +87,7 @@ export default function UsersPage() {
           <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: TEXT, margin: 0 }}>
             {editUser ? 'Edit User' : 'Create User'}
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', alignItems: 'end' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: '12px', alignItems: 'end' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <label style={{ fontSize: '0.78rem', color: TEXT2, fontWeight: '600' }}>Username</label>
               <input value={form.username} onChange={e => setForm(p => ({ ...p, username: e.target.value }))} required minLength={2}
@@ -124,8 +126,8 @@ export default function UsersPage() {
       ) : users.length === 0 ? (
         <div style={{ color: TEXT3, padding: '40px', textAlign: 'center' }}>No admin users found.</div>
       ) : (
-        <div style={{ background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: '16px', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+        <div style={{ background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: '16px', overflowX: 'auto' }}>
+          <table style={{ width: '100%', minWidth: '600px', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${BORDER}`, background: SURFACE2 }}>
                 <th style={thStyle}>ID</th>
