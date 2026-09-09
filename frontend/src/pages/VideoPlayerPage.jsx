@@ -334,14 +334,29 @@ export default function VideoPlayerPage() {
   const handleRetry = useCallback(() => { setError(''); loadData(); }, [loadData]);
 
   if (error) return (
-    <div className="player-error">
-      <div>
-        <p style={{ margin: '0 0 16px' }}>{error}</p>
+    <div className="player-error" style={{ padding: '40px 24px', maxWidth: '580px', margin: '0 auto' }}>
+      <div style={{
+        width: '54px', height: '54px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.15)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px',
+        border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444'
+      }}>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+      </div>
+      <h3 style={{ color: '#fff', fontSize: '1.2rem', marginBottom: '10px' }}>ভিডিওটি ব্রাউজারে চালানো যাচ্ছে না</h3>
+      <p style={{ color: '#94a3b8', fontSize: '0.9rem', lineHeight: '1.6', margin: '0 0 24px' }}>
+        অনেক ভিডিওর অডিও ফরম্যাট (AC3/5.1) অথবা কোডেক ব্রাউজারে সরাসরি সাপোর্ট করে না। সাউন্ড বা প্লেব্যাক সমস্যা হলে অনুগ্রহ করে ফাইলটি <strong>Download</strong> করে <strong>VLC Media Player</strong> অথবা <strong>MX Player</strong> দিয়ে উপভোগ করুন।
+      </p>
+      <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
         <button className="player-back-btn" onClick={handleRetry}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
           </svg>
           Retry
+        </button>
+        <button className="player-back-btn" onClick={() => { if (window.history.length > 1) navigate(-1); else navigate('/'); }}>
+          Back to Details
         </button>
       </div>
     </div>
