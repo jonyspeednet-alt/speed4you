@@ -27,6 +27,7 @@ const JOB_STATUS_COLOR = {
   done: '#60a5fa',
   failed: '#f87171',
   cancelled: '#facc15',
+  interrupted: '#fb923c',
 };
 
 function formatBytes(bytes) {
@@ -171,9 +172,10 @@ function StreamTable({ analysis }) {
   );
 }
 
-function JobCard({ job, onCancel, cancelling }) {
+function JobCard({ job, onCancel, cancelling, onRetry, retrying, onDeleteBackup, deletingBackup }) {
   const [showLog, setShowLog] = useState(false);
   const active = job.status === 'running' || job.status === 'queued';
+  const retryable = job.status === 'failed' || job.status === 'interrupted' || job.status === 'cancelled';
   const p = job.progress || {};
   return (
     <div style={cardStyle}>
@@ -189,6 +191,16 @@ function JobCard({ job, onCancel, cancelling }) {
           <button style={{ ...btnGhost, borderColor: 'rgba(239,68,68,0.3)', color: '#f87171' }}
             onClick={() => onCancel(job.id)} disabled={cancelling}>
             {cancelling ? 'Cancelling…' : 'Cancel'}
+          </button>
+        )}
+        {retryable && (
+          <button style={btnGhost} onClick={() => onRetry(job.id)} disabled={retrying}>
+            {retrying ? 'Queuing…' : 'Retry'}
+          </button>
+        )}
+        {job.status === 'done' && job.backupPath && (
+          <button style={btnGhost} onClick={() => onDeleteBackup(job.id)} disabled={deletingBackup}>
+            {deletingBackup ? 'Deleting…' : 'Delete backup'}
           </button>
         )}
       </div>
@@ -243,6 +255,142 @@ function JobCard({ job, onCancel, cancelling }) {
   );
 }
 
+function LibraryScanCard({ scanQuery, scanType, setScanType, selectedKeys, setSelectedKeys, preset, onStart, starting, onCancel, onQueue, queuing, notify }) {
+  const data = scanQuery.data || {};
+  const running = data.status === 'running';
+  const report = running ? data : (data.lastReport || data);
+  const found = report?.found || [];
+  const checked = report?.checked || 0;
+  const total = report?.total || 0;
+  const pct = total > 0 ? Math.min(100, (checked / total) * 100) : 0;
+
+  const toggleKey = (key) => {
+    setSelectedKeys((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  };
+  const allKeys = found.map((f) => `${f.itemId}:${f.targetKey}`);
+  const allSelected = allKeys.length > 0 && allKeys.every((k) => selectedKeys.includes(k));
+
+  return (
+    <div style={cardStyle}>
+      <div style={{ fontWeight: '800', color: TEXT, fontSize: '0.95rem', marginBottom: '4px' }}>3 · Full library scan</div>
+      <div style={{ color: TEXT3, fontSize: '0.78rem', marginBottom: '12px' }}>
+        Probes every published file and lists all browser-incompatible ones (EAC3/DTS sound, HEVC video). Runs in background — you can leave this page.
+      </div>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <select value={scanType} onChange={(e) => setScanType(e.target.value)} disabled={running} style={{ ...inputStyle, width: 'auto' }}>
+          <option value="all">Movies + Series</option>
+          <option value="movie">Movies only</option>
+          <option value="series">Series only</option>
+        </select>
+        {!running ? (
+          <button style={btnPrimary} onClick={onStart} disabled={starting}>
+            {starting ? 'Starting…' : 'Start scan'}
+          </button>
+        ) : (
+          <button style={{ ...btnGhost, borderColor: 'rgba(239,68,68,0.3)', color: '#f87171' }} onClick={onCancel}>
+            Cancel scan
+          </button>
+        )}
+        {data.startedAt && (
+          <span style={{ color: TEXT3, fontSize: '0.74rem' }}>
+            {data.status} · checked {checked}/{total} · found {report?.foundCount ?? found.length}
+            {report?.finishedAt ? ` · finished ${formatClock(report.finishedAt)}` : ''}
+          </span>
+        )}
+      </div>
+
+      {(running || total > 0) && (
+        <div style={{ marginTop: '10px' }}>
+          <ProgressBar percent={pct} color="linear-gradient(90deg, #a78bfa, #8b5cf6)" />
+        </div>
+      )}
+
+      {found.length > 0 && (
+        <div style={{ marginTop: '12px' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '8px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: TEXT2, fontSize: '0.78rem', cursor: 'pointer' }}>
+              <input type="checkbox" checked={allSelected}
+                onChange={() => setSelectedKeys(allSelected ? [] : allKeys)} />
+              Select all ({found.length})
+            </label>
+            <button style={btnGhost} disabled={queuing || selectedKeys.length === 0} onClick={() => onQueue(false)}>
+              {queuing ? 'Queuing…' : `Queue selected (${selectedKeys.length}) with preset “${preset}”`}
+            </button>
+            <button style={btnGhost} disabled={queuing} onClick={() => { if (window.confirm(`Queue ALL ${found.length} files for transcode?`)) onQueue(true); }}>
+              Queue all
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '320px', overflow: 'auto' }}>
+            {found.map((f) => {
+              const key = `${f.itemId}:${f.targetKey}`;
+              return (
+                <label key={key} style={{
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '7px 10px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${BORDER}`, fontSize: '0.76rem', cursor: 'pointer',
+                }}>
+                  <input type="checkbox" checked={selectedKeys.includes(key)} onChange={() => toggleKey(key)} />
+                  <span style={{ color: TEXT, fontWeight: '700', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {f.label}
+                  </span>
+                  <span style={{ color: TEXT3 }}>{f.video} · {f.audio}</span>
+                  <VerdictPill verdict={f.verdict} />
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {data.status === 'done' && found.length === 0 && (
+        <div style={{ marginTop: '10px', color: '#4ade80', fontSize: '0.8rem' }}>Scan finished — no incompatible files found. 🎉</div>
+      )}
+    </div>
+  );
+}
+
+function AutoFixCard({ settingsQuery, draft, setDraft, onSave, saving }) {
+  const saved = settingsQuery.data || { autoFix: false, autoPreset: 'browser', autoMaxJobs: 10 };
+  const cur = draft || saved;
+  const dirty = draft !== null;
+  return (
+    <div style={cardStyle}>
+      <div style={{ fontWeight: '800', color: TEXT, fontSize: '0.95rem', marginBottom: '4px' }}>4 · Auto-fix new files</div>
+      <div style={{ color: TEXT3, fontSize: '0.78rem', marginBottom: '12px' }}>
+        When ON, every content scan automatically queues browser-compatibility transcodes for newly found files. One job runs at a time — the rest wait.
+      </div>
+      {settingsQuery.isPending && <div style={{ color: TEXT3, fontSize: '0.8rem' }}>Loading settings…</div>}
+      {!settingsQuery.isPending && (
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: TEXT, fontSize: '0.82rem', fontWeight: '700', cursor: 'pointer' }}>
+            <input type="checkbox" checked={Boolean(cur.autoFix)}
+              onChange={(e) => setDraft({ ...cur, autoFix: e.target.checked })} />
+            Auto-fix {cur.autoFix ? 'ON' : 'OFF'}
+          </label>
+          <label style={{ color: TEXT2, fontSize: '0.78rem' }}>
+            Auto preset
+            <select value={cur.autoPreset}
+              onChange={(e) => setDraft({ ...cur, autoPreset: e.target.value })}
+              style={{ ...inputStyle, marginLeft: '6px', width: 'auto' }}>
+              <option value="browser">Browser compatible (auto)</option>
+              <option value="browser-720p">Browser 720p (fast)</option>
+              <option value="audio-only">Audio only (fastest)</option>
+            </select>
+          </label>
+          <label style={{ color: TEXT2, fontSize: '0.78rem' }}>
+            Max jobs per scan
+            <input type="number" min="1" max="50" value={cur.autoMaxJobs}
+              onChange={(e) => setDraft({ ...cur, autoMaxJobs: Number(e.target.value) || 10 })}
+              style={{ ...inputStyle, marginLeft: '6px', width: '70px' }} />
+          </label>
+          <button style={btnPrimary} disabled={!dirty || saving} onClick={() => onSave(cur)}>
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function MediaFixerPage() {
   const toast = useContext(ToastContext);
   const queryClient = useQueryClient();
@@ -253,6 +401,12 @@ export default function MediaFixerPage() {
   const [preset, setPreset] = useState('browser');
   const [analysis, setAnalysis] = useState(null);
   const [cancellingId, setCancellingId] = useState('');
+  const [busyJobId, setBusyJobId] = useState('');
+  const [advOpen, setAdvOpen] = useState(false);
+  const [trxOpts, setTrxOpts] = useState({ crf: 23, videoPreset: 'veryfast', audioBitrate: 192, keepSubtitles: true, audioMode: 'all' });
+  const [scanType, setScanType] = useState('all');
+  const [selectedKeys, setSelectedKeys] = useState([]);
+  const [settingsDraft, setSettingsDraft] = useState(null);
 
   const notify = (msg, type = 'info') => {
     try {
@@ -278,6 +432,7 @@ export default function MediaFixerPage() {
   const transcodeMutation = useMutation({
     mutationFn: () => adminService.startTranscode(input.trim(), {
       preset,
+      options: trxOpts,
       season: Number(season) || 1,
       episode: Number(episode) || 1,
       allEpisodes,
@@ -304,6 +459,39 @@ export default function MediaFixerPage() {
     onError: (e) => notify(e?.message || 'Cancel failed', 'error'),
   });
 
+  const retryMutation = useMutation({
+    mutationFn: (id) => adminService.retryTranscodeJob(id, { preset, options: trxOpts }),
+    onMutate: (id) => setBusyJobId(id),
+    onSettled: () => {
+      setBusyJobId('');
+      queryClient.invalidateQueries({ queryKey: ['transcode-jobs'] });
+    },
+    onSuccess: () => notify('Job queued again', 'info'),
+    onError: (e) => notify(e?.message || 'Retry failed', 'error'),
+  });
+
+  const deleteBackupMutation = useMutation({
+    mutationFn: (id) => adminService.deleteJobBackup(id),
+    onMutate: (id) => setBusyJobId(id),
+    onSettled: () => {
+      setBusyJobId('');
+      queryClient.invalidateQueries({ queryKey: ['transcode-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['media-backups'] });
+    },
+    onSuccess: (r) => notify(`Backup deleted (${formatBytes(r.sizeFreed)} freed)`, 'info'),
+    onError: (e) => notify(e?.message || 'Delete failed', 'error'),
+  });
+
+  const deleteAllBackupsMutation = useMutation({
+    mutationFn: () => adminService.deleteAllBackups(),
+    onSuccess: (r) => {
+      notify(`Deleted ${r.deleted} backup(s), freed ${formatBytes(r.sizeFreed)}`, 'info');
+      queryClient.invalidateQueries({ queryKey: ['transcode-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['media-backups'] });
+    },
+    onError: (e) => notify(e?.message || 'Delete failed', 'error'),
+  });
+
   const jobsQuery = useQuery({
     queryKey: ['transcode-jobs'],
     queryFn: () => adminService.getTranscodeJobs(),
@@ -311,6 +499,63 @@ export default function MediaFixerPage() {
       const jobs = query?.state?.data?.jobs || [];
       return jobs.some((j) => j.status === 'running' || j.status === 'queued') ? 2000 : false;
     },
+  });
+
+  const backupsQuery = useQuery({
+    queryKey: ['media-backups'],
+    queryFn: () => adminService.getBackups(),
+  });
+
+  const settingsQuery = useQuery({
+    queryKey: ['media-settings'],
+    queryFn: () => adminService.getMediaSettings(),
+  });
+
+  const saveSettingsMutation = useMutation({
+    mutationFn: (data) => adminService.saveMediaSettings(data),
+    onSuccess: (data) => {
+      setSettingsDraft(null);
+      queryClient.invalidateQueries({ queryKey: ['media-settings'] });
+      notify(data.autoFix ? 'Auto-fix ON — new incompatible files will be queued after each scan' : 'Auto-fix OFF', 'info');
+    },
+    onError: (e) => notify(e?.message || 'Save failed', 'error'),
+  });
+
+  const scanQuery = useQuery({
+    queryKey: ['media-scan'],
+    queryFn: () => adminService.getLibraryScan(),
+    refetchInterval: (query) => {
+      const s = query?.state?.data;
+      return s?.status === 'running' ? 3000 : false;
+    },
+  });
+
+  const startScanMutation = useMutation({
+    mutationFn: () => adminService.startLibraryScan(scanType),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['media-scan'] });
+      notify('Library scan started', 'info');
+    },
+    onError: (e) => notify(e?.message || 'Scan failed to start', 'error'),
+  });
+
+  const cancelScanMutation = useMutation({
+    mutationFn: () => adminService.cancelLibraryScan(),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['media-scan'] }),
+  });
+
+  const queueScanMutation = useMutation({
+    mutationFn: (useAll) => {
+      const keys = useAll ? undefined : selectedKeys;
+      return adminService.queueScanFindings({ keys, all: useAll, preset, options: trxOpts });
+    },
+    onSuccess: (data) => {
+      const started = (data.results || []).filter((r) => r.jobId).length;
+      notify(`Queued ${started} job(s) from scan`, 'info');
+      setSelectedKeys([]);
+      queryClient.invalidateQueries({ queryKey: ['transcode-jobs'] });
+    },
+    onError: (e) => notify(e?.message || 'Queue failed', 'error'),
   });
 
   const jobs = jobsQuery.data?.jobs || [];
@@ -427,6 +672,64 @@ export default function MediaFixerPage() {
               <button style={btnPrimary} onClick={() => transcodeMutation.mutate()} disabled={transcodeMutation.isPending}>
                 {transcodeMutation.isPending ? 'Starting…' : `Transcode ${analyzedBad} file(s)`}
               </button>
+              <div style={{ marginTop: '10px' }}>
+                <button style={btnGhost} onClick={() => setAdvOpen((v) => !v)}>
+                  {advOpen ? 'Hide advanced options' : 'Advanced options (quality, tracks, subtitles)'}
+                </button>
+                {advOpen && (
+                  <div style={{
+                    marginTop: '8px', padding: '12px', borderRadius: '10px',
+                    border: `1px solid ${BORDER}`, background: 'rgba(255,255,255,0.015)',
+                    display: 'flex', flexDirection: 'column', gap: '10px',
+                  }}>
+                    <label style={{ color: TEXT2, fontSize: '0.78rem' }}>
+                      Quality (CRF — lower is better, bigger file): <b style={{ color: TEXT }}>{trxOpts.crf}</b>
+                      <input type="range" min="18" max="28" step="1" value={trxOpts.crf}
+                        onChange={(e) => setTrxOpts((o) => ({ ...o, crf: Number(e.target.value) }))}
+                        style={{ width: '100%', marginTop: '4px' }} />
+                    </label>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                      <label style={{ color: TEXT2, fontSize: '0.78rem' }}>
+                        Speed preset
+                        <select value={trxOpts.videoPreset}
+                          onChange={(e) => setTrxOpts((o) => ({ ...o, videoPreset: e.target.value }))}
+                          style={{ ...inputStyle, marginLeft: '6px', width: 'auto' }}>
+                          <option value="ultrafast">ultrafast (fastest)</option>
+                          <option value="superfast">superfast</option>
+                          <option value="veryfast">veryfast (default)</option>
+                          <option value="faster">faster</option>
+                          <option value="fast">fast (slower, better)</option>
+                        </select>
+                      </label>
+                      <label style={{ color: TEXT2, fontSize: '0.78rem' }}>
+                        Audio bitrate
+                        <select value={trxOpts.audioBitrate}
+                          onChange={(e) => setTrxOpts((o) => ({ ...o, audioBitrate: Number(e.target.value) }))}
+                          style={{ ...inputStyle, marginLeft: '6px', width: 'auto' }}>
+                          <option value={128}>128k</option>
+                          <option value={192}>192k (default)</option>
+                          <option value={256}>256k</option>
+                          <option value={320}>320k</option>
+                        </select>
+                      </label>
+                      <label style={{ color: TEXT2, fontSize: '0.78rem' }}>
+                        Audio tracks
+                        <select value={trxOpts.audioMode}
+                          onChange={(e) => setTrxOpts((o) => ({ ...o, audioMode: e.target.value }))}
+                          style={{ ...inputStyle, marginLeft: '6px', width: 'auto' }}>
+                          <option value="all">all tracks</option>
+                          <option value="default">default only</option>
+                        </select>
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: TEXT2, fontSize: '0.78rem', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={trxOpts.keepSubtitles}
+                          onChange={(e) => setTrxOpts((o) => ({ ...o, keepSubtitles: e.target.checked }))} />
+                        Keep subtitles
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
               <div style={{ color: TEXT3, fontSize: '0.72rem', marginTop: '8px' }}>
                 Only broken streams are converted. The original file is kept as a backup (.orig-bak). One job runs at a time — the rest wait in queue.
               </div>
@@ -440,11 +743,46 @@ export default function MediaFixerPage() {
         </div>
       )}
 
+      {/* Library scan */}
+      <LibraryScanCard
+        scanQuery={scanQuery}
+        scanType={scanType}
+        setScanType={setScanType}
+        selectedKeys={selectedKeys}
+        setSelectedKeys={setSelectedKeys}
+        preset={preset}
+        onStart={() => startScanMutation.mutate()}
+        starting={startScanMutation.isPending}
+        onCancel={() => cancelScanMutation.mutate()}
+        onQueue={(useAll) => queueScanMutation.mutate(useAll)}
+        queuing={queueScanMutation.isPending}
+        notify={notify}
+      />
+
+      {/* Auto-fix settings */}
+      <AutoFixCard
+        settingsQuery={settingsQuery}
+        draft={settingsDraft}
+        setDraft={setSettingsDraft}
+        onSave={(data) => saveSettingsMutation.mutate(data)}
+        saving={saveSettingsMutation.isPending}
+      />
+
       {/* Jobs */}
       <div style={cardStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
           <div style={{ fontWeight: '800', color: TEXT, fontSize: '0.95rem', flex: 1 }}>Transcode jobs</div>
-          <button style={btnGhost} onClick={() => jobsQuery.refetch()} disabled={jobsQuery.isFetching}>
+          {backupsQuery.data && backupsQuery.data.count > 0 && (
+            <span style={{ fontSize: '0.74rem', color: TEXT3 }}>
+              {backupsQuery.data.count} backup(s) · {formatBytes(backupsQuery.data.totalBytes)}
+            </span>
+          )}
+          {backupsQuery.data && backupsQuery.data.count > 0 && (
+            <button style={btnGhost} onClick={() => { if (window.confirm('Delete ALL backup (.orig-bak) files? Transcoded files stay.')) deleteAllBackupsMutation.mutate(); }} disabled={deleteAllBackupsMutation.isPending}>
+              {deleteAllBackupsMutation.isPending ? 'Deleting…' : 'Delete all backups'}
+            </button>
+          )}
+          <button style={btnGhost} onClick={() => { jobsQuery.refetch(); backupsQuery.refetch(); }} disabled={jobsQuery.isFetching}>
             {jobsQuery.isFetching ? 'Refreshing…' : 'Refresh'}
           </button>
         </div>
@@ -455,7 +793,12 @@ export default function MediaFixerPage() {
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {jobs.map((job) => (
-            <JobCard key={job.id} job={job} onCancel={(id) => cancelMutation.mutate(id)} cancelling={cancellingId !== ''} />
+            <JobCard
+              key={job.id} job={job}
+              onCancel={(id) => cancelMutation.mutate(id)} cancelling={cancellingId !== ''}
+              onRetry={(id) => retryMutation.mutate(id)} retrying={busyJobId !== ''}
+              onDeleteBackup={(id) => deleteBackupMutation.mutate(id)} deletingBackup={busyJobId !== ''}
+            />
           ))}
         </div>
       </div>
