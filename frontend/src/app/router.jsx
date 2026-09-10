@@ -22,6 +22,7 @@ const DuplicatesPage = lazy(() => import('../pages/admin/DuplicatesPage'));
 const UsersPage = lazy(() => import('../pages/admin/UsersPage'));
 const SearchAnalyticsPage = lazy(() => import('../pages/admin/SearchAnalyticsPage'));
 const ContentPreviewPage = lazy(() => import('../pages/admin/ContentPreviewPage'));
+const MediaFixerPage = lazy(() => import('../pages/admin/MediaFixerPage'));
 
 function withRouteFallback(element) {
   return <Suspense fallback={<div className="catalog-message" role="status">Loading…</div>}>{element}</Suspense>;
@@ -134,6 +135,10 @@ const router = createBrowserRouter([
       {
         path: 'scanner',
         element: withRouteFallback(<ScannerPage />, 'default'),
+      },
+      {
+        path: 'media-fixer',
+        element: withRouteFallback(<MediaFixerPage />, 'default'),
       },
       {
         path: 'duplicates',

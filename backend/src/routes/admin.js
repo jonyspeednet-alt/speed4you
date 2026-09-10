@@ -109,6 +109,9 @@ router.post('/series/fix-metadata', asyncRoute(adminController.fixSeriesMetadata
 // File browser for scanner roots (used when manually adding content)
 router.get('/roots/:rootId/browse', asyncRoute(adminController.browseScannerRoot));
 
+// Media compatibility (analyze) + transcode jobs
+router.use('/media', require('./media'));
+
 // Metadata
 router.post('/metadata/tmdb', asyncRoute(adminController.fetchTmdbMetadata));
 router.post('/metadata/rematch',      asyncRoute(adminController.rematchMetadata));

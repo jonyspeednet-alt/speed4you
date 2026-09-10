@@ -80,6 +80,12 @@ speed4you/
 - **Scan summary stored**: Last scan result stored in `app_state` key `last_scan_summary`
 - **Webhook endpoint**: `POST /portal-api/api/webhook/scan` with header `x-webhook-secret` to trigger a scan remotely
 
+## Media Fixer (admin)
+- **Page**: `/admin/media-fixer` (`frontend/src/pages/admin/MediaFixerPage.jsx`)
+- **Backend**: `backend/src/services/media-compat.js` (ffprobe analyze), `backend/src/services/transcode-jobs.js` (job queue), `backend/src/routes/media.js` (mounted at `/api/admin/media`)
+- **Flow**: paste content link/ID → analyze (verdict: compatible / audio_issue / video_issue / both) → transcode with preset (`browser`, `browser-720p`, `audio-only`)
+- **Jobs**: one runs at a time (`TRANSCODE_MAX_CONCURRENT=1`), progress polled every 2s (percent, ETA, speed, log tail); original replaced atomically, backup kept as `<file>.orig-bak`
+
 ## Webhook
 - **Secret**: `d0c80a137b5ee31e7eff7083704c0ac073e26601429062491b3206d23ad80876`
 - **Endpoint**: `POST /portal-api/api/webhook/scan` (header `x-webhook-secret`)
