@@ -124,6 +124,30 @@ export const adminService = {
     method: 'POST',
     body: JSON.stringify({ batchSize: opts.batchSize || 5 }),
   }).finally(clearAdminCache),
+
+  // Media Fixer — browser-compatibility analyze + transcode
+  analyzeMedia: (input, opts = {}) => apiClient('/admin/media/analyze', {
+    method: 'POST',
+    body: JSON.stringify({
+      input,
+      season: opts.season,
+      episode: opts.episode,
+      allEpisodes: opts.allEpisodes,
+    }),
+  }),
+  startTranscode: (input, opts = {}) => apiClient('/admin/media/transcode', {
+    method: 'POST',
+    body: JSON.stringify({
+      input,
+      preset: opts.preset || 'browser',
+      season: opts.season,
+      episode: opts.episode,
+      allEpisodes: opts.allEpisodes,
+    }),
+  }).finally(clearAdminCache),
+  getTranscodeJobs: () => apiClient('/admin/media/jobs'),
+  getTranscodeJob: (id) => apiClient(`/admin/media/jobs/${id}`),
+  cancelTranscodeJob: (id) => apiClient(`/admin/media/jobs/${id}/cancel`, { method: 'POST' }),
 };
 
 export default adminService;

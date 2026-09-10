@@ -111,6 +111,16 @@ const NAV = [
     ),
   },
   {
+    path: "/admin/media-fixer",
+    label: "Media Fixer",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="23 7 16 12 23 17 23 7" />
+        <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+      </svg>
+    ),
+  },
+  {
     path: "/admin/duplicates",
     label: "Duplicates",
     icon: (
@@ -195,6 +205,7 @@ function AdminLayout() {
     if (p.startsWith("/admin/movies")) return "Movies";
     if (p.startsWith("/admin/series")) return "Series";
     if (p.startsWith("/admin/scanner")) return "Scanner";
+    if (p.startsWith("/admin/media-fixer")) return "Media Fixer";
     if (p.startsWith("/admin/duplicates")) return "Duplicates";
     if (p.startsWith("/admin/users")) return "Users";
     if (p.startsWith("/admin/analytics")) return "Analytics";
