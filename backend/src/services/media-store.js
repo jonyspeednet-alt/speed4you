@@ -187,15 +187,17 @@ function normalizeReportInput(body = {}) {
     throw err;
   }
   const issueType = REPORT_ISSUES.includes(body.issueType) ? body.issueType : 'other';
-  const numOrNull = (v) => {
+  // NOTE: season/episode use 0 (not NULL) when unknown — Postgres treats NULLs
+  // as distinct in UNIQUE constraints, which would break report de-duplication.
+  const numOrZero = (v) => {
     const n = Number(v);
-    return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
   };
   return {
     contentType,
     contentId: Math.floor(contentId),
-    season: contentType === 'series' ? numOrNull(body.season) : null,
-    episode: contentType === 'series' ? numOrNull(body.episode) : null,
+    season: numOrZero(body.season),
+    episode: numOrZero(body.episode),
     issueType,
     note: String(body.note || '').slice(0, 300),
   };
