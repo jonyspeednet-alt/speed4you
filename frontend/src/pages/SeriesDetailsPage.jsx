@@ -140,7 +140,7 @@ function EpisodeCard({ episode, index, seriesId, seasonParam, episodeParam, isMo
       </div>
     </div>
       {playerSrc && (
-        <VideoPlayerModal src={playerSrc} title={episode.name || `Episode ${episode.episode_number || index + 1}`} onClose={() => setPlayerSrc(null)} />
+        <VideoPlayerModal src={playerSrc} title={episode.name || `Episode ${episode.episode_number || index + 1}`} onClose={() => setPlayerSrc(null)} contentType="series" contentId={seriesId} season={seasonParam} episode={episodeParam} />
       )}
       <ConfirmDialog
         isOpen={showDownloadConfirm}

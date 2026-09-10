@@ -176,6 +176,96 @@ async function saveLastScanReport(report) {
   return report;
 }
 
+const REPORT_ISSUES = ['no_sound', 'no_video', 'buffering', 'wrong_content', 'other'];
+
+function normalizeReportInput(body = {}) {
+  const contentType = String(body.contentType || 'movie').toLowerCase() === 'series' ? 'series' : 'movie';
+  const contentId = Number(body.contentId);
+  if (!Number.isFinite(contentId) || contentId <= 0) {
+    const err = new Error('Invalid content');
+    err.code = 'BAD_INPUT';
+    throw err;
+  }
+  const issueType = REPORT_ISSUES.includes(body.issueType) ? body.issueType : 'other';
+  const numOrNull = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
+  };
+  return {
+    contentType,
+    contentId: Math.floor(contentId),
+    season: contentType === 'series' ? numOrNull(body.season) : null,
+    episode: contentType === 'series' ? numOrNull(body.episode) : null,
+    issueType,
+    note: String(body.note || '').slice(0, 300),
+  };
+}
+
+async function submitReport(input, ip) {
+  await ensureMediaTables();
+  const r = normalizeReportInput(input);
+  const result = await db.query(
+    `INSERT INTO media_reports (content_type, content_id, season, episode, issue_type, note, status, report_count, last_report_ip, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, 'open', 1, $7, NOW())
+     ON CONFLICT (content_type, content_id, season, episode, issue_type)
+     DO UPDATE SET report_count = media_reports.report_count + 1,
+                   status = 'open',
+                   last_report_ip = EXCLUDED.last_report_ip,
+                   note = CASE WHEN EXCLUDED.note <> '' THEN EXCLUDED.note ELSE media_reports.note END,
+                   updated_at = NOW()
+     RETURNING id, report_count`,
+    [r.contentType, r.contentId, r.season, r.episode, r.issueType, r.note, String(ip || '').slice(0, 64)]
+  );
+  return { id: result.rows[0].id, reportCount: result.rows[0].report_count };
+}
+
+async function listReports(status = 'open', limit = 100) {
+  await ensureMediaTables();
+  const st = status === 'all' ? null : (status === 'resolved' ? 'resolved' : 'open');
+  const result = st
+    ? await db.query('SELECT * FROM media_reports WHERE status = $1 ORDER BY updated_at DESC LIMIT $2', [st, Math.max(1, Math.min(500, Number(limit) || 100))])
+    : await db.query('SELECT * FROM media_reports ORDER BY updated_at DESC LIMIT $1', [Math.max(1, Math.min(500, Number(limit) || 100))]);
+  // Attach content titles (best effort)
+  const { getItemById } = require('../data/store/content');
+  const items = [];
+  for (const row of result.rows) {
+    let title = '';
+    try {
+      const item = await getItemById(row.content_id).catch(() => null);
+      if (item) title = item.title || '';
+    } catch { /* ignore */ }
+    items.push({
+      id: row.id,
+      contentType: row.content_type,
+      contentId: row.content_id,
+      season: row.season,
+      episode: row.episode,
+      issueType: row.issue_type,
+      note: row.note,
+      status: row.status,
+      reportCount: row.report_count,
+      title,
+      createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
+      updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null,
+    });
+  }
+  return items;
+}
+
+async function resolveReport(id, resolved = true) {
+  await ensureMediaTables();
+  const result = await db.query(
+    'UPDATE media_reports SET status = $2, updated_at = NOW() WHERE id = $1 RETURNING id',
+    [Number(id), resolved ? 'resolved' : 'open']
+  );
+  if (result.rows.length === 0) {
+    const err = new Error('Report not found');
+    err.code = 'NOT_FOUND';
+    throw err;
+  }
+  return { id: result.rows[0].id, status: resolved ? 'resolved' : 'open' };
+}
+
 module.exports = {
   ensureMediaTables,
   saveJobRecord,
@@ -186,4 +276,9 @@ module.exports = {
   saveSettings,
   getLastScanReport,
   saveLastScanReport,
+  REPORT_ISSUES,
+  normalizeReportInput,
+  submitReport,
+  listReports,
+  resolveReport,
 };

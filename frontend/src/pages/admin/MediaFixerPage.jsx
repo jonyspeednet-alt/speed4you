@@ -348,8 +348,78 @@ function LibraryScanCard({ scanQuery, scanType, setScanType, selectedKeys, setSe
   );
 }
 
-function AutoFixCard({ settingsQuery, draft, setDraft, onSave, saving }) {
-  const saved = settingsQuery.data || { autoFix: false, autoPreset: 'browser', autoMaxJobs: 10 };
+const REPORT_LABELS = {
+  no_sound: 'সাউন্ড নেই',
+  no_video: 'ভিডিও চলে না',
+  buffering: 'আটকে চলছে',
+  wrong_content: 'ভুল ভিডিও',
+  other: 'অন্য সমস্যা',
+};
+
+function ViewerReportsCard({ reportsQuery, onAnalyze, analyzing, onResolve }) {
+  const reports = reportsQuery.data?.reports || [];
+  return (
+    <div style={cardStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+        <div style={{ fontWeight: '800', color: TEXT, fontSize: '0.95rem', flex: 1 }}>
+          দর্শকদের রিপোর্ট {reports.length > 0 && (
+            <span style={{
+              marginLeft: '6px', padding: '2px 9px', borderRadius: '10px',
+              background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.35)',
+              color: '#f87171', fontSize: '0.72rem',
+            }}>{reports.length} open</span>
+          )}
+        </div>
+        <button style={btnGhost} onClick={() => reportsQuery.refetch()} disabled={reportsQuery.isFetching}>
+          {reportsQuery.isFetching ? 'Refreshing…' : 'Refresh'}
+        </button>
+      </div>
+      <div style={{ color: TEXT3, fontSize: '0.78rem', marginBottom: '12px' }}>
+        Player থেকে দর্শকরা যে সমস্যাগুলো জানিয়েছে। Analyze চাপলে ওপরের checker-এ ফাইলটি পরীক্ষা হবে।
+      </div>
+      {reportsQuery.isPending && <div style={{ color: TEXT3, fontSize: '0.8rem' }}>Loading reports…</div>}
+      {reportsQuery.isError && <div style={{ color: '#fca5a5', fontSize: '0.8rem' }}>Could not load reports.</div>}
+      {!reportsQuery.isPending && reports.length === 0 && (
+        <div style={{ color: TEXT3, fontSize: '0.8rem' }}>কোনো খোলা রিপোর্ট নেই। 🎉</div>
+      )}
+      {reports.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '320px', overflow: 'auto' }}>
+          {reports.map((r) => (
+            <div key={r.id} style={{
+              display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap',
+              padding: '9px 12px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)',
+              border: `1px solid ${BORDER}`, fontSize: '0.78rem',
+            }}>
+              <span style={{
+                padding: '3px 9px', borderRadius: '6px', fontWeight: '800', fontSize: '0.7rem',
+                background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5',
+                whiteSpace: 'nowrap',
+              }}>
+                {REPORT_LABELS[r.issueType] || r.issueType}
+              </span>
+              <span style={{ color: TEXT, fontWeight: '700', flex: 1, minWidth: '140px' }}>
+                {r.title || `${r.contentType} #${r.contentId}`}
+                {r.contentType === 'series' && r.season ? ` S${r.season}E${r.episode || '?'}` : ''}
+              </span>
+              {r.reportCount > 1 && (
+                <span style={{ color: TEXT3, fontSize: '0.72rem' }}>×{r.reportCount} reports</span>
+              )}
+              {r.note && <span style={{ color: TEXT3, fontSize: '0.72rem', fontStyle: 'italic' }}>“{r.note}”</span>}
+              <button style={btnGhost} disabled={analyzing} onClick={() => onAnalyze(r)}>
+                Analyze
+              </button>
+              <button style={btnGhost} onClick={() => onResolve(r.id)}>
+                Resolve
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AutoFixCard({ settingsQuery, draft, setDraft, onSave, saving }) {  const saved = settingsQuery.data || { autoFix: false, autoPreset: 'browser', autoMaxJobs: 10 };
   const cur = draft || saved;
   const dirty = draft !== null;
   return (
@@ -416,7 +486,7 @@ export default function MediaFixerPage() {
   };
 
   const analyzeMutation = useMutation({
-    mutationFn: () => adminService.analyzeMedia(input.trim(), {
+    mutationFn: (overrideInput) => adminService.analyzeMedia((overrideInput || input).trim(), {
       season: Number(season) || 1,
       episode: Number(episode) || 1,
       allEpisodes,
@@ -519,6 +589,21 @@ export default function MediaFixerPage() {
       notify(data.autoFix ? 'Auto-fix ON — new incompatible files will be queued after each scan' : 'Auto-fix OFF', 'info');
     },
     onError: (e) => notify(e?.message || 'Save failed', 'error'),
+  });
+
+  const reportsQuery = useQuery({
+    queryKey: ['media-reports'],
+    queryFn: () => adminService.getMediaReports('open'),
+    refetchInterval: 30000,
+  });
+
+  const resolveReportMutation = useMutation({
+    mutationFn: (id) => adminService.resolveMediaReport(id, true),
+    onSuccess: () => {
+      notify('Report resolved', 'info');
+      queryClient.invalidateQueries({ queryKey: ['media-reports'] });
+    },
+    onError: (e) => notify(e?.message || 'Resolve failed', 'error'),
   });
 
   const scanQuery = useQuery({
@@ -742,6 +827,19 @@ export default function MediaFixerPage() {
           )}
         </div>
       )}
+
+      {/* Viewer reports */}
+      <ViewerReportsCard
+        reportsQuery={reportsQuery}
+        onAnalyze={(r) => {
+          const link = `/${r.contentType === 'series' ? 'series' : 'movies'}/${r.contentId}`;
+          setInput(link);
+          analyzeMutation.mutate(link);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        analyzing={analyzeMutation.isPending}
+        onResolve={(id) => resolveReportMutation.mutate(id)}
+      />
 
       {/* Library scan */}
       <LibraryScanCard

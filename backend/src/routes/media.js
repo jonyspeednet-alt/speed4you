@@ -304,4 +304,20 @@ router.post('/scan/queue', asyncRoute(async (req, res) => {
   }
 }));
 
+// GET /api/admin/media/reports — viewer problem reports
+router.get('/reports', asyncRoute(async (req, res) => {
+  const status = String(req.query.status || 'open');
+  res.json({ reports: await mediaStore.listReports(status) });
+}));
+
+// POST /api/admin/media/reports/:id/resolve
+router.post('/reports/:id/resolve', asyncRoute(async (req, res) => {
+  try {
+    res.json(await mediaStore.resolveReport(req.params.id, req.body?.resolved !== false));
+  } catch (error) {
+    if (error?.code === 'NOT_FOUND') return res.status(404).json({ error: 'Report not found' });
+    throw error;
+  }
+}));
+
 module.exports = router;
