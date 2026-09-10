@@ -140,6 +140,7 @@ export const adminService = {
     body: JSON.stringify({
       input,
       preset: opts.preset || 'browser',
+      options: opts.options || {},
       season: opts.season,
       episode: opts.episode,
       allEpisodes: opts.allEpisodes,
@@ -148,6 +149,37 @@ export const adminService = {
   getTranscodeJobs: () => apiClient('/admin/media/jobs'),
   getTranscodeJob: (id) => apiClient(`/admin/media/jobs/${id}`),
   cancelTranscodeJob: (id) => apiClient(`/admin/media/jobs/${id}/cancel`, { method: 'POST' }),
+  retryTranscodeJob: (id, opts = {}) => apiClient(`/admin/media/jobs/${id}/retry`, {
+    method: 'POST',
+    body: JSON.stringify({ preset: opts.preset, options: opts.options || {} }),
+  }).finally(clearAdminCache),
+  deleteJobBackup: (id) => apiClient(`/admin/media/jobs/${id}/backup`, { method: 'DELETE' }),
+  getBackups: () => apiClient('/admin/media/backups'),
+  deleteAllBackups: () => apiClient('/admin/media/backups', { method: 'DELETE' }),
+
+  // Media Fixer settings (auto-fix)
+  getMediaSettings: () => apiClient('/admin/media/settings'),
+  saveMediaSettings: (data) => apiClient('/admin/media/settings', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+
+  // Media Fixer library scan
+  getLibraryScan: () => apiClient('/admin/media/scan'),
+  startLibraryScan: (type = 'all') => apiClient('/admin/media/scan/start', {
+    method: 'POST',
+    body: JSON.stringify({ type }),
+  }),
+  cancelLibraryScan: () => apiClient('/admin/media/scan/cancel', { method: 'POST' }),
+  queueScanFindings: (opts = {}) => apiClient('/admin/media/scan/queue', {
+    method: 'POST',
+    body: JSON.stringify({
+      keys: opts.keys,
+      all: opts.all,
+      preset: opts.preset || 'browser',
+      options: opts.options || {},
+    }),
+  }).finally(clearAdminCache),
 };
 
 export default adminService;

@@ -215,16 +215,24 @@ function codecDisplayName(codec) {
 
 /**
  * Build ffmpeg output args for a transcode. Only converts what is broken.
+ * opts: { crf (18-28), videoPreset (ultrafast..slow), audioBitrate (96-320k),
+ *         keepSubtitles (bool), audioMode ('all' | 'default') }
  * Returns { args, plan } where plan describes what will happen (for UI).
  */
-function buildTranscodeArgs(analysis, presetId) {
+function buildTranscodeArgs(analysis, presetId, rawOpts = {}) {
   const preset = PRESETS[presetId] || PRESETS.browser;
+  const opts = normalizeTranscodeOptions(rawOpts);
   const args = ['-y', '-i', analysis.filePath];
-  const plan = { video: 'copy', audio: [], preset: preset.id };
+  const plan = { video: 'copy', audio: [], preset: preset.id, options: opts };
+
+  const mapAudios = opts.audioMode === 'default'
+    ? analysis.audios.filter((a) => a.isDefault).slice(0, 1)
+    : analysis.audios;
 
   args.push('-map', '0:v:0');
-  if (analysis.audios.length > 0) args.push('-map', '0:a?');
-  if (analysis.subtitleCount > 0) args.push('-map', '0:s?');
+  if (mapAudios.length > 0) args.push('-map', opts.audioMode === 'default' ? '0:a:0' : '0:a?');
+  const keepSubs = opts.keepSubtitles && analysis.subtitleCount > 0;
+  if (keepSubs) args.push('-map', '0:s?');
   if (analysis.hasAttachments) args.push('-map', '0:t?');
 
   const needVideoConvert = preset.id === 'browser-720p'
@@ -238,8 +246,8 @@ function buildTranscodeArgs(analysis, presetId) {
     args.push('-c:v', 'copy');
     plan.video = 'copy (audio-only preset)';
   } else if (needVideoConvert) {
-    args.push('-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23');
-    plan.video = preset.id === 'browser-720p' ? 'H.264 720p (re-encode)' : 'H.264 (re-encode)';
+    args.push('-c:v', 'libx264', '-preset', opts.videoPreset, '-crf', String(opts.crf));
+    plan.video = preset.id === 'browser-720p' ? `H.264 720p (re-encode, CRF ${opts.crf})` : `H.264 (re-encode, CRF ${opts.crf})`;
     if (preset.id === 'browser-720p') {
       args.push('-vf', 'scale=-2:720');
     }
@@ -248,31 +256,50 @@ function buildTranscodeArgs(analysis, presetId) {
     plan.video = 'copy (already H.264)';
   }
 
-  analysis.audios.forEach((audio) => {
-    const out = `:a:${audio.outputIndex}`;
+  mapAudios.forEach((audio, mapIdx) => {
+    // NOTE: specifier must be the OUTPUT audio index (position in mapped set),
+    // not the input index — they differ when audioMode === 'default'.
+    const out = `:a:${mapIdx}`;
     const needsConvert = preset.id === 'audio-only'
       ? audio.status !== 'ok'
       : audio.status === 'bad' || audio.status === 'unknown';
-    if (analysis.audios.length === 1 && preset.id !== 'audio-only' && audio.status === 'bad') {
-      // single-specifier form is equivalent; keep per-stream form for clarity
-    }
     if (needsConvert) {
-      args.push(`-c${out}`, 'aac', `-b${out}`, '192k');
-      plan.audio.push(`${audio.language || `track ${audio.outputIndex + 1}`} (${audio.codec.toUpperCase()} → AAC)`);
+      args.push(`-c${out}`, 'aac', `-b${out}`, `${opts.audioBitrate}k`);
+      plan.audio.push(`${audio.language || `track ${audio.outputIndex + 1}`} (${audio.codec.toUpperCase()} → AAC ${opts.audioBitrate}k)`);
     } else {
       args.push(`-c${out}`, 'copy');
       plan.audio.push(`${audio.language || `track ${audio.outputIndex + 1}`} (${audio.codec.toUpperCase()} copy)`);
     }
   });
-  if (analysis.audios.length === 0) {
+  if (mapAudios.length === 0) {
     plan.audio.push('no audio tracks');
+  } else if (opts.audioMode === 'default' && analysis.audios.length > 1) {
+    plan.audio.push(`only default track kept (${analysis.audios.length - 1} dropped)`);
   }
 
-  if (analysis.subtitleCount > 0) args.push('-c:s', 'copy');
+  if (keepSubs) {
+    args.push('-c:s', 'copy');
+  } else if (analysis.subtitleCount > 0) {
+    plan.subtitles = 'dropped (keepSubtitles off)';
+  }
   if (analysis.hasAttachments) args.push('-c:t', 'copy');
   args.push('-max_muxing_queue_size', '9999');
 
   return { args, plan, preset };
+}
+
+const X264_PRESETS = ['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium'];
+
+function normalizeTranscodeOptions(raw = {}) {
+  const crfRaw = Number(raw.crf);
+  const bitrateRaw = Number(raw.audioBitrate);
+  return {
+    crf: Number.isFinite(crfRaw) ? Math.max(18, Math.min(28, Math.round(crfRaw))) : 23,
+    videoPreset: X264_PRESETS.includes(raw.videoPreset) ? raw.videoPreset : 'veryfast',
+    audioBitrate: Number.isFinite(bitrateRaw) ? Math.max(96, Math.min(320, Math.round(bitrateRaw))) : 192,
+    keepSubtitles: raw.keepSubtitles !== false,
+    audioMode: raw.audioMode === 'default' ? 'default' : 'all',
+  };
 }
 
 /**
@@ -589,5 +616,6 @@ module.exports = {
   resolvePlayableFile,
   analyzeTarget,
   analyzeContent,
+  normalizeTranscodeOptions,
   codecDisplayName,
 };

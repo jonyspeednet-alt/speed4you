@@ -5,13 +5,37 @@ const { spawn, execFile } = require('child_process');
 const { buildTranscodeArgs, probeMediaFile } = require('./media-compat');
 const logger = require('../utils/logger');
 
+const mediaStore = require('./media-store');
+
 const FFMPEG_BIN = process.env.FFMPEG_PATH || 'ffmpeg';
 const MAX_CONCURRENT = Math.max(1, Number(process.env.TRANSCODE_MAX_CONCURRENT || 1));
 const JOB_HISTORY_LIMIT = 50;
 const PROGRESS_POLL_MS = 1000;
+const PROGRESS_PERSIST_MS = 15000;
 
-const jobs = new Map(); // jobId -> job
+const jobs = new Map(); // jobId -> job (live runtime only)
 const queue = []; // jobIds waiting to start
+
+// Resolved once tables exist + interrupted leftovers are marked. Routes await it.
+const historyReady = mediaStore.ensureMediaTables().catch((error) => {
+  try { logger.warn('Transcode job persistence unavailable', { error: error.message }); } catch { /* ignore */ }
+});
+
+function persist(job, full = false) {
+  if (full) {
+    mediaStore.saveJobRecord(job).catch(() => {});
+  } else {
+    mediaStore.updateJobRecord(job.id, {
+      status: job.status,
+      progress: job.progress,
+      error: job.error || '',
+      log_tail: (job.logLines || []).slice(-25),
+      backup_path: job.backupPath || '',
+      started_at: job.startedAt,
+      finished_at: job.finishedAt,
+    }).catch(() => {});
+  }
+}
 
 function formatGBytes(bytes) {
   const n = Number(bytes || 0);
@@ -83,8 +107,8 @@ function parseFfmpegTime(value) {
   return sign * (Number(match[2]) * 3600 + Number(match[3]) * 60 + Number(match[4]));
 }
 
-function createJob({ item, target, analysis, presetId }) {
-  const { args, plan, preset } = buildTranscodeArgs(analysis, presetId);
+function createJob({ item, target, analysis, presetId, options = {} }) {
+  const { args, plan, preset } = buildTranscodeArgs(analysis, presetId, options);
   const id = newJobId();
   const dir = path.dirname(analysis.filePath);  const ext = path.extname(analysis.filePath) || '.mkv';
   const base = path.basename(analysis.filePath, ext);
@@ -124,8 +148,10 @@ function createJob({ item, target, analysis, presetId }) {
     rawTail: [],
     ffmpegArgs: args,
     preset: preset.id,
+    options,
     plan,
     verdict: analysis.verdict,
+    sizeBytes: analysis.sizeBytes || 0,
     durationSec: analysis.durationSec || 0,
     progress: { percent: 0, outTimeSec: 0, speed: '', etaSec: null },
     createdAt: new Date().toISOString(),
@@ -136,11 +162,15 @@ function createJob({ item, target, analysis, presetId }) {
     child: null,
     progressTimer: null,
     finalizing: false,
+    season: target.seasonNumber ?? null,
+    episode: target.episodeNumber ?? null,
+    lastPersistedAt: 0,
   };
   jobs.set(id, job);
   queue.push(id);
   appendLog(job, `Job created — preset: ${preset.label}`);
   appendLog(job, `Plan: video ${plan.video}; audio: ${plan.audio.join(' | ')}`);
+  persist(job, true);
   pumpQueue();
   return job;
 }
@@ -178,12 +208,19 @@ function updateProgress(job) {
   if (values.progress === 'end') {
     job.progress.percent = 100;
   }
+  // Persist progress sparingly — every PROGRESS_PERSIST_MS at most
+  const now = Date.now();
+  if (now - (job.lastPersistedAt || 0) > PROGRESS_PERSIST_MS) {
+    job.lastPersistedAt = now;
+    persist(job);
+  }
 }
 
 function startJob(job) {
   job.status = 'running';
   job.startedAt = new Date().toISOString();
   appendLog(job, `Starting ffmpeg (${FFMPEG_BIN})…`);
+  persist(job, true);
 
   // progress file must exist before ffmpeg opens it in append mode on some builds
   try { fs.writeFileSync(job.progressFile, ''); } catch { /* ignore */ }
@@ -262,6 +299,7 @@ function failJob(job, message) {
     appendLog(job, '--- last ffmpeg output ---');
     unseen.forEach((line) => appendLog(job, line));
   }
+  persist(job, true);
   try {
     logger.warn('Transcode job failed', { jobId: job.id, itemId: job.itemId, error: message });
   } catch { /* ignore */ }
@@ -329,6 +367,7 @@ async function finalizeJob(job) {
   job.progress.etaSec = 0;
   job.finishedAt = new Date().toISOString();
   appendLog(job, `DONE — original replaced. Backup kept at ${backupPath}`);
+  persist(job, true);
   try {
     logger.info('Transcode job completed', { jobId: job.id, itemId: job.itemId, target: job.targetLabel });
   } catch { /* ignore */ }
@@ -343,12 +382,12 @@ function cancelJob(id) {
     throw err;
   }
   if (job.status === 'done' || job.status === 'failed' || job.status === 'cancelled') {
-    return job;
+    return publicJob(job);
   }
   if (job.finalizing || (job.status === 'running' && !job.child)) {
     // ffmpeg already exited; the file swap is in progress — too late to cancel safely
     appendLog(job, 'Cancel ignored: job is already finalizing (verifying / replacing file).');
-    return job;
+    return publicJob(job);
   }
   const queuedIndex = queue.indexOf(id);
   if (queuedIndex >= 0) queue.splice(queuedIndex, 1);
@@ -362,32 +401,113 @@ function cancelJob(id) {
   job.status = 'cancelled';
   job.finishedAt = new Date().toISOString();
   appendLog(job, 'Cancelled by admin. Temp files cleaned up. Original untouched.');
+  persist(job, true);
   pumpQueue();
-  return job;
+  return publicJob(job);
 }
 
-function listJobs() {
+function listLiveJobs() {
   return [...jobs.values()]
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .slice(0, JOB_HISTORY_LIMIT)
     .map(publicJob);
 }
 
-function getJob(id) {
+async function listJobs() {
+  await historyReady;
+  const live = listLiveJobs();
+  const liveIds = new Set(live.map((j) => j.id));
+  let history = [];
+  try {
+    history = (await mediaStore.listJobHistory(JOB_HISTORY_LIMIT))
+      .filter((h) => !liveIds.has(h.id));
+  } catch { /* persistence unavailable — live only */ }
+  return [...live, ...history].slice(0, JOB_HISTORY_LIMIT);
+}
+
+async function getJob(id) {
   const job = jobs.get(id);
-  if (!job) {
-    const err = new Error('Job not found');
+  if (job) {
+    if (job.status === 'running') updateProgress(job);
+    return publicJob(job);
+  }
+  await historyReady;
+  try {
+    const record = await mediaStore.getJobRecord(id);
+    if (record) return record;
+  } catch { /* ignore */ }
+  const err = new Error('Job not found');
+  err.code = 'NOT_FOUND';
+  throw err;
+}
+
+function getActiveSourcePaths() {
+  const paths = new Set();
+  jobs.forEach((job) => {
+    if (job.status === 'queued' || job.status === 'running') paths.add(job.sourcePath);
+  });
+  return paths;
+}
+
+async function deleteBackup(id) {
+  await historyReady;
+  const job = jobs.get(id);
+  const backupPath = job ? job.backupPath : (await mediaStore.getJobRecord(id).catch(() => null))?.backupPath;
+  if (!backupPath) {
+    const err = new Error('No backup file for this job');
     err.code = 'NOT_FOUND';
     throw err;
   }
-  if (job.status === 'running') updateProgress(job);
-  return publicJob(job);
+  let sizeFreed = 0;
+  try {
+    sizeFreed = Number(fs.statSync(backupPath).size || 0);
+    fs.unlinkSync(backupPath);
+  } catch {
+    const err = new Error('Backup file already gone from disk');
+    err.code = 'NOT_FOUND';
+    throw err;
+  }
+  if (job) {
+    job.backupPath = null;
+    appendLog(job, 'Backup deleted by admin to free disk space.');
+  }
+  await mediaStore.updateJobRecord(id, { backup_path: '' }).catch(() => {});
+  return { jobId: id, deleted: backupPath, sizeFreed };
+}
+
+async function listBackups() {
+  await historyReady;
+  let history = [];
+  try {
+    history = await mediaStore.listJobHistory(200);
+  } catch { /* ignore */ }
+  const liveById = new Map(jobs);
+  const items = [];
+  const seen = new Set();
+  const pushIfBackup = (source, backupPath, label, jobId, status) => {
+    if (!backupPath || seen.has(jobId)) return;
+    seen.add(jobId);
+    let sizeBytes = 0;
+    let exists = false;
+    try {
+      sizeBytes = Number(fs.statSync(backupPath).size || 0);
+      exists = true;
+    } catch { /* gone */ }
+    items.push({ jobId, label, sourcePath: source, backupPath, sizeBytes, exists, status });
+  };
+  liveById.forEach((job) => pushIfBackup(job.sourcePath, job.backupPath, job.targetLabel, job.id, job.status));
+  history.forEach((h) => pushIfBackup(h.sourcePath, h.backupPath, h.targetLabel, h.id, h.status));
+  return items;
 }
 
 module.exports = {
   MAX_CONCURRENT,
+  historyReady,
   createJob,
   cancelJob,
   listJobs,
   getJob,
+  getActiveSourcePaths,
+  deleteBackup,
+  listBackups,
 };
