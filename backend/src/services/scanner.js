@@ -2416,7 +2416,7 @@ async function scanSelectedRoots(selectedRootIds = [], progressCallback, options
   });
 
   setImmediate(() => {
-    runPostScanTasks(normalizedSummary).catch(() => {});
+    runPostScanTasks(normalizedSummary, scanContext.runId).catch(() => {});
   });
 
   // Fire completion webhook if configured
@@ -2499,7 +2499,7 @@ function attachChildHandlers(child) {
       logScannerEvent('worker_completed', { runId: currentScanJob?.id || '' });
       const summary = normalizeSummary(message.summary);
       setImmediate(() => {
-        runPostScanTasks(summary).catch(() => {});
+        runPostScanTasks(summary, currentScanJob?.id || '').catch(() => {});
       });
       void refreshScannerCaches().catch(() => {}).finally(() => {
         updateRuntimeJob(currentScanJob).catch((err) => logScannerEvent('runtime_persist_failed', { error: err.message }));
@@ -2562,7 +2562,7 @@ async function isScanLockedByOtherInstance() {
   }
 }
 
-async function runPostScanTasks(summary) {
+async function runPostScanTasks(summary, runId) {
   try {
     const { db } = require('../data/store/base');
     const pool = await db.getPool();
@@ -2626,8 +2626,69 @@ async function runPostScanTasks(summary) {
       // non-critical
     }
     logScannerEvent('post_scan_tasks_completed', { missingPostersFixed: fixed, totalChecked: result.rows.length });
+
+    // ── MEDIA AUTO-FIX: queue browser-compatibility transcodes for new files ──
+    try {
+      await autoFixNewMedia(runId);
+    } catch (err) {
+      logScannerEvent('post_scan_autofix_failed', { error: err.message });
+    }
   } catch (err) {
     logScannerEvent('post_scan_tasks_failed', { error: err.message });
+  }
+}
+
+/**
+ * Media Fixer auto-fix: if enabled in admin settings, probe files from this
+ * scan run and queue transcodes for browser-incompatible ones (EAC3/HEVC…).
+ * Lazy requires avoid a require-cycle (transcode-jobs → data/store → scanner).
+ */
+async function autoFixNewMedia(runId) {
+  const { getAppState } = require('../data/store/base');
+  const settings = (await getAppState('media_fixer_settings', null).catch(() => null)) || {};
+  if (!settings.autoFix || !runId) return;
+
+  const { db } = require('../data/store/base');
+  const pool = await db.getPool();
+  const rows = (await pool.query(
+    'SELECT id FROM content_catalog WHERE last_scan_run_id = $1 ORDER BY id LIMIT 200',
+    [String(runId)]
+  ).catch(() => ({ rows: [] }))).rows || [];
+  if (rows.length === 0) return;
+
+  const { getItemById } = require('../data/store/content');
+  const { resolveTargets, analyzeTarget } = require('./media-compat');
+  const transcodeJobs = require('./transcode-jobs');
+
+  const maxJobs = Math.max(1, Math.min(50, Number(settings.autoMaxJobs || 10)));
+  const preset = ['browser', 'browser-720p', 'audio-only'].includes(settings.autoPreset)
+    ? settings.autoPreset : 'browser';
+  const busy = transcodeJobs.getActiveSourcePaths();
+  let queued = 0;
+
+  for (const row of rows) {
+    if (queued >= maxJobs) break;
+    try {
+      const item = await getItemById(row.id).catch(() => null);
+      if (!item || item.status !== 'published') continue;
+      const targets = resolveTargets(item, item.type === 'series' ? { allEpisodes: true } : {}).slice(0, 10);
+      for (const target of targets) {
+        if (queued >= maxJobs) break;
+        try {
+          const analysis = await analyzeTarget(target);
+          if (!analysis.exists) continue;
+          if (!['audio_issue', 'video_issue', 'both'].includes(analysis.verdict)) continue;
+          if (busy.has(analysis.filePath)) continue;
+          const job = transcodeJobs.createJob({ item, target, analysis, presetId: preset, options: {} });
+          busy.add(analysis.filePath);
+          queued += 1;
+          logScannerEvent('post_scan_autofix_queued', { jobId: job.id, itemId: item.id, target: target.label });
+        } catch { /* per-target failures must not stop the run */ }
+      }
+    } catch { /* per-item failures must not stop the run */ }
+  }
+  if (queued > 0) {
+    logScannerEvent('post_scan_autofix_done', { runId, queued });
   }
 }
 
