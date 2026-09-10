@@ -99,12 +99,11 @@ function createJob({ item, target, analysis, presetId }) {
     progressFile,
     logFile,
     logLines: [],
-    ffmpegArgs: args,
+    rawTail: [],    ffmpegArgs: args,
     preset: preset.id,
     plan,
     verdict: analysis.verdict,
-    durationSec: analysis.durationSec || 0,
-    progress: { percent: 0, outTimeSec: 0, speed: '', etaSec: null },
+    durationSec: analysis.durationSec || 0,    progress: { percent: 0, outTimeSec: 0, speed: '', etaSec: null },
     createdAt: new Date().toISOString(),
     startedAt: null,
     finishedAt: null,
@@ -164,7 +163,9 @@ function startJob(job) {
   // progress file must exist before ffmpeg opens it in append mode on some builds
   try { fs.writeFileSync(job.progressFile, ''); } catch { /* ignore */ }
 
-  const args = [...job.ffmpegArgs, '-nostats', '-progress', job.progressFile];
+  // NOTE: output path must be the last arg — ffmpeg treats it as the output file
+  const args = [...job.ffmpegArgs, '-nostats', '-progress', job.progressFile, job.tempPath];
+  appendLog(job, `Output: ${job.tempPath}`);
   let child;
   try {
     child = spawn(FFMPEG_BIN, args, { stdio: ['ignore', 'pipe', 'pipe'] });
@@ -177,8 +178,12 @@ function startJob(job) {
     String(chunk).split('\n').forEach((line) => {
       const text = line.trim();
       if (!text) return;
-      // keep interesting lines (errors, stream mapping, time) in the tail
-      if (/error|failed|invalid|mapping|stream|duration|video:|audio:|time=/i.test(text)) {
+      // Unfiltered ring buffer — dumped into the log on failure so the real
+      // ffmpeg error is never lost (exit code alone is useless for debugging)
+      job.rawTail.push(text.slice(0, 300));
+      if (job.rawTail.length > 40) job.rawTail.splice(0, job.rawTail.length - 40);
+      // keep interesting lines (errors, stream mapping, time) in the live tail
+      if (/error|fail|invalid|mapping|stream|duration|video:|audio:|time=|output|convert|denied|no such|cannot|unable|specified/i.test(text)) {
         appendLog(job, text.slice(0, 300));
       } else if (job.logLines.length < 5) {
         appendLog(job, text.slice(0, 300));
@@ -226,6 +231,12 @@ function failJob(job, message) {
   job.error = message;
   job.finishedAt = new Date().toISOString();
   appendLog(job, `FAILED: ${message}`);
+  // Surface the last raw ffmpeg lines so the UI log always shows the real cause
+  const unseen = (job.rawTail || []).filter((line) => !job.logLines.includes(line)).slice(-15);
+  if (unseen.length > 0) {
+    appendLog(job, '--- last ffmpeg output ---');
+    unseen.forEach((line) => appendLog(job, line));
+  }
   try {
     logger.warn('Transcode job failed', { jobId: job.id, itemId: job.itemId, error: message });
   } catch { /* ignore */ }
