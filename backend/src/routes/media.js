@@ -39,6 +39,7 @@ function sendKnownError(res, error) {
   if (code === 'NO_MEDIA') return res.status(404).json({ error: error.message });
   if (code === 'TOO_MANY') return res.status(400).json({ error: error.message });
   if (code === 'BAD_TYPE') return res.status(400).json({ error: error.message });
+  if (code === 'NO_SPACE') return res.status(400).json({ error: error.message });
   if (code === 'PROBE_FAILED') return res.status(502).json({ error: error.message });
   throw error;
 }
@@ -76,17 +77,37 @@ router.post('/transcode', asyncRoute(async (req, res) => {
     }
 
     const created = [];
+    const busyPaths = new Set(
+      transcodeJobs.listJobs()
+        .filter((j) => j.status === 'queued' || j.status === 'running')
+        .map((j) => j.sourcePath)
+    );
     for (const target of targets) {
       const analysis = await analyzeTarget(target);
       if (!analysis.exists) {
-        created.push({ target: target.label, skipped: true, reason: 'Source file not found on server' });
+        if (analysis.verdict === 'ambiguous') {
+          created.push({ target: target.label, skipped: true, reason: (analysis.issues[0] || {}).message || 'Ambiguous file mapping' });
+        } else {
+          created.push({ target: target.label, skipped: true, reason: 'Source file not found on server' });
+        }
+        continue;
+      }
+      if (busyPaths.has(analysis.filePath)) {
+        created.push({ target: target.label, skipped: true, reason: 'This file already has a queued/running transcode job' });
         continue;
       }
       if (analysis.verdict === 'compatible' && presetId === 'browser') {
         created.push({ target: target.label, skipped: true, reason: 'Already browser-compatible — nothing to convert' });
         continue;
       }
-      const job = transcodeJobs.createJob({ item, target, analysis, presetId });
+      let job;
+      try {
+        job = transcodeJobs.createJob({ item, target, analysis, presetId });
+      } catch (error) {
+        created.push({ target: target.label, skipped: true, reason: error.message });
+        continue;
+      }
+      busyPaths.add(analysis.filePath);
       created.push({ target: target.label, jobId: job.id, status: job.status });
     }
 

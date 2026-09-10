@@ -295,9 +295,9 @@ function parseContentInput(input) {
   }
   const segments = raw.split('?')[0].split('#')[0].split('/').filter(Boolean);
   const last = segments[segments.length - 1] || '';
-  const numMatch = last.match(/(\d+)(?!.*\d)/);
+  // Pure number → content ID. Anything else is a slug — getItemById resolves
+  // both, so never carve year-numbers (e.g. "-2026") out of slugs.
   if (last && /^\d+$/.test(last)) return last;
-  if (numMatch && segments.some((s) => /movie|series|play|content/i.test(s))) return numMatch[1];
   if (last) return decodeURIComponent(last); // slug
   const err = new Error('Could not understand that link. Paste a /movies/... or /series/... link, or a numeric ID.');
   err.code = 'BAD_INPUT';
@@ -360,6 +360,16 @@ function findFirstVideoFile(directoryPath) {
     if (nested) return nested;
   }
   return '';
+}
+
+function countTopLevelVideoFiles(directoryPath) {
+  let entries;
+  try {
+    entries = fs.readdirSync(directoryPath, { withFileTypes: true });
+  } catch {
+    return 0;
+  }
+  return entries.filter((entry) => entry.isFile() && VIDEO_EXTENSIONS.has(path.extname(entry.name).toLowerCase())).length;
 }
 
 function resolvePlayableFile(sourcePath, videoUrl) {
@@ -459,15 +469,32 @@ function resolveTargets(item, { season, episode, allEpisodes } = {}) {
         episodeNumber: toPositiveInt(selectedEpisode?.number ?? selectedEpisode?.id, 1),
       }];
     };
-    return pickEpisodes().map(({ season: s, ep, seasonNumber, episodeNumber }) => ({
-      key: `series-${item.id}-s${seasonNumber}e${episodeNumber}`,
-      label: `${item.title || `Series ${item.id}`} S${String(seasonNumber).padStart(2, '0')}E${String(episodeNumber).padStart(2, '0')}${ep?.title ? ` — ${ep.title}` : ''}`,
-      filePath: resolvePlayableFile(ep?.sourcePath || s?.sourcePath || item.sourcePath, ep?.videoUrl),
-      videoUrl: ep?.videoUrl || '',
-      sourcePath: ep?.sourcePath || s?.sourcePath || item.sourcePath || '',
-      seasonNumber,
-      episodeNumber,
-    }));
+    return pickEpisodes().map(({ season: s, ep, seasonNumber, episodeNumber }) => {
+      const epSourcePath = ep?.sourcePath || s?.sourcePath || item.sourcePath || '';
+      const filePath = resolvePlayableFile(epSourcePath, ep?.videoUrl);
+      // Safety: an episode without its own file link that resolves into a
+      // directory holding MULTIPLE videos is ambiguous — blindly taking the
+      // first file could transcode (and replace) the wrong episode.
+      let ambiguous = false;
+      if (!ep?.videoUrl && epSourcePath) {
+        try {
+          if (fs.existsSync(epSourcePath) && fs.statSync(epSourcePath).isDirectory()
+            && countTopLevelVideoFiles(epSourcePath) > 1) {
+            ambiguous = true;
+          }
+        } catch { /* ignore */ }
+      }
+      return {
+        key: `series-${item.id}-s${seasonNumber}e${episodeNumber}`,
+        label: `${item.title || `Series ${item.id}`} S${String(seasonNumber).padStart(2, '0')}E${String(episodeNumber).padStart(2, '0')}${ep?.title ? ` — ${ep.title}` : ''}`,
+        filePath: ambiguous ? '' : filePath,
+        ambiguous,
+        videoUrl: ep?.videoUrl || '',
+        sourcePath: epSourcePath,
+        seasonNumber,
+        episodeNumber,
+      };
+    });
   }
   const err = new Error(`Unsupported content type: ${item.type}`);
   err.code = 'BAD_TYPE';
@@ -475,6 +502,17 @@ function resolveTargets(item, { season, episode, allEpisodes } = {}) {
 }
 
 async function analyzeTarget(target) {
+  if (target.ambiguous) {
+    return {
+      ...target,
+      exists: false,
+      sizeBytes: 0,
+      verdict: 'ambiguous',
+      issues: [{ type: 'file', severity: 'warning', message: 'This episode has no direct file link and its folder holds multiple videos — the system cannot tell which file belongs to it. Fix the episode videoUrl (admin → Edit Content) or transcode the file manually.' }],
+      video: null,
+      audios: [],
+    };
+  }
   if (!target.filePath) {
     return {
       ...target,
