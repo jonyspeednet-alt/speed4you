@@ -85,6 +85,7 @@ speed4you/
 - **Backend**: `backend/src/services/media-compat.js` (ffprobe analyze), `backend/src/services/transcode-jobs.js` (job queue), `backend/src/routes/media.js` (mounted at `/api/admin/media`)
 - **Flow**: paste content link/ID → analyze (verdict: compatible / audio_issue / video_issue / both) → transcode with preset (`browser`, `browser-720p`, `audio-only`)
 - **Jobs**: one runs at a time (`TRANSCODE_MAX_CONCURRENT=1`), progress polled every 2s (percent, ETA, speed, log tail); original replaced atomically, backup kept as `<file>.orig-bak`
+- **Upgrades (2026-09-10)**: `transcode_jobs` DB table (history survives restart; interrupted jobs marked), library-wide incompatibility scan (`media-library-scan.js` + report in `app_state/media_last_scan`), post-scan auto-fix toggle (settings in `app_state/media_fixer_settings`, hook in scanner `runPostScanTasks`), retry failed jobs, per-job + bulk backup delete, advanced options (CRF 18-28, x264 preset, audio bitrate, default-track-only, drop subtitles)
 
 ## Webhook
 - **Secret**: `d0c80a137b5ee31e7eff7083704c0ac073e26601429062491b3206d23ad80876`
