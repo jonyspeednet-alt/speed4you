@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import ReportProblemButton from './ReportProblemButton';
 import '../../styles/videoPlayer.css';
 
 const RATES = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
-export default function VideoPlayerModal({ src, title, onClose, onNext }) {
+export default function VideoPlayerModal({ src, title, onClose, onNext, contentType, contentId, season, episode }) {
   const videoRef = useRef(null);
   const [playing, setPlaying] = useState(true);
   const [rate, setRate] = useState(1);
@@ -198,6 +199,9 @@ export default function VideoPlayerModal({ src, title, onClose, onNext }) {
         </button>
         <span className="player-title">{title}</span>
         <div className="player-spacer" />
+        {contentId ? (
+          <ReportProblemButton contentType={contentType} contentId={contentId} season={season} episode={episode} />
+        ) : null}
         <button className="player-ctrl-btn" onClick={closeModal} title="Close">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
