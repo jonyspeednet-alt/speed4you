@@ -2,6 +2,22 @@ import { useState, useEffect } from 'react';
 
 const STORAGE_KEY = 'speed4you_dismissed_playback_notice';
 
+const NOTICE_TEXT = (
+  <>
+    অনেক ভিডিওর অডিও ফরম্যাট (AC3/5.1) ব্রাউজারে সরাসরি চলে না। সাউন্ড বা প্লেব্যাক সমস্যা হলে ফাইলটি <strong>Download</strong> করে <strong>VLC Player</strong> অথবা <strong>MX Player</strong> দিয়ে উপভোগ করুন।
+  </>
+);
+
+const marqueeCss = `
+  @keyframes s4y-notice-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  .s4y-notice-track {
+    display: inline-flex; align-items: center; white-space: nowrap; width: max-content;
+    animation: s4y-notice-marquee 28s linear infinite; will-change: transform;
+  }
+  .s4y-notice-viewport:hover .s4y-notice-track { animation-play-state: paused; }
+  @media (prefers-reduced-motion: reduce) { .s4y-notice-track { animation: none; } }
+`;
+
 export default function PlaybackNoticeBanner() {
   const [visible, setVisible] = useState(false);
 
@@ -29,6 +45,7 @@ export default function PlaybackNoticeBanner() {
 
   return (
     <div style={bannerStyles.wrap} role="region" aria-label="Playback Notice">
+      <style>{marqueeCss}</style>
       <div style={bannerStyles.inner}>
         <div style={bannerStyles.content}>
           <span style={bannerStyles.badge}>
@@ -37,9 +54,12 @@ export default function PlaybackNoticeBanner() {
             </svg>
             প্লেব্যাক নোটিশ
           </span>
-          <span style={bannerStyles.text}>
-            অনেক ভিডিওর অডিও ফরম্যাট (AC3/5.1) ব্রাউজারে সরাসরি চলে না। সাউন্ড বা প্লেব্যাক সমস্যা হলে ফাইলটি <strong>Download</strong> করে <strong>VLC Player</strong> অথবা <strong>MX Player</strong> দিয়ে উপভোগ করুন।
-          </span>
+          <div className="s4y-notice-viewport" style={bannerStyles.viewport}>
+            <div className="s4y-notice-track">
+              <span style={bannerStyles.text}>{NOTICE_TEXT}</span>
+              <span style={bannerStyles.text} aria-hidden="true">{NOTICE_TEXT}</span>
+            </div>
+          </div>
         </div>
         <button
           onClick={handleDismiss}
@@ -78,7 +98,8 @@ const bannerStyles = {
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
-    flexWrap: 'wrap',
+    flex: 1,
+    minWidth: 0,
     fontSize: '0.86rem',
     color: '#ffe5cc',
     lineHeight: '1.45',
@@ -98,9 +119,15 @@ const bannerStyles = {
     whiteSpace: 'nowrap',
     flexShrink: 0,
   },
-  text: {
+  viewport: {
     flex: 1,
-    minWidth: '240px',
+    minWidth: 0,
+    overflow: 'hidden',
+    maskImage: 'linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%)',
+    WebkitMaskImage: 'linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%)',
+  },
+  text: {
+    paddingRight: '64px',
   },
   closeBtn: {
     background: 'transparent',
