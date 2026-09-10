@@ -13,6 +13,12 @@ const PROGRESS_POLL_MS = 1000;
 const jobs = new Map(); // jobId -> job
 const queue = []; // jobIds waiting to start
 
+function formatGBytes(bytes) {
+  const n = Number(bytes || 0);
+  if (n >= 1024 ** 3) return `${(n / 1024 ** 3).toFixed(1)} GB`;
+  return `${Math.round(n / 1024 ** 2)} MB`;
+}
+
 function newJobId() {
   return `trx-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -80,12 +86,28 @@ function parseFfmpegTime(value) {
 function createJob({ item, target, analysis, presetId }) {
   const { args, plan, preset } = buildTranscodeArgs(analysis, presetId);
   const id = newJobId();
-  const dir = path.dirname(analysis.filePath);
-  const ext = path.extname(analysis.filePath) || '.mkv';
+  const dir = path.dirname(analysis.filePath);  const ext = path.extname(analysis.filePath) || '.mkv';
   const base = path.basename(analysis.filePath, ext);
   const tempPath = path.join(dir, `${base}.transcode-${id}${ext}`);
   const progressFile = path.join(os.tmpdir(), `${id}.progress`);
   const logFile = path.join(os.tmpdir(), `${id}.log`);
+
+  // Disk guard: peak usage is ~2x source size (temp output + backup next to original)
+  if (typeof fs.statfsSync === 'function' && Number(analysis.sizeBytes || 0) > 0) {
+    try {
+      const fsStat = fs.statfsSync(dir);
+      const freeBytes = Number(fsStat.bfree || 0) * Number(fsStat.bsize || 0);
+      const needBytes = Number(analysis.sizeBytes) * 2.2;
+      if (freeBytes > 0 && freeBytes < needBytes) {
+        const err = new Error(`Not enough disk space for this transcode (need ~${formatGBytes(needBytes)}, free ${formatGBytes(freeBytes)}). Free up space and retry.`);
+        err.code = 'NO_SPACE';
+        throw err;
+      }
+    } catch (error) {
+      if (error?.code === 'NO_SPACE') throw error;
+      // statfs unavailable/failed — proceed; ffmpeg will fail loudly if disk fills
+    }
+  }
 
   const job = {
     id,
@@ -99,11 +121,13 @@ function createJob({ item, target, analysis, presetId }) {
     progressFile,
     logFile,
     logLines: [],
-    rawTail: [],    ffmpegArgs: args,
+    rawTail: [],
+    ffmpegArgs: args,
     preset: preset.id,
     plan,
     verdict: analysis.verdict,
-    durationSec: analysis.durationSec || 0,    progress: { percent: 0, outTimeSec: 0, speed: '', etaSec: null },
+    durationSec: analysis.durationSec || 0,
+    progress: { percent: 0, outTimeSec: 0, speed: '', etaSec: null },
     createdAt: new Date().toISOString(),
     startedAt: null,
     finishedAt: null,
@@ -111,6 +135,7 @@ function createJob({ item, target, analysis, presetId }) {
     backupPath: null,
     child: null,
     progressTimer: null,
+    finalizing: false,
   };
   jobs.set(id, job);
   queue.push(id);
@@ -277,6 +302,7 @@ function verifyOutput(tempPath, expectedDurationSec) {
 }
 
 async function finalizeJob(job) {
+  job.finalizing = true;
   appendLog(job, 'ffmpeg finished — verifying output…');
   await verifyOutput(job.tempPath, job.durationSec);
 
@@ -317,6 +343,11 @@ function cancelJob(id) {
     throw err;
   }
   if (job.status === 'done' || job.status === 'failed' || job.status === 'cancelled') {
+    return job;
+  }
+  if (job.finalizing || (job.status === 'running' && !job.child)) {
+    // ffmpeg already exited; the file swap is in progress — too late to cancel safely
+    appendLog(job, 'Cancel ignored: job is already finalizing (verifying / replacing file).');
     return job;
   }
   const queuedIndex = queue.indexOf(id);

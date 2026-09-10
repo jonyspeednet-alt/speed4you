@@ -17,6 +17,7 @@ const VERDICT_META = {
   video_issue: { color: '#f87171', label: 'Video play issue' },
   both: { color: '#f87171', label: 'Video + sound issue' },
   unknown: { color: '#f59e0b', label: 'Needs review' },
+  ambiguous: { color: '#c084fc', label: 'Needs attention' },
   file_missing: { color: '#f87171', label: 'File missing' },
 };
 
