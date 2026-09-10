@@ -255,6 +255,24 @@ async function ensureContentStore() {
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
       `);
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS media_reports (
+          id BIGSERIAL PRIMARY KEY,
+          content_type TEXT NOT NULL DEFAULT 'movie',
+          content_id BIGINT NOT NULL,
+          season INT,
+          episode INT,
+          issue_type TEXT NOT NULL DEFAULT 'other',
+          note TEXT NOT NULL DEFAULT '',
+          status TEXT NOT NULL DEFAULT 'open',
+          report_count INT NOT NULL DEFAULT 1,
+          last_report_ip TEXT NOT NULL DEFAULT '',
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          UNIQUE (content_type, content_id, season, episode, issue_type)
+        )
+      `);
+      await db.query('CREATE INDEX IF NOT EXISTS idx_media_reports_status ON media_reports (status, updated_at DESC)');
 
       if (IS_PRODUCTION && (!DEFAULT_ADMIN_USERNAME || !DEFAULT_ADMIN_PASSWORD_HASH)) {
         throw new Error('ADMIN_USERNAME and ADMIN_PASSWORD_HASH must be configured in production.');

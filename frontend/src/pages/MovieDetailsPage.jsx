@@ -303,7 +303,7 @@ export default function MovieDetailsPage({ adminPreview, contentData }) {
 
     </div>
       {playerSrc && (
-        <VideoPlayerModal src={playerSrc} title={movie?.title || ''} onClose={() => setPlayerSrc(null)} />
+        <VideoPlayerModal src={playerSrc} title={movie?.title || ''} onClose={() => setPlayerSrc(null)} contentType="movie" contentId={movie?.id} />
       )}
       <ConfirmDialog
         isOpen={showDownloadConfirm}

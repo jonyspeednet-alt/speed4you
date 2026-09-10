@@ -157,6 +157,13 @@ export const adminService = {
   getBackups: () => apiClient('/admin/media/backups'),
   deleteAllBackups: () => apiClient('/admin/media/backups', { method: 'DELETE' }),
 
+  // Viewer problem reports
+  getMediaReports: (status = 'open') => apiClient(`/admin/media/reports?status=${status}`),
+  resolveMediaReport: (id, resolved = true) => apiClient(`/admin/media/reports/${id}/resolve`, {
+    method: 'POST',
+    body: JSON.stringify({ resolved }),
+  }),
+
   // Media Fixer settings (auto-fix)
   getMediaSettings: () => apiClient('/admin/media/settings'),
   saveMediaSettings: (data) => apiClient('/admin/media/settings', {

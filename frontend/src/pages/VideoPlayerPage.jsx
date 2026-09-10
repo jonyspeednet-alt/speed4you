@@ -5,6 +5,7 @@ import { seriesService } from '../services/seriesService';
 import { progressService } from '../services/apiClient';
 import { contentService } from '../services';
 import { toPlayableSrc } from '../utils/mediaUrl';
+import ReportProblemButton from '../components/player/ReportProblemButton';
 import '../styles/videoPlayer.css';
 
 const RATES = [0.5, 0.75, 1, 1.25, 1.5, 2];
@@ -358,6 +359,12 @@ export default function VideoPlayerPage() {
         <button className="player-back-btn" onClick={() => { if (window.history.length > 1) navigate(-1); else navigate('/'); }}>
           Back to Details
         </button>
+        <ReportProblemButton
+          contentType={type === 'series' ? 'series' : 'movie'}
+          contentId={Number(id) || id}
+          season={type === 'series' ? seasonNum : undefined}
+          episode={type === 'series' ? episodeNum : undefined}
+        />
       </div>
     </div>
   );
@@ -375,6 +382,13 @@ export default function VideoPlayerPage() {
           Back
         </button>
         <span className="player-title">{title}</span>
+        <span style={{ flex: 1 }} />
+        <ReportProblemButton
+          contentType={type === 'series' ? 'series' : 'movie'}
+          contentId={Number(id) || id}
+          season={type === 'series' ? seasonNum : undefined}
+          episode={type === 'series' ? episodeNum : undefined}
+        />
         {item?.status === 'draft' && (
           <span style={{
             marginLeft: '10px', padding: '3px 10px', borderRadius: '6px',
