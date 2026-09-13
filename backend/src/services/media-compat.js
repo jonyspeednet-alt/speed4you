@@ -103,6 +103,7 @@ function analyzeProbe(filePath, probe, stat) {
   const videoStatus = mainVideo ? classifyVideoCodec(mainVideo.codec_name) : 'none';
 
   const audios = audioStreams.map((s, i) => ({
+    inputIndex: s.index,
     outputIndex: i,
     codec: String(s.codec_name || 'unknown'),
     status: classifyAudioCodec(s.codec_name),
@@ -226,11 +227,11 @@ function buildTranscodeArgs(analysis, presetId, rawOpts = {}) {
   const plan = { video: 'copy', audio: [], preset: preset.id, options: opts };
 
   const mapAudios = opts.audioMode === 'default'
-    ? analysis.audios.filter((a) => a.isDefault).slice(0, 1)
+    ? [analysis.audios.find((a) => a.isDefault) || analysis.audios[0]].filter(Boolean)
     : analysis.audios;
 
-  args.push('-map', '0:v:0');
-  if (mapAudios.length > 0) args.push('-map', opts.audioMode === 'default' ? '0:a:0' : '0:a?');
+  args.push('-map', '0:V:0');
+  if (mapAudios.length > 0) args.push('-map', opts.audioMode === 'default' ? `0:a:${mapAudios[0].outputIndex}` : '0:a?');
   const keepSubs = opts.keepSubtitles && analysis.subtitleCount > 0;
   if (keepSubs) args.push('-map', '0:s?');
   if (analysis.hasAttachments) args.push('-map', '0:t?');
@@ -399,7 +400,7 @@ function countTopLevelVideoFiles(directoryPath) {
   return entries.filter((entry) => entry.isFile() && VIDEO_EXTENSIONS.has(path.extname(entry.name).toLowerCase())).length;
 }
 
-function resolvePlayableFile(sourcePath, videoUrl) {
+function resolvePlayableFile(sourcePath, videoUrl, { strict = false } = {}) {
   const directVideoPath = resolveFilePathFromVideoUrl(videoUrl);
   if (directVideoPath) {
     try {
@@ -421,7 +422,9 @@ function resolvePlayableFile(sourcePath, videoUrl) {
     try {
       if (fs.existsSync(preferredPath) && fs.statSync(preferredPath).isFile()) return preferredPath;
     } catch { /* fall through */ }
+    if (strict) return '';
   }
+  if (strict) return ''; // An episode directory is not an exact file mapping.
   return findFirstVideoFile(sourcePath);
 }
 
@@ -479,11 +482,14 @@ function resolveTargets(item, { season, episode, allEpisodes } = {}) {
       }
       const seasonNumber = toPositiveInt(season, 1);
       const episodeNumber = toPositiveInt(episode, 1);
-      const selectedSeason = seasons.find((s, i) => toPositiveInt(s?.number ?? s?.id, i + 1) === seasonNumber)
-        || seasons[0];
+      const selectedSeason = seasons.find((s, i) => toPositiveInt(s?.number ?? s?.id, i + 1) === seasonNumber);
+      if (!selectedSeason) {
+        const err = new Error(`Season ${seasonNumber} not found`);
+        err.code = 'NO_MEDIA';
+        throw err;
+      }
       const eps = Array.isArray(selectedSeason.episodes) ? selectedSeason.episodes : [];
-      const selectedEpisode = eps.find((e, i) => toPositiveInt(e?.number ?? e?.id, i + 1) === episodeNumber)
-        || eps[episodeNumber - 1] || eps[0];
+      const selectedEpisode = eps.find((e, i) => toPositiveInt(e?.number ?? e?.id, i + 1) === episodeNumber);
       if (!selectedEpisode) {
         const err = new Error('Episode not found');
         err.code = 'NO_MEDIA';
@@ -498,7 +504,7 @@ function resolveTargets(item, { season, episode, allEpisodes } = {}) {
     };
     return pickEpisodes().map(({ season: s, ep, seasonNumber, episodeNumber }) => {
       const epSourcePath = ep?.sourcePath || s?.sourcePath || item.sourcePath || '';
-      const filePath = resolvePlayableFile(epSourcePath, ep?.videoUrl);
+      const filePath = resolvePlayableFile(epSourcePath, ep?.videoUrl, { strict: true });
       // Safety: an episode without its own file link that resolves into a
       // directory holding MULTIPLE videos is ambiguous — blindly taking the
       // first file could transcode (and replace) the wrong episode.

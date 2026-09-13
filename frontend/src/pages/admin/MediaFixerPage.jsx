@@ -255,7 +255,7 @@ function JobCard({ job, onCancel, cancelling, onRetry, retrying, onDeleteBackup,
   );
 }
 
-function LibraryScanCard({ scanQuery, scanType, setScanType, selectedKeys, setSelectedKeys, preset, onStart, starting, onCancel, onQueue, queuing, notify }) {
+function LibraryScanCard({ scanQuery, scanType, setScanType, selectedKeys, setSelectedKeys, preset, onStart, starting, onCancel, onQueue, queuing }) {
   const data = scanQuery.data || {};
   const running = data.status === 'running';
   const report = running ? data : (data.lastReport || data);
@@ -291,9 +291,9 @@ function LibraryScanCard({ scanQuery, scanType, setScanType, selectedKeys, setSe
             Cancel scan
           </button>
         )}
-        {data.startedAt && (
+        {report.startedAt && (
           <span style={{ color: TEXT3, fontSize: '0.74rem' }}>
-            {data.status} · checked {checked}/{total} · found {report?.foundCount ?? found.length}
+            {report.status} · checked {checked}/{total} · found {report?.foundCount ?? found.length}
             {report?.finishedAt ? ` · finished ${formatClock(report.finishedAt)}` : ''}
           </span>
         )}
@@ -341,7 +341,14 @@ function LibraryScanCard({ scanQuery, scanType, setScanType, selectedKeys, setSe
           </div>
         </div>
       )}
-      {data.status === 'done' && found.length === 0 && (
+      {scanQuery.isError && <div style={{ color: '#fca5a5' }}>{scanQuery.error?.message || 'Could not load scan'}</div>}
+      {report.error && <div style={{ color: '#fca5a5' }}>{report.error}</div>}
+      {report.truncated && <div style={{ color: '#fcd34d' }}>This saved report is incomplete. Run a new scan for all findings.</div>}
+      {(report.errors || []).length > 0 && <div style={{ color: '#fcd34d', marginTop: '10px' }}>
+        Some files could not be checked:
+        {report.errors.map((e, i) => <div key={i}>{e.label || e.itemId}: {e.error}</div>)}
+      </div>}
+      {report.status === 'done' && found.length === 0 && !(report.errors || []).length && !report.truncated && (
         <div style={{ marginTop: '10px', color: '#4ade80', fontSize: '0.8rem' }}>Scan finished — no incompatible files found. 🎉</div>
       )}
     </div>
@@ -424,12 +431,13 @@ function AutoFixCard({ settingsQuery, draft, setDraft, onSave, saving }) {  cons
   const dirty = draft !== null;
   return (
     <div style={cardStyle}>
-      <div style={{ fontWeight: '800', color: TEXT, fontSize: '0.95rem', marginBottom: '4px' }}>4 · Auto-fix new files</div>
+      <div style={{ fontWeight: '800', color: TEXT, fontSize: '0.95rem', marginBottom: '4px' }}>4 · Auto-fix and backup cleanup</div>
       <div style={{ color: TEXT3, fontSize: '0.78rem', marginBottom: '12px' }}>
-        When ON, every content scan automatically queues browser-compatibility transcodes for newly found files. One job runs at a time — the rest wait.
+        Auto-fix queues new incompatible files after content scans. Backup cleanup runs hourly and only removes completed backups older than the retention period; active files are skipped.
       </div>
       {settingsQuery.isPending && <div style={{ color: TEXT3, fontSize: '0.8rem' }}>Loading settings…</div>}
-      {!settingsQuery.isPending && (
+      {settingsQuery.isError && <div style={{ color: '#fca5a5' }}>Could not load settings. Refresh the page before saving.</div>}
+      {!settingsQuery.isPending && !settingsQuery.isError && (
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: TEXT, fontSize: '0.82rem', fontWeight: '700', cursor: 'pointer' }}>
             <input type="checkbox" checked={Boolean(cur.autoFix)}
@@ -452,6 +460,17 @@ function AutoFixCard({ settingsQuery, draft, setDraft, onSave, saving }) {  cons
               onChange={(e) => setDraft({ ...cur, autoMaxJobs: Number(e.target.value) || 10 })}
               style={{ ...inputStyle, marginLeft: '6px', width: '70px' }} />
           </label>
+          <label style={{ color: TEXT2, fontSize: '0.78rem' }}>
+            <input type="checkbox" checked={Boolean(cur.autoCleanBackups)}
+              onChange={(e) => setDraft({ ...cur, autoCleanBackups: e.target.checked })} />
+            Auto-clean completed backups
+          </label>
+          <label style={{ color: TEXT2, fontSize: '0.78rem' }}>
+            Keep backups (days)
+            <input type="number" min="1" max="90" value={cur.backupRetentionDays ?? 7}
+              onChange={(e) => setDraft({ ...cur, backupRetentionDays: Number(e.target.value) || 7 })}
+              style={{ ...inputStyle, marginLeft: '6px', width: '70px' }} />
+          </label>
           <button style={btnPrimary} disabled={!dirty || saving} onClick={() => onSave(cur)}>
             {saving ? 'Saving…' : 'Save'}
           </button>
@@ -470,46 +489,48 @@ export default function MediaFixerPage() {
   const [allEpisodes, setAllEpisodes] = useState(false);
   const [preset, setPreset] = useState('browser');
   const [analysis, setAnalysis] = useState(null);
-  const [cancellingId, setCancellingId] = useState('');
-  const [busyJobId, setBusyJobId] = useState('');
+  const [cancellingId, setCancellingId] = useState([]);
+  const [busyJobId, setBusyJobId] = useState([]);
   const [advOpen, setAdvOpen] = useState(false);
   const [trxOpts, setTrxOpts] = useState({ crf: 23, videoPreset: 'veryfast', audioBitrate: 192, keepSubtitles: true, audioMode: 'all' });
   const [scanType, setScanType] = useState('all');
   const [selectedKeys, setSelectedKeys] = useState([]);
   const [settingsDraft, setSettingsDraft] = useState(null);
+  const [bulkInput, setBulkInput] = useState('');
+  const [queueResults, setQueueResults] = useState([]);
 
   const notify = (msg, type = 'info') => {
     try {
-      if (type === 'error') toast?.error?.(msg);
-      else toast?.success?.(msg);
+      toast?.show?.({ message: msg, type });
     } catch { /* toast optional */ }
   };
 
   const analyzeMutation = useMutation({
-    mutationFn: (overrideInput) => adminService.analyzeMedia((overrideInput || input).trim(), {
-      season: Number(season) || 1,
-      episode: Number(episode) || 1,
-      allEpisodes,
+    mutationFn: (request) => adminService.analyzeMedia((request?.input || input).trim(), {
+      season: request?.season ?? (Number(season) || 1),
+      episode: request?.episode ?? (Number(episode) || 1),
+      allEpisodes: request?.allEpisodes ?? allEpisodes,
     }),
+    onMutate: () => setAnalysis(null),
     onSuccess: (data) => {
       setAnalysis(data);
       const bad = (data.summary?.audio_issue || 0) + (data.summary?.video_issue || 0) + (data.summary?.both || 0);
-      notify(bad > 0 ? `Found issues in ${bad} file(s)` : 'All files look browser-compatible', bad > 0 ? 'info' : 'info');
+      const needsReview = (data.targets || []).some((t) => t.verdict !== 'compatible');
+      notify(bad > 0 ? `Found issues in ${bad} file(s)` : needsReview ? 'Some files need review — see results' : 'All files look browser-compatible', 'info');
     },
     onError: (e) => notify(e?.message || 'Analyze failed', 'error'),
   });
 
   const transcodeMutation = useMutation({
-    mutationFn: () => adminService.startTranscode(input.trim(), {
+    mutationFn: () => adminService.startTranscode(String(analysis.item.id), {
       preset,
       options: trxOpts,
-      season: Number(season) || 1,
-      episode: Number(episode) || 1,
-      allEpisodes,
+      ...analysis.options,
     }),
     onSuccess: (data) => {
       const started = (data.jobs || []).length;
       const skipped = (data.results || []).filter((r) => r.skipped).length;
+      setQueueResults(data.results || []);
       notify(started > 0 ? `Started ${started} transcode job(s)` : 'Nothing to transcode', 'info');
       if (skipped > 0 && started === 0) {
         notify((data.results || []).map((r) => `${r.target}: ${r.reason}`).join(' | '), 'info');
@@ -521,30 +542,30 @@ export default function MediaFixerPage() {
 
   const cancelMutation = useMutation({
     mutationFn: (id) => adminService.cancelTranscodeJob(id),
-    onMutate: (id) => setCancellingId(id),
-    onSettled: () => {
-      setCancellingId('');
+    onMutate: (id) => setCancellingId((ids) => [...ids, id]),
+    onSettled: (_data, _error, id) => {
+      setCancellingId((ids) => ids.filter((value) => value !== id));
       queryClient.invalidateQueries({ queryKey: ['transcode-jobs'] });
     },
     onError: (e) => notify(e?.message || 'Cancel failed', 'error'),
   });
 
   const retryMutation = useMutation({
-    mutationFn: (id) => adminService.retryTranscodeJob(id, { preset, options: trxOpts }),
-    onMutate: (id) => setBusyJobId(id),
-    onSettled: () => {
-      setBusyJobId('');
+    mutationFn: (id) => adminService.retryTranscodeJob(id),
+    onMutate: (id) => setBusyJobId((ids) => [...ids, id]),
+    onSettled: (_data, _error, id) => {
+      setBusyJobId((ids) => ids.filter((value) => value !== id));
       queryClient.invalidateQueries({ queryKey: ['transcode-jobs'] });
     },
     onSuccess: () => notify('Job queued again', 'info'),
-    onError: (e) => notify(e?.message || 'Retry failed', 'error'),
+    onError: (e) => { setQueueResults([{ target: 'Retry', reason: e?.message || 'Retry failed' }]); notify(e?.message || 'Retry failed', 'error'); },
   });
 
   const deleteBackupMutation = useMutation({
     mutationFn: (id) => adminService.deleteJobBackup(id),
-    onMutate: (id) => setBusyJobId(id),
-    onSettled: () => {
-      setBusyJobId('');
+    onMutate: (id) => setBusyJobId((ids) => [...ids, id]),
+    onSettled: (_data, _error, id) => {
+      setBusyJobId((ids) => ids.filter((value) => value !== id));
       queryClient.invalidateQueries({ queryKey: ['transcode-jobs'] });
       queryClient.invalidateQueries({ queryKey: ['media-backups'] });
     },
@@ -556,6 +577,7 @@ export default function MediaFixerPage() {
     mutationFn: () => adminService.deleteAllBackups(),
     onSuccess: (r) => {
       notify(`Deleted ${r.deleted} backup(s), freed ${formatBytes(r.sizeFreed)}`, 'info');
+      if (r.errors?.length) setQueueResults(r.errors.map((e) => ({ target: e.jobId, reason: e.error })));
       queryClient.invalidateQueries({ queryKey: ['transcode-jobs'] });
       queryClient.invalidateQueries({ queryKey: ['media-backups'] });
     },
@@ -567,13 +589,14 @@ export default function MediaFixerPage() {
     queryFn: () => adminService.getTranscodeJobs(),
     refetchInterval: (query) => {
       const jobs = query?.state?.data?.jobs || [];
-      return jobs.some((j) => j.status === 'running' || j.status === 'queued') ? 2000 : false;
+      return jobs.some((j) => j.status === 'running' || j.status === 'queued') ? 2000 : 10000;
     },
   });
 
   const backupsQuery = useQuery({
     queryKey: ['media-backups'],
     queryFn: () => adminService.getBackups(),
+    refetchInterval: 10000,
   });
 
   const settingsQuery = useQuery({
@@ -583,10 +606,10 @@ export default function MediaFixerPage() {
 
   const saveSettingsMutation = useMutation({
     mutationFn: (data) => adminService.saveMediaSettings(data),
-    onSuccess: (data) => {
+    onSuccess: () => {
       setSettingsDraft(null);
       queryClient.invalidateQueries({ queryKey: ['media-settings'] });
-      notify(data.autoFix ? 'Auto-fix ON — new incompatible files will be queued after each scan' : 'Auto-fix OFF', 'info');
+      notify('Auto-fix and backup settings saved', 'info');
     },
     onError: (e) => notify(e?.message || 'Save failed', 'error'),
   });
@@ -611,13 +634,14 @@ export default function MediaFixerPage() {
     queryFn: () => adminService.getLibraryScan(),
     refetchInterval: (query) => {
       const s = query?.state?.data;
-      return s?.status === 'running' ? 3000 : false;
+      return s?.status === 'running' ? 3000 : 15000;
     },
   });
 
   const startScanMutation = useMutation({
     mutationFn: () => adminService.startLibraryScan(scanType),
     onSuccess: () => {
+      setSelectedKeys([]);
       queryClient.invalidateQueries({ queryKey: ['media-scan'] });
       notify('Library scan started', 'info');
     },
@@ -627,12 +651,24 @@ export default function MediaFixerPage() {
   const cancelScanMutation = useMutation({
     mutationFn: () => adminService.cancelLibraryScan(),
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['media-scan'] }),
+    onError: (e) => notify(e?.message || 'Could not cancel scan', 'error'),
   });
 
   const queueScanMutation = useMutation({
-    mutationFn: (useAll) => {
-      const keys = useAll ? undefined : selectedKeys;
-      return adminService.queueScanFindings({ keys, all: useAll, preset, options: trxOpts });
+    mutationFn: async (useAll) => {
+      const state = scanQuery.data || {};
+      const report = state.lastReport || state;
+      const keys = useAll ? (report.found || []).map((f) => `${f.itemId}:${f.targetKey}`) : [...selectedKeys];
+      const results = [];
+      for (const key of keys) {
+        try {
+          const data = await adminService.queueScanFindings({ keys: [key], preset, options: trxOpts });
+          results.push(...(data.results || []));
+        } catch (error) { results.push({ target: key, skipped: true, reason: error.message }); }
+        setQueueResults([...results]);
+        queryClient.invalidateQueries({ queryKey: ['transcode-jobs'] });
+      }
+      return { results };
     },
     onSuccess: (data) => {
       const started = (data.results || []).filter((r) => r.jobId).length;
@@ -641,6 +677,30 @@ export default function MediaFixerPage() {
       queryClient.invalidateQueries({ queryKey: ['transcode-jobs'] });
     },
     onError: (e) => notify(e?.message || 'Queue failed', 'error'),
+  });
+
+  const bulkQueueMutation = useMutation({
+    mutationFn: async ({ retryIds } = {}) => {
+      const inputs = retryIds || [...new Set(bulkInput.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean))];
+      if (inputs.length > 200) throw new Error('Use at most 200 links per batch');
+      const results = [];
+      for (const value of inputs) {
+        try {
+          if (retryIds) {
+            const job = await adminService.retryTranscodeJob(value);
+            results.push({ target: job.targetLabel || value, jobId: job.id });
+          } else {
+            const data = await adminService.startTranscode(value, { preset, options: trxOpts, season: Number(season) || 1, episode: Number(episode) || 1, allEpisodes });
+            results.push(...(data.results || []));
+          }
+        } catch (error) { results.push({ target: value, skipped: true, reason: error.message }); }
+        setQueueResults([...results]);
+        queryClient.invalidateQueries({ queryKey: ['transcode-jobs'] });
+      }
+      return results;
+    },
+    onMutate: () => setQueueResults([]),
+    onError: (error) => setQueueResults([{ target: 'Batch', reason: error.message }]),
   });
 
   const jobs = jobsQuery.data?.jobs || [];
@@ -665,7 +725,7 @@ export default function MediaFixerPage() {
             placeholder="https://speed4you.net/movies/34876  or  34876"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') analyzeMutation.mutate(); }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !analyzeMutation.isPending && input.trim()) analyzeMutation.mutate(); }}
           />
           <button style={btnPrimary} onClick={() => analyzeMutation.mutate()} disabled={analyzeMutation.isPending || !input.trim()}>
             {analyzeMutation.isPending ? 'Analyzing…' : 'Analyze'}
@@ -755,7 +815,7 @@ export default function MediaFixerPage() {
                 ))}
               </div>
               <button style={btnPrimary} onClick={() => transcodeMutation.mutate()} disabled={transcodeMutation.isPending}>
-                {transcodeMutation.isPending ? 'Starting…' : `Transcode ${analyzedBad} file(s)`}
+                {transcodeMutation.isPending ? 'Queuing…' : `Queue fixes for ${analysis.item?.title}`}
               </button>
               <div style={{ marginTop: '10px' }}>
                 <button style={btnGhost} onClick={() => setAdvOpen((v) => !v)}>
@@ -828,13 +888,38 @@ export default function MediaFixerPage() {
         </div>
       )}
 
+      <div style={cardStyle}>
+        <div style={{ color: TEXT, fontWeight: '800', marginBottom: '8px' }}>Add multiple jobs</div>
+        <div style={{ color: TEXT2, fontSize: '0.8rem', marginBottom: '8px' }}>
+          Paste one content link or ID per line. Jobs can be added while another is running. Uses the season/episode selection above.
+        </div>
+        <textarea aria-label="Content links to queue" style={{ ...inputStyle, minHeight: '90px' }} value={bulkInput} onChange={(e) => setBulkInput(e.target.value)} placeholder={'34876\n/movies/34877'} />
+        <select aria-label="Queue preset" style={{ ...inputStyle, width: 'auto', margin: '8px 8px 8px 0' }} value={preset} onChange={(e) => setPreset(e.target.value)}>
+          {presets.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+        </select>
+        <button style={btnPrimary} disabled={bulkQueueMutation.isPending || !bulkInput.trim()} onClick={() => bulkQueueMutation.mutate()}>
+          {bulkQueueMutation.isPending ? 'Adding jobs…' : 'Add links to queue'}
+        </button>
+      </div>
+      {queueResults.length > 0 && <div style={cardStyle} role="status">
+        <div style={{ color: TEXT, fontWeight: '700' }}>Queue results · {queueResults.filter((r) => r.jobId).length} added</div>
+        <div style={{ maxHeight: '240px', overflow: 'auto' }}>
+          {queueResults.map((r, i) => <div key={i} style={{ color: r.jobId ? '#4ade80' : '#fcd34d', fontSize: '0.8rem', marginTop: '6px' }}>
+            {r.target}: {r.jobId ? `Queued (${r.jobId})` : r.reason || 'Skipped'}
+          </div>)}
+        </div>
+      </div>}
+
       {/* Viewer reports */}
       <ViewerReportsCard
         reportsQuery={reportsQuery}
         onAnalyze={(r) => {
           const link = `/${r.contentType === 'series' ? 'series' : 'movies'}/${r.contentId}`;
           setInput(link);
-          analyzeMutation.mutate(link);
+          setSeason(String(r.season || 1));
+          setEpisode(String(r.episode || 1));
+          setAllEpisodes(false);
+          analyzeMutation.mutate({ input: link, season: r.season || 1, episode: r.episode || 1, allEpisodes: false });
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         analyzing={analyzeMutation.isPending}
@@ -854,7 +939,6 @@ export default function MediaFixerPage() {
         onCancel={() => cancelScanMutation.mutate()}
         onQueue={(useAll) => queueScanMutation.mutate(useAll)}
         queuing={queueScanMutation.isPending}
-        notify={notify}
       />
 
       {/* Auto-fix settings */}
@@ -870,6 +954,13 @@ export default function MediaFixerPage() {
       <div style={cardStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
           <div style={{ fontWeight: '800', color: TEXT, fontSize: '0.95rem', flex: 1 }}>Transcode jobs</div>
+          <span style={{ color: TEXT2, fontSize: '0.8rem' }}>
+            {jobs.filter((j) => j.status === 'running').length} running · {jobs.filter((j) => j.status === 'queued').length} queued · {jobsQuery.data?.maxConcurrent || 1} at a time
+          </span>
+          <button style={btnGhost} disabled={bulkQueueMutation.isPending || busyJobId.length > 0 || !jobs.some((j) => ['interrupted', 'failed', 'cancelled'].includes(j.status))}
+            onClick={() => bulkQueueMutation.mutate({ retryIds: jobs.filter((j) => ['interrupted', 'failed', 'cancelled'].includes(j.status)).map((j) => j.id) })}>
+            {bulkQueueMutation.isPending ? 'Queuing…' : 'Retry listed failed / interrupted jobs'}
+          </button>
           {backupsQuery.data && backupsQuery.data.count > 0 && (
             <span style={{ fontSize: '0.74rem', color: TEXT3 }}>
               {backupsQuery.data.count} backup(s) · {formatBytes(backupsQuery.data.totalBytes)}
@@ -893,9 +984,9 @@ export default function MediaFixerPage() {
           {jobs.map((job) => (
             <JobCard
               key={job.id} job={job}
-              onCancel={(id) => cancelMutation.mutate(id)} cancelling={cancellingId !== ''}
-              onRetry={(id) => retryMutation.mutate(id)} retrying={busyJobId !== ''}
-              onDeleteBackup={(id) => deleteBackupMutation.mutate(id)} deletingBackup={busyJobId !== ''}
+              onCancel={(id) => cancelMutation.mutate(id)} cancelling={cancellingId.includes(job.id)}
+              onRetry={(id) => retryMutation.mutate(id)} retrying={busyJobId.includes(job.id) || bulkQueueMutation.isPending}
+              onDeleteBackup={(id) => deleteBackupMutation.mutate(id)} deletingBackup={busyJobId.includes(job.id)}
             />
           ))}
         </div>
