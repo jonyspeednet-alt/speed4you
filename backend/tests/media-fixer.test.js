@@ -90,6 +90,7 @@ function jobHarness() {
     getJobRecord: async (id) => records.find((r) => r.id === id),
     clearBackupPath: async (p) => { records.forEach((r) => { if (r.backupPath === p) r.backupPath = ''; }); },
     markSuperseded: async (sourcePath, exceptId) => { supersededSource = sourcePath; supersededBy = exceptId; return 1; },
+    pruneHistory: async () => 0,
     getSettings: async () => ({ autoCleanBackups: autoClean, backupRetentionDays: 7 }),
   };
   const service = load('transcode-jobs.js', {
