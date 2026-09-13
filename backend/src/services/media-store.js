@@ -196,6 +196,12 @@ async function markSuperseded(sourcePath, exceptId) {
   return result.rowCount || 0;
 }
 
+async function pruneHistory() {
+  await ensureMediaTables();
+  const result = await db.query("DELETE FROM transcode_jobs WHERE status IN ('done', 'superseded') AND (backup_path = '' OR backup_path IS NULL)");
+  return result.rowCount || 0;
+}
+
 async function getSettings() {
   const stored = await getAppState(SETTINGS_KEY, null);
   return { ...DEFAULT_SETTINGS, ...(stored || {}) };
@@ -325,6 +331,7 @@ module.exports = {
   clearBackupPath,
   listInterruptedJobs,
   markSuperseded,
+  pruneHistory,
   getSettings,
   saveSettings,
   getLastScanReport,
