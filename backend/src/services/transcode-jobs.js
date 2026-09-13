@@ -9,7 +9,7 @@ const mediaStore = require('./media-store');
 
 const FFMPEG_BIN = process.env.FFMPEG_PATH || 'ffmpeg';
 const MAX_CONCURRENT = Math.max(1, Number(process.env.TRANSCODE_MAX_CONCURRENT || 1));
-const JOB_HISTORY_LIMIT = 50;
+const JOB_HISTORY_LIMIT = 20;
 const PROGRESS_POLL_MS = 1000;
 const PROGRESS_PERSIST_MS = 15000;
 
