@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const vm = require('vm');
 const { EventEmitter } = require('events');
@@ -65,6 +66,8 @@ function jobHarness() {
   const children = [];
   let records = [];
   let autoClean = false;
+  let supersededSource = null;
+  let supersededBy = null;
   const saved = [];
   const fakeFs = {
     realpathSync: (p) => path.resolve(p), existsSync: (p) => files.has(p),
@@ -83,8 +86,10 @@ function jobHarness() {
     updateJobRecord: async () => {},
     listJobHistory: async () => [],
     listBackupRecords: async () => records,
+    listInterruptedJobs: async () => records.filter((r) => r.status === 'interrupted' && r.sourcePath),
     getJobRecord: async (id) => records.find((r) => r.id === id),
     clearBackupPath: async (p) => { records.forEach((r) => { if (r.backupPath === p) r.backupPath = ''; }); },
+    markSuperseded: async (sourcePath, exceptId) => { supersededSource = sourcePath; supersededBy = exceptId; return 1; },
     getSettings: async () => ({ autoCleanBackups: autoClean, backupRetentionDays: 7 }),
   };
   const service = load('transcode-jobs.js', {
@@ -103,7 +108,10 @@ function jobHarness() {
     files.set(filePath, 2000000);
     return service.createJob({ item: { id: index, title: `Movie ${index}` }, target: { key: `movie-${index}` }, analysis: { filePath, durationSec: 60 }, presetId: 'browser' });
   }
-  return { service, create, files, children, saved, setRecords: (r) => { records = r; }, enableCleanup: () => { autoClean = true; } };
+  return {
+    service, create, files, children, saved, setRecords: (r) => { records = r; }, enableCleanup: () => { autoClean = true; },
+    superseded: () => ({ source: supersededSource, by: supersededBy }),
+  };
 }
 
 test('queue accepts many distinct files, includes all active jobs and rejects duplicate sources atomically', async () => {
@@ -116,6 +124,34 @@ test('queue accepts many distinct files, includes all active jobs and rejects du
   assert.throws(() => h.create(1), { code: 'BUSY' });
   h.service.cancelJob(list[0].id);
   assert.equal((await h.service.getJob(list[1].id)).status, 'running');
+});
+
+test('creating a job on a source marks older retryable jobs superseded', async () => {
+  const h = jobHarness();
+  const job = h.create(42);
+  assert.equal(h.superseded().source, job.sourcePath);
+  assert.equal(h.superseded().by, job.id);
+});
+
+test('interrupted artifact cleanup removes reconstructed temp/progress/log files', async () => {
+  const h = jobHarness();
+  const source = path.resolve('mock-media', 'Show S02E10.mkv');
+  const record = { id: 'trx-abc123-x1', sourcePath: source, status: 'interrupted' };
+  h.setRecords([record]);
+  const tempPath = path.join(path.dirname(source), 'Show S02E10.transcode-trx-abc123-x1.mkv');
+  const progressFile = path.join(os.tmpdir(), 'trx-abc123-x1.progress');
+  const logFile = path.join(os.tmpdir(), 'trx-abc123-x1.log');
+  h.files.set(tempPath, 5000000);
+  h.files.set(progressFile, 10);
+  h.files.set(logFile, 10);
+  await h.service.cleanupInterruptedArtifacts();
+  assert.equal(h.files.has(tempPath), false);
+  assert.equal(h.files.has(progressFile), false);
+  assert.equal(h.files.has(logFile), false);
+  const built = h.service.interruptedArtifactPaths(record);
+  assert.equal(built.tempPath, tempPath);
+  assert.equal(built.progressFile, progressFile);
+  assert.equal(built.logFile, logFile);
 });
 
 test('repeat transcode preserves existing backup and records a new backup', async () => {
@@ -196,6 +232,31 @@ test('API rejects invalid episode numbers and Retry preserves the historical pre
   assert.equal(created.presetId, 'browser-720p');
   assert.equal(created.options.crf, 19);
   assert.equal(created.options.audioMode, 'default');
+});
+
+test('Retry refuses an already browser-compatible file under the browser preset', async () => {
+  const routes = new Map();
+  const router = {};
+  for (const method of ['get', 'post', 'delete', 'put']) router[method] = (p, handler) => routes.set(`${method} ${p}`, handler);
+  let created = false;
+  const record = { id: 'old', status: 'interrupted', preset: 'browser', options: {} };
+  load('../routes/media.js', {
+    express: { Router: () => router }, '../data/store': storeStub,
+    '../services/media-compat': compat,
+    '../services/transcode-jobs': {
+      getJob: async () => record,
+      createJob: () => { created = true; return { id: 'new' }; },
+    },
+    '../services/media-store': {}, '../services/media-library-scan': {},
+    '../services/media-retry': { resolveRetry: async () => ({ item: { id: 1 }, target: {}, analysis: { verdict: 'compatible' } }) },
+  });
+  const request = (route, body) => new Promise((resolve, reject) => {
+    let status = 200;
+    const res = { status: (s) => { status = s; return res; }, json: (data) => resolve({ status, data }) };
+    routes.get(route)({ body, query: {}, params: { id: 'old' } }, res, reject);
+  });
+  assert.equal((await request('post /jobs/:id/retry', {})).status, 409);
+  assert.equal(created, false);
 });
 
 test('full library scan checks beyond 5000 targets and returns more than 500 findings', async () => {

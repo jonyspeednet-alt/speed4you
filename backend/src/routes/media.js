@@ -169,6 +169,9 @@ router.post('/jobs/:id/retry', asyncRoute(async (req, res) => {
     const trxOptions = normalizeTranscodeOptions({ ...(record.options || {}), ...(options || {}) });
 
     const { item, target, analysis } = await resolveRetry(record);
+    if (presetId === 'browser' && analysis.verdict === 'compatible') {
+      return res.status(409).json({ error: 'This file is already browser-compatible — nothing to retry' });
+    }
     const job = transcodeJobs.createJob({ item, target, analysis, presetId, options: trxOptions });
     res.status(201).json(await transcodeJobs.getJob(job.id));
   } catch (error) {
