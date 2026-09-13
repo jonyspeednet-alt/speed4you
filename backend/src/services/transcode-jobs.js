@@ -83,11 +83,6 @@ function appendLog(job, line) {
   if (!text) return;
   job.logLines.push(text);
   if (job.logLines.length > 200) job.logLines.splice(0, job.logLines.length - 200);
-  if (job.logFile) {
-    try {
-      fs.appendFileSync(job.logFile, `${text}\n`);
-    } catch { /* ignore */ }
-  }
 }
 
 function readProgressFile(progressFile) {
@@ -129,7 +124,6 @@ function createJob({ item, target, analysis, presetId, options = {} }) {
   const base = path.basename(analysis.filePath, ext);
   const tempPath = path.join(dir, `${base}.transcode-${id}${ext}`);
   const progressFile = path.join(os.tmpdir(), `${id}.progress`);
-  const logFile = path.join(os.tmpdir(), `${id}.log`);
 
   // Disk guard: peak usage is ~2x source size (temp output + backup next to original)
   if (typeof fs.statfsSync === 'function' && Number(analysis.sizeBytes || 0) > 0) {
@@ -158,7 +152,6 @@ function createJob({ item, target, analysis, presetId, options = {} }) {
     sourcePath: analysis.filePath,
     tempPath,
     progressFile,
-    logFile,
     logLines: [],
     rawTail: [],
     ffmpegArgs: args,
@@ -574,7 +567,6 @@ function interruptedArtifactPaths(record) {
   return {
     tempPath: path.join(path.dirname(record.sourcePath), `${base}.transcode-${record.id}${ext}`),
     progressFile: path.join(os.tmpdir(), `${record.id}.progress`),
-    logFile: path.join(os.tmpdir(), `${record.id}.log`),
   };
 }
 
@@ -597,7 +589,7 @@ async function cleanupInterruptedArtifacts() {
   for (const record of records) {
     const paths = interruptedArtifactPaths(record);
     if (!paths) continue;
-    [paths.tempPath, paths.progressFile, paths.logFile].forEach((file) => {
+    Object.values(paths).forEach((file) => {
       if (removeIfExists(file)) {
         try { logger.info('Cleaned leftover transcode artifact', { jobId: record.id, file }); } catch { /* ignore */ }
       }
