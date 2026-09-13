@@ -367,6 +367,11 @@ function resolveFilePathFromVideoUrl(videoUrl) {
 
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.m4v', '.webm', '.mkv', '.avi', '.mov', '.wmv', '.mpg', '.mpeg', '.ts', '.m2ts']);
 
+function isTranscodeTempFile(name) {
+  // "Movie.transcode-trx-xxxx.mkv" — ffmpeg output for an active/interrupted job
+  return /\.transcode-tr/gi.test(name);
+}
+
 function findFirstVideoFile(directoryPath) {
   let entries;
   try {
@@ -375,7 +380,7 @@ function findFirstVideoFile(directoryPath) {
     return '';
   }
   const files = entries
-    .filter((entry) => entry.isFile() && VIDEO_EXTENSIONS.has(path.extname(entry.name).toLowerCase()))
+    .filter((entry) => entry.isFile() && VIDEO_EXTENSIONS.has(path.extname(entry.name).toLowerCase()) && !isTranscodeTempFile(entry.name))
     .map((entry) => entry.name)
     .sort((left, right) => left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' }));
   if (files.length > 0) return path.join(directoryPath, files[0]);
@@ -397,7 +402,7 @@ function countTopLevelVideoFiles(directoryPath) {
   } catch {
     return 0;
   }
-  return entries.filter((entry) => entry.isFile() && VIDEO_EXTENSIONS.has(path.extname(entry.name).toLowerCase())).length;
+  return entries.filter((entry) => entry.isFile() && VIDEO_EXTENSIONS.has(path.extname(entry.name).toLowerCase()) && !isTranscodeTempFile(entry.name)).length;
 }
 
 function resolvePlayableFile(sourcePath, videoUrl, { strict = false } = {}) {

@@ -186,6 +186,12 @@ function createJob({ item, target, analysis, presetId, options = {} }) {
   appendLog(job, `Job created — preset: ${preset.label}`);
   appendLog(job, `Plan: video ${plan.video}; audio: ${plan.audio.join(' | ')}`);
   persist(job, true);
+  // A newer job on the exact same source supersedes older retryable attempts.
+  try {
+    if (typeof mediaStore.markSuperseded === 'function') {
+      mediaStore.markSuperseded(sourcePath, id).catch(() => {});
+    }
+  } catch { /* persistence optional */ }
   pumpQueue();
   return job;
 }
@@ -557,7 +563,66 @@ const backupCleanupTimer = setInterval(() => {
   cleanupExpiredBackups().catch((error) => logger.warn('Backup cleanup failed', { error: error.message }));
 }, 60 * 60 * 1000);
 backupCleanupTimer.unref();
-historyReady.then(() => cleanupExpiredBackups()).catch((error) => logger.warn('Backup cleanup failed', { error: error.message }));
+
+// Stale ffmpeg temp/progress/log files from jobs killed mid-flight by a restart
+// are reconstructed from the DB records and removed. Temp names only ever match
+// if the job actually crashed, so this cannot touch real media.
+function interruptedArtifactPaths(record) {
+  if (!record?.sourcePath || !record?.id) return null;
+  const ext = path.extname(record.sourcePath) || '.mkv';
+  const base = path.basename(record.sourcePath, ext);
+  return {
+    tempPath: path.join(path.dirname(record.sourcePath), `${base}.transcode-${record.id}${ext}`),
+    progressFile: path.join(os.tmpdir(), `${record.id}.progress`),
+    logFile: path.join(os.tmpdir(), `${record.id}.log`),
+  };
+}
+
+function removeIfExists(file) {
+  try {
+    if (file && fs.existsSync(file)) {
+      fs.unlinkSync(file);
+      return true;
+    }
+  } catch { /* best effort — permissions may block */ }
+  return false;
+}
+
+async function cleanupInterruptedArtifacts() {
+  await historyReady;
+  let records = [];
+  try {
+    records = await mediaStore.listInterruptedJobs();
+  } catch { /* persistence unavailable */ }
+  for (const record of records) {
+    const paths = interruptedArtifactPaths(record);
+    if (!paths) continue;
+    [paths.tempPath, paths.progressFile, paths.logFile].forEach((file) => {
+      if (removeIfExists(file)) {
+        try { logger.info('Cleaned leftover transcode artifact', { jobId: record.id, file }); } catch { /* ignore */ }
+      }
+    });
+  }
+  scrubTmpArtifacts();
+}
+
+// Completed/failed jobs never delete their /tmp log file, and interrupted ones
+// leave .progress files. At boot no job is live, so the whole namespace is safe
+// to scrub.
+function scrubTmpArtifacts() {
+  try {
+    fs.readdirSync(os.tmpdir()).forEach((name) => {
+      if (name.startsWith('trx-') && (name.endsWith('.log') || name.endsWith('.progress'))) {
+        removeIfExists(path.join(os.tmpdir(), name));
+      }
+    });
+  } catch { /* ignore */ }
+}
+
+historyReady.then(() => {
+  cleanupInterruptedArtifacts().catch((error) => logger.warn('Interrupted artifact cleanup failed', { error: error.message }));
+  cleanupExpiredBackups().catch((error) => logger.warn('Backup cleanup failed', { error: error.message }));
+});
 
 module.exports = {
   MAX_CONCURRENT,
@@ -570,4 +635,6 @@ module.exports = {
   deleteBackup,
   listBackups,
   cleanupExpiredBackups,
+  cleanupInterruptedArtifacts,
+  interruptedArtifactPaths,
 };
