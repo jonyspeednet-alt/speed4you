@@ -614,6 +614,7 @@ function scrubTmpArtifacts() {
 historyReady.then(() => {
   cleanupInterruptedArtifacts().catch((error) => logger.warn('Interrupted artifact cleanup failed', { error: error.message }));
   cleanupExpiredBackups().catch((error) => logger.warn('Backup cleanup failed', { error: error.message }));
+  mediaStore.pruneHistory().catch((error) => logger.warn('History prune failed', { error: error.message }));
 });
 
 module.exports = {
