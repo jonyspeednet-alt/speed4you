@@ -7,6 +7,8 @@ const DEFAULT_SETTINGS = {
   autoFix: false,
   autoPreset: 'browser',
   autoMaxJobs: 10,
+  autoCleanBackups: true,
+  backupRetentionDays: 7,
 };
 
 let tablesReadyPromise = null;
@@ -151,6 +153,17 @@ async function getJobRecord(id) {
   return rowToHistory(result.rows[0]);
 }
 
+async function listBackupRecords() {
+  await ensureMediaTables();
+  const result = await db.query("SELECT * FROM transcode_jobs WHERE backup_path <> '' ORDER BY created_at DESC");
+  return result.rows.map(rowToHistory);
+}
+
+async function clearBackupPath(backupPath) {
+  await ensureMediaTables();
+  await db.query("UPDATE transcode_jobs SET backup_path = '' WHERE backup_path = $1", [backupPath]);
+}
+
 async function getSettings() {
   const stored = await getAppState(SETTINGS_KEY, null);
   return { ...DEFAULT_SETTINGS, ...(stored || {}) };
@@ -162,6 +175,8 @@ async function saveSettings(patch) {
     autoFix: Boolean(patch.autoFix ?? current.autoFix),
     autoPreset: ['browser', 'browser-720p', 'audio-only'].includes(patch.autoPreset) ? patch.autoPreset : current.autoPreset,
     autoMaxJobs: Math.max(1, Math.min(50, Number(patch.autoMaxJobs ?? current.autoMaxJobs) || 10)),
+    autoCleanBackups: Boolean(patch.autoCleanBackups ?? current.autoCleanBackups),
+    backupRetentionDays: Math.max(1, Math.min(90, Math.floor(Number(patch.backupRetentionDays ?? current.backupRetentionDays) || 7))),
   };
   await setAppState(SETTINGS_KEY, next);
   return next;
@@ -274,6 +289,8 @@ module.exports = {
   updateJobRecord,
   listJobHistory,
   getJobRecord,
+  listBackupRecords,
+  clearBackupPath,
   getSettings,
   saveSettings,
   getLastScanReport,

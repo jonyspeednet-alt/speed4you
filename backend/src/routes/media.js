@@ -11,6 +11,7 @@ const {
 const transcodeJobs = require('../services/transcode-jobs');
 const mediaStore = require('../services/media-store');
 const libraryScan = require('../services/media-library-scan');
+const { resolveRetry } = require('../services/media-retry');
 
 const router = express.Router();
 
@@ -20,23 +21,27 @@ function asyncRoute(handler) {
   };
 }
 
-function toPositiveInt(value, fallback) {
+function selectionNumber(value, label) {
+  if (value === undefined || value === null || value === '') return undefined;
   const asNumber = Number(value);
-  if (Number.isFinite(asNumber) && asNumber > 0) return Math.floor(asNumber);
-  return fallback;
+  if (Number.isInteger(asNumber) && asNumber > 0) return asNumber;
+  const error = new Error(`${label} must be a positive whole number`);
+  error.code = 'BAD_INPUT';
+  throw error;
 }
 
 function pickOptions(body = {}, query = {}) {
   const src = { ...query, ...body };
   return {
-    season: src.season !== undefined ? toPositiveInt(src.season, 1) : undefined,
-    episode: src.episode !== undefined ? toPositiveInt(src.episode, 1) : undefined,
+    season: selectionNumber(src.season, 'Season'),
+    episode: selectionNumber(src.episode, 'Episode'),
     allEpisodes: src.allEpisodes === true || src.allEpisodes === 'true' || src.allEpisodes === '1',
   };
 }
 
 function sendKnownError(res, error) {
   const code = error?.code;
+  if (code === 'BUSY') return res.status(409).json({ error: error.message });
   if (code === 'BAD_INPUT') return res.status(400).json({ error: error.message });
   if (code === 'NOT_FOUND') return res.status(404).json({ error: error.message });
   if (code === 'NO_MEDIA') return res.status(404).json({ error: error.message });
@@ -154,32 +159,16 @@ router.post('/jobs/:id/cancel', (req, res, next) => {
 // POST /api/admin/media/jobs/:id/retry — re-run a failed/interrupted/cancelled job
 router.post('/jobs/:id/retry', asyncRoute(async (req, res) => {
   try {
-    const record = await mediaStore.getJobRecord(req.params.id);
+    const record = await transcodeJobs.getJob(req.params.id);
     if (!record) return res.status(404).json({ error: 'Job not found' });
-    if (['queued', 'running'].includes(record.status)) {
-      return res.status(400).json({ error: 'Job is still active — cancel it first to retry' });
+    if (!['failed', 'interrupted', 'cancelled'].includes(record.status)) {
+      return res.status(400).json({ error: 'Only failed, interrupted or cancelled jobs can be retried' });
     }
-    const item = await getItemById(record.itemId).catch(() => null);
-    if (!item) return res.status(404).json({ error: 'Original content no longer exists' });
-
-    const busy = transcodeJobs.getActiveSourcePaths();
     const { preset, options } = req.body || {};
     const presetId = PRESETS[preset] ? preset : (record.preset || 'browser');
     const trxOptions = normalizeTranscodeOptions({ ...(record.options || {}), ...(options || {}) });
 
-    // Re-resolve the same episode/file, then re-analyze fresh
-    const targets = resolveTargets(item, {
-      season: record.season || undefined,
-      episode: record.episode || undefined,
-      allEpisodes: false,
-    });
-    const target = targets.find((t) => t.key === record.targetKey) || targets[0];
-    if (!target) return res.status(404).json({ error: 'Target file no longer found' });
-    const analysis = await analyzeTarget(target);
-    if (!analysis.exists) return res.status(404).json({ error: 'Source file not found on server' });
-    if (busy.has(analysis.filePath)) {
-      return res.status(400).json({ error: 'This file already has a queued/running job' });
-    }
+    const { item, target, analysis } = await resolveRetry(record);
     const job = transcodeJobs.createJob({ item, target, analysis, presetId, options: trxOptions });
     res.status(201).json(await transcodeJobs.getJob(job.id));
   } catch (error) {
@@ -193,6 +182,7 @@ router.delete('/jobs/:id/backup', asyncRoute(async (req, res) => {
     res.json(await transcodeJobs.deleteBackup(req.params.id));
   } catch (error) {
     if (error?.code === 'NOT_FOUND') return res.status(404).json({ error: error.message });
+    if (error?.code === 'BUSY') return res.status(409).json({ error: error.message });
     throw error;
   }
 }));
@@ -201,7 +191,7 @@ router.delete('/jobs/:id/backup', asyncRoute(async (req, res) => {
 router.get('/backups', asyncRoute(async (req, res) => {
   const items = await transcodeJobs.listBackups();
   const totalBytes = items.reduce((sum, b) => sum + (b.exists ? Number(b.sizeBytes || 0) : 0), 0);
-  res.json({ totalBytes, count: items.length, items });
+  res.json({ totalBytes, count: items.filter((b) => b.exists).length, items });
 }));
 
 // DELETE /api/admin/media/backups — delete ALL kept originals
@@ -280,7 +270,7 @@ router.post('/scan/queue', asyncRoute(async (req, res) => {
           continue;
         }
         const targets = resolveTargets(item, { season: f.season || undefined, episode: f.episode || undefined, allEpisodes: false });
-        const target = targets.find((t) => t.key === f.targetKey) || targets[0];
+        const target = targets.find((t) => t.key === f.targetKey);
         if (!target) {
           created.push({ target: f.label, skipped: true, reason: 'Target no longer found' });
           continue;

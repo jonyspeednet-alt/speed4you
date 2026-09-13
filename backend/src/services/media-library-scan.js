@@ -1,11 +1,10 @@
-const { listItems, getItemById } = require('../data/store');
+const { listItems } = require('../data/store');
 const { resolveTargets, analyzeTarget } = require('./media-compat');
 const mediaStore = require('./media-store');
 const logger = require('../utils/logger');
 
 const BAD_VERDICTS = new Set(['audio_issue', 'video_issue', 'both']);
 const PAGE_SIZE = 100;
-const MAX_SCAN_TARGETS = 5000;
 
 const scan = {
   status: 'idle', // idle | running | done | cancelled | failed
@@ -28,8 +27,8 @@ function publicScan() {
     total: scan.total,
     checked: scan.checked,
     foundCount: scan.found.length,
-    found: scan.found.slice(0, 500),
-    truncated: scan.found.length > 500,
+    found: [...scan.found],
+    truncated: false,
     errors: scan.errors.slice(0, 20),
     error: scan.error,
   };
@@ -80,7 +79,7 @@ async function runScanLoop(typeFilter) {
   scan.total = Number(first.total || 0);
 
   let offset = 0;
-  let targetCount = 0;
+
   while (offset < scan.total) {
     if (scan.cancelRequested) {
       scan.status = 'cancelled';
@@ -97,14 +96,17 @@ async function runScanLoop(typeFilter) {
       let targets = [];
       try {
         targets = resolveTargets(item, item.type === 'series' ? { allEpisodes: true } : {});
-      } catch {
-        continue; // no seasons etc. — skip silently
+      } catch (error) {
+        if (scan.errors.length < 50) scan.errors.push({ itemId: item.id, error: error.message });
+        continue;
       }
       for (const target of targets) {
-        if (targetCount >= MAX_SCAN_TARGETS) break;
-        targetCount += 1;
+        if (scan.cancelRequested) break;
         try {
           const analysis = await analyzeTarget(target);
+          if (['file_missing', 'ambiguous', 'unknown'].includes(analysis.verdict) && scan.errors.length < 50) {
+            scan.errors.push({ itemId: item.id, label: target.label, error: analysis.issues?.[0]?.message || analysis.verdict });
+          }
           if (BAD_VERDICTS.has(analysis.verdict)) {
             scan.found.push({
               itemId: item.id,
@@ -127,12 +129,12 @@ async function runScanLoop(typeFilter) {
           }
         }
       }
-      if (targetCount >= MAX_SCAN_TARGETS) break;
+
     }
     offset += items.length;
   }
 
-  scan.status = 'done';
+  scan.status = scan.cancelRequested ? 'cancelled' : 'done';
   scan.finishedAt = new Date().toISOString();
   await mediaStore.saveLastScanReport({ ...publicScan(), savedAt: new Date().toISOString() }).catch(() => {});
   try {
