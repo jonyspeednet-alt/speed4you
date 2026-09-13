@@ -50,6 +50,18 @@ async function ensureMediaTables() {
          error = 'Interrupted by server restart/deploy. Use Retry to run again.'
          WHERE status IN ('queued', 'running')`
       );
+
+      // A failed/interrupted/cancelled job is worthless once a LATER job has
+      // successfully replaced the very same file — hide its Retry button.
+      await db.query(
+        `UPDATE transcode_jobs SET status = 'superseded',
+           error = CASE WHEN error = '' OR error IS NULL
+             THEN 'Superseded by a newer transcode of the same file'
+             ELSE error || ' — superseded by a newer transcode of the same file' END
+         WHERE status IN ('failed', 'interrupted', 'cancelled')
+           AND source_path <> ''
+           AND source_path IN (SELECT source_path FROM transcode_jobs WHERE status = 'done')`
+      );
     })().catch((error) => {
       tablesReadyPromise = null;
       throw error;
@@ -162,6 +174,26 @@ async function listBackupRecords() {
 async function clearBackupPath(backupPath) {
   await ensureMediaTables();
   await db.query("UPDATE transcode_jobs SET backup_path = '' WHERE backup_path = $1", [backupPath]);
+}
+
+async function listInterruptedJobs() {
+  await ensureMediaTables();
+  const result = await db.query("SELECT * FROM transcode_jobs WHERE status = 'interrupted' AND source_path <> '' ORDER BY created_at DESC");
+  return result.rows.map(rowToHistory);
+}
+
+async function markSuperseded(sourcePath, exceptId) {
+  if (!sourcePath) return 0;
+  await ensureMediaTables();
+  const result = await db.query(
+    `UPDATE transcode_jobs SET status = 'superseded',
+       error = CASE WHEN error = '' OR error IS NULL
+         THEN 'Superseded by a newer transcode of the same file'
+         ELSE error || ' — superseded by a newer transcode of the same file' END
+     WHERE source_path = $1 AND status IN ('failed', 'interrupted', 'cancelled') AND id <> $2`,
+    [sourcePath, exceptId]
+  );
+  return result.rowCount || 0;
 }
 
 async function getSettings() {
@@ -291,6 +323,8 @@ module.exports = {
   getJobRecord,
   listBackupRecords,
   clearBackupPath,
+  listInterruptedJobs,
+  markSuperseded,
   getSettings,
   saveSettings,
   getLastScanReport,

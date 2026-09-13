@@ -28,6 +28,7 @@ const JOB_STATUS_COLOR = {
   failed: '#f87171',
   cancelled: '#facc15',
   interrupted: '#fb923c',
+  superseded: '#94a3b8',
 };
 
 function formatBytes(bytes) {
