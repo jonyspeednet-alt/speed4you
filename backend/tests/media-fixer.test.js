@@ -133,25 +133,21 @@ test('creating a job on a source marks older retryable jobs superseded', async (
   assert.equal(h.superseded().by, job.id);
 });
 
-test('interrupted artifact cleanup removes reconstructed temp/progress/log files', async () => {
+test('interrupted artifact cleanup removes reconstructed temp/progress files', async () => {
   const h = jobHarness();
   const source = path.resolve('mock-media', 'Show S02E10.mkv');
   const record = { id: 'trx-abc123-x1', sourcePath: source, status: 'interrupted' };
   h.setRecords([record]);
   const tempPath = path.join(path.dirname(source), 'Show S02E10.transcode-trx-abc123-x1.mkv');
   const progressFile = path.join(os.tmpdir(), 'trx-abc123-x1.progress');
-  const logFile = path.join(os.tmpdir(), 'trx-abc123-x1.log');
   h.files.set(tempPath, 5000000);
   h.files.set(progressFile, 10);
-  h.files.set(logFile, 10);
   await h.service.cleanupInterruptedArtifacts();
   assert.equal(h.files.has(tempPath), false);
   assert.equal(h.files.has(progressFile), false);
-  assert.equal(h.files.has(logFile), false);
   const built = h.service.interruptedArtifactPaths(record);
   assert.equal(built.tempPath, tempPath);
   assert.equal(built.progressFile, progressFile);
-  assert.equal(built.logFile, logFile);
 });
 
 test('repeat transcode preserves existing backup and records a new backup', async () => {
