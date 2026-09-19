@@ -9,6 +9,7 @@
     "dev": "nodemon src/index.js",
     "test": "node --test tests/**/*.test.js",
     "bulk:enrich-publish": "node scripts/bulk-enrich-publish.js",
+    "metadata:quarantine-incomplete": "node src/scripts/quarantine-incomplete-published.js",
     "media:analyze": "node scripts/analyze-media-compat.js",
     "media:audit-player": "node scripts/audit-player-library.js",
     "media:optimize-cache": "node scripts/optimize-media-cache.js",

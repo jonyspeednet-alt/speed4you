@@ -2,6 +2,10 @@ const TMDB_API_BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p';
 const NOISE_PATTERNS = [
   /\b(480p|720p|1080p|2160p|4k)\b/gi,
+  /\b(4k|uhd|fhd|hd|sd|ds4k|web[- ]?dl|web[- ]?rip)\b/gi,
+  /\b(amzn|amazon|nf|netflix|hmax|hulu|zee5|hotstar|jio(?:hotstar)?)\b/gi,
+  /\b(hindi|english|bangla|bengali|tamil|telugu|malayalam|kannada|korean|japanese)\b/gi,
+  /\b(hdhub4u|ospreay|ms|ag|psa|proper|repack)\b/gi,
   /\bhdwebmovies?\b/gi,
   /\bh\s*\.?\s*264\b/gi,
   /\b(web[- ]?dl|webrip|bluray|brrip|hdrip|dvdrip|x264|x265|h\.?264|h\.?265|hevc)\b/gi,
@@ -18,6 +22,7 @@ const NOISE_PATTERNS = [
   /\([^)]*\bTV\s*(Mini\s*)?Series\b[^)]*\)/gi,
   /\b(nf|netflix|hdtv|hdtvrip|bdrip|10bit|10-bit|8bit|hdr10?|hdr|sdr)\b/gi,
   /\b(ddp?[+-]?\d([.\s]*\d)?|ddp?|dolby|atmos|ac3|dts|aac|mp3|truehd|he-aac)\b/gi,
+  /\b(?:2[ .]0|5[ .]1|7[ .]1)\b/gi,
   /\b(katmoviehd|psa|yts|yify|rarbg|fgt|pahe|galaxyrg|tgx|qxr|sartre|tomboc|joy|etrg|juggs|axxo|shaanig)\b/gi,
   /\b(old|repack|proper|v\d+|temp|sample|copy)\b/gi,
   /\bHQ\b/gi,
@@ -42,9 +47,16 @@ function isGoodUrl(url) {
 }
 
 // Extract the 4-digit year embedded in a raw title string (e.g. "Movie Name (2019)..." → 2019)
+function isPlausibleReleaseYear(value, currentYear = new Date().getUTCFullYear()) {
+  const year = Number(value);
+  // A one-year look-ahead supports announced releases without treating codec/
+  // filename numbers such as "2064" as a release date.
+  return Number.isInteger(year) && year >= 1888 && year <= currentYear + 1;
+}
+
 function extractYearFromRawTitle(raw) {
-  const match = String(raw || '').match(/\b(19|20)\d{2}\b/);
-  return match ? Number(match[0]) : null;
+  const matches = String(raw || '').match(/\b(?:19|20)\d{2}\b/g) || [];
+  return matches.map(Number).find((year) => isPlausibleReleaseYear(year)) || null;
 }
 
 // Return just the "core" title — everything before the first '(' or '['
@@ -551,8 +563,9 @@ async function enrichItemWithMetadata(item) {
     const mediaType = item.type === 'series' ? 'tv' : 'movie';
 
     // Also try to pull year from raw title if item.year is missing
-    const rawYear = item.year || extractYearFromRawTitle(item.title);
-    const enrichedItem = rawYear && !item.year ? { ...item, year: rawYear } : item;
+    const suppliedYear = isPlausibleReleaseYear(item.year) ? Number(item.year) : null;
+    const rawYear = suppliedYear || extractYearFromRawTitle(item.title) || extractYearFromRawTitle(item.sourcePath);
+    const enrichedItem = rawYear && !suppliedYear ? { ...item, year: rawYear } : item;
 
     // Strategy 1: search with cleaned title + year filter
     let results = [];
@@ -710,9 +723,9 @@ async function enrichItemWithMetadata(item) {
     if (!results.length) {
       return {
         ...enrichedItem,
-        metadataStatus: 'matched',
-        metadataProvider: 'local',
-        metadataConfidence: 50,
+        metadataStatus: 'not_found',
+        metadataProvider: 'tmdb',
+        metadataConfidence: 0,
         metadataUpdatedAt: new Date().toISOString(),
         metadataError: 'No TMDb match found after multiple search strategies.',
         parsedTitle,
@@ -817,6 +830,8 @@ function mergeEpisodeMetadata(existingSeasons = [], tmdbSeasons = []) {
 
 module.exports = {
   cleanSearchTitle,
+  extractYearFromRawTitle,
+  isPlausibleReleaseYear,
   enrichItemWithMetadata,
   fetchMetadataByTmdbId,
   fetchMetadataByImdbId,

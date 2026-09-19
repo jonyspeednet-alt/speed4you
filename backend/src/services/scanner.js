@@ -1099,7 +1099,10 @@ async function hasAllCandidatesInCatalog(candidates = [], existingSignatureSet =
 
 function createBaseScannerItem(root, values) {
   const item = {
-    status: 'published',
+    // Do not expose a scanner discovery until metadata enrichment has provided
+    // a trustworthy poster and description. scanner-enhanced-metadata promotes
+    // complete, high-confidence matches to published.
+    status: 'draft',
     language: root.language,
     category: root.category,
     sourceRootId: root.id,
@@ -2572,16 +2575,21 @@ async function runPostScanTasks(summary, runId) {
          AND (payload->>'poster' IS NULL OR payload->>'poster' = ''
            OR payload->>'backdrop' IS NULL OR payload->>'backdrop' = ''
            OR payload->>'description' IS NULL OR payload->>'description' = '')
-       ORDER BY id LIMIT 20`,
+       ORDER BY
+         CASE WHEN payload->>'metadataStatus' IN ('failed', 'skipped') THEN 0
+              WHEN payload->>'metadataStatus' = 'not_found' THEN 2
+              ELSE 1 END,
+         id DESC
+       LIMIT 20`,
     );
     let fixed = 0;
     for (const row of result.rows) {
       try {
         const enriched = await enrichItemWithMetadata(row.payload);
-        if (enriched && (enriched.poster || enriched.backdrop || enriched.description)) {
+        if (enriched) {
           const { updateItem } = require('../data/store/content');
           await updateItem(row.id, enriched);
-          fixed++;
+          if (enriched.poster || enriched.backdrop || enriched.description) fixed++;
         }
       } catch {
         // skip failed items

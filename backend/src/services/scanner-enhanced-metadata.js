@@ -65,6 +65,11 @@ function extractMetadataPatch(enrichedItem, sourceItem) {
 function applyMetadataPatch(item, patch, parsedTitle) {
   const finalPoster = isGoodUrl(item.poster) ? item.poster : (patch.poster || '');
   const finalBackdrop = isGoodUrl(item.backdrop) ? item.backdrop : (patch.backdrop || finalPoster);
+  const minimumConfidence = Math.max(15, Number(process.env.SCANNER_AUTO_PUBLISH_CONFIDENCE || 60));
+  const hasPublishableMetadata = patch.metadataStatus === 'matched'
+    && Number(patch.metadataConfidence || 0) >= minimumConfidence
+    && isGoodUrl(finalPoster)
+    && Boolean(String(item.description || patch.description || '').trim());
   return {
     ...item,
     title: patch.title || item.title || '',
@@ -81,16 +86,17 @@ function applyMetadataPatch(item, patch, parsedTitle) {
     originalLanguage: patch.originalLanguage || item.originalLanguage || '',
     releasedAt: item.releasedAt || patch.releasedAt || '',
     seasons: patch.seasons || item.seasons || [],
-    // Auto-publish signal from the enricher (confidence >= 80). Only ever
-    // upgrade to published here — never downgrade an item that is already
-    // published/archived (the store's upsert additionally preserves
-    // user-managed statuses on existing items).
-    status: patch.status === 'published' ? 'published' : (item.status || 'draft'),
+    // New scanner discoveries start as drafts. A complete, confident match is
+    // the only automatic path to publication. Existing published records keep
+    // their status here; the explicit quarantine task handles legacy blanks.
+    status: hasPublishableMetadata ? 'published' : (item.status || 'draft'),
     metadataStatus: patch.metadataStatus || item.metadataStatus || 'skipped',
     metadataProvider: patch.metadataProvider || item.metadataProvider || '',
     metadataConfidence: patch.metadataConfidence ?? item.metadataConfidence ?? 0,
     metadataUpdatedAt: patch.metadataUpdatedAt || new Date().toISOString(),
-    metadataError: patch.metadataError || '',
+    metadataError: Object.prototype.hasOwnProperty.call(patch, 'metadataError')
+      ? patch.metadataError
+      : (item.metadataError || ''),
     parsedTitle: patch.parsedTitle || parsedTitle,
   };
 }
