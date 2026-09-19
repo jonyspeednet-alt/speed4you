@@ -24,6 +24,21 @@ const NOISE_PATTERNS = [
   /\b(ddp?[+-]?\d([.\s]*\d)?|ddp?|dolby|atmos|ac3|dts|aac|mp3|truehd|he-aac)\b/gi,
   /\b(?:2[ .]0|5[ .]1|7[ .]1)\b/gi,
   /\b(katmoviehd|psa|yts|yify|rarbg|fgt|pahe|galaxyrg|tgx|qxr|sartre|tomboc|joy|etrg|juggs|axxo|shaanig)\b/gi,
+  /\b(desire[ .\-]?movies|world4ufree|extraflix|electron|cinevood|hdhub|4khdhub|khn|crwn|tbd|qash|dudu|archi|phd|n1h4l|xdmovies|fridaay|bhol|hoichoi)\b/gi,
+  // CAM / telesync sources (HDTC, HDTS, HDCAM...)
+  /\b(hdtc|hdts|hdcam|camrip|cam|telesync|telecine|ppvrip|ppv)\b/gi,
+  // Line-audio tags: LiNE, Li NE, Li-NE
+  /\bl[i1][ ._\-]*ne\b/gi,
+  // Subtitle/audio leftover tags
+  /\b(esubs?|msubs?|subs?|subtitles?|org|hc|audio|audios|dual|multi|clean|cleaned|south movies?)\b/gi,
+  // Encoder group leftovers
+  /\b(jhs|sliv|internal|mod|hs)\b/gi,
+  // Trailing standalone WEB tag only (e.g. "... AMZN WEB") — anchored so real
+  // titles like "Charlotte's Web" are untouched
+  /\sweb\s*$/i,
+  // Codec with resolution leftovers like AAC2, AC3 + spaced Blu Ray
+  /\b(aac|ac3|dts|dd)\d*\b/gi,
+  /\bblu[- ]?ray\b/gi,
   /\b(old|repack|proper|v\d+|temp|sample|copy)\b/gi,
   /\bHQ\b/gi,
   /\[[^\]]+\]/g,
