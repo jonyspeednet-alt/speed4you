@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
+import { openPartnerUrl } from "../../utils/partnerLinks";
 
 const partnerSites = [
   { url: "https://bokasoka.net", label: "Bokasoka" },
@@ -137,7 +138,9 @@ export default function TopNav() {
                     href={site.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    onClick={() => {
+                    title={site.label + " (https kaaj na korle auto http diye khulbe)"}
+                    onClick={(e) => {
+                      openPartnerUrl(e, site.url);
                       setPartnerOpen(false);
                       setMobileMenuOpen(false);
                     }}
