@@ -590,19 +590,27 @@ export default function MediaFixerPage() {
     queryFn: () => adminService.getTranscodeJobs(),
     refetchInterval: (query) => {
       const jobs = query?.state?.data?.jobs || [];
-      return jobs.some((j) => j.status === 'running' || j.status === 'queued') ? 2000 : 10000;
+      // Poll only while a job needs live progress. Re-fetching job history,
+      // log tails and backup metadata while idle made this admin page noisy.
+      return jobs.some((j) => j.status === 'running' || j.status === 'queued') ? 2000 : false;
     },
+    refetchOnWindowFocus: false,
   });
 
   const backupsQuery = useQuery({
     queryKey: ['media-backups'],
     queryFn: () => adminService.getBackups(),
-    refetchInterval: 10000,
+    // This endpoint stats every retained backup on disk, so update it after
+    // backup/job mutations or an explicit refresh instead of every 10 seconds.
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
   });
 
   const settingsQuery = useQuery({
     queryKey: ['media-settings'],
     queryFn: () => adminService.getMediaSettings(),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const saveSettingsMutation = useMutation({
@@ -618,7 +626,9 @@ export default function MediaFixerPage() {
   const reportsQuery = useQuery({
     queryKey: ['media-reports'],
     queryFn: () => adminService.getMediaReports('open'),
-    refetchInterval: 30000,
+    // Viewer reports are updated through an explicit refresh or after resolve.
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
   });
 
   const resolveReportMutation = useMutation({
@@ -635,8 +645,9 @@ export default function MediaFixerPage() {
     queryFn: () => adminService.getLibraryScan(),
     refetchInterval: (query) => {
       const s = query?.state?.data;
-      return s?.status === 'running' ? 3000 : 15000;
+      return s?.status === 'running' ? 3000 : false;
     },
+    refetchOnWindowFocus: false,
   });
 
   const startScanMutation = useMutation({
@@ -665,15 +676,13 @@ export default function MediaFixerPage() {
         const data = await adminService.queueScanFindings({ all: true, preset, options: trxOpts });
         results.push(...(data.results || []));
       } else {
-        for (const key of keys) {
-          try {
-            const data = await adminService.queueScanFindings({ keys: [key], preset, options: trxOpts });
-            results.push(...(data.results || []));
-          } catch (error) { results.push({ target: key, skipped: true, reason: error.message }); }
-          setQueueResults([...results]);
-          queryClient.invalidateQueries({ queryKey: ['transcode-jobs'] });
-        }
+        // Submit selected findings in one bounded request; sending one request
+        // per checkbox made a large selection feel like the UI had frozen.
+        const data = await adminService.queueScanFindings({ keys, preset, options: trxOpts });
+        results.push(...(data.results || []));
       }
+      setQueueResults(results);
+      queryClient.invalidateQueries({ queryKey: ['transcode-jobs'] });
       return { results };
     },
     onSuccess: (data) => {
