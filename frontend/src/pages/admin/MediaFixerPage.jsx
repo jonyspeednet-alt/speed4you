@@ -312,13 +312,13 @@ function LibraryScanCard({ scanQuery, scanType, setScanType, selectedKeys, setSe
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: TEXT2, fontSize: '0.78rem', cursor: 'pointer' }}>
               <input type="checkbox" checked={allSelected}
                 onChange={() => setSelectedKeys(allSelected ? [] : allKeys)} />
-              Select all ({found.length})
+              Select all shown ({found.length})
             </label>
             <button style={btnGhost} disabled={queuing || selectedKeys.length === 0} onClick={() => onQueue(false)}>
               {queuing ? 'Queuing…' : `Queue selected (${selectedKeys.length}) with preset “${preset}”`}
             </button>
-            <button style={btnGhost} disabled={queuing} onClick={() => { if (window.confirm(`Queue ALL ${found.length} files for transcode?`)) onQueue(true); }}>
-              Queue all
+            <button style={btnGhost} disabled={queuing} onClick={() => { if (window.confirm(`Queue all ${report?.foundCount ?? found.length} incompatible files for transcode?`)) onQueue(true); }}>
+              Queue all ({report?.foundCount ?? found.length})
             </button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '320px', overflow: 'auto' }}>
@@ -659,15 +659,20 @@ export default function MediaFixerPage() {
     mutationFn: async (useAll) => {
       const state = scanQuery.data || {};
       const report = state.lastReport || state;
-      const keys = useAll ? (report.found || []).map((f) => `${f.itemId}:${f.targetKey}`) : [...selectedKeys];
+      const keys = [...selectedKeys];
       const results = [];
-      for (const key of keys) {
-        try {
-          const data = await adminService.queueScanFindings({ keys: [key], preset, options: trxOpts });
-          results.push(...(data.results || []));
-        } catch (error) { results.push({ target: key, skipped: true, reason: error.message }); }
-        setQueueResults([...results]);
-        queryClient.invalidateQueries({ queryKey: ['transcode-jobs'] });
+      if (useAll) {
+        const data = await adminService.queueScanFindings({ all: true, preset, options: trxOpts });
+        results.push(...(data.results || []));
+      } else {
+        for (const key of keys) {
+          try {
+            const data = await adminService.queueScanFindings({ keys: [key], preset, options: trxOpts });
+            results.push(...(data.results || []));
+          } catch (error) { results.push({ target: key, skipped: true, reason: error.message }); }
+          setQueueResults([...results]);
+          queryClient.invalidateQueries({ queryKey: ['transcode-jobs'] });
+        }
       }
       return { results };
     },
