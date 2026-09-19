@@ -8,6 +8,10 @@ const logger = require('../utils/logger');
 const mediaStore = require('./media-store');
 
 const FFMPEG_BIN = process.env.FFMPEG_PATH || 'ffmpeg';
+// Transcoding is intentionally background work. Lower its scheduler priority
+// on Linux so API requests and the Media Fixer UI remain responsive on a
+// small server while an AAC/video conversion is running.
+const FFMPEG_NICE_LEVEL = Math.max(0, Math.min(19, Number(process.env.TRANSCODE_NICE_LEVEL || 10)));
 const MAX_CONCURRENT = Math.max(1, Number(process.env.TRANSCODE_MAX_CONCURRENT || 1));
 const JOB_HISTORY_LIMIT = 20;
 const PROGRESS_POLL_MS = 1000;
@@ -244,7 +248,10 @@ function startJob(job) {
   appendLog(job, `Output: ${job.tempPath}`);
   let child;
   try {
-    child = spawn(FFMPEG_BIN, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const useNice = process.platform !== 'win32' && FFMPEG_NICE_LEVEL > 0;
+    child = useNice
+      ? spawn('nice', ['-n', String(FFMPEG_NICE_LEVEL), FFMPEG_BIN, ...args], { stdio: ['ignore', 'pipe', 'pipe'] })
+      : spawn(FFMPEG_BIN, args, { stdio: ['ignore', 'pipe', 'pipe'] });
   } catch (error) {
     return failJob(job, `Could not start ffmpeg: ${error.message}`);
   }
@@ -431,9 +438,10 @@ function listLiveJobs() {
   return [...active, ...recent].map(publicJob);
 }
 
-async function listJobs() {
+async function listJobs({ activeOnly = false } = {}) {
   await historyReady;
   const live = listLiveJobs();
+  if (activeOnly) return live.filter((j) => ['running', 'queued'].includes(j.status));
   const liveIds = new Set(live.map((j) => j.id));
   let history = [];
   try {

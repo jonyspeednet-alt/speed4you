@@ -173,7 +173,7 @@ function StreamTable({ analysis }) {
   );
 }
 
-function JobCard({ job, onCancel, cancelling, onRetry, retrying, onDeleteBackup, deletingBackup }) {
+const JobCard = memo(function JobCard({ job, onCancel, cancelling, onRetry, retrying, onDeleteBackup, deletingBackup }) {
   const [showLog, setShowLog] = useState(false);
   const active = job.status === 'running' || job.status === 'queued';
   const retryable = job.status === 'failed' || job.status === 'interrupted' || job.status === 'cancelled';
@@ -254,7 +254,7 @@ function JobCard({ job, onCancel, cancelling, onRetry, retrying, onDeleteBackup,
       )}
     </div>
   );
-}
+});
 
 function LibraryScanCard({ scanQuery, scanType, setScanType, selectedKeys, setSelectedKeys, preset, onStart, starting, onCancel, onQueue, queuing }) {
   const data = scanQuery.data || {};
@@ -587,13 +587,21 @@ export default function MediaFixerPage() {
 
   const jobsQuery = useQuery({
     queryKey: ['transcode-jobs'],
-    queryFn: () => adminService.getTranscodeJobs(),
+    queryFn: () => adminService.getTranscodeJobs({ activeOnly: true }),
     refetchInterval: (query) => {
       const jobs = query?.state?.data?.jobs || [];
       // Poll only while a job needs live progress. Re-fetching job history,
       // log tails and backup metadata while idle made this admin page noisy.
       return jobs.some((j) => j.status === 'running' || j.status === 'queued') ? 2000 : false;
     },
+    refetchOnWindowFocus: false,
+  });
+
+  const historyQuery = useQuery({
+    queryKey: ['transcode-jobs', 'history'],
+    queryFn: () => adminService.getTranscodeJobs(),
+    staleTime: 60_000,
+    refetchInterval: false,
     refetchOnWindowFocus: false,
   });
 
@@ -718,7 +726,9 @@ export default function MediaFixerPage() {
     onError: (error) => setQueueResults([{ target: 'Batch', reason: error.message }]),
   });
 
-  const jobs = jobsQuery.data?.jobs || [];
+  const activeJobs = jobsQuery.data?.jobs || [];
+  const activeJobIds = new Set(activeJobs.map((job) => job.id));
+  const jobs = [...activeJobs, ...(historyQuery.data?.jobs || []).filter((job) => !activeJobIds.has(job.id))];
   const presets = analysis?.presets || [
     { id: 'browser', label: 'Browser compatible (auto)', description: 'Only converts what is broken.' },
     { id: 'browser-720p', label: 'Browser compatible 720p (fast)', description: 'Scales to 720p H.264 + AAC.' },
@@ -986,7 +996,7 @@ export default function MediaFixerPage() {
               {deleteAllBackupsMutation.isPending ? 'Deleting…' : 'Delete all backups'}
             </button>
           )}
-          <button style={btnGhost} onClick={() => { jobsQuery.refetch(); backupsQuery.refetch(); }} disabled={jobsQuery.isFetching}>
+          <button style={btnGhost} onClick={() => { jobsQuery.refetch(); historyQuery.refetch(); backupsQuery.refetch(); }} disabled={jobsQuery.isFetching || historyQuery.isFetching}>
             {jobsQuery.isFetching ? 'Refreshing…' : 'Refresh'}
           </button>
         </div>
@@ -999,9 +1009,9 @@ export default function MediaFixerPage() {
           {jobs.map((job) => (
             <JobCard
               key={job.id} job={job}
-              onCancel={(id) => cancelMutation.mutate(id)} cancelling={cancellingId.includes(job.id)}
-              onRetry={(id) => retryMutation.mutate(id)} retrying={busyJobId.includes(job.id) || bulkQueueMutation.isPending}
-              onDeleteBackup={(id) => deleteBackupMutation.mutate(id)} deletingBackup={busyJobId.includes(job.id)}
+              onCancel={cancelMutation.mutate} cancelling={cancellingId.includes(job.id)}
+              onRetry={retryMutation.mutate} retrying={busyJobId.includes(job.id) || bulkQueueMutation.isPending}
+              onDeleteBackup={deleteBackupMutation.mutate} deletingBackup={busyJobId.includes(job.id)}
             />
           ))}
         </div>
