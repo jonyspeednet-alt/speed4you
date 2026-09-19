@@ -39,6 +39,18 @@ function publicScan({ includeAllFindings = false } = {}) {
   };
 }
 
+function publicReport(report, { includeAllFindings = false } = {}) {
+  if (!report || typeof report !== 'object') return report;
+  const allFindings = Array.isArray(report.found) ? report.found : [];
+  const findings = includeAllFindings ? allFindings : allFindings.slice(-PUBLIC_FINDINGS_LIMIT);
+  return {
+    ...report,
+    found: [...findings],
+    foundCount: Number(report.foundCount || allFindings.length),
+    truncated: !includeAllFindings && allFindings.length > findings.length,
+  };
+}
+
 async function startLibraryScan({ type } = {}) {
   if (scan.status === 'running') {
     const err = new Error('A library scan is already running');
@@ -152,7 +164,7 @@ async function runScanLoop(typeFilter) {
 async function getScanState() {
   if (scan.status === 'idle') {
     const last = await mediaStore.getLastScanReport().catch(() => null);
-    return { ...publicScan(), lastReport: last };
+    return { ...publicScan(), lastReport: publicReport(last) };
   }
   return publicScan();
 }
@@ -161,10 +173,16 @@ function getScanFindings() {
   return [...scan.found];
 }
 
+async function getStoredScanFindings() {
+  const last = await mediaStore.getLastScanReport().catch(() => null);
+  return Array.isArray(last?.found) ? [...last.found] : [];
+}
+
 module.exports = {
   startLibraryScan,
   cancelLibraryScan,
   getScanState,
   getScanFindings,
+  getStoredScanFindings,
   BAD_VERDICTS: [...BAD_VERDICTS],
 };
