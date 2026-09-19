@@ -146,7 +146,7 @@ export const adminService = {
       allEpisodes: opts.allEpisodes,
     }),
   }).finally(clearAdminCache),
-  getTranscodeJobs: () => apiClient('/admin/media/jobs'),
+  getTranscodeJobs: ({ activeOnly = false } = {}) => apiClient(`/admin/media/jobs${activeOnly ? '?activeOnly=true' : ''}`),
   getTranscodeJob: (id) => apiClient(`/admin/media/jobs/${id}`),
   cancelTranscodeJob: (id) => apiClient(`/admin/media/jobs/${id}/cancel`, { method: 'POST' }),
   retryTranscodeJob: (id, opts = {}) => apiClient(`/admin/media/jobs/${id}/retry`, {

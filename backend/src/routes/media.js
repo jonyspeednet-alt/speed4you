@@ -133,7 +133,8 @@ router.get('/presets', (req, res) => {
 
 // GET /api/admin/media/jobs — recent transcode jobs (live + persisted history)
 router.get('/jobs', asyncRoute(async (req, res) => {
-  res.json({ maxConcurrent: transcodeJobs.MAX_CONCURRENT, jobs: await transcodeJobs.listJobs() });
+  const activeOnly = req.query.activeOnly === 'true' || req.query.activeOnly === '1';
+  res.json({ maxConcurrent: transcodeJobs.MAX_CONCURRENT, jobs: await transcodeJobs.listJobs({ activeOnly }) });
 }));
 
 // GET /api/admin/media/jobs/:id — single job with live progress
