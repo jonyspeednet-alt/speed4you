@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { readStorage, removeStorage } from '../../utils/storage';
+import { openPartnerUrl } from '../../utils/partnerLinks';
 
 export default function SiteFooter() {
   const signedIn = Boolean(readStorage('token'));
@@ -15,8 +16,8 @@ export default function SiteFooter() {
         {signedIn && <button type="button" onClick={() => { removeStorage('token'); removeStorage('user'); window.location.assign(import.meta.env.BASE_URL || '/'); }}>Sign out</button>}
         <a href="https://data.speed4you.net/Software/" target="_blank" rel="noopener noreferrer">Software</a>
         <a href={`${import.meta.env.BASE_URL}speed4you.apk`} download>Android app</a>
-        <a href="https://bokasoka.net" target="_blank" rel="noopener noreferrer">Bokasoka</a>
-        <a href="https://cinemabazar.net" target="_blank" rel="noopener noreferrer">Cinemabazar</a>
+        <a href="https://bokasoka.net" target="_blank" rel="noopener noreferrer" title="Bokasoka (https kaaj na korle auto http diye khulbe)" onClick={(e) => openPartnerUrl(e, 'https://bokasoka.net')}>Bokasoka</a>
+        <a href="https://cinemabazar.net" target="_blank" rel="noopener noreferrer" title="Cinemabazar (https kaaj na korle auto http diye khulbe)" onClick={(e) => openPartnerUrl(e, 'https://cinemabazar.net')}>Cinemabazar</a>
       </nav>
     </footer>
   );
