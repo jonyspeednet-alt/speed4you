@@ -176,10 +176,14 @@ exports.getStats = async (req, res) => {
 };
 
 exports.getContentList = async (req, res) => {
-  const { status, type, source, sourceRootId, language, category, collection, tag, search, sort, page, limit, summary, duplicatesOnly, metadataStatus } = req.query;
+  const { status, type, source, sourceRootId, language, category, collection, tag, search, sort, sortBy, sortDir, page, limit, summary, duplicatesOnly, metadataStatus } = req.query;
   const pageNum = Number(page) || 1;
   const limitNum = Number(limit) || 50;
   const offset = (pageNum - 1) * limitNum;
+  // The admin table sends sortBy/sortDir while public listings use sort. Keep the
+  // public contract, but honour the admin's default updatedAt ordering as well.
+  const adminSort = sortBy === 'title' ? 'title' : sortBy === 'year' ? 'year' : 'latest';
+  const requestedSort = sort || adminSort;
   const result = await listItems({
     status,
     type,
@@ -192,7 +196,7 @@ exports.getContentList = async (req, res) => {
     search,
     duplicatesOnly: String(duplicatesOnly) === 'true',
     metadataStatus,
-  }, offset, limitNum, sort || 'latest', false, true);
+  }, offset, limitNum, requestedSort, false, true, sortDir);
   res.json(withSummaryResult(result, String(summary) === 'true'));
 };
 
@@ -207,7 +211,7 @@ exports.getSeries = async (req, res) => {
 };
 
 exports.getLibraryOrganization = async (req, res) => {
-  const { status, type, source, sourceRootId, language, category, collection, tag, search, duplicatesOnly, metadataStatus } = req.query;
+  const { status, type, source, sourceRootId, language, category, collection, tag, search, duplicatesOnly, metadataStatus, summaryOnly } = req.query;
   res.json(await getLibraryOrganization({ 
     status, 
     type, 
@@ -220,7 +224,7 @@ exports.getLibraryOrganization = async (req, res) => {
     search, 
     duplicatesOnly: String(duplicatesOnly) === 'true',
     metadataStatus,
-  }));
+  }, { summaryOnly: String(summaryOnly) === 'true' }));
 };
 
 exports.getContentById = async (req, res) => {
@@ -1166,4 +1170,3 @@ exports.browseScannerRoot = (req, res) => {
     files,
   });
 };
-
