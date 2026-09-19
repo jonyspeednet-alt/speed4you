@@ -253,7 +253,11 @@ router.post('/scan/queue', asyncRoute(async (req, res) => {
     const presetId = PRESETS[preset] ? preset : 'browser';
     const trxOptions = normalizeTranscodeOptions(options || {});
     const state = await libraryScan.getScanState();
-    const pool = state.status === 'running' ? state.found : ((state.lastReport || state).found || state.found || []);
+    // The polling response intentionally caps findings for UI responsiveness.
+    // Queue-all must still operate on the complete in-memory scan list.
+    const pool = state.status === 'running'
+      ? libraryScan.getScanFindings()
+      : ((state.lastReport || state).found || state.found || []);
     const wanted = all ? pool : pool.filter((f) => (keys || []).includes(`${f.itemId}:${f.targetKey}`));
     if (wanted.length === 0) return res.status(400).json({ error: 'No matching scan findings to queue' });
     if (wanted.length > 200) return res.status(400).json({ error: `Too many files (${wanted.length}, max 200 per batch)` });
