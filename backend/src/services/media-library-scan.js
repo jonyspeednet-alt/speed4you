@@ -5,6 +5,10 @@ const logger = require('../utils/logger');
 
 const BAD_VERDICTS = new Set(['audio_issue', 'video_issue', 'both']);
 const PAGE_SIZE = 100;
+// Polling the scan state must stay cheap even when a library has hundreds of
+// incompatible files. The complete list remains in memory/on the saved report
+// for queueing; the UI receives only a bounded, recent preview.
+const PUBLIC_FINDINGS_LIMIT = 100;
 
 const scan = {
   status: 'idle', // idle | running | done | cancelled | failed
@@ -18,7 +22,8 @@ const scan = {
   error: null,
 };
 
-function publicScan() {
+function publicScan({ includeAllFindings = false } = {}) {
+  const findings = includeAllFindings ? scan.found : scan.found.slice(-PUBLIC_FINDINGS_LIMIT);
   return {
     status: scan.status,
     startedAt: scan.startedAt,
@@ -27,8 +32,8 @@ function publicScan() {
     total: scan.total,
     checked: scan.checked,
     foundCount: scan.found.length,
-    found: [...scan.found],
-    truncated: false,
+    found: [...findings],
+    truncated: !includeAllFindings && scan.found.length > findings.length,
     errors: scan.errors.slice(0, 20),
     error: scan.error,
   };
@@ -84,7 +89,7 @@ async function runScanLoop(typeFilter) {
     if (scan.cancelRequested) {
       scan.status = 'cancelled';
       scan.finishedAt = new Date().toISOString();
-      await mediaStore.saveLastScanReport({ ...publicScan(), savedAt: new Date().toISOString() }).catch(() => {});
+      await mediaStore.saveLastScanReport({ ...publicScan({ includeAllFindings: true }), savedAt: new Date().toISOString() }).catch(() => {});
       return;
     }
     const { items } = await listItems(filters, offset, PAGE_SIZE, 'latest');
@@ -136,7 +141,7 @@ async function runScanLoop(typeFilter) {
 
   scan.status = scan.cancelRequested ? 'cancelled' : 'done';
   scan.finishedAt = new Date().toISOString();
-  await mediaStore.saveLastScanReport({ ...publicScan(), savedAt: new Date().toISOString() }).catch(() => {});
+  await mediaStore.saveLastScanReport({ ...publicScan({ includeAllFindings: true }), savedAt: new Date().toISOString() }).catch(() => {});
   try {
     logger.info('Media library scan completed', {
       total: scan.total, checked: scan.checked, found: scan.found.length,
@@ -152,9 +157,14 @@ async function getScanState() {
   return publicScan();
 }
 
+function getScanFindings() {
+  return [...scan.found];
+}
+
 module.exports = {
   startLibraryScan,
   cancelLibraryScan,
   getScanState,
+  getScanFindings,
   BAD_VERDICTS: [...BAD_VERDICTS],
 };
