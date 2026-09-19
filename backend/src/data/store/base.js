@@ -155,6 +155,8 @@ async function ensureContentStore() {
       await db.query('CREATE INDEX IF NOT EXISTS idx_content_catalog_language ON content_catalog (language)');
       await db.query('CREATE INDEX IF NOT EXISTS idx_content_catalog_collection ON content_catalog (collection)');
       await db.query('CREATE INDEX IF NOT EXISTS idx_content_catalog_duplicates ON content_catalog (content_type, title_key)');
+      // Supports the content-library de-duplication query's "newest row per title" pass.
+      await db.query('CREATE INDEX IF NOT EXISTS idx_content_catalog_dedup_latest ON content_catalog (content_type, title_key, updated_at DESC, id DESC)');
       await db.query("CREATE INDEX IF NOT EXISTS idx_content_catalog_updated_at ON content_catalog (updated_at DESC)");
       await db.query("CREATE INDEX IF NOT EXISTS idx_content_catalog_view_count ON content_catalog (view_count DESC)");
 

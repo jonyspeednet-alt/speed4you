@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { startTransition, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { adminService } from '../../services';
 import ConfirmDialog from '../../components/overlays/ConfirmDialog';
@@ -93,7 +93,9 @@ function ContentLibraryPage() {
     return { search: p.get('search')||'', status: p.get('status')||'', source: p.get('source')||'', language: p.get('language')||'', category: p.get('category')||'', collection: p.get('collection')||'', tag: p.get('tag')||'', sourceRootId: p.get('sourceRootId')||'', duplicatesOnly: p.get('duplicatesOnly')==='true', metadataStatus: p.get('metadataStatus')||'' };
   });
   const [searchInput, setSearchInput] = useState('');
-  const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0 });
+  // Render a small first page so the admin table becomes interactive quickly. Users can
+  // still opt into 50 or 100 rows from the per-page control.
+  const [pagination, setPagination] = useState({ page: 1, limit: 25, total: 0 });
   const [pageInput, setPageInput] = useState('1');
   const [sortBy, setSortBy] = useState('updatedAt');
   const [sortDir, setSortDir] = useState('desc');
@@ -186,9 +188,6 @@ function ContentLibraryPage() {
     }
   }, [apiParams, sectionType]);
 
-  const loadContentRef = useRef(loadContent);
-  useEffect(() => { loadContentRef.current = loadContent; }, [loadContent]);
-
   useEffect(() => { loadContent(); }, [loadContent]);
 
   useEffect(() => {
@@ -199,7 +198,9 @@ function ContentLibraryPage() {
 
   const loadOrganization = useCallback(async () => {
     try {
-      const orgRes = await adminService.getContentOrganization(orgParams);
+      // The metric cards only need totals. Fetching every category, tag and root here
+      // made the first visit run six full catalog aggregations unnecessarily.
+      const orgRes = await adminService.getContentOrganization({ ...orgParams, summaryOnly: 'true' });
       setOrganization(orgRes || {});
     } catch { /* intentionally ignored: best-effort refresh */ }
   }, [orgParams]);
@@ -208,17 +209,6 @@ function ContentLibraryPage() {
     const t = setTimeout(loadOrganization, 50);
     return () => clearTimeout(t);
   }, [loadOrganization]);
-
-  const filterChangeDeps = [
-    filters.search, filters.status, filters.source, filters.language,
-    filters.category, filters.collection, filters.tag, filters.sourceRootId, filters.duplicatesOnly, filters.metadataStatus,
-  ];
-  useEffect(() => {
-    setPagination((c) => ({ ...c, page: 1 }));
-    const t = setTimeout(() => loadContentRef.current(), 50);
-    return () => clearTimeout(t);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, filterChangeDeps);
 
   const filterOptions = useMemo(() => ({
     languages: [...new Set(allContent.map((i) => i.language).filter(Boolean))].sort(),
@@ -270,8 +260,16 @@ function ContentLibraryPage() {
     const qs = p.toString();
     window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : ''));
   };
-  const updateFilter = (key, value) => setFilters((c) => { const n = { ...c, [key]: value }; syncFiltersToUrl(n); return n; });
-  const resetFilters = () => { const d = { search: '', status: '', source: '', language: '', category: '', collection: '', tag: '', sourceRootId: '', duplicatesOnly: false, metadataStatus: '' }; setFilters(d); syncFiltersToUrl(d); };
+  const updateFilter = (key, value) => {
+    setPagination((c) => (c.page === 1 ? c : { ...c, page: 1 }));
+    setFilters((c) => { const n = { ...c, [key]: value }; syncFiltersToUrl(n); return n; });
+  };
+  const resetFilters = () => {
+    const d = { search: '', status: '', source: '', language: '', category: '', collection: '', tag: '', sourceRootId: '', duplicatesOnly: false, metadataStatus: '' };
+    setPagination((c) => (c.page === 1 ? c : { ...c, page: 1 }));
+    setFilters(d);
+    syncFiltersToUrl(d);
+  };
 
   useEffect(() => {
     const onPop = () => {

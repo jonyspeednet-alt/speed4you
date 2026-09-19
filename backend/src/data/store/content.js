@@ -176,7 +176,7 @@ async function getDuplicateGroupsForItems(items = [], { bypassCache = false } = 
   return groups;
 }
 
-async function listItems(filters = {}, offset = 0, limit = null, sort = 'latest', includeDuplicates = true, deduplicate = false) {
+async function listItems(filters = {}, offset = 0, limit = null, sort = 'latest', includeDuplicates = true, deduplicate = false, sortDir = 'desc') {
   await ensureContentStore();
   const params = [];
   const clauses = buildCatalogFilterClauses(filters, params);
@@ -213,6 +213,8 @@ async function listItems(filters = {}, offset = 0, limit = null, sort = 'latest'
     orderClause = 'ORDER BY featured_order DESC NULLS LAST, CASE WHEN featured THEN 1 ELSE 0 END DESC, id DESC';
   } else if (sort === 'released') {
     orderClause = 'ORDER BY released_at DESC NULLS LAST, trending_score DESC, id DESC';
+  } else if (sort === 'title') {
+    orderClause = `ORDER BY title ${String(sortDir).toLowerCase() === 'asc' ? 'ASC' : 'DESC'} NULLS LAST, id DESC`;
   } else if (sort === 'year') {
     orderClause = 'ORDER BY year DESC NULLS LAST, released_at DESC NULLS LAST, id DESC';
   } else {
@@ -232,10 +234,17 @@ async function listItems(filters = {}, offset = 0, limit = null, sort = 'latest'
 
   let dataQuery;
   if (deduplicate) {
+    const adminDirection = String(sortDir).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+    const dedupOrderClause = sort === 'title'
+      ? `ORDER BY sub.title ${adminDirection} NULLS LAST, sub.id DESC`
+      : sort === 'year'
+        ? 'ORDER BY sub.year DESC NULLS LAST, sub.released_at DESC NULLS LAST, sub.id DESC'
+        : 'ORDER BY sub.updated_at DESC NULLS LAST, sub.id DESC';
     dataQuery = `SELECT payload FROM (
-      SELECT payload, ROW_NUMBER() OVER (PARTITION BY content_type, title_key ORDER BY updated_at DESC NULLS LAST, id DESC) AS rn
+      SELECT payload, title, year, released_at, updated_at, id,
+        ROW_NUMBER() OVER (PARTITION BY content_type, title_key ORDER BY updated_at DESC NULLS LAST, id DESC) AS rn
       FROM content_catalog ${whereClause}
-    ) sub WHERE rn = 1 ORDER BY (sub.payload->>'title') ASC NULLS LAST ${pagingClause}`;
+    ) sub WHERE rn = 1 ${dedupOrderClause} ${pagingClause}`;
   } else {
     dataQuery = `SELECT payload FROM content_catalog ${whereClause} ${orderClause} ${pagingClause}`;
   }
@@ -528,7 +537,7 @@ async function vacuumDatabase() {
   return { success: true };
 }
 
-async function getLibraryOrganization(filters = {}) {
+async function getLibraryOrganization(filters = {}, { summaryOnly = false } = {}) {
   await ensureContentStore();
   const params = [];
   const clauses = buildCatalogFilterClauses(filters, params);
@@ -547,6 +556,23 @@ async function getLibraryOrganization(filters = {}) {
     FROM content_catalog 
     ${whereClause}
   `, params);
+  if (summaryOnly) {
+    const totalsRes = await totalsPromise;
+    return {
+      totals: {
+        items: totalsRes.rows[0]?.items || 0,
+        collections: totalsRes.rows[0]?.collections || 0,
+        tags: 0,
+        published: totalsRes.rows[0]?.published || 0,
+        drafts: totalsRes.rows[0]?.drafts || 0,
+        scanner: totalsRes.rows[0]?.scanner || 0,
+        manual: totalsRes.rows[0]?.manual || 0,
+        needsReview: totalsRes.rows[0]?.needs_review || 0,
+        notFound: totalsRes.rows[0]?.not_found || 0,
+        duplicates: totalsRes.rows[0]?.duplicates || 0,
+      },
+    };
+  }
   const categoriesPromise = db.query(`SELECT category AS label, COUNT(*)::int AS count FROM content_catalog ${whereClause} GROUP BY label ORDER BY count DESC, label ASC LIMIT 200`, params);
   const languagesPromise = db.query(`SELECT language AS label, COUNT(*)::int AS count FROM content_catalog ${whereClause} GROUP BY label ORDER BY count DESC, label ASC LIMIT 200`, params);
   const collectionsPromise = db.query(`SELECT collection AS label, COUNT(*)::int AS count FROM content_catalog ${whereClause ? whereClause + '\n    AND' : 'WHERE'} collection <> '' GROUP BY label ORDER BY count DESC, label ASC LIMIT 200`, params);
