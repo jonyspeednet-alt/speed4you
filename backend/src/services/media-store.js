@@ -9,6 +9,8 @@ const DEFAULT_SETTINGS = {
   autoMaxJobs: 10,
   autoCleanBackups: true,
   backupRetentionDays: 7,
+  autoHindiDefault: true,
+  autoHindiMaxJobs: 15,
 };
 
 let tablesReadyPromise = null;
@@ -215,6 +217,8 @@ async function saveSettings(patch) {
     autoMaxJobs: Math.max(1, Math.min(50, Number(patch.autoMaxJobs ?? current.autoMaxJobs) || 10)),
     autoCleanBackups: Boolean(patch.autoCleanBackups ?? current.autoCleanBackups),
     backupRetentionDays: Math.max(1, Math.min(90, Math.floor(Number(patch.backupRetentionDays ?? current.backupRetentionDays) || 7))),
+    autoHindiDefault: (patch.autoHindiDefault ?? current.autoHindiDefault) !== false,
+    autoHindiMaxJobs: Math.max(1, Math.min(50, Number(patch.autoHindiMaxJobs ?? current.autoHindiMaxJobs) || 15)),
   };
   await setAppState(SETTINGS_KEY, next);
   return next;

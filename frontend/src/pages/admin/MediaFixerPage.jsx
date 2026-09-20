@@ -427,7 +427,7 @@ function ViewerReportsCard({ reportsQuery, onAnalyze, analyzing, onResolve }) {
   );
 }
 
-function AutoFixCard({ settingsQuery, draft, setDraft, onSave, saving }) {  const saved = settingsQuery.data || { autoFix: false, autoPreset: 'browser', autoMaxJobs: 10 };
+function AutoFixCard({ settingsQuery, draft, setDraft, onSave, saving }) {  const saved = settingsQuery.data || { autoFix: false, autoPreset: 'browser', autoMaxJobs: 10, autoHindiDefault: true, autoHindiMaxJobs: 15 };
   const cur = draft || saved;
   const dirty = draft !== null;
   return (
@@ -459,6 +459,18 @@ function AutoFixCard({ settingsQuery, draft, setDraft, onSave, saving }) {  cons
             Max jobs per scan
             <input type="number" min="1" max="50" value={cur.autoMaxJobs}
               onChange={(e) => setDraft({ ...cur, autoMaxJobs: Number(e.target.value) || 10 })}
+              style={{ ...inputStyle, marginLeft: '6px', width: '70px' }} />
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: TEXT, fontSize: '0.82rem', fontWeight: '700', cursor: 'pointer' }}
+            title="After every scan, Hindi becomes the first audio track wherever a Hindi track exists (no re-encode).">
+            <input type="checkbox" checked={cur.autoHindiDefault !== false}
+              onChange={(e) => setDraft({ ...cur, autoHindiDefault: e.target.checked })} />
+            Auto Hindi-default {cur.autoHindiDefault !== false ? 'ON' : 'OFF'}
+          </label>
+          <label style={{ color: TEXT2, fontSize: '0.78rem' }}>
+            Hindi jobs per scan
+            <input type="number" min="1" max="50" value={cur.autoHindiMaxJobs ?? 15}
+              onChange={(e) => setDraft({ ...cur, autoHindiMaxJobs: Number(e.target.value) || 15 })}
               style={{ ...inputStyle, marginLeft: '6px', width: '70px' }} />
           </label>
           <label style={{ color: TEXT2, fontSize: '0.78rem' }}>
