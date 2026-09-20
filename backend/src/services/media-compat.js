@@ -179,17 +179,17 @@ function analyzeProbe(filePath, probe, stat) {
       codec: unknownAudios[0].codec,
     });
   }
-  // Hindi-default suggestion: a Hindi track exists but another language plays by default.
+  // Hindi-default suggestion: a Hindi track exists but it is not the first audio
+  // track. Browsers ignore the default flag and always play track 1.
   const hindiAudio = findHindiAudio(audios);
   const defaultAudio = findDefaultAudio(audios);
-  const hindiNeedsDefault = Boolean(
-    hindiAudio && defaultAudio && hindiAudio !== defaultAudio && !isHindiLang(defaultAudio.language)
-  );
+  const firstAudio = audios[0] || null;
+  const hindiNeedsDefault = Boolean(hindiAudio && firstAudio && hindiAudio !== firstAudio);
   if (hindiNeedsDefault) {
     issues.push({
       type: 'audio',
       severity: 'info',
-      message: `Hindi track found (track ${hindiAudio.outputIndex + 1}) but “${defaultAudio.language || 'track ' + (defaultAudio.outputIndex + 1)}” plays by default. Use the “Hindi default audio” preset for a 1-minute fix with no re-encode.`,
+      message: `Hindi track found (track ${hindiAudio.outputIndex + 1}) but “${defaultAudio.language || 'track ' + (defaultAudio.outputIndex + 1)}” plays first — browsers ignore the default flag. Use the “Hindi default audio” preset for a 1-minute fix with no re-encode.`,
       codec: hindiAudio.codec,
       suggestion: 'hindi-default',
       hindiTrack: hindiAudio.outputIndex + 1,
@@ -267,21 +267,30 @@ function buildTranscodeArgs(analysis, presetId, rawOpts = {}) {
 
   const hindiAudio = findHindiAudio(analysis.audios || []);
   const defaultAudio = findDefaultAudio(analysis.audios || []);
-  const preferHindi = opts.preferHindi && hindiAudio && defaultAudio && hindiAudio !== defaultAudio;
+  const firstAudio = (analysis.audios || [])[0] || null;
+  const hindiNeedsFirst = Boolean(hindiAudio && firstAudio && hindiAudio !== firstAudio);
+  const preferHindi = opts.preferHindi && hindiNeedsFirst;
 
   if (preset.id === 'hindi-default') {
     if (!hindiAudio) {
       throw Object.assign(new Error('No Hindi audio track found in this file.'), { code: 'NO_HINDI' });
     }
-    if (!preferHindi) {
-      throw Object.assign(new Error('Hindi is already the default audio track.'), { code: 'ALREADY_DEFAULT' });
+    if (!hindiNeedsFirst) {
+      throw Object.assign(new Error('Hindi is already the first (default) audio track.'), { code: 'ALREADY_DEFAULT' });
     }
-    args.push('-map', '0', '-c', 'copy');
-    analysis.audios.forEach((audio, mapIdx) => {
-      args.push(`-disposition:a:${mapIdx}`, audio === hindiAudio ? 'default' : '0');
-    });
+    // Browsers play the FIRST audio track and ignore the default flag,
+    // so Hindi must move to the front (copy, no re-encode).
+    const otherAudios = analysis.audios.filter((a) => a !== hindiAudio);
+    args.push('-map', '0:V:0');
+    args.push('-map', `0:a:${hindiAudio.outputIndex}`);
+    otherAudios.forEach((a) => args.push('-map', `0:a:${a.outputIndex}`));
+    if (analysis.subtitleCount > 0) args.push('-map', '0:s?');
+    if (analysis.hasAttachments) args.push('-map', '0:t?');
+    args.push('-c', 'copy');
+    args.push('-disposition:a:0', 'default');
+    otherAudios.forEach((_, i) => args.push(`-disposition:a:${i + 1}`, '0'));
     plan.video = 'copy (untouched)';
-    plan.audio.push(`Hindi track ${hindiAudio.outputIndex + 1} set as default (${defaultAudio.language || 'track ' + (defaultAudio.outputIndex + 1)} was default) — no re-encode`);
+    plan.audio.push(`Hindi track ${hindiAudio.outputIndex + 1} moved to first + default (${firstAudio.language || 'track ' + (firstAudio.outputIndex + 1)} was first) — no re-encode`);
     args.push('-max_muxing_queue_size', '9999');
     return { args, plan, preset };
   }
