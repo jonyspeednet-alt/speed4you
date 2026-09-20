@@ -4,7 +4,7 @@ const NOISE_PATTERNS = [
   /\b(480p|720p|1080p|2160p|4k)\b/gi,
   /\b(4k|uhd|fhd|hd|sd|ds4k|web[- ]?dl|web[- ]?rip)\b/gi,
   /\b(amzn|amazon|nf|netflix|hmax|hulu|zee5|hotstar|jio(?:hotstar)?)\b/gi,
-  /\b(hindi|english|bangla|bengali|tamil|telugu|malayalam|kannada|korean|japanese)\b/gi,
+  /\b(hindi|english|bangla|bengali|tamil|telugu|malayalam|kannada|punjabi|korean|japanese)\b/gi,
   /\b(hdhub4u|ospreay|ms|ag|psa|proper|repack)\b/gi,
   /\bhdwebmovies?\b/gi,
   /\bh\s*\.?\s*264\b/gi,
@@ -153,6 +153,7 @@ function detectLanguageFromText(text) {
   const normalized = String(text || '').toLowerCase();
   if (/\b(bangla|bengali)\b/i.test(normalized)) return 'bn';
   if (/\b(hindi)\b/i.test(normalized)) return 'hi';
+  if (/\b(punjabi)\b/i.test(normalized)) return 'pa';
   if (/\b(tamil)\b/i.test(normalized)) return 'ta';
   if (/\b(telugu)\b/i.test(normalized)) return 'te';
   if (/\b(malayalam)\b/i.test(normalized)) return 'ml';
@@ -228,6 +229,7 @@ function inferOriginalLanguage(item) {
 
   if (languageText.includes('bengali') || categoryText.includes('bangla')) return 'bn';
   if (languageText.includes('hindi')) return 'hi';
+  if (languageText.includes('punjabi')) return 'pa';
   if (languageText.includes('japanese') || categoryText.includes('animation')) return 'ja';
   if (languageText.includes('korean')) return 'ko';
   return 'en';
@@ -243,12 +245,28 @@ function scoreCandidate(candidate, item) {
   const targetLanguage = inferOriginalLanguage(item);
   let score = 0;
 
+  // Guard: title evidence is mandatory. A candidate with zero title overlap
+  // must never match on year/poster/popularity alone (that produced the
+  // "Pizza Movies" mass-mismatch: score 81 with no shared word).
+  const queryTokens = new Set(searchTitle.split(/\s+/).filter((w) => w.length > 2));
+  const candTokens = candidateTitle.split(/\s+/).filter((w) => w.length > 2);
+  const tokenOverlap = candTokens.filter((t) => queryTokens.has(t)).length;
+  const hasTitleEvidence =
+    (candidateTitle && (candidateTitle === searchTitle || candidateOriginalTitle === searchTitle)) ||
+    (candidateTitle && (candidateTitle.includes(searchTitle) || searchTitle.includes(candidateTitle))) ||
+    tokenOverlap > 0;
+
   if (candidateTitle === searchTitle || candidateOriginalTitle === searchTitle) {
     score += 75;
   } else if (candidateTitle.includes(searchTitle) || searchTitle.includes(candidateTitle)) {
     score += 60;
   } else if (candidate.poster_path || candidate.backdrop_path) {
     score += 45;
+  }
+  if (!hasTitleEvidence) {
+    // Cap below every acceptance threshold (applyTmdb>=15, needs_review>=25,
+    // title-overwrite>=60) so the item keeps its filename title for review.
+    return Math.min(score, 14);
   }
 
   if (targetYear && candidateYear) {
@@ -665,7 +683,13 @@ async function enrichItemWithMetadata(item) {
         if (/\.(mkv|mp4|avi|webm|mov)$/i.test(folderCandidate)) continue;
         const cleanFolder = cleanSearchTitle(folderCandidate);
         const isYearFolder = /^\d{4}$/.test(folderCandidate.trim());
-        const isCategoryFolder = /\b(movies|series|dubbed|hindi|bangla|english|tamil|telugu|malayalam|korean|japanese|animation|3d|requested|foreign|collection|cartoon|storage|extra|adult|new|other|web|tv)\b/i.test(folderCandidate);
+        // Normalize separators before the category test: \b never matches
+        // inside "Hindi_Movies" because _ is a word char (caused a bare
+        // "Movies" search that mismatched hundreds of items).
+        const folderForCategoryTest = String(folderCandidate).replace(/[_.\-]+/g, ' ');
+        const isCategoryFolder = /\b(movies|series|dubbed|hindi|bangla|english|tamil|telugu|malayalam|punjabi|korean|japanese|animation|3d|requested|foreign|collection|cartoon|storage|extra|adult|new|other|web|tv)\b/i.test(folderForCategoryTest);
+        // Never search a bare generic folder name ("Movies", "Films").
+        if (/^(movies?|films?)$/i.test(String(cleanFolder).trim())) continue;
         if (cleanFolder && cleanFolder.length >= 2 && !isYearFolder && !isCategoryFolder) {
           try {
             // First try cleanFolder
