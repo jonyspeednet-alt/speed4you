@@ -493,7 +493,7 @@ export default function MediaFixerPage() {
   const [cancellingId, setCancellingId] = useState([]);
   const [busyJobId, setBusyJobId] = useState([]);
   const [advOpen, setAdvOpen] = useState(false);
-  const [trxOpts, setTrxOpts] = useState({ crf: 23, videoPreset: 'veryfast', audioBitrate: 192, keepSubtitles: true, audioMode: 'all' });
+  const [trxOpts, setTrxOpts] = useState({ crf: 23, videoPreset: 'veryfast', audioBitrate: 192, keepSubtitles: true, audioMode: 'all', preferHindi: true });
   const [scanType, setScanType] = useState('all');
   const [selectedKeys, setSelectedKeys] = useState([]);
   const [settingsDraft, setSettingsDraft] = useState(null);
@@ -523,8 +523,8 @@ export default function MediaFixerPage() {
   });
 
   const transcodeMutation = useMutation({
-    mutationFn: () => adminService.startTranscode(String(analysis.item.id), {
-      preset,
+    mutationFn: (override) => adminService.startTranscode(String(analysis.item.id), {
+      preset: override?.preset || preset,
       options: trxOpts,
       ...analysis.options,
     }),
@@ -733,8 +733,12 @@ export default function MediaFixerPage() {
     { id: 'browser', label: 'Browser compatible (auto)', description: 'Only converts what is broken.' },
     { id: 'browser-720p', label: 'Browser compatible 720p (fast)', description: 'Scales to 720p H.264 + AAC.' },
     { id: 'audio-only', label: 'Audio only (fastest)', description: 'Converts bad audio to AAC, video untouched.' },
+    { id: 'hindi-default', label: 'Hindi default audio (instant)', description: 'No re-encode. Makes Hindi the default track.' },
   ];
   const analyzedBad = analysis ? (analysis.summary?.audio_issue || 0) + (analysis.summary?.video_issue || 0) + (analysis.summary?.both || 0) : 0;
+  const hasHindiSuggestion = Boolean(
+    analysis && (analysis.targets || []).some((t) => (t.issues || []).some((i) => i.suggestion === 'hindi-default'))
+  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxWidth: '980px' }}>
@@ -820,9 +824,17 @@ export default function MediaFixerPage() {
           ))}
 
           {/* Transcode */}
-          {analyzedBad > 0 && (
+          {(analyzedBad > 0 || hasHindiSuggestion) && (
             <div style={{ marginTop: '14px', borderTop: `1px solid ${BORDER}`, paddingTop: '14px' }}>
               <div style={{ fontWeight: '800', color: TEXT, fontSize: '0.9rem', marginBottom: '8px' }}>2 · Fix it (transcode for browsers)</div>
+              {hasHindiSuggestion && analyzedBad === 0 && (
+                <div style={{ marginBottom: '10px' }}>
+                  <button style={btnPrimary} disabled={transcodeMutation.isPending}
+                    onClick={() => { setPreset('hindi-default'); transcodeMutation.mutate({ preset: 'hindi-default' }); }}>
+                    {transcodeMutation.isPending ? 'Queuing…' : 'Hindi default korun (1 min, no re-encode)'}
+                  </button>
+                </div>
+              )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
                 {presets.map((p) => (
                   <label key={p.id} style={{
@@ -895,6 +907,12 @@ export default function MediaFixerPage() {
                         <input type="checkbox" checked={trxOpts.keepSubtitles}
                           onChange={(e) => setTrxOpts((o) => ({ ...o, keepSubtitles: e.target.checked }))} />
                         Keep subtitles
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: TEXT2, fontSize: '0.78rem', cursor: 'pointer' }}
+                        title="When a Hindi track exists, make it the default audio (and keep it when using 'default only').">
+                        <input type="checkbox" checked={trxOpts.preferHindi !== false}
+                          onChange={(e) => setTrxOpts((o) => ({ ...o, preferHindi: e.target.checked }))} />
+                        Hindi default (jodi Hindi track thake)
                       </label>
                     </div>
                   </div>
