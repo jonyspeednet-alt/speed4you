@@ -2641,6 +2641,13 @@ async function runPostScanTasks(summary, runId) {
     } catch (err) {
       logScannerEvent('post_scan_autofix_failed', { error: err.message });
     }
+
+    // ── AUTO HINDI-DEFAULT: Hindi first wherever a Hindi track exists ──
+    try {
+      await autoHindiDefaultAudio(runId);
+    } catch (err) {
+      logScannerEvent('post_scan_hindi_failed', { error: err.message });
+    }
   } catch (err) {
     logScannerEvent('post_scan_tasks_failed', { error: err.message });
   }
@@ -2698,6 +2705,105 @@ async function autoFixNewMedia(runId) {
   if (queued > 0) {
     logScannerEvent('post_scan_autofix_done', { runId, queued });
   }
+}
+
+/**
+ * Auto Hindi-default: after every scan, make Hindi the first audio track
+ * wherever a Hindi track exists but does not play first (browsers ignore the
+ * default flag and always play track 1). Covers this run's new files plus a
+ * rolling batch of older items, so the whole library converges over time.
+ * Gated by media_fixer_settings.autoHindiDefault (default ON).
+ * Lazy requires avoid a require-cycle (transcode-jobs → data/store → scanner).
+ */
+async function autoHindiDefaultAudio(runId) {
+  const { getAppState, setAppState } = require('../data/store/base');
+  const settings = (await getAppState('media_fixer_settings', null).catch(() => null)) || {};
+  if (settings.autoHindiDefault === false) return;
+  if (!runId) return;
+
+  const { db } = require('../data/store/base');
+  const pool = await db.getPool();
+  const { getItemById } = require('../data/store/content');
+  const { resolveTargets, analyzeTarget, findHindiAudio } = require('./media-compat');
+  const transcodeJobs = require('./transcode-jobs');
+
+  const maxJobs = Math.max(1, Math.min(50, Number(settings.autoHindiMaxJobs || 15)));
+  const busy = transcodeJobs.getActiveSourcePaths();
+  let queued = 0;
+  let probed = 0;
+
+  async function maybeQueue(item, target) {
+    if (queued >= maxJobs) return false;
+    try {
+      const analysis = await analyzeTarget(target);
+      probed += 1;
+      if (!analysis.exists || !Array.isArray(analysis.audios) || analysis.audios.length < 2) return true;
+      const hindi = findHindiAudio(analysis.audios);
+      if (!hindi || analysis.audios[0] === hindi) return true; // already Hindi-first
+      if (busy.has(analysis.filePath)) return true;
+      const job = transcodeJobs.createJob({ item, target, analysis, presetId: 'hindi-default', options: { preferHindi: true } });
+      busy.add(analysis.filePath);
+      queued += 1;
+      logScannerEvent('post_scan_hindi_queued', { jobId: job.id, itemId: item.id, target: target.label });
+    } catch { /* per-target failures must not stop the run */ }
+    return true;
+  }
+
+  // Phase 1 — this run's new/changed files.
+  try {
+    const rows = (await pool.query(
+      'SELECT id FROM content_catalog WHERE last_scan_run_id = $1 ORDER BY id LIMIT 200',
+      [String(runId)]
+    ).catch(() => ({ rows: [] }))).rows || [];
+    for (const row of rows) {
+      if (queued >= maxJobs) break;
+      try {
+        const item = await getItemById(row.id).catch(() => null);
+        if (!item || item.status !== 'published') continue;
+        const targets = resolveTargets(item, item.type === 'series' ? { allEpisodes: true } : {}).slice(0, 10);
+        for (const target of targets) {
+          if (queued >= maxJobs) break;
+          await maybeQueue(item, target);
+        }
+      } catch { /* per-item failures must not stop the run */ }
+    }
+  } catch { /* phase 1 failure must not block phase 2 */ }
+
+  // Phase 2 — rolling audit of older items (cursor survives across scans).
+  try {
+    const ROLLING_BATCH = 40;
+    const TARGETS_PER_ITEM = 3;
+    const cursorRaw = await getAppState('hindi_audit_cursor', 0).catch(() => 0);
+    let cursor = Number(cursorRaw) || 0;
+    const rows = (await pool.query(
+      'SELECT id FROM content_catalog WHERE status = $1 AND id > $2 ORDER BY id LIMIT ' + ROLLING_BATCH,
+      ['published', cursor]
+    ).catch(() => ({ rows: [] }))).rows || [];
+    for (const row of rows) {
+      if (queued >= maxJobs) break;
+      cursor = Math.max(cursor, Number(row.id) || cursor);
+      try {
+        const item = await getItemById(row.id).catch(() => null);
+        if (!item || item.status !== 'published') continue;
+        const targets = resolveTargets(item, item.type === 'series' ? { allEpisodes: true } : {}).slice(0, TARGETS_PER_ITEM);
+        for (const target of targets) {
+          if (queued >= maxJobs) break;
+          await maybeQueue(item, target);
+        }
+      } catch { /* per-item failures must not stop the run */ }
+    }
+    // Wrap around when the end is reached so the audit keeps cycling.
+    try {
+      const maxRow = (await pool.query(
+        'SELECT MAX(id) AS max_id FROM content_catalog WHERE status = $1',
+        ['published']
+      ).catch(() => ({ rows: [] }))).rows?.[0];
+      const maxId = Number(maxRow?.max_id) || 0;
+      await setAppState('hindi_audit_cursor', cursor >= maxId ? 0 : cursor).catch(() => {});
+    } catch { /* cursor save non-critical */ }
+  } catch { /* phase 2 failure non-critical */ }
+
+  logScannerEvent('post_scan_hindi_done', { runId, queued, probed });
 }
 
 async function rescanItem(item) {
