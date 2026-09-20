@@ -33,6 +33,11 @@ const PRESETS = {
     label: 'Audio only (fastest)',
     description: 'Video untouched. Converts bad audio tracks to AAC. Use for sound-only issues.',
   },
+  'hindi-default': {
+    id: 'hindi-default',
+    label: 'Hindi default audio (instant)',
+    description: 'No re-encode. Makes the Hindi track the default when another language is default.',
+  },
 };
 
 function runCommand(binary, args, timeoutMs) {
@@ -71,6 +76,20 @@ function pickTag(stream, ...names) {
     }
   }
   return '';
+}
+
+// True when an audio language tag means Hindi (ISO 639-2 'hin' or the word itself).
+function isHindiLang(lang) {
+  const v = String(lang || '').trim().toLowerCase();
+  return v === 'hin' || v === 'hindi' || v === 'hi';
+}
+
+function findHindiAudio(audios = []) {
+  return audios.find((a) => isHindiLang(a.language)) || null;
+}
+
+function findDefaultAudio(audios = []) {
+  return audios.find((a) => a.isDefault) || audios[0] || null;
 }
 
 function classifyVideoCodec(codec) {
@@ -160,6 +179,23 @@ function analyzeProbe(filePath, probe, stat) {
       codec: unknownAudios[0].codec,
     });
   }
+  // Hindi-default suggestion: a Hindi track exists but another language plays by default.
+  const hindiAudio = findHindiAudio(audios);
+  const defaultAudio = findDefaultAudio(audios);
+  const hindiNeedsDefault = Boolean(
+    hindiAudio && defaultAudio && hindiAudio !== defaultAudio && !isHindiLang(defaultAudio.language)
+  );
+  if (hindiNeedsDefault) {
+    issues.push({
+      type: 'audio',
+      severity: 'info',
+      message: `Hindi track found (track ${hindiAudio.outputIndex + 1}) but “${defaultAudio.language || 'track ' + (defaultAudio.outputIndex + 1)}” plays by default. Use the “Hindi default audio” preset for a 1-minute fix with no re-encode.`,
+      codec: hindiAudio.codec,
+      suggestion: 'hindi-default',
+      hindiTrack: hindiAudio.outputIndex + 1,
+      defaultTrack: defaultAudio.outputIndex + 1,
+    });
+  }
 
   const hasVideoError = issues.some((i) => i.type === 'video' && i.severity === 'error');
   const hasAudioError = issues.some((i) => i.type === 'audio' && i.severity === 'error');
@@ -217,7 +253,10 @@ function codecDisplayName(codec) {
 /**
  * Build ffmpeg output args for a transcode. Only converts what is broken.
  * opts: { crf (18-28), videoPreset (ultrafast..slow), audioBitrate (96-320k),
- *         keepSubtitles (bool), audioMode ('all' | 'default') }
+ *         keepSubtitles (bool), audioMode ('all' | 'default'), preferHindi (bool, default true) }
+ * preferHindi: when a Hindi track exists, it becomes the default audio track
+ * in the output (and is the kept track when audioMode is 'default').
+ * The 'hindi-default' preset only flips the default-audio flag (copy, no re-encode).
  * Returns { args, plan } where plan describes what will happen (for UI).
  */
 function buildTranscodeArgs(analysis, presetId, rawOpts = {}) {
@@ -226,8 +265,29 @@ function buildTranscodeArgs(analysis, presetId, rawOpts = {}) {
   const args = ['-y', '-i', analysis.filePath];
   const plan = { video: 'copy', audio: [], preset: preset.id, options: opts };
 
+  const hindiAudio = findHindiAudio(analysis.audios || []);
+  const defaultAudio = findDefaultAudio(analysis.audios || []);
+  const preferHindi = opts.preferHindi && hindiAudio && defaultAudio && hindiAudio !== defaultAudio;
+
+  if (preset.id === 'hindi-default') {
+    if (!hindiAudio) {
+      throw Object.assign(new Error('No Hindi audio track found in this file.'), { code: 'NO_HINDI' });
+    }
+    if (!preferHindi) {
+      throw Object.assign(new Error('Hindi is already the default audio track.'), { code: 'ALREADY_DEFAULT' });
+    }
+    args.push('-map', '0', '-c', 'copy');
+    analysis.audios.forEach((audio, mapIdx) => {
+      args.push(`-disposition:a:${mapIdx}`, audio === hindiAudio ? 'default' : '0');
+    });
+    plan.video = 'copy (untouched)';
+    plan.audio.push(`Hindi track ${hindiAudio.outputIndex + 1} set as default (${defaultAudio.language || 'track ' + (defaultAudio.outputIndex + 1)} was default) — no re-encode`);
+    args.push('-max_muxing_queue_size', '9999');
+    return { args, plan, preset };
+  }
+
   const mapAudios = opts.audioMode === 'default'
-    ? [analysis.audios.find((a) => a.isDefault) || analysis.audios[0]].filter(Boolean)
+    ? [(preferHindi ? hindiAudio : null) || analysis.audios.find((a) => a.isDefault) || analysis.audios[0]].filter(Boolean)
     : analysis.audios;
 
   args.push('-map', '0:V:0');
@@ -277,6 +337,14 @@ function buildTranscodeArgs(analysis, presetId, rawOpts = {}) {
   } else if (opts.audioMode === 'default' && analysis.audios.length > 1) {
     plan.audio.push(`only default track kept (${analysis.audios.length - 1} dropped)`);
   }
+  // From now on Hindi stays default: mark it on the output tracks as well,
+  // so any future transcode keeps playing Hindi first.
+  if (preferHindi && preset.id !== 'hindi-default' && mapAudios.length > 0) {
+    mapAudios.forEach((audio, mapIdx) => {
+      args.push(`-disposition:a:${mapIdx}`, audio === hindiAudio ? 'default' : '0');
+    });
+    plan.audio.push(`Hindi track ${hindiAudio.outputIndex + 1} marked as default`);
+  }
 
   if (keepSubs) {
     args.push('-c:s', 'copy');
@@ -300,6 +368,7 @@ function normalizeTranscodeOptions(raw = {}) {
     audioBitrate: Number.isFinite(bitrateRaw) ? Math.max(96, Math.min(320, Math.round(bitrateRaw))) : 192,
     keepSubtitles: raw.keepSubtitles !== false,
     audioMode: raw.audioMode === 'default' ? 'default' : 'all',
+    preferHindi: raw.preferHindi !== false,
   };
 }
 
@@ -629,4 +698,7 @@ module.exports = {
   analyzeContent,
   normalizeTranscodeOptions,
   codecDisplayName,
+  isHindiLang,
+  findHindiAudio,
+  findDefaultAudio,
 };
