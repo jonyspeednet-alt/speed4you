@@ -14,6 +14,7 @@ const { ensureContentStore, closePool } = require('./data/store');
 const trackActiveUserMiddleware = require('./middleware/trackActiveUsers');
 const { startActiveUserCleanup, stopActiveUserCleanup } = require('./data/store/activeUsers');
 const logger = require('./utils/logger');
+const { getDiskHealth } = require('./utils/disk-health');
 const checkEnv = require('./config/env-check');
 
 // Validate environment before doing anything else
@@ -193,7 +194,7 @@ app.use((req, res, next) => {
 });
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), deploy: 'v6' });
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), deploy: 'v6', disk: getDiskHealth() });
 });
 
 app.get('/health/scanner', async (req, res) => {
