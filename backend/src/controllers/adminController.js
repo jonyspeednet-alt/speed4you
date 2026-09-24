@@ -20,6 +20,7 @@ const { clearMetadataCache, getEnhancedCacheStats } = require('../services/scann
 const { getDuplicateReviewReport, runDuplicateCleanup, getCatalogDuplicateGroups } = require('../services/duplicate-review');
 const { listUsers, createUser, updateUser, deleteUser } = require('../services/admin-user');
 const { AppError } = require('../utils/error');
+const { getDiskHealth } = require('../utils/disk-health');
 const db = require('../config/database');
 const { saveBufferAsset, saveDataUrlAsset } = require('../utils/assetHelper');
 const fs = require('fs');
@@ -168,6 +169,7 @@ const path = require('path');
       brokenRoots: scannerHealth.brokenRoots,
       currentJob: scannerHealth.currentJob,
     },
+    disk: getDiskHealth(),
   });
 };
 
