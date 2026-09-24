@@ -260,6 +260,63 @@ jobs:
             df -h / | tail -1
             mount | grep _root_offload || echo "(no bind mounts yet)"
 
+      - name: Mount spare disks and audit root-resident media
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          envs: SUDO_PASSWORD
+          script: |
+            set -e
+            echo "=== spare disks (sdu=New_Movies_3, sdw=New_Movies_4) ==="
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p /var/www/html/New_Movies_3 /var/www/html/New_Movies_4
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sh -c 'chown www-data:www-data /var/www/html/New_Movies_3 /var/www/html/New_Movies_4; chmod 775 /var/www/html/New_Movies_3 /var/www/html/New_Movies_4'
+            for uuid in 0a9babf7-53e8-4e0f-8a26-126c2971244c 478a3d2e-6447-4321-86de-98c1104a5388; do
+              if grep -q "^# *UUID=$uuid" /etc/fstab 2>/dev/null; then
+                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i "s|^# *UUID=$uuid|UUID=$uuid|" /etc/fstab
+                echo "uncommented fstab entry for $uuid"
+              else
+                echo "fstab entry for $uuid already active"
+              fi
+            done
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mount /var/www/html/New_Movies_3 || echo "New_Movies_3 mount skipped/failed (continuing)"
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mount /var/www/html/New_Movies_4 || echo "New_Movies_4 mount skipped/failed (continuing)"
+            df -h /var/www/html/New_Movies_3 /var/www/html/New_Movies_4 2>/dev/null || true
+            echo "--- New_Movies_3 top level ---"
+            ls -A /var/www/html/New_Movies_3 2>/dev/null | head -10 || echo "(unmounted/empty)"
+            echo "--- New_Movies_4 top level ---"
+            ls -A /var/www/html/New_Movies_4 2>/dev/null | head -10 || echo "(unmounted/empty)"
+            echo "=== root-resident media audit (unmounted dirs over 1G on /) ==="
+            AUDIT_FAIL=0
+            audit_dir() {
+              d="$1"
+              [ -e "$d" ] || return 0
+              [ -L "$d" ] && return 0
+              mountpoint -q "$d" 2>/dev/null && return 0
+              size_kb=$(du -xs "$d" 2>/dev/null | cut -f1)
+              [ -n "$size_kb" ] || return 0
+              if [ "$size_kb" -gt 1048576 ]; then
+                echo "WARNING: root-resident media with no disk: $d ($((size_kb / 1048576))G on root)"
+                AUDIT_FAIL=1
+              fi
+            }
+            for d in /var/www/html/*/; do
+              case "$(basename "$d")" in
+                Extra_Storage*|portal|_h5ai|iptv*|Movies_Archive|index*|*.bak) continue;;
+              esac
+              audit_dir "$d"
+            done
+            for d in /var/www/html/TV_Series/*/; do audit_dir "$d"; done
+            if [ "$AUDIT_FAIL" = 1 ]; then
+              echo "!!! ACTION REQUIRED: assign a disk or extend _root_offload binds before root fills again !!!"
+            else
+              echo "root audit clean: no unmounted media dir over 1G on root"
+            fi
+
       - name: Install deps, write .env, restart, health check
         uses: appleboy/ssh-action@v1.2.0
         env:
