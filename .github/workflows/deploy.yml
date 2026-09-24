@@ -778,6 +778,50 @@ jobs:
                 printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i 's/limit_conn media_download 5;/limit_conn media_download 30;/g' "$CONF"
                 echo "limit_conn media_download raised 5 -> 30"
               fi
+              # Tune /portal-api/ proxy for large file downloads (multi-GB MKV via Node).
+              # Default proxy timeouts (60s) + buffering kill slow downloads mid-stream
+              # with Chrome "Failed - Network error". Disable buffering and raise timeouts.
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' python3 - "$CONF" <<'PY'
+              import sys
+              conf = sys.argv[1]
+              with open(conf) as f:
+                  text = f.read()
+              want = [
+                  'proxy_connect_timeout 30s;',
+                  'proxy_read_timeout 3600s;',
+                  'proxy_send_timeout 3600s;',
+                  'proxy_buffering off;',
+                  'proxy_request_buffering off;',
+              ]
+              start = text.find('location /portal-api/')
+              if start == -1:
+                  print('portal-api location not found, skipping')
+                  sys.exit(0)
+              brace = text.find('{', start)
+              depth = 0
+              end = -1
+              for i in range(brace, len(text)):
+                  if text[i] == '{':
+                      depth += 1
+                  elif text[i] == '}':
+                      depth -= 1
+                      if depth == 0:
+                          end = i
+                          break
+              if end == -1:
+                  print('portal-api block end not found')
+                  sys.exit(1)
+              block = text[brace:end]
+              missing = [d for d in want if d.split()[0] not in block]
+              if missing:
+                  insert = '\n'.join('        ' + d for d in missing) + '\n'
+                  text = text[:end] + insert + text[end:]
+                  with open(conf, 'w') as f:
+                      f.write(text)
+                  print('portal-api proxy tuned, added: ' + ', '.join(missing))
+              else:
+                  print('portal-api proxy already tuned')
+              PY
               # Remove stale location /tv block (intercepts /tv and serves wrong old portal index.html)
               if grep -q 'location /tv' "$CONF"; then
                 START=$(grep -n 'location /tv' "$CONF" | head -1 | cut -d: -f1)

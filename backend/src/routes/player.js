@@ -25,8 +25,7 @@ router.get('/:contentType/:id/preview', require('../middleware/require-admin-aut
       }
       throw new AppError('Source file is not available for preview', 404, 'NOT_FOUND');
     }
-    const stat = safeStat(resolvedPath);
-    if (!stat?.isFile()) {
+    if (!safeStat(resolvedPath)?.isFile()) {
       throw new AppError('Source file is not available on the server for preview', 404, 'NOT_FOUND');
     }
     const ext = path.extname(resolvedPath).toLowerCase() || '.mp4';
@@ -38,11 +37,7 @@ router.get('/:contentType/:id/preview', require('../middleware/require-admin-aut
     }
     filename = filename.replace(/[\\/:*?"<>|]/g, '_');
     const cleanFilename = `${filename}${ext}`;
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(cleanFilename)}"; filename*=UTF-8''${encodeURIComponent(cleanFilename)}`);
-    res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Length', stat.size);
-    res.setHeader('Cache-Control', 'no-cache');
-    fs.createReadStream(resolvedPath).pipe(res);
+    sendFileWithRangeSupport(req, res, resolvedPath, cleanFilename, next);
   } catch (error) {
     next(error);
   }
@@ -55,6 +50,99 @@ function safeStat(targetPath) {
   } catch {
     return null;
   }
+}
+
+function buildContentDisposition(cleanFilename) {
+  const fallback = String(cleanFilename || 'download')
+    .replace(/["\r\n]/g, '_')
+    // ASCII fallback for the quoted filename parameter (RFC 6266)
+    // eslint-disable-next-line no-control-regex
+    .replace(/[^\x20-\x7E]/g, '_');
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(cleanFilename)}`;
+}
+
+function sendFileWithRangeSupport(req, res, resolvedPath, cleanFilename, next) {
+  const stat = safeStat(resolvedPath);
+  if (!stat?.isFile()) {
+    return false;
+  }
+  const totalSize = stat.size;
+  const rangeHeader = req.headers.range;
+
+  res.setHeader('Content-Type', 'application/octet-stream');
+  res.setHeader('Content-Disposition', buildContentDisposition(cleanFilename));
+  res.setHeader('Accept-Ranges', 'bytes');
+  res.setHeader('Cache-Control', 'no-cache');
+
+  // No Range requested — send the whole file (200)
+  if (!rangeHeader) {
+    res.setHeader('Content-Length', totalSize);
+    if (req.method === 'HEAD') {
+      res.end();
+      return true;
+    }
+    const stream = fs.createReadStream(resolvedPath);
+    stream.on('error', (err) => {
+      logger.error('Player: download stream error', { path: resolvedPath, error: err.message });
+      if (!res.headersSent) {
+        next(err);
+      } else {
+        res.destroy();
+      }
+    });
+    req.on('close', () => stream.destroy());
+    stream.pipe(res);
+    return true;
+  }
+
+  // Parse "bytes=start-end" / "bytes=start-" / "bytes=-suffix"
+  const match = /^bytes=(\d*)-(\d*)$/.exec(String(rangeHeader).trim());
+  if (!match) {
+    res.setHeader('Content-Range', `bytes */${totalSize}`);
+    res.status(416).end();
+    return true;
+  }
+  let start = match[1] === '' ? null : Number(match[1]);
+  let end = match[2] === '' ? null : Number(match[2]);
+  if (start === null && end !== null) {
+    // Suffix request: last N bytes
+    if (end === 0) {
+      res.setHeader('Content-Range', `bytes */${totalSize}`);
+      res.status(416).end();
+      return true;
+    }
+    start = Math.max(0, totalSize - end);
+    end = totalSize - 1;
+  } else {
+    if (start === null) start = 0;
+    if (end === null || end >= totalSize) end = totalSize - 1;
+  }
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < 0 || start >= totalSize || start > end) {
+    res.setHeader('Content-Range', `bytes */${totalSize}`);
+    res.status(416).end();
+    return true;
+  }
+
+  const chunkSize = end - start + 1;
+  res.status(206);
+  res.setHeader('Content-Range', `bytes ${start}-${end}/${totalSize}`);
+  res.setHeader('Content-Length', chunkSize);
+  if (req.method === 'HEAD') {
+    res.end();
+    return true;
+  }
+  const stream = fs.createReadStream(resolvedPath, { start, end });
+  stream.on('error', (err) => {
+    logger.error('Player: ranged download stream error', { path: resolvedPath, range: rangeHeader, error: err.message });
+    if (!res.headersSent) {
+      next(err);
+    } else {
+      res.destroy();
+    }
+  });
+  req.on('close', () => stream.destroy());
+  stream.pipe(res);
+  return true;
 }
 
 function toPositiveInt(value, fallback) {
@@ -222,11 +310,7 @@ router.get('/download/:contentType/:id', async (req, res, next) => {
     }
     filename = filename.replace(/[\\/:*?"<>|]/g, '_');
     const cleanFilename = `${filename}${ext}`;
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(cleanFilename)}"; filename*=UTF-8''${encodeURIComponent(cleanFilename)}`);
-    res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Length', stat.size);
-    res.setHeader('Cache-Control', 'no-cache');
-    fs.createReadStream(resolvedPath).pipe(res);
+    sendFileWithRangeSupport(req, res, resolvedPath, cleanFilename, next);
   } catch (error) {
     if (!res.headersSent) next(error);
   }
