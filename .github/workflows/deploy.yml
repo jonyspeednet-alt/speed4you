@@ -779,9 +779,14 @@ jobs:
                 echo "limit_conn media_download raised 5 -> 30"
               fi
               # Tune /portal-api/ proxy for large file downloads (multi-GB MKV via Node).
-              # Default proxy timeouts (60s) + buffering kill slow downloads mid-stream
-              # with Chrome "Failed - Network error". Disable buffering and raise timeouts.
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' python3 - "$CONF" <<'PY'
+              # NOTE: root disk fills up -> nginx proxy temp writes fail with
+              # "No space left on device" and large downloads abort mid-stream.
+              # proxy_buffering off streams directly, no temp disk needed.
+              # (Edit a /tmp copy with plain python, then sudo cp back. Do NOT
+              # pipe a password into sudo on the same command as a heredoc —
+              # the pipe and the heredoc fight over stdin and break the script.)
+              cp "$CONF" /tmp/speed4you.net.tmp
+              python3 - /tmp/speed4you.net.tmp <<'PY'
               import sys
               conf = sys.argv[1]
               with open(conf) as f:
@@ -822,6 +827,8 @@ jobs:
               else:
                   print('portal-api proxy already tuned')
               PY
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp /tmp/speed4you.net.tmp "$CONF"
+              rm -f /tmp/speed4you.net.tmp
               # Remove stale location /tv block (intercepts /tv and serves wrong old portal index.html)
               if grep -q 'location /tv' "$CONF"; then
                 START=$(grep -n 'location /tv' "$CONF" | head -1 | cut -d: -f1)
