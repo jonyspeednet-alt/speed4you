@@ -210,6 +210,10 @@ jobs:
                 find "$src" -xdev -mindepth 1 -delete
                 printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$dest"
                 printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mount --bind "$dest" "$src"
+                if ! mountpoint -q "$src" 2>/dev/null; then
+                  echo "MOUNT FAILED for $src - original files are safe at $dest"
+                  return 1
+                fi
                 if ! grep -qF "$src" /etc/fstab 2>/dev/null; then
                   printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sh -c "echo '$dest $src none bind 0 0' >> /etc/fstab"
                   echo "fstab entry added for $src"
@@ -222,6 +226,22 @@ jobs:
             offload_one /var/www/html/TV_Series/TV_Web_Series-F-M "$OFFLOAD/F-M" || echo "F-M offload failed (continuing)"
             offload_one /var/www/html/TV_Series/TV_Web_Series-U-Z "$OFFLOAD/U-Z" || echo "U-Z offload failed (continuing)"
             offload_one /var/www/html/New_Movies_2 "$OFFLOAD/New_Movies_2" || echo "New_Movies_2 offload failed (continuing)"
+            # Belt-and-braces: ensure fstab has all three bind entries (reboot persistence),
+            # even if a previous run mounted but exited before writing fstab.
+            ensure_fstab() {
+              src="$1"; dest="$2"
+              if ! grep -qF "$src" /etc/fstab 2>/dev/null; then
+                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sh -c "echo '$dest $src none bind 0 0' >> /etc/fstab"
+                echo "fstab entry added for $src"
+              fi
+              if ! mountpoint -q "$src" 2>/dev/null; then
+                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mount --bind "$dest" "$src"
+                echo "bind-mounted $src"
+              fi
+            }
+            ensure_fstab /var/www/html/TV_Series/TV_Web_Series-F-M "$OFFLOAD/F-M"
+            ensure_fstab /var/www/html/TV_Series/TV_Web_Series-U-Z "$OFFLOAD/U-Z"
+            ensure_fstab /var/www/html/New_Movies_2 "$OFFLOAD/New_Movies_2"
             echo "=== rescue: AFTER ==="
             df -h / | tail -1
             mount | grep _root_offload || echo "(no bind mounts yet)"
