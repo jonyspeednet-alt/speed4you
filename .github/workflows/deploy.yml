@@ -242,6 +242,13 @@ jobs:
             ensure_fstab /var/www/html/TV_Series/TV_Web_Series-F-M "$OFFLOAD/F-M"
             ensure_fstab /var/www/html/TV_Series/TV_Web_Series-U-Z "$OFFLOAD/U-Z"
             ensure_fstab /var/www/html/New_Movies_2 "$OFFLOAD/New_Movies_2"
+            # Boot safety: bind lines must have nofail (else a missing Extra_Storage_2 hangs boot)
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i 's|none bind 0 0|none bind,nofail 0 0|' /etc/fstab
+            # Retire stale U-Z disk entry (UUID c6288c80: disk physically gone, U-Z served via bind mount)
+            if grep -q '^UUID=c6288c80' /etc/fstab 2>/dev/null; then
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sed -i 's|^UUID=c6288c80|#UUID=c6288c80|' /etc/fstab
+              echo "stale U-Z disk fstab entry commented out"
+            fi
             echo "=== rescue: AFTER ==="
             df -h / | tail -1
             mount | grep _root_offload || echo "(no bind mounts yet)"
