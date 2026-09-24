@@ -190,6 +190,13 @@ jobs:
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sh -c 'rm -rf /tmp/* /var/tmp/*; apt-get clean >/dev/null 2>&1 || true'
             rm -rf /home/speed4you/portal-deploy-staging
             echo "tmp cleaned"
+            # 2b. Deep cleanup (idempotent): snap/flatpak are unused on this media
+            # server (~6G combined) + prune dated deploy backups, keep newest 5.
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sh -c 'DEBIAN_FRONTEND=noninteractive apt-get remove --purge -y snapd flatpak >/dev/null 2>&1; rm -rf /var/lib/snapd /var/lib/flatpak /snap' || echo "snap/flatpak removal skipped"
+            if [ -d /home/speed4you/portal-deploy-backups ]; then
+              (cd /home/speed4you/portal-deploy-backups && ls -t | grep -v '^current$' | tail -n +6 | xargs -r rm -rf) || echo "backup prune skipped"
+              echo "old backups pruned"
+            fi
             # 3. Offload root-resident media (F-M 18G, U-Z 35G, New_Movies_2 5.3G) to
             # Extra_Storage_2 (3.4T free, scanner-ignored by Extra_Storage regex)
             # and bind-mount back so all paths/DB/scanner roots stay identical.
@@ -363,7 +370,7 @@ jobs:
             SCANNER_MEDIA_ROOT=/var/www/html
             SCANNER_AUTO_DISCOVER_ROOTS=true
             SCANNER_AUTO_DISCOVER_MAX_DEPTH=1
-            SCANNER_AUTO_SCAN_INTERVAL_MINUTES=10
+            SCANNER_AUTO_SCAN_INTERVAL_MINUTES=360
             SCANNER_MIN_MOVIE_SIZE=524288000
             SCANNER_MIN_EPISODE_SIZE=104857600
             ADMIN_ACCESS_KEY=${ADMIN_ACCESS_KEY}

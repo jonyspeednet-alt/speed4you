@@ -4,6 +4,16 @@ import { useQuery } from '@tanstack/react-query';
 import { adminService } from '../../services';
 import { useBreakpoint } from '../../hooks';
 
+function formatBytes(bytes) {
+  const value = Number(bytes);
+  if (!Number.isFinite(value) || value < 0) return '—';
+  if (value === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const index = Math.min(units.length - 1, Math.floor(Math.log(value) / Math.log(1024)));
+  const scaled = value / 1024 ** index;
+  return `${scaled >= 100 ? Math.round(scaled) : scaled.toFixed(1)} ${units[index]}`;
+}
+
 function StatCard({ label, value, sub, accent }) {
   return (
     <div style={{
@@ -42,6 +52,11 @@ export default function AdminDashboard() {
   const health = dash?.scannerHealth || {};
   const scannerJob = health.currentJob;
   const isScanning = scannerJob?.status === 'running';
+  const disk = dash?.disk || {};
+  const diskStatus = disk.status || 'unknown';
+  const diskDetail = Number.isFinite(disk.usePercent)
+    ? `${formatBytes(disk.freeBytes)} free · ${disk.usePercent}% used`
+    : '—';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -55,7 +70,7 @@ export default function AdminDashboard() {
           { label: 'Backend', ok: true },
           { label: 'Database', ok: true },
           { label: 'Scanner', ok: !isScanning, running: isScanning, detail: isScanning ? 'Scanning...' : `${health.healthyRoots || 0}/${health.totalRoots || 0} roots` },
-          { label: 'Disk', ok: true, warn: false, detail: '\u2014' },
+          { label: 'Disk', ok: diskStatus === 'ok', paused: diskStatus === 'warning' || diskStatus === 'unknown', detail: diskDetail },
         ].map(item => (
           <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{
