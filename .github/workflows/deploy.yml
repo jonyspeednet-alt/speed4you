@@ -169,6 +169,63 @@ jobs:
               echo "Cleanup script installed"
             fi
 
+      - name: Rescue root disk (journal vacuum + offload root-resident media)
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          envs: SUDO_PASSWORD
+          script: |
+            set -e
+            echo "=== rescue: BEFORE ==="
+            df -h / | tail -1
+            # 1. Journal vacuum now (~3G relief) + cap future growth at 500M
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sh -c 'journalctl --vacuum-size=500M >/dev/null 2>&1; mkdir -p /etc/systemd/journald.conf.d; printf "[Journal]\nSystemMaxUse=500M\nRuntimeMaxUse=200M\n" > /etc/systemd/journald.conf.d/size-cap.conf; systemctl restart systemd-journald || true'
+            echo "journal vacuumed + capped"
+            # 2. Temp dirs + apt cache + stale deploy staging
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sh -c 'rm -rf /tmp/* /var/tmp/*; apt-get clean >/dev/null 2>&1 || true'
+            rm -rf /home/speed4you/portal-deploy-staging
+            echo "tmp cleaned"
+            # 3. Offload root-resident media (F-M 18G, U-Z 35G, New_Movies_2 5.3G) to
+            # Extra_Storage_2 (3.4T free, scanner-ignored by Extra_Storage regex)
+            # and bind-mount back so all paths/DB/scanner roots stay identical.
+            OFFLOAD=/var/www/html/Extra_Storage_2/_root_offload
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p "$OFFLOAD/F-M" "$OFFLOAD/U-Z" "$OFFLOAD/New_Movies_2"
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R speed4you:speed4you "$OFFLOAD"
+            offload_one() {
+              src="$1"; dest="$2"
+              if [ ! -d "$src" ]; then echo "missing, skip: $src"; return 0; fi
+              if mountpoint -q "$src" 2>/dev/null; then echo "already offloaded: $src"; return 0; fi
+              echo "--- copying $src -> $dest ---"
+              rsync -a --whole-file "$src/" "$dest/"
+              src_count=$(find "$src" -xdev -type f | wc -l)
+              dest_count=$(find "$dest" -type f | wc -l)
+              echo "file counts src=$src_count dest=$dest_count"
+              if [ "$src_count" -gt 0 ] && [ "$src_count" = "$dest_count" ]; then
+                echo "verified, clearing source and bind-mounting"
+                find "$src" -xdev -mindepth 1 -delete
+                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown -R www-data:www-data "$dest"
+                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mount --bind "$dest" "$src"
+                if ! grep -qF "$src" /etc/fstab 2>/dev/null; then
+                  printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sh -c "echo '$dest $src none bind 0 0' >> /etc/fstab"
+                  echo "fstab entry added for $src"
+                fi
+              else
+                echo "VERIFY FAILED for $src - original kept, no mount"
+                return 1
+              fi
+            }
+            offload_one /var/www/html/TV_Series/TV_Web_Series-F-M "$OFFLOAD/F-M" || echo "F-M offload failed (continuing)"
+            offload_one /var/www/html/TV_Series/TV_Web_Series-U-Z "$OFFLOAD/U-Z" || echo "U-Z offload failed (continuing)"
+            offload_one /var/www/html/New_Movies_2 "$OFFLOAD/New_Movies_2" || echo "New_Movies_2 offload failed (continuing)"
+            echo "=== rescue: AFTER ==="
+            df -h / | tail -1
+            mount | grep _root_offload || echo "(no bind mounts yet)"
+
       - name: Install deps, write .env, restart, health check
         uses: appleboy/ssh-action@v1.2.0
         env:
@@ -782,51 +839,18 @@ jobs:
               # NOTE: root disk fills up -> nginx proxy temp writes fail with
               # "No space left on device" and large downloads abort mid-stream.
               # proxy_buffering off streams directly, no temp disk needed.
-              # (Edit a /tmp copy with plain python, then sudo cp back. Do NOT
-              # pipe a password into sudo on the same command as a heredoc —
-              # the pipe and the heredoc fight over stdin and break the script.)
+              # Shell only here: python heredocs inside this YAML break on indentation,
+              # so the tuning is done with grep (idempotent) + sed (append in block).
               cp "$CONF" /tmp/speed4you.net.tmp
-              python3 - /tmp/speed4you.net.tmp <<'PY'
-              import sys
-              conf = sys.argv[1]
-              with open(conf) as f:
-                  text = f.read()
-              want = [
-                  'proxy_connect_timeout 30s;',
-                  'proxy_read_timeout 3600s;',
-                  'proxy_send_timeout 3600s;',
-                  'proxy_buffering off;',
-                  'proxy_request_buffering off;',
-              ]
-              start = text.find('location /portal-api/')
-              if start == -1:
-                  print('portal-api location not found, skipping')
-                  sys.exit(0)
-              brace = text.find('{', start)
-              depth = 0
-              end = -1
-              for i in range(brace, len(text)):
-                  if text[i] == '{':
-                      depth += 1
-                  elif text[i] == '}':
-                      depth -= 1
-                      if depth == 0:
-                          end = i
-                          break
-              if end == -1:
-                  print('portal-api block end not found')
-                  sys.exit(1)
-              block = text[brace:end]
-              missing = [d for d in want if d.split()[0] not in block]
-              if missing:
-                  insert = '\n'.join('        ' + d for d in missing) + '\n'
-                  text = text[:end] + insert + text[end:]
-                  with open(conf, 'w') as f:
-                      f.write(text)
-                  print('portal-api proxy tuned, added: ' + ', '.join(missing))
-              else:
-                  print('portal-api proxy already tuned')
-              PY
+              for directive in 'proxy_connect_timeout 30s' 'proxy_read_timeout 3600s' 'proxy_send_timeout 3600s' 'proxy_buffering off' 'proxy_request_buffering off'; do
+                key=$(echo "$directive" | cut -d' ' -f1)
+                if grep -q "$key" /tmp/speed4you.net.tmp 2>/dev/null; then
+                  echo "portal-api proxy already has $key"
+                else
+                  sed -i "/location \/portal-api\//a\\        $directive;" /tmp/speed4you.net.tmp
+                  echo "portal-api proxy added: $directive"
+                fi
+              done
               printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp /tmp/speed4you.net.tmp "$CONF"
               rm -f /tmp/speed4you.net.tmp
               # Remove stale location /tv block (intercepts /tv and serves wrong old portal index.html)
