@@ -214,7 +214,7 @@ jobs:
                   echo "MOUNT FAILED for $src - original files are safe at $dest"
                   return 1
                 fi
-                if ! grep -qF "$src" /etc/fstab 2>/dev/null; then
+                if ! grep -qF "$dest $src" /etc/fstab 2>/dev/null; then
                   printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sh -c "echo '$dest $src none bind 0 0' >> /etc/fstab"
                   echo "fstab entry added for $src"
                 fi
@@ -230,7 +230,7 @@ jobs:
             # even if a previous run mounted but exited before writing fstab.
             ensure_fstab() {
               src="$1"; dest="$2"
-              if ! grep -qF "$src" /etc/fstab 2>/dev/null; then
+              if ! grep -qF "$dest $src" /etc/fstab 2>/dev/null; then
                 printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sh -c "echo '$dest $src none bind 0 0' >> /etc/fstab"
                 echo "fstab entry added for $src"
               fi
