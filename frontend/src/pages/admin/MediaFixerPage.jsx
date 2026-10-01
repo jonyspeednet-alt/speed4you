@@ -21,6 +21,13 @@ const VERDICT_META = {
   file_missing: { color: '#f87171', label: 'File missing' },
 };
 
+const PRESET_LABELS = {
+  browser: 'Browser compatible',
+  'browser-720p': 'Browser 720p',
+  'audio-only': 'Audio only',
+  'hindi-default': 'Hindi default',
+};
+
 const JOB_STATUS_COLOR = {
   queued: TEXT3,
   running: '#4ade80',
@@ -120,7 +127,7 @@ const ProgressBar = memo(function ProgressBar({ percent, color }) {
           {pct.toFixed(1)}%
         </span>
       </div>
-      <div style={{ width: '100%', height: '10px', borderRadius: '5px', background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+      <div role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label="Transcode progress" style={{ width: '100%', height: '10px', borderRadius: '5px', background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
         <div style={{
           width: `${pct}%`, height: '100%', borderRadius: '5px',
           background: color || 'linear-gradient(90deg, #4ade80, #22c55e)',
@@ -200,7 +207,7 @@ const JobCard = memo(function JobCard({ job, onCancel, cancelling, onRetry, retr
           </button>
         )}
         {job.status === 'done' && job.backupPath && (
-          <button style={btnGhost} onClick={() => onDeleteBackup(job.id)} disabled={deletingBackup}>
+          <button style={btnGhost} onClick={() => { if (window.confirm('Delete backup for this job? This cannot be undone.')) onDeleteBackup(job.id); }} disabled={deletingBackup}>
             {deletingBackup ? 'Deleting…' : 'Delete backup'}
           </button>
         )}
@@ -270,21 +277,22 @@ function LibraryScanCard({ scanQuery, scanType, setScanType, selectedKeys, setSe
   };
   const allKeys = found.map((f) => `${f.itemId}:${f.targetKey}`);
   const allSelected = allKeys.length > 0 && allKeys.every((k) => selectedKeys.includes(k));
+  const presetLabel = PRESET_LABELS[preset] || preset;
 
   return (
     <div style={cardStyle}>
-      <div style={{ fontWeight: '800', color: TEXT, fontSize: '0.95rem', marginBottom: '4px' }}>3 · Full library scan</div>
+      <div style={{ fontWeight: '800', color: TEXT, fontSize: '0.95rem', marginBottom: '4px' }}>4 · Full library scan</div>
       <div style={{ color: TEXT3, fontSize: '0.78rem', marginBottom: '12px' }}>
         Probes every published file and lists all browser-incompatible ones (EAC3/DTS sound, HEVC video). Runs in background — you can leave this page.
       </div>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-        <select value={scanType} onChange={(e) => setScanType(e.target.value)} disabled={running} style={{ ...inputStyle, width: 'auto' }}>
+        <select value={scanType} onChange={(e) => setScanType(e.target.value)} disabled={running} aria-label="Scan type" style={{ ...inputStyle, width: 'auto' }}>
           <option value="all">Movies + Series</option>
           <option value="movie">Movies only</option>
           <option value="series">Series only</option>
         </select>
         {!running ? (
-          <button style={btnPrimary} onClick={onStart} disabled={starting}>
+          <button style={{ ...btnPrimary, ...(starting && { opacity: 0.6, cursor: 'not-allowed' }) }} onClick={onStart} disabled={starting}>
             {starting ? 'Starting…' : 'Start scan'}
           </button>
         ) : (
@@ -314,11 +322,11 @@ function LibraryScanCard({ scanQuery, scanType, setScanType, selectedKeys, setSe
                 onChange={() => setSelectedKeys(allSelected ? [] : allKeys)} />
               Select all shown ({found.length})
             </label>
-            <button style={btnGhost} disabled={queuing || selectedKeys.length === 0} onClick={() => onQueue(false)}>
-              {queuing ? 'Queuing…' : `Queue selected (${selectedKeys.length}) with preset “${preset}”`}
+            <button style={{ ...btnGhost, ...((queuing || selectedKeys.length === 0) && { opacity: 0.6, cursor: 'not-allowed' }) }} disabled={queuing || selectedKeys.length === 0} onClick={() => onQueue(false)}>
+              {queuing ? 'Queuing…' : `Queue selected (${selectedKeys.length}) with preset “${presetLabel}”`}
             </button>
-            <button style={btnGhost} disabled={queuing} onClick={() => { if (window.confirm(`Queue all ${report?.foundCount ?? found.length} incompatible files for transcode?`)) onQueue(true); }}>
-              Queue all ({report?.foundCount ?? found.length})
+            <button style={{ ...btnGhost, ...(queuing && { opacity: 0.6, cursor: 'not-allowed' }) }} disabled={queuing} onClick={() => { if (window.confirm(`Queue all ${report?.foundCount ?? found.length} incompatible files for transcode?`)) onQueue(true); }}>
+              Queue all ({report?.foundCount ?? found.length}) with preset “{presetLabel}”
             </button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '320px', overflow: 'auto' }}>
@@ -370,7 +378,7 @@ function ViewerReportsCard({ reportsQuery, onAnalyze, analyzing, onResolve }) {
     <div style={cardStyle}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
         <div style={{ fontWeight: '800', color: TEXT, fontSize: '0.95rem', flex: 1 }}>
-          দর্শকদের রিপোর্ট {reports.length > 0 && (
+          3 · দর্শকদের রিপোর্ট {reports.length > 0 && (
             <span style={{
               marginLeft: '6px', padding: '2px 9px', borderRadius: '10px',
               background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.35)',
@@ -416,7 +424,7 @@ function ViewerReportsCard({ reportsQuery, onAnalyze, analyzing, onResolve }) {
               <button style={btnGhost} disabled={analyzing} onClick={() => onAnalyze(r)}>
                 Analyze
               </button>
-              <button style={btnGhost} onClick={() => onResolve(r.id)}>
+              <button style={btnGhost} onClick={() => { if (window.confirm('Resolve this report?')) onResolve(r.id); }}>
                 Resolve
               </button>
             </div>
@@ -432,7 +440,7 @@ function AutoFixCard({ settingsQuery, draft, setDraft, onSave, saving }) {  cons
   const dirty = draft !== null;
   return (
     <div style={cardStyle}>
-      <div style={{ fontWeight: '800', color: TEXT, fontSize: '0.95rem', marginBottom: '4px' }}>4 · Auto-fix and backup cleanup</div>
+      <div style={{ fontWeight: '800', color: TEXT, fontSize: '0.95rem', marginBottom: '4px' }}>5 · Auto-fix and backup cleanup</div>
       <div style={{ color: TEXT3, fontSize: '0.78rem', marginBottom: '12px' }}>
         Auto-fix queues new incompatible files after content scans. Backup cleanup runs hourly and only removes completed backups older than the retention period; active files are skipped.
       </div>
@@ -688,8 +696,6 @@ export default function MediaFixerPage() {
 
   const queueScanMutation = useMutation({
     mutationFn: async (useAll) => {
-      const state = scanQuery.data || {};
-      const report = state.lastReport || state;
       const keys = [...selectedKeys];
       const results = [];
       if (useAll) {
@@ -748,12 +754,27 @@ export default function MediaFixerPage() {
     { id: 'hindi-default', label: 'Hindi default audio (instant)', description: 'No re-encode. Makes Hindi the default track.' },
   ];
   const analyzedBad = analysis ? (analysis.summary?.audio_issue || 0) + (analysis.summary?.video_issue || 0) + (analysis.summary?.both || 0) : 0;
+  const isMovieInput = /\/movies?\//i.test(input) || /\bmovie\b/i.test(input)
+    || (/^\d+$/.test(input.trim()) && analysis?.item?.type === 'movie');
   const hasHindiSuggestion = Boolean(
     analysis && (analysis.targets || []).some((t) => (t.issues || []).some((i) => i.suggestion === 'hindi-default'))
   );
+  const bulkCount = [...new Set(bulkInput.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean))].length;
+  const bulkOverLimit = bulkCount > 200;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxWidth: '980px' }}>
+      <h1 style={{ color: TEXT, margin: 0, fontSize: '1.1rem', fontWeight: '800' }}>Media Fixer</h1>
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 5,
+        background: SURFACE2, border: `1px solid ${BORDER}`,
+        borderRadius: '10px', padding: '8px 12px',
+        color: TEXT3, fontSize: '0.76rem', fontWeight: '600',
+      }}>
+        <span style={{ color: TEXT }}>{activeJobs.filter((j) => j.status === 'running').length} running</span>
+        {' · '}{activeJobs.filter((j) => j.status === 'queued').length} queued
+        {' · '}scan {scanQuery.data?.status || 'idle'}
+      </div>
       {/* Input card */}
       <div style={cardStyle}>
         <div style={{ fontWeight: '800', color: TEXT, fontSize: '0.95rem', marginBottom: '4px' }}>1 · Check a movie or series</div>
@@ -762,17 +783,18 @@ export default function MediaFixerPage() {
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <input
+            aria-label="Content link or ID"
             style={{ ...inputStyle, flex: '1 1 280px' }}
             placeholder="https://speed4you.net/movies/34876  or  34876"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !analyzeMutation.isPending && input.trim()) analyzeMutation.mutate(); }}
           />
-          <button style={btnPrimary} onClick={() => analyzeMutation.mutate()} disabled={analyzeMutation.isPending || !input.trim()}>
+          <button style={{ ...btnPrimary, ...((analyzeMutation.isPending || !input.trim()) && { opacity: 0.6, cursor: 'not-allowed' }) }} onClick={() => analyzeMutation.mutate()} disabled={analyzeMutation.isPending || !input.trim()}>
             {analyzeMutation.isPending ? 'Analyzing…' : 'Analyze'}
           </button>
         </div>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '12px', alignItems: 'center' }}>
+        <div title={isMovieInput ? "Movies don't need Season/Episode" : undefined} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '12px', alignItems: 'center', ...(isMovieInput && { opacity: 0.45 }) }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: TEXT2, fontSize: '0.78rem' }}>
             Season
             <input style={{ ...inputStyle, width: '70px' }} value={season} onChange={(e) => setSeason(e.target.value)} disabled={allEpisodes} />
@@ -785,6 +807,7 @@ export default function MediaFixerPage() {
             <input type="checkbox" checked={allEpisodes} onChange={(e) => setAllEpisodes(e.target.checked)} />
             All episodes (series)
           </label>
+          {isMovieInput && <span style={{ color: TEXT3, fontSize: '0.74rem' }}>Movies don&apos;t need Season/Episode</span>}
         </div>
         {analyzeMutation.isError && (
           <div style={{ marginTop: '10px', color: '#fca5a5', fontSize: '0.8rem' }}>
@@ -838,10 +861,10 @@ export default function MediaFixerPage() {
           {/* Transcode */}
           {(analyzedBad > 0 || hasHindiSuggestion) && (
             <div style={{ marginTop: '14px', borderTop: `1px solid ${BORDER}`, paddingTop: '14px' }}>
-              <div style={{ fontWeight: '800', color: TEXT, fontSize: '0.9rem', marginBottom: '8px' }}>2 · Fix it (transcode for browsers)</div>
+              <div style={{ fontWeight: '800', color: TEXT, fontSize: '0.9rem', marginBottom: '8px' }}>1b · Fix it (transcode for browsers)</div>
               {hasHindiSuggestion && analyzedBad === 0 && (
                 <div style={{ marginBottom: '10px' }}>
-                  <button style={btnPrimary} disabled={transcodeMutation.isPending}
+                  <button style={{ ...btnPrimary, ...(transcodeMutation.isPending && { opacity: 0.6, cursor: 'not-allowed' }) }} disabled={transcodeMutation.isPending}
                     onClick={() => { setPreset('hindi-default'); transcodeMutation.mutate({ preset: 'hindi-default' }); }}>
                     {transcodeMutation.isPending ? 'Queuing…' : 'Hindi default korun (1 min, no re-encode)'}
                   </button>
@@ -863,7 +886,7 @@ export default function MediaFixerPage() {
                   </label>
                 ))}
               </div>
-              <button style={btnPrimary} onClick={() => transcodeMutation.mutate()} disabled={transcodeMutation.isPending}>
+              <button style={{ ...btnPrimary, ...(transcodeMutation.isPending && { opacity: 0.6, cursor: 'not-allowed' }) }} onClick={() => transcodeMutation.mutate()} disabled={transcodeMutation.isPending}>
                 {transcodeMutation.isPending ? 'Queuing…' : `Queue fixes for ${analysis.item?.title}`}
               </button>
               <div style={{ marginTop: '10px' }}>
@@ -944,15 +967,19 @@ export default function MediaFixerPage() {
       )}
 
       <div style={cardStyle}>
-        <div style={{ color: TEXT, fontWeight: '800', marginBottom: '8px' }}>Add multiple jobs</div>
+        <div style={{ color: TEXT, fontWeight: '800', marginBottom: '8px' }}>2 · Add multiple jobs</div>
         <div style={{ color: TEXT2, fontSize: '0.8rem', marginBottom: '8px' }}>
           Paste one content link or ID per line. Jobs can be added while another is running. Uses the season/episode selection above.
         </div>
         <textarea aria-label="Content links to queue" style={{ ...inputStyle, minHeight: '90px' }} value={bulkInput} onChange={(e) => setBulkInput(e.target.value)} placeholder={'34876\n/movies/34877'} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px 8px', marginTop: '4px' }}>
+          <span style={{ color: TEXT3, fontSize: '0.74rem' }}>One per line, comma also works, max 200</span>
+          <span style={{ color: bulkOverLimit ? '#f87171' : TEXT2, fontSize: '0.74rem', fontWeight: '700' }}>{bulkCount}/200</span>
+        </div>
         <select aria-label="Queue preset" style={{ ...inputStyle, width: 'auto', margin: '8px 8px 8px 0' }} value={preset} onChange={(e) => setPreset(e.target.value)}>
           {presets.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
         </select>
-        <button style={btnPrimary} disabled={bulkQueueMutation.isPending || !bulkInput.trim()} onClick={() => bulkQueueMutation.mutate()}>
+        <button style={{ ...btnPrimary, ...((bulkQueueMutation.isPending || !bulkInput.trim() || bulkOverLimit) && { opacity: 0.6, cursor: 'not-allowed' }) }} disabled={bulkQueueMutation.isPending || !bulkInput.trim() || bulkOverLimit} onClick={() => bulkQueueMutation.mutate()}>
           {bulkQueueMutation.isPending ? 'Adding jobs…' : 'Add links to queue'}
         </button>
       </div>
@@ -1008,7 +1035,7 @@ export default function MediaFixerPage() {
       {/* Jobs */}
       <div style={cardStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
-          <div style={{ fontWeight: '800', color: TEXT, fontSize: '0.95rem', flex: 1 }}>Transcode jobs</div>
+          <div style={{ fontWeight: '800', color: TEXT, fontSize: '0.95rem', flex: 1 }}>6 · Transcode jobs</div>
           <span style={{ color: TEXT2, fontSize: '0.8rem' }}>
             {jobs.filter((j) => j.status === 'running').length} running · {jobs.filter((j) => j.status === 'queued').length} queued · {jobsQuery.data?.maxConcurrent || 1} at a time
           </span>
