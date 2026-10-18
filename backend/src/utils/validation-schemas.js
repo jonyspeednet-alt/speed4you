@@ -23,6 +23,10 @@ const contentSchema = Joi.object({
   type: Joi.string().valid('movie', 'series').default('movie'),
   status: Joi.string().valid('published', 'draft').default('draft'),
   genre: Joi.string().allow('', null),
+  // Array form of `genre`; the UI renders this one. Declared without a default
+  // so that a PUT which omits it leaves the stored array untouched instead of
+  // wiping it.
+  genres: Joi.array().items(Joi.string().allow('', null)).allow(null),
   year: Joi.number().integer().min(1800).max(new Date().getFullYear() + 5).allow(null),
   language: Joi.string().allow('', null),
   category: Joi.string().allow('', null),
