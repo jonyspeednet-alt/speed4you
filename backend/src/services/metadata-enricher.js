@@ -31,11 +31,23 @@ const NOISE_PATTERNS = [
   /\bl[i1][ ._\-]*ne\b/gi,
   // Subtitle/audio leftover tags
   /\b(esubs?|msubs?|subs?|subtitles?|org|hc|audio|audios|dual|multi|clean|cleaned|south movies?)\b/gi,
+  // Audio provenance tags that leak from scene filenames ("Hindi Dubbed" etc.)
+  // Leaves only the bare "Dubbed"/"Dub" token behind otherwise, which makes
+  // TMDb return zero results (e.g. "Dumbo Dubbed", "Falling Inn Love Dubbed").
+  /\b(dubbed|dub|dubbing|dual[- ]?audio|multi[- ]?audio)\b/gi,
+  // Disc/source leftovers ("Shaft BD", "S P Chauhan DVD")
+  /\b(bd|br|dvd|dvdrip|dvdscr|webdl)\b/gi,
+  // Standalone TLD token left behind when a release-site domain is split into
+  // words ("MovieLinkBD.com" -> "Movie Link BD com"). The lookbehind keeps real
+  // titles such as "Fear Dot Com" / "Kadhal Dot Com" intact.
+  /(?<!\bdot )\bcom\b/gi,
+  // Release-site brands seen in real filenames
+  /\b(movielinkbd|moviezflix|moviez[- ]?flix|moviesflix|moviezflixpro|filmyzilla|filmywap|vegamovies|rogmovies|mkvcinemas|khatrimaza|bolly4u|9xmovies|isaimini|tamilrockers|movierulz|1tamilmv|worldfree4u|world4ufree|mkvhub|hdmoviez|hub4u|thenkiri|dvdplay)\b/gi,
   // Encoder group leftovers
   /\b(jhs|sliv|internal|mod|hs)\b/gi,
-  // Trailing standalone WEB tag only (e.g. "... AMZN WEB") — anchored so real
-  // titles like "Charlotte's Web" are untouched
-  /\sweb\s*$/i,
+  // NOTE: the old "/\sweb\s*$/" rule stripped the real last word of titles such
+  // as "Charlotte's Web". A stray trailing "WEB" tag is now dropped by the
+  // token-trimming fallback instead.
   // Codec with resolution leftovers like AAC2, AC3 + spaced Blu Ray
   /\b(aac|ac3|dts|dd)\d*\b/gi,
   /\bblu[- ]?ray\b/gi,
@@ -85,7 +97,8 @@ function extractCoreTitle(raw) {
   return cleaned;
 }
 
-function cleanSearchTitle(value) {
+function cleanSearchTitle(value, options = {}) {
+  const keepTrailingP = options.keepTrailingP === true;
   let normalized = String(value || '').normalize('NFC');
   
   // Decode URL-encoded spaces (e.g., %20)
@@ -108,6 +121,14 @@ function cleanSearchTitle(value) {
     normalized = normalized.replace(pattern, ' ');
   }
 
+  // "AKA" releases carry two names ("El Hoyo AKA The Platform"). Use the part
+  // BEFORE "AKA" (normally the original title); the alternative is searched
+  // separately via extractAkaAlternative().
+  if (/\baka\b/i.test(normalized)) {
+    const before = normalized.split(/\baka\b/i)[0].trim();
+    if (before) normalized = before;
+  }
+
   // Strip trailing "p" that leaked from resolution tags (e.g. "Turbulencep" -> "Turbulence")
   const REAL_P_WORDS = new Set([
     'stop','loop','drop','wrap','help','sleep','keep','step','deep','cheap',
@@ -115,11 +136,13 @@ function cleanSearchTitle(value) {
     'hemp','temp','shop','crop','prop','drip','grip','trip','chip','ship',
     'clip','flip','snoop','swoop','troop','stoop','scalp','yelp','gulp','pulp'
   ]);
-  normalized = normalized.replace(/\b([a-zA-Z]{3,})p\b/g, (match, base) => {
-    if (REAL_P_WORDS.has(match.toLowerCase())) return match;
-    if (/^\d+$/.test(base)) return match;
-    return base;
-  });
+  if (!keepTrailingP) {
+    normalized = normalized.replace(/\b([a-zA-Z]{3,})p\b/g, (match, base) => {
+      if (REAL_P_WORDS.has(match.toLowerCase())) return match;
+      if (/^\d+$/.test(base)) return match;
+      return base;
+    });
+  }
 
   // Add space between camelCase words (Unicode-safe)
   normalized = normalized.replace(/([a-z])([A-Z])/g, '$1 $2');
@@ -147,6 +170,97 @@ function cleanSearchTitle(value) {
   }
 
   return cleaned;
+}
+
+// The name that follows "AKA" in a release title, if any
+// ("El Hoyo AKA The Platform" -> "The Platform"); '' when there is none.
+function extractAkaAlternative(value) {
+  const parts = String(value || '').split(/\baka\b/i);
+  if (parts.length < 2) return '';
+  return cleanSearchTitle(parts.slice(1).join(' '));
+}
+
+// Strict acceptance test for results coming from degraded (token-trimmed)
+// queries. The candidate title must be token-prefix compatible with the query
+// ("Prahaar" ↔ "Prahaar: The Untold Story of Ujjwal Nikam") and, when both years
+// are known, within 2 years of the item. Without this, a weak query such as
+// "The Jailer" (from "Movie Link Rajini The Jailer") or "vs Mumbai" (from
+// "Delhi vs Mumbai") could match an unrelated film.
+function titleTokens(value) {
+  return cleanSearchTitle(value)
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\p{M}]+/gu, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function matchesTrimmedQuery(candidate, query, itemYear) {
+  // Degraded queries are only trusted with year corroboration: without a known
+  // item year a short window such as "Movie" could match an unrelated film.
+  if (!itemYear) return false;
+
+  const candidateTokens = titleTokens(candidate.title || candidate.name || '');
+  const queryTokens = titleTokens(query);
+  if (!candidateTokens.length || !queryTokens.length) return false;
+
+  const [shortTokens, longTokens] = candidateTokens.length <= queryTokens.length
+    ? [candidateTokens, queryTokens]
+    : [queryTokens, candidateTokens];
+  if (!shortTokens.every((token, index) => token === longTokens[index])) return false;
+
+  const candidateYear = Number(String(candidate.release_date || candidate.first_air_date || '').slice(0, 4)) || null;
+  if (!candidateYear) return false;
+  return Math.abs(candidateYear - itemYear) <= 1;
+}
+
+const STOPWORDS = new Set(['the', 'a', 'an', 'of', 'in', 'on', 'and', 'vs', 'aka', 'to', 'for']);
+
+/**
+ * Degraded search queries to try when the full cleaned title returns nothing.
+ * Release junk is almost always a leading site brand ("Movie Link BD com
+ * Rajini The Jailer") or a trailing tag ("Shaft BD", "Falling Inn Love
+ * Dubbed"), so we offer every window that drops up to MAX_DROP tokens from the
+ * front and/or the back — including both sides at once ("Movie Link siccîn
+ * 1080" -> "siccîn"). Windows are ordered most-specific first (longest query,
+ * then smallest edit, then brand-side first). Callers MUST validate each result
+ * with matchesTrimmedQuery() and should pick the best-scoring candidate rather
+ * than the first hit, so a generic short window can never win over the real
+ * title.
+ */
+function buildTrimmedQueries(title) {
+  const parsed = cleanSearchTitle(title);
+  const words = parsed.split(/\s+/).filter(Boolean);
+  const MAX_DROP = 4;
+  const windows = [];
+
+  for (let leading = 0; leading <= MAX_DROP; leading += 1) {
+    for (let trailing = 0; trailing <= MAX_DROP - leading; trailing += 1) {
+      const total = leading + trailing;
+      if (total === 0 || total >= words.length) continue;
+      const slice = words.slice(leading, words.length - trailing);
+      // A window must keep at least one word-like token, otherwise it is pure
+      // resolution/codec residue such as "1080".
+      const hasWord = slice.some((word) =>
+        word.length > 1 && /\p{L}/u.test(word) && !STOPWORDS.has(word.toLowerCase()));
+      if (!hasWord) continue;
+      windows.push({ query: slice.join(' '), tokens: slice.length, leading, trailing, total });
+    }
+  }
+
+  const seen = new Set([parsed.toLowerCase()]);
+  return windows
+    .sort((a, b) => (b.tokens - a.tokens)
+      || (a.total - b.total)
+      || (b.leading - a.leading)
+      || (a.trailing - b.trailing))
+    .filter((window) => {
+      const key = window.query.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .map((window) => window.query);
 }
 
 function detectLanguageFromText(text) {
@@ -236,8 +350,11 @@ function inferOriginalLanguage(item) {
 }
 
 
-function scoreCandidate(candidate, item) {
-  const searchTitle = cleanSearchTitle(item.title).toLowerCase();
+function scoreCandidate(candidate, item, queryTitleOverride) {
+  // queryTitleOverride lets a caller score a candidate against the degraded
+  // query that actually produced it (fallback windows), instead of the original
+  // junk-laden item title.
+  const searchTitle = String(queryTitleOverride || cleanSearchTitle(item.title)).toLowerCase();
   const candidateTitle = cleanSearchTitle(String(candidate.title || candidate.name || '')).toLowerCase();
   const candidateOriginalTitle = String(candidate.original_title || candidate.original_name || '').toLowerCase();
   const targetYear = Number(item.year) || extractYearFromRawTitle(item.title) || extractYearFromRawTitle(item.sourcePath);
@@ -759,6 +876,78 @@ async function enrichItemWithMetadata(item) {
 
 
 
+    // The query that actually produced the accepted results. Scoring must use it
+    // as the evidence source, otherwise a fallback hit is re-scored against the
+    // original junk title, capped at 14 and thrown away again.
+    let evidenceQuery = null;
+
+    // Strategy 12: alternate cleanings — the name after "AKA", and a variant
+    // that keeps a trailing "p" the resolution-tag stripper may have eaten
+    // ("The Trap" -> "The Tra").
+    if (!results.length) {
+      const alternates = [];
+      const akaAlt = extractAkaAlternative(item.title);
+      if (akaAlt && akaAlt !== parsedTitle) alternates.push(akaAlt);
+      const keepP = cleanSearchTitle(item.title, { keepTrailingP: true });
+      if (keepP && keepP !== parsedTitle) alternates.push(keepP);
+      for (const alt of alternates) {
+        try {
+          const altResp = await tmdbFetchJson(`/search/${mediaType}`, { query: alt });
+          const altResults = Array.isArray(altResp.results) ? altResp.results : [];
+          if (altResults.length) {
+            results = altResults;
+            evidenceQuery = alt;
+            break;
+          }
+        } catch {}
+      }
+    }
+
+    // Strategy 13: progressive token trimming. Release junk is almost always a
+    // leading site brand ("Movie Link BD com Rajini The Jailer") or a trailing
+    // tag ("Shaft BD", "Falling Inn Love Dubbed"), so try every window that drops
+    // up to 4 tokens from the front and/or back. Results are only trusted when
+    // matchesTrimmedQuery() accepts them (token-prefix + year within 1), and the
+    // best-scoring candidate wins — a generic window like "Movie" therefore can
+    // never outrank the real title found by a more specific window. A year is
+    // mandatory here: it is the only independent corroboration a degraded query
+    // has, so without it we stay conservative and leave the item for review.
+    if (!results.length && rawYear) {
+      const trimBases = [item.title];
+      const akaBase = extractAkaAlternative(item.title);
+      if (akaBase) trimBases.push(akaBase);
+
+      const hits = new Map();
+      const triedQueries = new Set();
+      for (const base of trimBases) {
+        for (const query of buildTrimmedQueries(base)) {
+          const queryKey = query.toLowerCase();
+          if (triedQueries.has(queryKey)) continue;
+          triedQueries.add(queryKey);
+
+          try {
+            const trimResp = await tmdbFetchJson(`/search/${mediaType}`, { query });
+            const trimResults = Array.isArray(trimResp.results) ? trimResp.results : [];
+            for (const candidate of trimResults) {
+              if (!matchesTrimmedQuery(candidate, query, rawYear)) continue;
+              const key = String(candidate.id ?? candidate.title);
+              if (!hits.has(key)) hits.set(key, { candidate, query });
+            }
+          } catch {}
+        }
+      }
+
+      if (hits.size) {
+        const best = [...hits.values()]
+          .map((hit) => ({ ...hit, score: scoreCandidate(hit.candidate, enrichedItem, hit.query) }))
+          .sort((left, right) => right.score - left.score)[0];
+        if (best.score >= 15) {
+          results = [best.candidate];
+          evidenceQuery = best.query;
+        }
+      }
+    }
+
     if (!results.length) {
       return {
         ...enrichedItem,
@@ -772,7 +961,7 @@ async function enrichItemWithMetadata(item) {
     }
 
     const rankedResults = results
-      .map((candidate) => ({ candidate, score: scoreCandidate(candidate, enrichedItem) }))
+      .map((candidate) => ({ candidate, score: scoreCandidate(candidate, enrichedItem, evidenceQuery || undefined) }))
       .sort((left, right) => right.score - left.score);
     const bestMatch = rankedResults[0];
     const candidateMediaType = bestMatch.candidate.media_type || mediaType;
@@ -813,7 +1002,11 @@ async function enrichItemWithMetadata(item) {
       originalLanguage: applyTmdb ? details.originalLanguage : '',
       language: resolvedLanguage,
       status: enrichedItem.status || process.env.SCANNER_DEFAULT_STATUS || 'published',
-      metadataStatus: applyTmdb ? 'matched' : (confidence >= 25 ? 'needs_review' : 'not_found'),
+      metadataStatus: applyTmdb ? 'matched' : 'not_found',
+    // NOTE: the previous expression ("applyTmdb ? 'matched' : (confidence >= 25 ? 'needs_review' : 'not_found')")
+    // could never return 'needs_review' because applyTmdb is already true for
+    // every confidence >= 15. Low-confidence matches are still 'matched' but
+    // carry metadataConfidence < 60, which keeps them in draft for review.
       metadataProvider: 'tmdb',
       metadataConfidence: confidence,
       metadataUpdatedAt: new Date().toISOString(),
@@ -869,6 +1062,9 @@ function mergeEpisodeMetadata(existingSeasons = [], tmdbSeasons = []) {
 
 module.exports = {
   cleanSearchTitle,
+  extractAkaAlternative,
+  matchesTrimmedQuery,
+  buildTrimmedQueries,
   extractYearFromRawTitle,
   isPlausibleReleaseYear,
   enrichItemWithMetadata,

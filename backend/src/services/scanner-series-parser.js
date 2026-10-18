@@ -11,6 +11,8 @@ function cleanTitle(name, type = 'series') {
   cleaned = cleaned
     .replace(/\b(\d{1,4}p|4k|uhd|hdr\d*|10bit|remux|bluray|bdrip|brrip|web-?dl|webrip|dvdrip|hdrip|hdtv|camrip|telesync)\b/gi, '')
     .replace(/\b(x264|x265|hevc|h264|h265|av1|vp9|aac|dts|dd5\.1|ac3|eac3|mp3|flac|esub|sub|dual|dual-audio|multi|multi-audio|hindi-dubbed|bengali-dubbed|tamil-dubbed|telugu-dubbed)\b/gi, '')
+    // Audio-provenance tags: "Hindi Dubbed", "Dub", "Dubbing", "Dual Audio"
+    .replace(/\b(dubbed|dub|dubbing|dual-?audio|multi-?audio)\b/gi, '')
     .replace(/\b(yify|yts|psa|qxr|rarbg|tigole|galaxyrg|megusta|mkvca?c?)\b/gi, '');
 
   if (type === 'movie') {
@@ -20,7 +22,10 @@ function cleanTitle(name, type = 'series') {
   }
 
   cleaned = cleaned
-    .replace(/[^\p{L}\p{N}\s]/gu, ' ') // Remove special chars but preserve Unicode letters + spaces
+    // \p{M} (combining marks) MUST be kept: Indic vowel signs / virama live in
+    // that Unicode category, so dropping them corrupted titles such as
+    // "మేజర్" -> "మ జర" (see catalog item 35372).
+    .replace(/[^\p{L}\p{N}\p{M}\s]/gu, ' ') // Remove special chars, keep Unicode letters/marks + spaces
     .replace(/\s+/g, ' ')
     .trim();
 
