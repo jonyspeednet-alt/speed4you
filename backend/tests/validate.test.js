@@ -51,3 +51,23 @@ test('validateQuery populates validatedQuery on valid input', async () => {
   assert.equal(called, true);
   assert.equal(req.validatedQuery.page, 2);
 });
+
+test('contentSchema round-trips the genres array the UI renders', () => {
+  const { contentSchema } = require('../src/utils/validation-schemas');
+  const optional = contentSchema.fork(
+    Object.keys(contentSchema.describe().keys),
+    (schema) => schema.optional(),
+  );
+  const validateOptions = { abortEarly: false, stripUnknown: true };
+
+  // An empty array must be accepted so bad genre data can be cleared.
+  const cleared = optional.validate({ genres: [] }, validateOptions);
+  assert.equal(cleared.error, undefined);
+  assert.deepEqual(cleared.value.genres, []);
+
+  // Omitting the key must leave it out entirely, otherwise every unrelated PUT
+  // through the admin form (which has no genres field) would wipe the array.
+  const omitted = optional.validate({ title: 'Dumbo' }, validateOptions);
+  assert.equal(omitted.error, undefined);
+  assert.equal(Object.prototype.hasOwnProperty.call(omitted.value, 'genres'), false);
+});
