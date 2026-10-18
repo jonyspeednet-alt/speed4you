@@ -613,15 +613,29 @@ exports.rematchMetadata = async (req, res) => {
   const { enrichItemWithMetadata } = require('../services/scanner-enhanced-metadata');
   const dryRun = req.query.dry === 'true' || req.query.dry === '1';
   const batchSize = Math.min(20, Math.max(1, Number(req.body?.batchSize || 5)));
+  // Optional filters so a backfill can be run in small, safe slices
+  // (?status=draft&limit=25) instead of sweeping the whole catalog.
+  const statusFilter = String(req.body?.status || req.query.status || '').trim();
+  const rawLimit = Number(req.body?.limit ?? req.query.limit ?? 0);
+  const limit = Number.isFinite(rawLimit) ? Math.max(0, Math.trunc(rawLimit)) : 0;
 
-  const queryResult = await db.query(
-    `SELECT id, payload FROM content_catalog
-     WHERE metadata_status IN ('skipped', 'needs_review', 'not_found', 'failed')
-     ORDER BY id`,
-  );
+  const params = [];
+  let where = `metadata_status IN ('skipped', 'needs_review', 'not_found', 'failed')`;
+  if (statusFilter) {
+    params.push(statusFilter);
+    where += ` AND status = $${params.length}`;
+  }
+  let sql = `SELECT id, payload FROM content_catalog WHERE ${where} ORDER BY updated_at ASC NULLS FIRST, id`;
+  if (limit > 0) {
+    params.push(limit);
+    sql += ` LIMIT $${params.length}`;
+  }
+
+  const queryResult = await db.query(sql, params);
 
   const total = queryResult.rows.length;
   let matched = 0;
+  let published = 0;
   let failed = 0;
   const errors = [];
 
@@ -637,6 +651,7 @@ exports.rematchMetadata = async (req, res) => {
         }
 
         matched++;
+        if (enriched?.status === 'published' && item?.status !== 'published') published++;
       } catch (err) {
         failed++;
         errors.push({ id: row.id, error: err.message });
@@ -644,7 +659,7 @@ exports.rematchMetadata = async (req, res) => {
     }));
   }
 
-  res.json({ ok: true, dryRun, total, matched, failed, errors: errors.slice(0, 50) });
+  res.json({ ok: true, dryRun, total, matched, published, failed, errors: errors.slice(0, 50) });
 };
 
 /**

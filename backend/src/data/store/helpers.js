@@ -1,5 +1,8 @@
 function normalizeTitleKey(value, year) {
-  const raw = String(value || '').trim();
+  // NFC first: combining marks (Indic matras/virama) are kept by the \p{M} class
+  // below, so an NFD-encoded title must not produce a different key than its NFC
+  // form (it would split duplicate grouping).
+  const raw = String(value || '').trim().normalize('NFC');
   const normalized = raw
     .toLowerCase()
     .replace(/\b(1080p|720p|480p|2160p|4k|8k)\b/g, '')
@@ -9,10 +12,12 @@ function normalizeTitleKey(value, year) {
     .replace(/\b(v2|v3|fhd|hq|proper|uncut|extended|unrated|directors?[\s-]?cut)\b/g, '')
     .replace(/\b(zee5|netflix|amazon|hotstar|disney|sony|jio|aha|mx)\b/g, '')
     .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    // \p{M} keeps Indic combining marks (vowel signs/virama) so titles such as
+    // "మేజర్" do not collapse into different-looking keys.
+    .replace(/[^\p{L}\p{N}\p{M}]+/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  let key = normalized || raw.toLowerCase().replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[^\p{L}\p{N}]+/gu, ' ').replace(/\s+/g, ' ').trim();
+  let key = normalized || raw.toLowerCase().replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[^\p{L}\p{N}\p{M}]+/gu, ' ').replace(/\s+/g, ' ').trim();
   if (!key) {
     key = raw.toLowerCase().replace(/[^a-z0-9\p{L}]/gu, '').trim() || 'untitled-item';
   }
