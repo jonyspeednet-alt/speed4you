@@ -2598,6 +2598,59 @@ async function runPostScanTasks(summary, runId) {
     const newDiscoveries = (summary.rootResults || [])
       .filter((r) => (r.discovered || 0) > 0)
       .map((r) => ({ rootLabel: r.label, count: r.discovered }));
+
+    // ── DRAFT SELF-HEALING ─────────────────────────────────────────────────
+    // Drafts that never matched (not_found / failed / skipped) are otherwise
+    // never retried: the scan skips unchanged folders via fingerprints, and the
+    // loop above only covers published rows. Retry a small oldest-first batch on
+    // every scan so a transient TMDb failure or a later metadata fix still
+    // publishes, without a manual rematch.
+    let draftRetriesChecked = 0;
+    let draftRetriesPublished = 0;
+    try {
+      const draftResult = await pool.query(
+        `SELECT id, payload FROM content_catalog
+         WHERE status = 'draft'
+           AND (payload->>'metadataStatus' IS NULL
+             OR payload->>'metadataStatus' IN ('pending', 'not_found', 'failed', 'skipped'))
+         ORDER BY payload->>'metadataRetryAt' ASC NULLS FIRST, id ASC
+         LIMIT 10`,
+      );
+      draftRetriesChecked = draftResult.rows.length;
+      for (const row of draftResult.rows) {
+        try {
+          const enriched = await enrichItemWithMetadata(row.payload);
+          if (enriched) {
+            const statusChanged = enriched.metadataStatus !== row.payload?.metadataStatus;
+            if (enriched.status === 'published' || statusChanged) {
+              const { updateItem } = require('../data/store/content');
+              await updateItem(row.id, enriched);
+              if (enriched.status === 'published') draftRetriesPublished++;
+            }
+          }
+        } catch {
+          // skip items that keep failing
+        }
+        // Always stamp the retry, otherwise the same oldest rows would be picked
+        // on every scan (updated_at only moves when something is written) and no
+        // other draft could ever enter the batch.
+        await pool.query(
+          `UPDATE content_catalog
+              SET payload = jsonb_set(payload, '{metadataRetryAt}', to_jsonb($2::text), true)
+            WHERE id = $1`,
+          [row.id, new Date().toISOString()],
+        ).catch(() => {});
+      }
+      if (draftRetriesChecked) {
+        logScannerEvent('post_scan_draft_retries', {
+          checked: draftRetriesChecked,
+          published: draftRetriesPublished,
+        });
+      }
+    } catch (err) {
+      logScannerEvent('post_scan_draft_retries_failed', { error: err.message });
+    }
+
     const scanSummary = {
       completedAt: summary.completedAt || new Date().toISOString(),
       created: summary.created || 0,
@@ -2605,6 +2658,8 @@ async function runPostScanTasks(summary, runId) {
       deleted: summary.deleted || 0,
       errors: (summary.errors || []).length,
       missingPostersFixed: fixed,
+      draftRetriesChecked,
+      draftRetriesPublished,
       newDiscoveries,
     };
     try {
