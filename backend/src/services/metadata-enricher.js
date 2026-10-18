@@ -216,6 +216,12 @@ function matchesTrimmedQuery(candidate, query, itemYear) {
 
 const STOPWORDS = new Set(['the', 'a', 'an', 'of', 'in', 'on', 'and', 'vs', 'aka', 'to', 'for']);
 
+// Shortest single-word fallback query we are willing to trust. Shorter tokens
+// ("demo", "sada", "love", "part") collide with unrelated same-year films too
+// easily; every real recovery so far used a longer name ("Prahaar", "siccîn")
+// or a multi-word window.
+const MIN_SINGLE_TOKEN_LENGTH = 5;
+
 /**
  * Degraded search queries to try when the full cleaned title returns nothing.
  * Release junk is almost always a leading site brand ("Movie Link BD com
@@ -223,10 +229,11 @@ const STOPWORDS = new Set(['the', 'a', 'an', 'of', 'in', 'on', 'and', 'vs', 'aka
  * Dubbed"), so we offer every window that drops up to MAX_DROP tokens from the
  * front and/or the back — including both sides at once ("Movie Link siccîn
  * 1080" -> "siccîn"). Windows are ordered most-specific first (longest query,
- * then smallest edit, then brand-side first). Callers MUST validate each result
- * with matchesTrimmedQuery() and should pick the best-scoring candidate rather
- * than the first hit, so a generic short window can never win over the real
- * title.
+ * then smallest edit, then brand-side first), and a single-word window must be
+ * at least MIN_SINGLE_TOKEN_LENGTH characters long to be offered at all.
+ * Callers MUST validate each result with matchesTrimmedQuery() and should pick
+ * the best-scoring candidate rather than the first hit, so a generic short
+ * window can never win over the real title.
  */
 function buildTrimmedQueries(title) {
   const parsed = cleanSearchTitle(title);
@@ -244,6 +251,13 @@ function buildTrimmedQueries(title) {
       const hasWord = slice.some((word) =>
         word.length > 1 && /\p{L}/u.test(word) && !STOPWORDS.has(word.toLowerCase()));
       if (!hasWord) continue;
+      // A one-word window is the weakest evidence there is: "LG 3D Demo 2012"
+      // reached "Demo Dummies" (2012) and "Sada Gola 2025" reached an unrelated
+      // Bengali film, both legitimately dated and prefix-compatible. Only trust a
+      // single token when it is long enough to be distinctive; anything shorter
+      // stays a draft and waits for a human or an explicit TMDb id.
+      const onlyToken = slice.length === 1 ? slice[0] : '';
+      if (onlyToken && onlyToken.length < MIN_SINGLE_TOKEN_LENGTH) continue;
       windows.push({ query: slice.join(' '), tokens: slice.length, leading, trailing, total });
     }
   }
