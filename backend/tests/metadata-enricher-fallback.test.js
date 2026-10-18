@@ -23,6 +23,11 @@ const FALLBACK_FIXTURES = {
   delhi: [
     { id: 9002, title: 'Delhi Belly', release_date: '2011-07-01', poster_path: '/db.jpg', overview: 'Three friends get tangled with a crime boss.', popularity: 25, original_language: 'hi' },
   ],
+  // The real production false positive: a 2012 documentary answered the
+  // four-letter window "Demo" of "LG 3D Demo 2012".
+  demo: [
+    { id: 505135, title: 'Demo Dummies', release_date: '2012-01-01', poster_path: '/dd.jpg', overview: 'An in depth look at the insanity of hit-to-pass racing.', popularity: 5, original_language: 'en' },
+  ],
 };
 
 const DETAIL_FIXTURES = {
@@ -30,6 +35,7 @@ const DETAIL_FIXTURES = {
   1081010: { id: 1081010, title: 'Prahaar: The Untold Story of Ujjwal Nikam', original_title: 'Prahaar', overview: 'The story of public prosecutor Ujjwal Nikam.', poster_path: '/prahaar.jpg', backdrop_path: '/prahaar-b.jpg', release_date: '2026-02-06', genres: [{ name: 'Drama' }], vote_average: 7.1, runtime: 140, original_language: 'hi', popularity: 30, external_ids: { imdb_id: 'tt1081010' } },
   9001: { id: 9001, title: 'Movie 43', original_title: 'Movie 43', overview: 'A series of interconnected short films.', poster_path: '/m43.jpg', release_date: '2013-01-25', genres: [], vote_average: 4.5, runtime: 94, original_language: 'en', popularity: 20, external_ids: { imdb_id: 'tt1706620' } },
   9002: { id: 9002, title: 'Delhi Belly', original_title: 'दिल्ली बेली', overview: 'Three friends get tangled with a crime boss.', poster_path: '/db.jpg', release_date: '2011-07-01', genres: [], vote_average: 7, runtime: 96, original_language: 'hi', popularity: 25, external_ids: { imdb_id: 'tt1934231' } },
+  505135: { id: 505135, title: 'Demo Dummies', original_title: 'Demo Dummies', overview: 'An in depth look at the insanity of hit-to-pass racing.', poster_path: '/dd.jpg', release_date: '2012-01-01', genres: [{ name: 'Documentary' }], vote_average: 6, runtime: 88, original_language: 'en', popularity: 5, external_ids: { imdb_id: 'tt1884287' } },
 };
 
 const requestedQueries = [];
@@ -123,4 +129,18 @@ test('a junk window is never used when the item has no year to corroborate it', 
   assert.equal(result.status, 'draft');
   // Only the primary cleaned title is attempted; degraded windows stay off.
   assert.deepEqual(requestedQueries, ['movie link siccin']);
+});
+
+test('a short single-word window cannot invent a match for a non-film file', async () => {
+  // Production regression: this file was published as the 2012 documentary
+  // "Demo Dummies" because the window "Demo" happened to be dated 2012.
+  const item = draftItem(35253, 'LG 3D Demo 2012', '/var/www/html/3D_Movies/3D/LG 3D Demo (2012)', 2012);
+
+  const result = await enrichItemWithMetadata(item);
+
+  assert.equal(result.metadataStatus, 'not_found');
+  assert.equal(result.status, 'draft');
+  assert.equal(result.tmdbId || null, null);
+  assert.equal(result.title, 'LG 3D Demo 2012');
+  assert.ok(!requestedQueries.includes('demo'), `queries tried: ${JSON.stringify(requestedQueries)}`);
 });

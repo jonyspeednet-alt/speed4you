@@ -121,6 +121,19 @@ test('fallback results are only accepted on a title prefix plus year match', () 
   assert.equal(matchesTrimmedQuery({ title: 'Movie' }, 'Movie', itemYear), false);
 });
 
+test('single-word fallback windows must be distinctive enough to trust', () => {
+  // Real production false positives: "LG 3D Demo 2012" matched "Demo Dummies"
+  // (2012) and "Sada Gola 2025" matched an unrelated Bengali film. Both came
+  // from a four-letter single-word window, so those are no longer offered.
+  assert.ok(!buildTrimmedQueries('LG 3D Demo 2012').includes('Demo'));
+  assert.deepEqual(buildTrimmedQueries('Sada Gola 2025'), []);
+
+  // Longer single-word windows and multi-word windows stay available.
+  assert.ok(buildTrimmedQueries('Movie Link BD com siccin 2026 1080').includes('siccin'));
+  assert.ok(buildTrimmedQueries('LG 3D Demo 2012').includes('LG 3D'));
+  assert.ok(buildTrimmedQueries('Movie Link BD com Prahaar 2026 Hindi HDTC').includes('Prahaar'));
+});
+
 test('scanner title cleaning keeps Indic combining marks (matras/virama)', () => {
   // Item 35372 was stored as "మ జర" because \p{M} was treated as a special char.
   assert.equal(cleanTitle('మేజర్ (2022).mkv', 'movie'), 'మేజర్');
