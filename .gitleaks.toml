@@ -6,7 +6,7 @@ useDefault = true
 [[rules]]
 id = "speed4you-hardcoded-password"
 description = "Detects hardcoded passwords in quoted configuration values"
-regex = '''(?i)password\s*[:=]\s*['"]([^'"]{3,})['"]'''
+regex = '''(?i)password\s*[:=]\s*['"]([^$'"][^'"]{2,})['"]'''
 secretGroup = 1
 keywords = ["password"]
 tags = ["speed4you", "credential"]
