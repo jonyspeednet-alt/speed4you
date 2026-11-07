@@ -397,7 +397,8 @@ jobs:
             # Generate WEBHOOK_SECRET if not provided via GitHub secret
             if [ -z "${WEBHOOK_SECRET}" ]; then
               WEBHOOK_SECRET=$(openssl rand -hex 32)
-              echo "WEBHOOK_SECRET not set in GitHub secrets — generated random: $WEBHOOK_SECRET"
+              echo "::add-mask::$WEBHOOK_SECRET"
+              echo "WEBHOOK_SECRET not set in GitHub secrets — generated a new random value."
             fi
             cat > .env <<EOF
             PORT=4100

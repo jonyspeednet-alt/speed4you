@@ -662,16 +662,8 @@ $remoteEnvWrite = @"
 if [ -f '$($deployConfig.RemoteBackendPath)/.env' ]; then
   echo 'Keeping existing remote .env'
 else
-  cat > '$($deployConfig.RemoteBackendPath)/.env' <<'EOF'
-PORT=$($deployConfig.RemotePort)
-CORS_ALLOWED_ORIGINS=$($deployConfig.RemoteCorsAllowedOrigins)
-PLAYER_CACHE_ROOT=$($deployConfig.RemotePlayerCacheRoot)
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=isp_entertainment
-DB_USER=postgres
-DB_PASSWORD=postgres
-EOF
+  echo 'Remote .env is missing. Provide backend/.env.deploy; refusing insecure defaults.' >&2
+  exit 1
 fi
 
 if grep -Eq '^[[:space:]]*CORS_ALLOWED_ORIGINS=' '$($deployConfig.RemoteBackendPath)/.env'; then
@@ -718,13 +710,13 @@ if ! grep -Eq '^[[:space:]]*DB_NAME=' '$($deployConfig.RemoteBackendPath)/.env';
 fi
 
 if ! grep -Eq '^[[:space:]]*DB_USER=' '$($deployConfig.RemoteBackendPath)/.env'; then
-  printf 'DB_USER=postgres\n' >> '$($deployConfig.RemoteBackendPath)/.env'
-  echo 'Added missing DB_USER to remote .env'
+  echo 'DB_USER is missing in remote .env; refusing to deploy.' >&2
+  exit 1
 fi
 
 if ! grep -Eq '^[[:space:]]*DB_PASSWORD=' '$($deployConfig.RemoteBackendPath)/.env'; then
-  printf 'DB_PASSWORD=postgres\n' >> '$($deployConfig.RemoteBackendPath)/.env'
-  echo 'Added missing DB_PASSWORD to remote .env'
+  echo 'DB_PASSWORD is missing in remote .env; refusing to deploy.' >&2
+  exit 1
 fi
 "@
 if (Test-Path $localDeployEnvPath) {

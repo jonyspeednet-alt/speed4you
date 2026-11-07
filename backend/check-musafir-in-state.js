@@ -1,11 +1,12 @@
+require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
 const { Pool } = require('pg');
 
 const pool = new Pool({
-  host: 'localhost',
-  port: 5432,
-  database: 'isp_entertainment',
-  user: 'postgres',
-  password: 'postgres',
+  host: process.env.DB_HOST || 'localhost',
+  port: Number(process.env.DB_PORT) || 5432,
+  database: process.env.DB_NAME || 'isp_entertainment',
+  user: process.env.DB_USER || 'postgres',
+  password: process.env.DB_PASSWORD,
 });
 
 async function checkMusafirInState() {

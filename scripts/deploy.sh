@@ -114,22 +114,8 @@ if [ -n "$DEPLOY_ENV_FILE_CONTENT" ]; then
     echo "Writing .env file from provided ***REMOVED***."
     echo "$DEPLOY_ENV_FILE_CONTENT" > "$BACKEND_PATH/.env"
 else
-    echo "Writing default .env file."
-    cat > "$BACKEND_PATH/.env" <<EOF
-PORT=${REMOTE_PORT}
-CORS_ALLOWED_ORIGINS=${REMOTE_CORS_ALLOWED_ORIGINS}
-PLAYER_CACHE_ROOT=${REMOTE_PLAYER_CACHE_ROOT}
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=isp_entertainment
-DB_USER=postgres
-DB_PASSWORD=postgres
-FFMPEG_PATH=/usr/bin/ffmpeg
-FFPROBE_PATH=/usr/bin/ffprobe
-TV_PORTAL_BASE_URL=
-TV_ALLOWED_HOSTS=
-TV_ALLOWED_PORTS=80,8082
-EOF
+    echo "DEPLOY_ENV_FILE_CONTENT is required; refusing to create an insecure default .env." >&2
+    exit 1
 fi
 
 # 5. Restart backend service
