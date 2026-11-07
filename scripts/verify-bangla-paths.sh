@@ -3,8 +3,7 @@
 # Problem: scanner root points to /var/www/html/Extra_Storage/Bangla_Movies (doesn't exist)
 # Real path: /var/www/html/Bangla_Movies/
 
-PGPASSWORD=postgres
-export PGPASSWORD
+export PGPASSWORD="${DB_PASSWORD:?Set DB_PASSWORD before running}"
 PG="psql -h 127.0.0.1 -U postgres -d isp_entertainment"
 
 echo "=== STEP 1: Verify actual file structure ==="

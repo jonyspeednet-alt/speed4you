@@ -1,3 +1,4 @@
+require('./load-db-env');
 const { execSync } = require('child_process');
 const fs = require('fs');
 
@@ -12,7 +13,7 @@ for (const item of nas) {
   const shortTitle = item.name.split('(')[0].split(':')[0].split('1080p')[0].split('720p')[0].split('HDTC')[0].split('AMZN')[0].trim().replace(/['"'()]/g, "''").replace(/\s+/g, ' ');
   
   try {
-    const result = execSync(`PGPASSWORD=postgres psql -U postgres -h localhost -d isp_entertainment -t -A -c "SELECT id, title, payload->>'sourcePath' as sp FROM content_catalog WHERE title ILIKE '%${shortTitle.replace(/'/g, "''")}%' AND status='published' LIMIT 3;" 2>&1`, { timeout: 5000 }).toString().trim();
+    const result = execSync(`PGPASSWORD=$DB_PASSWORD psql -U postgres -h localhost -d isp_entertainment -t -A -c "SELECT id, title, payload->>'sourcePath' as sp FROM content_catalog WHERE title ILIKE '%${shortTitle.replace(/'/g, "''")}%' AND status='published' LIMIT 3;" 2>&1`, { timeout: 5000 }).toString().trim();
     
     if (result) {
       alreadyOnServer.push({ nas: item.name, db: result.split('|')[1] || 'unknown' });

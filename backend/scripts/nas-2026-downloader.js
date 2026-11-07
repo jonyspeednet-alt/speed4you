@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './load-db-env.js';
 import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
@@ -71,7 +72,7 @@ function main() {
   // First find DB IDs
   for (const item of downloads) {
     try {
-      const result = execSync(`PGPASSWORD=postgres psql -U postgres -h localhost -d isp_entertainment -t -A -c "SELECT id FROM content_catalog WHERE title ILIKE '%${item.searchTitle}%' AND status='published' AND (payload->>'sourcePath' IS NULL OR payload->>'sourcePath'='');" 2>&1`, { timeout: 10000 }).toString().trim();
+      const result = execSync(`PGPASSWORD=$DB_PASSWORD psql -U postgres -h localhost -d isp_entertainment -t -A -c "SELECT id FROM content_catalog WHERE title ILIKE '%${item.searchTitle}%' AND status='published' AND (payload->>'sourcePath' IS NULL OR payload->>'sourcePath'='');" 2>&1`, { timeout: 10000 }).toString().trim();
       if (result) {
         item.id = parseInt(result);
         log(`Found DB ID for "${item.title}": ${item.id}`);
@@ -116,7 +117,7 @@ function main() {
           const sqlFile = `/tmp/update-nas-${item.id}.sql`;
           fs.writeFileSync(sqlFile, `UPDATE content_catalog SET payload = jsonb_set(payload, '{sourcePath}', '"/${relPath}"::jsonb') WHERE id = ${item.id};`);
           try {
-            execSync(`PGPASSWORD=postgres psql -U postgres -h localhost -d isp_entertainment -f "${sqlFile}" 2>&1`, { timeout: 10000 });
+            execSync(`PGPASSWORD=$DB_PASSWORD psql -U postgres -h localhost -d isp_entertainment -f "${sqlFile}" 2>&1`, { timeout: 10000 });
             log(`  DB updated: id=${item.id}`);
           } catch (e) {
             log(`  DB update failed: ${e.message}`);

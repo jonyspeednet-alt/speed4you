@@ -1,7 +1,6 @@
 #!/bin/bash
 # Fix: Same scanSignature → delete duplicates, keep best (lowest id/published)
-PGPASSWORD=postgres
-export PGPASSWORD
+export PGPASSWORD="${DB_PASSWORD:?Set DB_PASSWORD before running}"
 PG="psql -h 127.0.0.1 -U postgres -d isp_entertainment"
 
 echo "=== STEP 1: Find all groups with duplicate scanSignatures ==="

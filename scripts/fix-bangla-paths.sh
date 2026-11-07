@@ -5,8 +5,7 @@
 # 3. Fix existing 4 records' videoUrl/sourcePath
 # 4. Trigger re-scan via API
 
-PGPASSWORD=postgres
-export PGPASSWORD
+export PGPASSWORD="${DB_PASSWORD:?Set DB_PASSWORD before running}"
 PG="psql -h 127.0.0.1 -U postgres -d isp_entertainment"
 
 echo "=== STEP 1: Verify actual HTTP access (with correct Host header) ==="

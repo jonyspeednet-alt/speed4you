@@ -1,8 +1,9 @@
+require('./load-db-env');
 const { execSync } = require('child_process');
 
 function query(sql) {
   require('fs').writeFileSync('/tmp/q.sql', sql);
-  return execSync('PGPASSWORD=postgres psql -U postgres -h localhost -d isp_entertainment -f /tmp/q.sql -t -A 2>&1', { encoding: 'utf8', timeout: 10000 }).trim();
+  return execSync('PGPASSWORD=$DB_PASSWORD psql -U postgres -h localhost -d isp_entertainment -f /tmp/q.sql -t -A 2>&1', { encoding: 'utf8', timeout: 10000 }).trim();
 }
 
 // Delete Do Deewane Seher Mein (29325) - file not available on CTGMovies

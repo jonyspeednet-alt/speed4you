@@ -22,7 +22,7 @@ ls /var/www/html/English_Movies/ | head -10 | cat -v | head -10
 
 echo ""
 echo "=== TEST: Does /media/ work for English Movies? ==="
-PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d isp_entertainment -t -c "
+PGPASSWORD="${DB_PASSWORD:?Set DB_PASSWORD before running}" psql -h 127.0.0.1 -U postgres -d isp_entertainment -t -c "
 SELECT payload->>'videoUrl' FROM content_catalog 
 WHERE source_root_id='english-movies' AND payload->>'videoUrl' IS NOT NULL 
 LIMIT 3
@@ -30,7 +30,7 @@ LIMIT 3
 
 echo ""
 echo "=== TEST a known English movie via /media/ on localhost ==="
-ENG_URL=$(PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d isp_entertainment -t -c "
+ENG_URL=$(PGPASSWORD="${DB_PASSWORD:?Set DB_PASSWORD before running}" psql -h 127.0.0.1 -U postgres -d isp_entertainment -t -c "
 SELECT payload->>'videoUrl' FROM content_catalog 
 WHERE source_root_id='english-movies' AND payload->>'videoUrl' IS NOT NULL 
 LIMIT 1

@@ -1,3 +1,4 @@
+require('./load-db-env');
 const { execSync } = require('child_process');
 const fs = require('fs');
 
@@ -14,7 +15,7 @@ for (const item of downloaded) {
   let currentPath = '';
   try {
     currentPath = execSync(
-      `PGPASSWORD=postgres psql -U postgres -h localhost -d isp_entertainment -t -A -c "SELECT payload->>'sourcePath' FROM content_catalog WHERE id = ${item.dbId};"`,
+      `PGPASSWORD=$DB_PASSWORD psql -U postgres -h localhost -d isp_entertainment -t -A -c "SELECT payload->>'sourcePath' FROM content_catalog WHERE id = ${item.dbId};"`,
       { encoding: 'utf8', timeout: 10000 }
     ).trim();
   } catch (e) {}
@@ -31,11 +32,11 @@ for (const item of downloaded) {
   try {
     // Write SQL to temp file on server
     execSync(`cat > ${tmpFile} << 'ENDSQL'\n${sql}\nENDSQL`, { encoding: 'utf8', timeout: 5000 });
-    execSync(`PGPASSWORD=postgres psql -U postgres -h localhost -d isp_entertainment -f ${tmpFile} -t -A 2>&1`, { encoding: 'utf8', timeout: 10000 });
+    execSync(`PGPASSWORD=$DB_PASSWORD psql -U postgres -h localhost -d isp_entertainment -f ${tmpFile} -t -A 2>&1`, { encoding: 'utf8', timeout: 10000 });
     
     // Verify
     const newPath = execSync(
-      `PGPASSWORD=postgres psql -U postgres -h localhost -d isp_entertainment -t -A -c "SELECT payload->>'sourcePath' FROM content_catalog WHERE id = ${item.dbId};"`,
+      `PGPASSWORD=$DB_PASSWORD psql -U postgres -h localhost -d isp_entertainment -t -A -c "SELECT payload->>'sourcePath' FROM content_catalog WHERE id = ${item.dbId};"`,
       { encoding: 'utf8', timeout: 10000 }
     ).trim();
     

@@ -4,7 +4,7 @@ import json, os, subprocess, sys, re
 from tempfile import NamedTemporaryFile
 
 env = os.environ.copy()
-env['PGPASSWORD'] = os.environ.get('DB_PASSWORD', 'postgres')
+env['PGPASSWORD'] = os.environ['DB_PASSWORD']
 def psql(query):
     with NamedTemporaryFile(mode='w', suffix='.sql', delete=False) as f:
         fname = f.name; f.write(query + '\n')

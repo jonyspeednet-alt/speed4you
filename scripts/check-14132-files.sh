@@ -1,6 +1,5 @@
 #!/bin/bash
-PGPASSWORD=postgres
-export PGPASSWORD
+export PGPASSWORD="${DB_PASSWORD:?Set DB_PASSWORD before running}"
 PG="psql -h 127.0.0.1 -U postgres -d isp_entertainment"
 
 echo "=== ALL EPISODES OF ITEM 14132 ==="

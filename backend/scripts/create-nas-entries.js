@@ -1,3 +1,4 @@
+require('./load-db-env');
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -14,7 +15,7 @@ console.log(`Files: ${files.length}`);
 // Get next available ID
 let nextId = 40000;
 try {
-  const result = execSync(`PGPASSWORD=postgres psql -U postgres -h localhost -d isp_entertainment -t -A -c "SELECT MAX(id) FROM content_catalog;" 2>&1`, { timeout: 5000 }).toString().trim();
+  const result = execSync(`PGPASSWORD=$DB_PASSWORD psql -U postgres -h localhost -d isp_entertainment -t -A -c "SELECT MAX(id) FROM content_catalog;" 2>&1`, { timeout: 5000 }).toString().trim();
   if (result) nextId = parseInt(result) + 1;
 } catch (e) {}
 console.log(`Starting IDs from: ${nextId}`);
@@ -27,7 +28,7 @@ for (const file of files) {
   
   // Check if this path already exists in DB
   try {
-    const check = execSync(`PGPASSWORD=postgres psql -U postgres -h localhost -d isp_entertainment -t -A -c "SELECT id FROM content_catalog WHERE payload->>'sourcePath' = '${relPath}' LIMIT 1;" 2>&1`, { timeout: 5000 }).toString().trim();
+    const check = execSync(`PGPASSWORD=$DB_PASSWORD psql -U postgres -h localhost -d isp_entertainment -t -A -c "SELECT id FROM content_catalog WHERE payload->>'sourcePath' = '${relPath}' LIMIT 1;" 2>&1`, { timeout: 5000 }).toString().trim();
     if (check) { skipped++; continue; }
   } catch (e) {}
   
@@ -41,7 +42,7 @@ for (const file of files) {
   fs.writeFileSync(sqlFile, sql);
   
   try {
-    execSync(`PGPASSWORD=postgres psql -U postgres -h localhost -d isp_entertainment -f "${sqlFile}" 2>&1`, { timeout: 5000 });
+    execSync(`PGPASSWORD=$DB_PASSWORD psql -U postgres -h localhost -d isp_entertainment -f "${sqlFile}" 2>&1`, { timeout: 5000 });
     console.log(`  ${nextId} | ${title}`);
     created++;
     nextId++;

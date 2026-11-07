@@ -11,7 +11,7 @@
  *   node backend/scripts/find-duplicates.js --keep=ID      # for interactive: keep specific ID, delete others
  */
 
-require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
+require('./load-db-env');
 const { Pool } = require('pg');
 const fs = require('fs');
 
@@ -20,7 +20,7 @@ const pool = new Pool({
   port: Number(process.env.DB_PORT) || 5432,
   database: process.env.DB_NAME || 'isp_entertainment',
   user: process.env.DB_USER || 'postgres',
-  ***REMOVED***: process.env.DB_PASSWORD || 'postgres',
+  password: process.env.DB_PASSWORD,
 });
 
 function normalizeTitleKey(value, year) {

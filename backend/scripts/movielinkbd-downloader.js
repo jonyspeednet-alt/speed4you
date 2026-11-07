@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require('./load-db-env');
 /**
  * MovieLinkBD Downloader
  * Uses Puppeteer to bypass Cloudflare and download movies from MovieLinkBD
@@ -387,7 +388,7 @@ async function main() {
             // Update DB sourcePath
             const relPath = path.relative(MEDIA_ROOT, result);
             try {
-              execSync(`PGPASSWORD=postgres psql -U postgres -h localhost -d isp_entertainment -c "UPDATE content_catalog SET payload = jsonb_set(payload, '{sourcePath}', '"'"'/${relPath}'"'"'::jsonb) WHERE id = ${item.id};" 2>&1`, { timeout: 10000 });
+              execSync(`PGPASSWORD=$DB_PASSWORD psql -U postgres -h localhost -d isp_entertainment -c "UPDATE content_catalog SET payload = jsonb_set(payload, '{sourcePath}', '"'"'/${relPath}'"'"'::jsonb) WHERE id = ${item.id};" 2>&1`, { timeout: 10000 });
               log(`Updated DB: ID ${item.id} → /${relPath}`);
             } catch (e) {
               log(`DB update failed: ${e.message}`);

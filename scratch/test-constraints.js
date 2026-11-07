@@ -1,3 +1,4 @@
+require('../backend/scripts/load-db-env');
 const { Client } = require('../backend/node_modules/pg');
 
 async function main() {
@@ -6,7 +7,7 @@ async function main() {
     port: parseInt(process.env.DB_PORT || '5432'),
     database: process.env.DB_NAME || 'isp_entertainment',
     user: process.env.DB_USER || 'postgres',
-    ***REMOVED***: process.env.DB_PASSWORD || 'postgres',
+    password: process.env.DB_PASSWORD,
   });
 
   await client.connect();

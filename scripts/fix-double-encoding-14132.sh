@@ -4,8 +4,7 @@
 # But the videoUrl stored in DB has them double-encoded as "Matka%2520King..."
 # We need to fix: %2520 → %20, %2528 → %28, %2529 → %29, etc.
 
-PGPASSWORD=postgres
-export PGPASSWORD
+export PGPASSWORD="${DB_PASSWORD:?Set DB_PASSWORD before running}"
 PG="psql -h 127.0.0.1 -U postgres -d isp_entertainment"
 
 echo "=== STEP 1: Show current videoUrl for item 14132 ==="

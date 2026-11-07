@@ -1,5 +1,5 @@
 #!/bin/bash
-PGPASSWORD=postgres psql -h localhost -U postgres -d isp_entertainment <<'EOF'
+PGPASSWORD="${DB_PASSWORD:?Set DB_PASSWORD before running}" psql -h localhost -U postgres -d isp_entertainment <<'EOF'
 DO $$
 DECLARE
     payload_json JSONB;

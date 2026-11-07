@@ -38,7 +38,7 @@ new_seasons = [{
 
 # Get current payload for Regai
 env = os.environ.copy()
-env['PGPASSWORD'] = os.environ.get('DB_PASSWORD', 'postgres')
+env['PGPASSWORD'] = os.environ['DB_PASSWORD']
 cmd = ['psql', '-h', 'localhost', '-U', 'postgres', '-d', 'isp_entertainment',
        '-t', '-A', '-c', "SELECT payload FROM content_catalog WHERE id=32690;"]
 r = subprocess.run(cmd, capture_output=True, text=True, env=env)

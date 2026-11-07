@@ -1,3 +1,4 @@
+require('./load-db-env');
 const { execSync } = require('child_process');
 const fs = require('fs');
 
@@ -7,7 +8,7 @@ const nas = JSON.parse(fs.readFileSync('/tmp/nas-2026-items.json', 'utf8'));
 // Get all content titles from DB
 let dbTitles = [];
 try {
-  const result = execSync(`PGPASSWORD=postgres psql -U postgres -h localhost -d isp_entertainment -t -A -c "SELECT title FROM content_catalog WHERE status='published';" 2>&1`, { timeout: 10000 }).toString();
+  const result = execSync(`PGPASSWORD=$DB_PASSWORD psql -U postgres -h localhost -d isp_entertainment -t -A -c "SELECT title FROM content_catalog WHERE status='published';" 2>&1`, { timeout: 10000 }).toString();
   dbTitles = result.trim().split('\n').map(t => t.trim().toLowerCase());
 } catch (e) {
   console.log('DB error:', e.message);

@@ -1,8 +1,7 @@
 #!/bin/bash
 echo "=== CHECK WHAT ROOTS SERVE FILES AND HOW ==="
 # List all scanner roots from DB
-PGPASSWORD=postgres
-export PGPASSWORD
+export PGPASSWORD="${DB_PASSWORD:?Set DB_PASSWORD before running}"
 PG="psql -h 127.0.0.1 -U postgres -d isp_entertainment"
 
 $PG -c "SELECT id, label, scan_path, public_base_url, type FROM scanner_roots ORDER BY id"

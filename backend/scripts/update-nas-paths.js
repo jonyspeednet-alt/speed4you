@@ -1,3 +1,4 @@
+require('./load-db-env');
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -14,7 +15,7 @@ console.log(`Files: ${files.length}`);
 // Get all published entries with no sourcePath
 let dbEntries = [];
 try {
-  const result = execSync(`PGPASSWORD=postgres psql -U postgres -h localhost -d isp_entertainment -t -A -c "SELECT id, title FROM content_catalog WHERE status='published' AND (payload->>'sourcePath' IS NULL OR payload->>'sourcePath' = '');" 2>&1`, { timeout: 10000 }).toString().trim();
+      const result = execSync(`PGPASSWORD=$DB_PASSWORD psql -U postgres -h localhost -d isp_entertainment -t -A -c "SELECT id, title FROM content_catalog WHERE status='published' AND (payload->>'sourcePath' IS NULL OR payload->>'sourcePath' = '');" 2>&1`, { timeout: 10000 }).toString().trim();
   dbEntries = result.split('\n').map(line => {
     const [id, ...titleParts] = line.split('|');
     return { id: parseInt(id), title: titleParts.join('|').trim() };
@@ -51,7 +52,7 @@ for (const file of files) {
     const sqlFile = `/tmp/upd-${bestMatch.id}.sql`;
     fs.writeFileSync(sqlFile, `UPDATE content_catalog SET payload = jsonb_set(payload, '{sourcePath}', '"${relPath}"'::jsonb) WHERE id = ${bestMatch.id};`);
     try {
-      execSync(`PGPASSWORD=postgres psql -U postgres -h localhost -d isp_entertainment -f "${sqlFile}" 2>&1`, { timeout: 5000 });
+      execSync(`PGPASSWORD=$DB_PASSWORD psql -U postgres -h localhost -d isp_entertainment -f "${sqlFile}" 2>&1`, { timeout: 5000 });
       console.log(`  ${bestMatch.id} | ${bestMatch.title} -> ${file} (${bestScore.toFixed(0)}%)`);
       matched++;
     } catch (e) { console.log(`  DB error for ${file}: ${e.message}`); }

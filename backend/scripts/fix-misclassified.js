@@ -1,11 +1,13 @@
 const { Pool } = require('pg');
 
+require('./load-db-env');
+
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
   port: Number(process.env.DB_PORT) || 5432,
   database: process.env.DB_NAME || 'isp_entertainment',
   user: process.env.DB_USER || 'postgres',
-  ***REMOVED***: process.env.DB_PASSWORD || 'postgres',
+  password: process.env.DB_PASSWORD,
 });
 
 async function fixMisclassifiedEntries(dryRun = true) {

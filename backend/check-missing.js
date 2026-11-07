@@ -1,9 +1,10 @@
+require('./scripts/load-db-env');
 const { execSync } = require('child_process');
 
 const sql = `SELECT id, title, payload->>'sourcePath' as sp FROM content_catalog WHERE status != 'deleted' AND payload->>'sourcePath' LIKE '%Requested%' ORDER BY id;`;
 const b64 = Buffer.from(sql).toString('base64');
 const result = execSync(
-  `echo '${b64}' | base64 -d | PGPASSWORD='postgres' psql -h localhost -U postgres -d isp_entertainment -t -A -F '|'`,
+  `echo '${b64}' | base64 -d | PGPASSWORD=$DB_PASSWORD psql -h localhost -U postgres -d isp_entertainment -t -A -F '|'`,
   { encoding: 'utf-8', timeout: 15000 }
 ).trim();
 

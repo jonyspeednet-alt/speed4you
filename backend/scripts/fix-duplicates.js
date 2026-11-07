@@ -11,7 +11,7 @@
  *   node backend/scripts/fix-duplicates.js --verbose    # Show all details
  */
 
-require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
+require('./load-db-env');
 const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
@@ -21,7 +21,7 @@ const pool = new Pool({
   port: Number(process.env.DB_PORT) || 5432,
   database: process.env.DB_NAME || 'isp_entertainment',
   user: process.env.DB_USER || 'postgres',
-  ***REMOVED***: process.env.DB_PASSWORD || 'postgres',
+  password: process.env.DB_PASSWORD,
 });
 
 const args = process.argv.slice(2);

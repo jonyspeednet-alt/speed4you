@@ -25,7 +25,7 @@ if os.path.isdir(tv_root):
 
 # Get all published series from DB
 env = os.environ.copy()
-env['PGPASSWORD'] = os.environ.get('DB_PASSWORD', 'postgres')
+env['PGPASSWORD'] = os.environ['DB_PASSWORD']
 cmd = ['psql', '-h', 'localhost', '-U', 'postgres', '-d', 'isp_entertainment',
        '-t', '-A', '-c', "SELECT id, LOWER(payload->>'title'), payload->>'title' as raw_title, payload->'seasons'->0->>'sourcePath' as path FROM content_catalog WHERE content_type='series' AND status='published' ORDER BY id;"]
 r = subprocess.run(cmd, capture_output=True, text=True, env=env)

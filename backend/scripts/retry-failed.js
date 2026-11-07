@@ -1,3 +1,4 @@
+require('./load-db-env');
 const https = require('https');
 const http = require('http');
 const fs = require('fs');
@@ -124,7 +125,7 @@ async function processItem(item) {
 
     // Update DB
     const sql = `UPDATE content_catalog SET payload = jsonb_set(payload, '{sourcePath}', to_jsonb('${destPath.replace('/var/www/html/', '/var/www/html/').replace(/'/g, "''")}'::text)), payload = jsonb_set(payload, '{fileSize}', '${result.size}'::jsonb) WHERE id = ${item.dbId};`;
-    execSync(`echo '${Buffer.from(sql).toString('base64')}' | base64 -d | PGPASSWORD=postgres psql -U postgres -h localhost -d isp_entertainment -t -A 2>&1`, { encoding: 'utf8', timeout: 10000 });
+    execSync(`echo '${Buffer.from(sql).toString('base64')}' | base64 -d | PGPASSWORD=$DB_PASSWORD psql -U postgres -h localhost -d isp_entertainment -t -A 2>&1`, { encoding: 'utf8', timeout: 10000 });
     log(`  DB updated`);
     return true;
   } catch (err) {

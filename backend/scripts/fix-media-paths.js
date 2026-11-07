@@ -16,7 +16,7 @@
  *   5. Nested season/episode sourcePath in JSONB
  */
 
-require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
+require('./load-db-env');
 const { Pool } = require('pg');
 
 const pool = new Pool({
@@ -24,7 +24,7 @@ const pool = new Pool({
   port: Number(process.env.DB_PORT) || 5432,
   database: process.env.DB_NAME || 'isp_entertainment',
   user: process.env.DB_USER || 'postgres',
-  ***REMOVED***: process.env.DB_PASSWORD || 'postgres',
+  password: process.env.DB_PASSWORD,
   max: 5,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,

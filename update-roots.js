@@ -1,6 +1,7 @@
 const { Client } = require('pg');
 const fs = require('fs');
 const path = require('path');
+require('./backend/scripts/load-db-env');
 
 const configPath = process.argv[2] || path.join(__dirname, 'new_roots.json');
 if (!fs.existsSync(configPath)) {
@@ -14,7 +15,7 @@ const client = new Client({
   port: Number(process.env.DB_PORT) || 5432,
   database: process.env.DB_NAME || 'isp_entertainment',
   user: process.env.DB_USER || 'postgres',
-  ***REMOVED***: process.env.DB_PASSWORD || 'postgres',
+  password: process.env.DB_PASSWORD,
 });
 client.connect().then(async () => {
   await client.query("UPDATE app_state SET value = $1::jsonb WHERE key = 'scanner_roots'", [JSON.stringify(roots)]);

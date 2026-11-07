@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require('./load-db-env');
 /**
  * NAS Downloader - Downloads missing movies from bokasoka.net NAS (198.20.20.20)
  * 
@@ -125,7 +126,7 @@ function updateDB(id, sourcePath) {
   fs.writeFileSync(sqlFile, `UPDATE content_catalog SET payload = jsonb_set(payload, '{sourcePath}', '"'${relPath}'" '::jsonb) WHERE id = ${id};`);
   
   try {
-    execSync(`PGPASSWORD=postgres psql -U postgres -h localhost -d isp_entertainment -f "${sqlFile}" 2>&1`, { timeout: 10000 });
+    execSync(`PGPASSWORD=$DB_PASSWORD psql -U postgres -h localhost -d isp_entertainment -f "${sqlFile}" 2>&1`, { timeout: 10000 });
     fs.unlinkSync(sqlFile);
     return true;
   } catch (e) {

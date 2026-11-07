@@ -13,8 +13,7 @@
 #   3. Reports what was done
 # ============================================================
 
-PGPASSWORD=postgres
-export PGPASSWORD
+export PGPASSWORD="${DB_PASSWORD:?Set DB_PASSWORD before running}"
 PG="psql -h 127.0.0.1 -U postgres -d isp_entertainment"
 
 echo "====== BEFORE FIX ======"

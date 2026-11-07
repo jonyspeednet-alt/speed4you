@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require('./load-db-env');
 /**
  * Update DB sourcePaths for MovieLinkBD downloaded files
  * Scans /var/www/html/Requested/Movies/ and /var/www/html/Requested/Series/
@@ -115,7 +116,7 @@ function updateDB(id, sourcePath) {
   const sql = `UPDATE content_catalog SET payload = jsonb_set(payload, '{sourcePath}', '"'"'/${relPath}'"'"'::jsonb) WHERE id = ${id};`;
   
   try {
-    execSync(`PGPASSWORD=postgres psql -U postgres -h localhost -d isp_entertainment -c "${sql}" 2>&1`, { timeout: 10000 });
+    execSync(`PGPASSWORD=$DB_PASSWORD psql -U postgres -h localhost -d isp_entertainment -c "${sql}" 2>&1`, { timeout: 10000 });
     return true;
   } catch (e) {
     log(`  DB error: ${e.message}`);
@@ -152,7 +153,7 @@ function main() {
   let alreadySet = 0;
   
   // Check which items already have sourcePath set
-  const dbResult = execSync(`PGPASSWORD=postgres psql -U postgres -h localhost -d isp_entertainment -t -A -c "SELECT id, payload->>'sourcePath' FROM content_catalog WHERE id IN (${[...MOVIE_MAPPINGS, ...SERIES_MAPPINGS].map(m => m.id).join(',')});" 2>&1`, { timeout: 10000 }).toString();
+  const dbResult = execSync(`PGPASSWORD=$DB_PASSWORD psql -U postgres -h localhost -d isp_entertainment -t -A -c "SELECT id, payload->>'sourcePath' FROM content_catalog WHERE id IN (${[...MOVIE_MAPPINGS, ...SERIES_MAPPINGS].map(m => m.id).join(',')});" 2>&1`, { timeout: 10000 }).toString();
   
   const existingPaths = {};
   for (const line of dbResult.trim().split('\n')) {

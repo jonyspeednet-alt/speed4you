@@ -10,3 +10,27 @@ regex = '''(?i)password\s*[:=]\s*['"]([^'"]{3,})['"]'''
 secretGroup = 1
 keywords = ["password"]
 tags = ["speed4you", "credential"]
+
+[[rules]]
+id = "speed4you-weak-postgres-password"
+description = "Detects insecure default PostgreSQL passwords"
+regex = '''(?i)(DB_PASSWORD|PGPASSWORD)\s*=\s*['"]?(postgres|password|changeme|default)['"]?'''
+secretGroup = 2
+keywords = ["DB_PASSWORD", "PGPASSWORD"]
+tags = ["speed4you", "database"]
+
+[[rules]]
+id = "speed4you-password-fallback"
+description = "Detects hardcoded password fallback values"
+regex = '''(?i)(password|DB_PASSWORD)\s*:\s*[^,\r\n]{0,100}\|\|\s*['"]([^'"]{3,})['"]'''
+secretGroup = 2
+keywords = ["password"]
+tags = ["speed4you", "database"]
+
+[[rules]]
+id = "speed4you-python-db-default"
+description = "Detects Python database password defaults"
+regex = '''(?i)os\.environ\.get\(\s*['"]DB_PASSWORD['"]\s*,\s*['"](postgres|password|changeme|default)['"]\s*\)'''
+secretGroup = 1
+keywords = ["DB_PASSWORD"]
+tags = ["speed4you", "database"]

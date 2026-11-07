@@ -1,13 +1,12 @@
 #!/usr/bin/env node
+require('./load-db-env');
 const { execSync } = require('child_process');
 const fs = require('fs');
-
-process.env.PGPASSWORD = 'postgres';
 
 function pgQuery(sql) {
   const tmpFile = '/tmp/pg_q_' + Date.now() + '.sql';
   fs.writeFileSync(tmpFile, sql);
-  const out = execSync(`PGPASSWORD=postgres psql -U postgres -h localhost -d isp_entertainment -f ${tmpFile} -t -A -F '|' 2>&1`, { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
+  const out = execSync(`PGPASSWORD=$DB_PASSWORD psql -U postgres -h localhost -d isp_entertainment -f ${tmpFile} -t -A -F '|' 2>&1`, { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
   fs.unlinkSync(tmpFile);
   return out.trim();
 }
@@ -15,7 +14,7 @@ function pgQuery(sql) {
 function pgExec(sql) {
   const tmpFile = '/tmp/pg_e_' + Date.now() + '.sql';
   fs.writeFileSync(tmpFile, sql);
-  execSync(`PGPASSWORD=postgres psql -U postgres -h localhost -d isp_entertainment -f ${tmpFile} 2>&1`, { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
+  execSync(`PGPASSWORD=$DB_PASSWORD psql -U postgres -h localhost -d isp_entertainment -f ${tmpFile} 2>&1`, { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
   fs.unlinkSync(tmpFile);
 }
 

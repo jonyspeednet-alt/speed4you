@@ -21,7 +21,7 @@ if _env_file:
 
 def psql(query):
     """Run a query via psql with environment variable. For large queries, use a temp file."""
-    env = os.environ.copy(); env['PGPASSWORD'] = os.environ.get('DB_PASSWORD','postgres')
+    env = os.environ.copy(); env['PGPASSWORD'] = os.environ['DB_PASSWORD']
     conn = ['psql', '-h', os.environ.get('DB_HOST','localhost'), '-p', os.environ.get('DB_PORT','5432'),
             '-U', os.environ.get('DB_USER','postgres'), '-d', os.environ.get('DB_NAME','isp_entertainment'),
             '-t', '-A']
