@@ -5,7 +5,7 @@ from tempfile import NamedTemporaryFile
 from urllib.parse import quote
 
 env = os.environ.copy()
-env['PGPASSWORD'] = os.environ.get('DB_PASSWORD', 'REDACTED_DB_PASSWORD')
+env['PGPASSWORD'] = os.environ['DB_PASSWORD']
 
 def psql(query):
     with NamedTemporaryFile(mode='w', suffix='.sql', delete=False) as f:

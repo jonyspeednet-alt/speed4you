@@ -1,1 +1,1 @@
-PGPASSWORD="${DB_PASSWORD:-postgres}" psql -h localhost -U postgres -d isp_entertainment -c "SELECT language, COUNT(*) FROM content_catalog GROUP BY language ORDER BY count DESC LIMIT 20;"
+PGPASSWORD="${DB_PASSWORD:?Set DB_PASSWORD before running}" psql -h localhost -U postgres -d isp_entertainment -c "SELECT language, COUNT(*) FROM content_catalog GROUP BY language ORDER BY count DESC LIMIT 20;"
