@@ -88,7 +88,7 @@ speed4you/
 - **Upgrades (2026-09-10)**: `transcode_jobs` DB table (history survives restart; interrupted jobs marked), library-wide incompatibility scan (`media-library-scan.js` + report in `app_state/media_last_scan`), post-scan auto-fix toggle (settings in `app_state/media_fixer_settings`, hook in scanner `runPostScanTasks`), retry failed jobs, per-job + bulk backup delete, advanced options (CRF 18-28, x264 preset, audio bitrate, default-track-only, drop subtitles)
 
 ## Webhook
-- **Secret**: `[REDACTED]`
+- **Secret**: Read from the server-only `.env` file; never store or print its value in source control.
 - **Endpoint**: `POST /portal-api/api/webhook/scan` (header `x-webhook-secret`)
 - 🔄 Webhook secret is auto-rotated by deploy workflow — re-check `.env` if it fails
 

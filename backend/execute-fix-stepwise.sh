@@ -146,7 +146,11 @@ echo ""
 echo "Step 7: Trigger Comprehensive Rescan"
 echo "-------------------------------------"
 
-WEBHOOK_SECRET=$(grep "WEBHOOK_SECRET" "$ENV_FILE" | cut -d '=' -f2 || echo "[REDACTED]")
+WEBHOOK_SECRET=$(awk -F= '$1 == "WEBHOOK_SECRET" { sub(/^[^=]*=/, ""); sub(/\r$/, ""); print; exit }' "$ENV_FILE")
+if [ -z "$WEBHOOK_SECRET" ]; then
+  echo "WEBHOOK_SECRET is missing from $ENV_FILE; refusing to trigger the scan." >&2
+  exit 1
+fi
 
 echo "Triggering rescan..."
 curl -X POST https://data.speed4you.net/portal-api/api/webhook/scan \

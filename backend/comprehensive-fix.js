@@ -2,6 +2,15 @@
 # Comprehensive Fix Script for Speed4You Scanner Issues
 # This script addresses all identified root causes and prevents future issues
 
+ENV_FILE="/home/speed4you/portal-app/backend/.env"
+if [ -z "${WEBHOOK_SECRET:-}" ] && [ -r "$ENV_FILE" ]; then
+  WEBHOOK_SECRET=$(awk -F= '$1 == "WEBHOOK_SECRET" { sub(/^[^=]*=/, ""); sub(/\r$/, ""); print; exit }' "$ENV_FILE")
+fi
+if [ -z "${WEBHOOK_SECRET:-}" ]; then
+  echo "WEBHOOK_SECRET is missing from $ENV_FILE; refusing to run." >&2
+  exit 1
+fi
+
 echo "=== Speed4You Scanner Comprehensive Fix ==="
 echo "Step 1: Fix Permission Structure"
 echo "--------------------------------"
@@ -76,7 +85,7 @@ echo "-------------------------------------"
 
 # Trigger webhook rescan
 curl -X POST https://data.speed4you.net/portal-api/api/webhook/scan \
-  -H "x-webhook-secret: [REDACTED]" \
+  -H "x-webhook-secret: ${WEBHOOK_SECRET}" \
   -H "Content-Type: application/json"
 
 echo "=== Fix Complete ==="

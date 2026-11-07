@@ -1,0 +1,12 @@
+title = "Speed4You secret scanning rules"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "speed4you-hardcoded-password"
+description = "Detects hardcoded passwords in quoted configuration values"
+regex = '''(?i)password\s*[:=]\s*['"]([^'"]{3,})['"]'''
+secretGroup = 1
+keywords = ["password"]
+tags = ["speed4you", "credential"]
