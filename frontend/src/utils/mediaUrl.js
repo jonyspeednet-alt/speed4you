@@ -7,5 +7,9 @@
 export function toPlayableSrc(videoUrl) {
   if (!videoUrl) return '';
   if (/^https?:\/\//i.test(videoUrl)) return videoUrl;
-  return videoUrl.startsWith('/') ? `/media${videoUrl}` : `/media/${videoUrl}`;
+  const path = videoUrl.startsWith('/') ? videoUrl : `/${videoUrl}`;
+  if (typeof window !== 'undefined' && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost')) {
+    return `https://speed4you.net/media${path}`;
+  }
+  return `/media${path}`;
 }
