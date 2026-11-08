@@ -110,6 +110,11 @@ export default defineConfig(({ mode }) => {
           rewrite: (path) => path.replace(/^\/portal-api/, ''),
           changeOrigin: true,
         },
+        '/media': {
+          target: env.VITE_MEDIA_TARGET || 'https://speed4you.net',
+          changeOrigin: true,
+          secure: false,
+        },
       },
     },
     preview: {

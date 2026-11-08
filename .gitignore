@@ -16,6 +16,7 @@ temp/
 tmp-list-roots.js
 *.sqlite
 *.db
+*.dump
 backend/src/data/scanner-roots.json
 backend/src/data/uploads/*
 coverage/
@@ -99,3 +100,21 @@ secrets-to-remove.txt
 secrets*.txt
 *password*.txt
 *secret*.txt
+
+# Local SSH/deployment credentials and host-specific SSH config
+/.ssh/
+/.ssh-*/
+/deploy_key*
+*.pem
+*.ppk
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+id_ecdsa
+id_ecdsa.*
+id_dsa
+id_dsa.*
+authorized_keys
+known_hosts
+ssh_config.local

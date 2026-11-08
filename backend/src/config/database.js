@@ -39,6 +39,13 @@ function createInMemoryPool() {
     implementation: () => 'pg-mem',
   });
 
+  mem.public.registerFunction({
+    name: 'ln',
+    args: ['float'],
+    returns: 'float',
+    implementation: (x) => Math.log(Number(x)),
+  });
+
   const adapter = mem.adapters.createPg();
   const pool = new adapter.Pool();
   pool.totalCount = 1;
