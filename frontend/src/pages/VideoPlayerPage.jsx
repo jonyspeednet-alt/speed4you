@@ -278,8 +278,9 @@ export default function VideoPlayerPage() {
   }, [src, retryKey]);
   const handleRetry = useCallback(() => {
     setError('');
-    setRetryKey(value => value + 1);
-  }, []);
+    if (src) setRetryKey(value => value + 1);
+    else loadData();
+  }, [src, loadData]);
 
   const handleBack = useCallback(() => {
     if (window.history.length > 1) navigate(-1);
