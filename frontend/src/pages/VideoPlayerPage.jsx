@@ -137,7 +137,7 @@ export default function VideoPlayerPage() {
   }, [type, id]);
 
   useEffect(() => {
-    if (!src || !playerContainerRef.current) return undefined;
+    if (error || !src || !playerContainerRef.current) return undefined;
 
     let art;
     let video;
@@ -215,7 +215,7 @@ export default function VideoPlayerPage() {
         if (art) art.destroy(false);
       };
     }
-  }, [src, retryKey, saveProgress, type, id, navigate]);
+  }, [src, retryKey, saveProgress, type, id, navigate, error]);
 
   useEffect(() => {
     document.documentElement.style.overflow = 'hidden';
