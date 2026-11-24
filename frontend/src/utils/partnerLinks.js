@@ -96,30 +96,36 @@ export function openPartnerUrl(event, httpsUrl) {
   const navigate = (win, url) => {
     if (win && !win.closed) {
       try {
-        win.location.href = url;
+        win.location.replace(url);
       } catch {
         win.location = url;
       }
-    } else {
-      window.open(url, '_blank', 'noopener,noreferrer');
     }
   };
 
   // Cached verdict -> open immediately, no blank-tab flash.
   if (cached === 'https' || cached === 'http') {
-    navigate(null, cached === 'https' ? httpsUrl : httpUrl);
+    window.open(cached === 'https' ? httpsUrl : httpUrl, '_blank', 'noopener,noreferrer');
     return;
   }
 
   // Open a placeholder synchronously to survive popup blockers, then
-  // steer it to the working protocol once the probe finishes.
-  const win = window.open('about:blank', '_blank', 'noopener,noreferrer');
+  // steer it to the working protocol once the probe finishes. Do not pass
+  // `noopener` to window.open here: browsers are allowed to return `null`
+  // when it is present even though they opened the tab. Detach the opener
+  // explicitly instead so we retain the Window reference needed to navigate
+  // that tab and never mistake it for a blocked popup.
+  const win = window.open('', '_blank');
   if (!win) {
-    // Popup blocked: fall back to same-tab navigation via probe.
-    resolvePartnerUrl(httpsUrl).then((url) => {
-      window.location.href = url;
-    });
+    // Keep Speed4You in place if the browser blocks popups. The user can
+    // allow popups and click again; never replace the current portal tab.
     return;
+  }
+
+  try {
+    win.opener = null;
+  } catch {
+    /* Some browsers expose opener as read-only; navigation still works. */
   }
 
   resolvePartnerUrl(httpsUrl).then((url) => navigate(win, url));
