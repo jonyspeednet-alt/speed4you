@@ -132,6 +132,18 @@ jobs:
             grep -oE 'index-[a-z0-9]+\.js' "$DEST/index.html" || echo "NOT FOUND"
 
       - name: Copy backend to app directory
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: jony
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          source: "backend/"
+          target: /home/jony/portal-backend-staging
+          strip_components: 1
+          rm: true
+
+      - name: Apply backend to app directory
         uses: appleboy/ssh-action@v1.2.0
         env:
           SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}
@@ -142,11 +154,11 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT }}
           envs: SUDO_PASSWORD
           script: |
-            SRC=/home/speed4you/actions-runner/_work/speed4you/speed4you/backend
+            SRC=/home/jony/portal-backend-staging
             DEST=/home/speed4you/portal-app/backend
             if [ -d "$SRC" ]; then
-              mkdir -p "$DEST"
-              cp -a "$SRC/." "$DEST/"
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p "$DEST"
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -a "$SRC/." "$DEST/"
               echo "Backend copied to $DEST"
               # Diagnostic: check admin routes file
               echo "=== Checking admin.js in SRC ==="
