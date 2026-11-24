@@ -103,7 +103,7 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ secrets.DEPLOY_PORT }}
           source: "frontend/dist/"
-          target: /home/speed4you/portal-frontend-staging
+          target: /home/jony/portal-frontend-staging
           strip_components: 2
           rm: true
 
@@ -118,7 +118,7 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT }}
           envs: SUDO_PASSWORD
           script: |
-            SRC=/home/speed4you/portal-frontend-staging
+            SRC=/home/jony/portal-frontend-staging
             DEST=/var/www/speed4you.net
             echo "=== Downloaded files ==="
             ls -la "$SRC/index.html" "$SRC/assets/" 2>/dev/null
@@ -188,7 +188,7 @@ jobs:
             echo "journal vacuumed + capped"
             # 2. Temp dirs + apt cache + stale deploy staging
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sh -c 'rm -rf /tmp/* /var/tmp/*; apt-get clean >/dev/null 2>&1 || true'
-            rm -rf /home/speed4you/portal-deploy-staging
+            rm -rf /home/jony/portal-deploy-staging
             echo "tmp cleaned"
             # 2b. Deep cleanup (idempotent): snap/flatpak are unused on this media
             # server (~6G combined) + prune dated deploy backups, keep newest 5.
