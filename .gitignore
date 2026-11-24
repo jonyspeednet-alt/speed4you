@@ -31,6 +31,7 @@ coverage/
 deploy_key
 deploy_key.pub
 DEPLOYMENT-SECRETS.md
+SSL_MEMORY.md
 .env
 .env.local
 .env.*.local
@@ -38,6 +39,8 @@ DEPLOYMENT-SECRETS.md
 # Backup and scratch files
 *.backup
 scratch.js
+database/
+*.sql.gz
 tmp-nginx-*.conf
 frontend/dist.zip
 
