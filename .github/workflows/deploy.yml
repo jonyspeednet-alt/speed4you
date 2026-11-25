@@ -376,6 +376,9 @@ jobs:
             run_as_service() {
               printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' -u speed4you "$@"
             }
+            in_backend() {
+              run_as_service sh -c 'cd "$1" || exit; shift; exec "$@"' sh "$BACKEND" "$@"
+            }
             patch_backend() {
               local patch_code
               patch_code=$(cat)
@@ -387,8 +390,7 @@ jobs:
               fi
             done
 
-            cd "$BACKEND"
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' -u speed4you npm ci --omit=dev
+            in_backend npm ci --omit=dev
 
             # Ensure all required origins are always in CORS
             CORS="${CORS_ALLOWED_ORIGINS}"
@@ -666,10 +668,10 @@ jobs:
 
             echo "=== Generating admin JWT and running cleanup + rematch (non-fatal) ==="
             set +e
-            JWT_SECRET_VAL=$(grep JWT_SECRET "$BACKEND/.env" 2>/dev/null | cut -d= -f2)
+            JWT_SECRET_VAL=$(run_as_service grep JWT_SECRET "$BACKEND/.env" 2>/dev/null | cut -d= -f2)
             if [ -n "$JWT_SECRET_VAL" ]; then
               export JWT_SIGN_SECRET="$JWT_SECRET_VAL"
-              TOKEN=$(cd "$BACKEND" && run_as_service node -e "
+              TOKEN=$(in_backend node -e "
                 const jwt = require('jsonwebtoken');
                 console.log(jwt.sign({id:1, username:'admin', role:'admin'}, process.env['JWT_SIGN_SECRET'], {expiresIn:'1h'}));
               " 2>/dev/null || echo "")
