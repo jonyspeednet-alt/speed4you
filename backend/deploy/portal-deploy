@@ -1,0 +1,47 @@
+#!/bin/bash
+set -euo pipefail
+umask 027
+export PATH=/opt/node-v22.23.5-linux-x64/bin:/usr/bin:/bin
+
+[[ $# == 1 && $(id -un) == portal-backend ]] || exit 64
+backend=/var/lib/portal-backend/backend
+backup=/var/lib/portal-backend/portal-deploy-backups/current
+cd "$backend"
+
+copy_state() {
+  local source=$1 destination=$2 file
+  mkdir -p "$destination"
+  for file in catalog.json scanner-log.json scanner-roots.json scanner-runtime.json scanner-state.json; do
+    if [[ -f "$source/$file" ]]; then
+      cp -a -- "$source/$file" "$destination/$file"
+    fi
+  done
+}
+
+case "$1" in
+  check) test -x /opt/node-v22.23.5-linux-x64/bin/node ;;
+  backup) copy_state "$backend/src/data" "$backup" ;;
+  restore) copy_state "$backup" "$backend/src/data" ;;
+  unpack) tar --extract --file=- --no-same-owner --no-same-permissions ;;
+  install)
+    npm ci --omit=dev
+    node -e 'require("sharp")'
+    mkdir -p /var/lib/portal-backend/{player-cache,scanner-cache}
+    ;;
+  environment)
+    env_file=$(mktemp "$backend/.env.deploy.XXXXXXXX")
+    trap 'rm -f -- "$env_file"' EXIT
+    cat > "$env_file"
+    mv -fT -- "$env_file" "$backend/.env"
+    ;;
+  patch) python3 - ;;
+  token)
+    node -e '
+      require("dotenv").config({ quiet: true });
+      const { getJwtSecret } = require("./src/config/auth");
+      const jwt = require("jsonwebtoken");
+      console.log(jwt.sign({ id: 1, username: "admin", role: "admin" }, getJwtSecret(), { expiresIn: "5m" }));
+    '
+    ;;
+  *) exit 64 ;;
+esac

@@ -1,0 +1,3 @@
+Cmnd_Alias PORTAL_APP_DEPLOY = /usr/local/libexec/portal-deploy check, /usr/local/libexec/portal-deploy backup, /usr/local/libexec/portal-deploy restore, /usr/local/libexec/portal-deploy unpack, /usr/local/libexec/portal-deploy install, /usr/local/libexec/portal-deploy environment, /usr/local/libexec/portal-deploy patch, /usr/local/libexec/portal-deploy token
+jony ALL=(portal-backend) NOPASSWD: PORTAL_APP_DEPLOY
+jony ALL=(root) NOPASSWD: /usr/bin/systemctl restart isp-portal.service
