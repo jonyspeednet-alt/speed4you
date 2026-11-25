@@ -8,7 +8,7 @@ jobs:
     runs-on: self-hosted
     steps:
       - name: Run cleanup on server
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
         env:
           SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}
         with:

@@ -13,10 +13,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 20
           cache: npm
@@ -33,7 +33,6 @@ jobs:
         working-directory: frontend
         env:
           VITE_APP_BASE: /
-          VITE_ADMIN_ACCESS_KEY: ${{ secrets.ADMIN_ACCESS_KEY }}
 
       - name: Record frontend bundle fingerprint
         id: frontend_bundle
@@ -58,7 +57,7 @@ jobs:
         working-directory: backend
 
       - name: Check server disk space
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
         env:
           SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}
         with:
@@ -76,7 +75,7 @@ jobs:
             ls -la /var/www/html/portal/ 2>/dev/null | head -5 || echo "(empty or missing)"
 
       - name: Backup production data files
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
         env:
           SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}
         with:
@@ -100,7 +99,7 @@ jobs:
             echo "Backup complete"
 
       - name: Deploy frontend via SCP
-        uses: appleboy/scp-action@v1
+        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: jony
@@ -112,7 +111,7 @@ jobs:
           rm: true
 
       - name: Apply frontend to web root
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
         env:
           SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}
         with:
@@ -137,7 +136,7 @@ jobs:
             grep -oE 'index-[a-z0-9]+\.js' "$DEST/index.html" || echo "NOT FOUND"
 
       - name: Copy backend to app directory
-        uses: appleboy/scp-action@v1
+        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: jony
@@ -149,7 +148,7 @@ jobs:
           rm: true
 
       - name: Apply backend to app directory
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
         env:
           SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}
         with:
@@ -189,7 +188,7 @@ jobs:
 
       - name: Rescue root disk (journal vacuum + offload root-resident media)
         if: ${{ false }}
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
         env:
           SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}
         with:
@@ -281,7 +280,7 @@ jobs:
 
       - name: Mount spare disks and audit root-resident media
         if: ${{ false }}
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
         env:
           SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}
         with:
@@ -338,7 +337,7 @@ jobs:
             fi
 
       - name: Install deps, write .env, restart, health check
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
@@ -714,7 +713,7 @@ jobs:
             set -e
 
       - name: Setup data portal on data.speed4you.net
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
         env:
           SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}
         with:
@@ -913,7 +912,7 @@ jobs:
             echo "=== data.speed4you.net setup complete ==="
 
       - name: Configure speed4you.net nginx HTTP/2 & gzip
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
         env:
           SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}
         with:
