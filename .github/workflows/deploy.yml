@@ -59,12 +59,17 @@ jobs:
 
       - name: Check server disk space
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: jony
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ secrets.DEPLOY_PORT }}
+          envs: SUDO_PASSWORD
           script: |
+            set -e
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -k -S -p '' -v
             echo "=== Disk space ==="
             df -h /var/www/html/ /home/speed4you/ / 2>/dev/null || df -h
             echo "=== Frontend destination ==="
@@ -118,6 +123,7 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT }}
           envs: SUDO_PASSWORD
           script: |
+            set -e
             SRC=/home/jony/portal-frontend-staging
             DEST=/var/www/speed4you.net
             echo "=== Downloaded files ==="
@@ -154,11 +160,12 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT }}
           envs: SUDO_PASSWORD
           script: |
+            set -e
             SRC=/home/jony/portal-backend-staging
             DEST=/home/speed4you/portal-app/backend
             if [ -d "$SRC" ]; then
               printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p "$DEST"
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' cp -a "$SRC/." "$DEST/"
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' rsync -a --chown=speed4you:speed4you "$SRC/" "$DEST/"
               echo "Backend copied to $DEST"
               # Diagnostic: check admin routes file
               echo "=== Checking admin.js in SRC ==="
@@ -182,6 +189,7 @@ jobs:
             fi
 
       - name: Rescue root disk (journal vacuum + offload root-resident media)
+        if: ${{ false }}
         uses: appleboy/ssh-action@v1.2.0
         env:
           SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}
@@ -273,6 +281,7 @@ jobs:
             mount | grep _root_offload || echo "(no bind mounts yet)"
 
       - name: Mount spare disks and audit root-resident media
+        if: ${{ false }}
         uses: appleboy/ssh-action@v1.2.0
         env:
           SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}
@@ -364,6 +373,14 @@ jobs:
             BACKUP_DIR=/home/speed4you/portal-deploy-backups/current
 
             # Restore production data files
+            run_as_service() {
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' -u speed4you "$@"
+            }
+            patch_backend() {
+              local patch_code
+              patch_code=$(cat)
+              run_as_service python3 -c "$patch_code"
+            }
             for f in catalog.json scanner-log.json scanner-roots.json scanner-runtime.json scanner-state.json; do
               if [ -f "$BACKUP_DIR/$f" ]; then
                 cp -a "$BACKUP_DIR/$f" "$BACKEND/src/data/$f" 2>/dev/null || true
@@ -371,7 +388,7 @@ jobs:
             done
 
             cd "$BACKEND"
-            npm ci --omit=dev
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' -u speed4you npm ci --omit=dev
 
             # Ensure all required origins are always in CORS
             CORS="${CORS_ALLOWED_ORIGINS}"
@@ -412,7 +429,9 @@ jobs:
               echo "::add-mask::$WEBHOOK_SECRET"
               echo "WEBHOOK_SECRET not set in GitHub secrets — generated a new random value."
             fi
-            cat > .env <<EOF
+            ENV_FILE=$(mktemp)
+            trap 'rm -f "$ENV_FILE"' EXIT
+            cat > "$ENV_FILE" <<EOF
             PORT=4100
             JWT_SECRET=${JWT_SECRET}
             TMDB_API_KEY=${TMDB_API_KEY}
@@ -446,9 +465,10 @@ jobs:
             ADMIN_ACCESS_KEY=${ADMIN_ACCESS_KEY}
             WEBHOOK_SECRET=${WEBHOOK_SECRET}
             EOF
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' install -m 600 -o speed4you -g speed4you "$ENV_FILE" "$BACKEND/.env"
 
             echo "Ensuring new metadata routes exist in admin.js..."
-            python3 << 'PYEOF'
+            patch_backend << 'PYEOF'
             import os, re
 
             BACKEND = '/home/speed4you/portal-app/backend'
@@ -548,7 +568,7 @@ jobs:
             PYEOF
 
             echo "Patching scanner.js - add season folder skip..."
-            python3 << 'PYEOF'
+            patch_backend << 'PYEOF'
             import os
             BACKEND = '/home/speed4you/portal-app/backend'
             sjs = os.path.join(BACKEND, 'src/services/scanner.js')
@@ -577,7 +597,7 @@ jobs:
             PYEOF
 
             echo "Patching metadata-enricher.js - add TV noise patterns..."
-            python3 << 'PYEOF'
+            patch_backend << 'PYEOF'
             import os
             BACKEND = '/home/speed4you/portal-app/backend'
             mej = os.path.join(BACKEND, 'src/services/metadata-enricher.js')
@@ -595,7 +615,7 @@ jobs:
             PYEOF
 
             echo "Patching index.js - add deploy field to health endpoint and health-deploy route..."
-            python3 << 'PYEOF'
+            patch_backend << 'PYEOF'
             import os
             BACKEND = '/home/speed4you/portal-app/backend'
             ind = os.path.join(BACKEND, 'src/index.js')
@@ -649,7 +669,7 @@ jobs:
             JWT_SECRET_VAL=$(grep JWT_SECRET "$BACKEND/.env" 2>/dev/null | cut -d= -f2)
             if [ -n "$JWT_SECRET_VAL" ]; then
               export JWT_SIGN_SECRET="$JWT_SECRET_VAL"
-              TOKEN=$(cd "$BACKEND" && node -e "
+              TOKEN=$(cd "$BACKEND" && run_as_service node -e "
                 const jwt = require('jsonwebtoken');
                 console.log(jwt.sign({id:1, username:'admin', role:'admin'}, process.env['JWT_SIGN_SECRET'], {expiresIn:'1h'}));
               " 2>/dev/null || echo "")
