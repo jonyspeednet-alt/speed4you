@@ -18,7 +18,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -69,6 +69,7 @@ jobs:
           script: |
             set -e
             printf '%s\n' "$SUDO_PASSWORD" | sudo -k -S -p '' -v
+            test -x /opt/node-v22.23.5-linux-x64/bin/node
             echo "=== Disk space ==="
             df -h /var/www/html/ /var/lib/portal-backend/ / 2>/dev/null || df -h
             echo "=== Frontend destination ==="
@@ -369,6 +370,8 @@ jobs:
             set -e
             BACKEND=/var/lib/portal-backend/backend
             BACKUP_DIR=/var/lib/portal-backend/portal-deploy-backups/current
+            NODE_BIN=/opt/node-v22.23.5-linux-x64/bin
+            test -x "$NODE_BIN/node"
 
             # Restore production data files
             run_as_service() {
@@ -390,7 +393,8 @@ jobs:
               done
             ' sh "$BACKEND" "$BACKUP_DIR"
 
-            in_backend npm ci --omit=dev
+            in_backend env "PATH=$NODE_BIN:$PATH" npm ci --omit=dev
+            in_backend "$NODE_BIN/node" -e 'require("sharp")'
 
             # Ensure all required origins are always in CORS
             CORS="${CORS_ALLOWED_ORIGINS}"
@@ -670,7 +674,7 @@ jobs:
             JWT_SECRET_VAL=$(run_as_service grep JWT_SECRET "$BACKEND/.env" 2>/dev/null | cut -d= -f2)
             if [ -n "$JWT_SECRET_VAL" ]; then
               export JWT_SIGN_SECRET="$JWT_SECRET_VAL"
-              TOKEN=$(in_backend node -e "
+              TOKEN=$(in_backend "$NODE_BIN/node" -e "
                 const jwt = require('jsonwebtoken');
                 console.log(jwt.sign({id:1, username:'admin', role:'admin'}, process.env['JWT_SIGN_SECRET'], {expiresIn:'1h'}));
               " 2>/dev/null || echo "")
