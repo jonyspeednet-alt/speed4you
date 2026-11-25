@@ -71,11 +71,9 @@ jobs:
             set -e
             printf '%s\n' "$SUDO_PASSWORD" | sudo -k -S -p '' -v
             echo "=== Disk space ==="
-            df -h /var/www/html/ /home/speed4you/ / 2>/dev/null || df -h
+            df -h /var/www/html/ /var/lib/portal-backend/ / 2>/dev/null || df -h
             echo "=== Frontend destination ==="
             ls -la /var/www/html/portal/ 2>/dev/null | head -5 || echo "(empty or missing)"
-            echo "=== Build output ==="
-            ls -la /home/speed4you/actions-runner/_work/speed4you/speed4you/frontend/dist/ 2>/dev/null | head -5 || echo "(empty or missing)"
 
       - name: Backup production data files
         uses: appleboy/ssh-action@v1.2.0
@@ -88,16 +86,17 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT }}
           envs: SUDO_PASSWORD
           script: |
-            BACKEND=/home/speed4you/portal-app/backend
-            BACKUP_DIR=/home/speed4you/portal-deploy-backups/current
-            mkdir -p "$BACKUP_DIR"
-            if [ -d "$BACKEND" ]; then
+            BACKEND=/var/lib/portal-backend/backend
+            BACKUP_DIR=/var/lib/portal-backend/portal-deploy-backups/current
+            set -e
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' -u portal-backend sh -ec '
+              mkdir -p "$2"
               for f in catalog.json scanner-log.json scanner-roots.json scanner-runtime.json scanner-state.json; do
-                if [ -f "$BACKEND/src/data/$f" ]; then
-                  cp -a "$BACKEND/src/data/$f" "$BACKUP_DIR/$f"
+                if [ -f "$1/src/data/$f" ]; then
+                  cp -a "$1/src/data/$f" "$2/$f"
                 fi
               done
-            fi
+            ' sh "$BACKEND" "$BACKUP_DIR"
             echo "Backup complete"
 
       - name: Deploy frontend via SCP
@@ -162,10 +161,10 @@ jobs:
           script: |
             set -e
             SRC=/home/jony/portal-backend-staging
-            DEST=/home/speed4you/portal-app/backend
+            DEST=/var/lib/portal-backend/backend
             if [ -d "$SRC" ]; then
               printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p "$DEST"
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' rsync -a --chown=speed4you:speed4you "$SRC/" "$DEST/"
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' rsync -a --chown=portal-backend:portal-backend "$SRC/" "$DEST/"
               echo "Backend copied to $DEST"
               # Diagnostic: check admin routes file
               echo "=== Checking admin.js in SRC ==="
@@ -213,8 +212,8 @@ jobs:
             # 2b. Deep cleanup (idempotent): snap/flatpak are unused on this media
             # server (~6G combined) + prune dated deploy backups, keep newest 5.
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' sh -c 'DEBIAN_FRONTEND=noninteractive apt-get remove --purge -y snapd flatpak >/dev/null 2>&1; rm -rf /var/lib/snapd /var/lib/flatpak /snap' || echo "snap/flatpak removal skipped"
-            if [ -d /home/speed4you/portal-deploy-backups ]; then
-              (cd /home/speed4you/portal-deploy-backups && ls -t | grep -v '^current$' | tail -n +6 | xargs -r rm -rf) || echo "backup prune skipped"
+            if [ -d /var/lib/portal-backend/portal-deploy-backups ]; then
+              (cd /var/lib/portal-backend/portal-deploy-backups && ls -t | grep -v '^current$' | tail -n +6 | xargs -r rm -rf) || echo "backup prune skipped"
               echo "old backups pruned"
             fi
             # 3. Offload root-resident media (F-M 18G, U-Z 35G, New_Movies_2 5.3G) to
@@ -369,12 +368,12 @@ jobs:
           envs: TMDB_API_KEY,OMDB_API_KEY,JWT_SECRET,SUDO_PASSWORD,CORS_ALLOWED_ORIGINS,PLAYER_CACHE_ROOT,DB_HOST,DB_PORT,DB_NAME,DB_USER,DB_PASSWORD,ADMIN_USERNAME,ADMIN_PASSWORD_HASH,PUBLIC_API_PER_IP_LIMIT,DB_POOL_MAX,PLAYER_MAX_CONCURRENT_LIVE_STREAMS,TV_PORTAL_BASE_URL,TV_ALLOWED_HOSTS,TV_ALLOWED_PORTS,ADMIN_ACCESS_KEY
           script: |
             set -e
-            BACKEND=/home/speed4you/portal-app/backend
-            BACKUP_DIR=/home/speed4you/portal-deploy-backups/current
+            BACKEND=/var/lib/portal-backend/backend
+            BACKUP_DIR=/var/lib/portal-backend/portal-deploy-backups/current
 
             # Restore production data files
             run_as_service() {
-              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' -u speed4you "$@"
+              printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' -u portal-backend "$@"
             }
             in_backend() {
               run_as_service sh -c 'cd "$1" || exit; shift; exec "$@"' sh "$BACKEND" "$@"
@@ -384,11 +383,13 @@ jobs:
               patch_code=$(cat)
               run_as_service python3 -c "$patch_code"
             }
-            for f in catalog.json scanner-log.json scanner-roots.json scanner-runtime.json scanner-state.json; do
-              if [ -f "$BACKUP_DIR/$f" ]; then
-                cp -a "$BACKUP_DIR/$f" "$BACKEND/src/data/$f" 2>/dev/null || true
-              fi
-            done
+            run_as_service sh -ec '
+              for f in catalog.json scanner-log.json scanner-roots.json scanner-runtime.json scanner-state.json; do
+                if [ -f "$2/$f" ]; then
+                  cp -a "$2/$f" "$1/src/data/$f"
+                fi
+              done
+            ' sh "$BACKEND" "$BACKUP_DIR"
 
             in_backend npm ci --omit=dev
 
@@ -421,10 +422,9 @@ jobs:
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p /var/www/html/Extra_Storage/nginx-tmp/proxy
             printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p /var/www/html/Extra_Storage/scanner-cache
             # Ensure player cache dir exists and is writable by speed4you user (backend runs as speed4you)
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' mkdir -p /var/www/html/Extra_Storage/portal-media-cache
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' chown speed4you:speed4you /var/www/html/Extra_Storage/portal-media-cache
+            run_as_service mkdir -p /var/lib/portal-backend/player-cache /var/lib/portal-backend/scanner-cache
 
-            SCANNER_CACHE_DIR=/var/www/html/Extra_Storage/scanner-cache
+            SCANNER_CACHE_DIR=/var/lib/portal-backend/scanner-cache
             # Generate WEBHOOK_SECRET if not provided via GitHub secret
             if [ -z "${WEBHOOK_SECRET}" ]; then
               WEBHOOK_SECRET=$(openssl rand -hex 32)
@@ -439,7 +439,7 @@ jobs:
             TMDB_API_KEY=${TMDB_API_KEY}
             OMDB_API_KEY=${OMDB_KEY}
             CORS_ALLOWED_ORIGINS=${CORS}
-            PLAYER_CACHE_ROOT=${PLAYER_CACHE_ROOT}
+            PLAYER_CACHE_ROOT=/var/lib/portal-backend/player-cache
             SCANNER_CACHE_DIR=${SCANNER_CACHE_DIR}
             MEDIA_NORMALIZER_TEMP_DIR=${MEDIA_NORMALIZER_TEMP_DIR}
             PUBLIC_API_PER_IP_LIMIT=${PUBLIC_API_PER_IP_LIMIT:-200}
@@ -467,13 +467,13 @@ jobs:
             ADMIN_ACCESS_KEY=${ADMIN_ACCESS_KEY}
             WEBHOOK_SECRET=${WEBHOOK_SECRET}
             EOF
-            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' install -m 600 -o speed4you -g speed4you "$ENV_FILE" "$BACKEND/.env"
+            printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' install -m 600 -o portal-backend -g portal-backend "$ENV_FILE" "$BACKEND/.env"
 
             echo "Ensuring new metadata routes exist in admin.js..."
             patch_backend << 'PYEOF'
             import os, re
 
-            BACKEND = '/home/speed4you/portal-app/backend'
+            BACKEND = '/var/lib/portal-backend/backend'
 
             print("=== Checking admin.js ===")
             ajs = os.path.join(BACKEND, 'src/routes/admin.js')
@@ -572,7 +572,7 @@ jobs:
             echo "Patching scanner.js - add season folder skip..."
             patch_backend << 'PYEOF'
             import os
-            BACKEND = '/home/speed4you/portal-app/backend'
+            BACKEND = '/var/lib/portal-backend/backend'
             sjs = os.path.join(BACKEND, 'src/services/scanner.js')
             with open(sjs) as f: content = f.read()
             if 'looksLikeSeasonFolder(' in content and 'if (looksLikeSeasonFolder(directory))' not in content:
@@ -601,7 +601,7 @@ jobs:
             echo "Patching metadata-enricher.js - add TV noise patterns..."
             patch_backend << 'PYEOF'
             import os
-            BACKEND = '/home/speed4you/portal-app/backend'
+            BACKEND = '/var/lib/portal-backend/backend'
             mej = os.path.join(BACKEND, 'src/services/metadata-enricher.js')
             with open(mej) as f: content = f.read()
             if 'TV Series' not in content:
@@ -619,7 +619,7 @@ jobs:
             echo "Patching index.js - add deploy field to health endpoint and health-deploy route..."
             patch_backend << 'PYEOF'
             import os
-            BACKEND = '/home/speed4you/portal-app/backend'
+            BACKEND = '/var/lib/portal-backend/backend'
             ind = os.path.join(BACKEND, 'src/index.js')
             with open(ind) as f: content = f.read()
             if "deploy: '" not in content:
@@ -644,8 +644,8 @@ jobs:
             PYEOF
 
             echo "Stopping old backend..."
-            if [ -f /home/speed4you/portal-app/backend.pid ]; then
-              OLD_PID=$(cat /home/speed4you/portal-app/backend.pid 2>/dev/null || true)
+            if [ -f /var/lib/portal-backend/backend.pid ]; then
+              OLD_PID=$(cat /var/lib/portal-backend/backend.pid 2>/dev/null || true)
               if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
                 kill "$OLD_PID" || true
                 sleep 2
